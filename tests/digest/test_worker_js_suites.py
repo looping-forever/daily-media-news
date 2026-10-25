@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tests/digest/test_worker_js_suites.py — five shipped JS suites, wired in.
+"""tests/digest/test_worker_js_suites.py — six shipped JS suites, wired in.
 
 WHAT WAS ACTUALLY BROKEN (measured at 4b31c6a, not assumed)
 -----------------------------------------------------------
@@ -26,6 +26,16 @@ dispatch quota — the Worker charges every dispatch it makes against a per-mont
 record and refuses once the month reaches the hard ceiling (2000 allowance - 200
 reserve = 1800; the 1400 design target is reported, never enforced). It is the
 runtime counterpart to the static `config/actions-budget.json` gate.
+
+A SIXTH SUITE JOINED THEM ON 2026-10-25: `worker_token_expiry.test.js`. The Worker
+now records `GitHub-Authentication-Token-Expiration` from the authenticated calls it
+was already making, reports it at `?health=1` as `token_expiry`, and warns once a
+calendar month when the token is 14 days or fewer from death. It also reports the
+repository slug it dispatches to, which is the field whose absence made the
+2026-10-25 cutover unprovable from health alone. The day arithmetic is the part
+worth executing: a millisecond delta truncates, so a token expiring tomorrow morning
+reads as "0 days" — the naive number is asserted IN the suite so it cannot pass by
+accident.
 
 THE CONVENTION IS THE ONE THIS REPOSITORY ALREADY USES. See
 tests/digest/test_duplicate_detector.py: a `node --test` JS suite reached from a
@@ -434,6 +444,60 @@ class BudgetQuotaWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
         "the visibility probe force-disables a FLAG-ON quota on a public repo",
         "a probe that cannot answer is NOT read as public: the flag still decides",
         "a CONFIRMED private answer keeps an armed quota armed",
+    )
+
+
+class TokenExpiryWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
+    """The GitHub token's own expiry, executed against the committed Worker.
+
+    GitHub returns `GitHub-Authentication-Token-Expiration` on any authenticated
+    response made with an expiring fine-grained PAT, and omits it for a token that
+    never expires. The Worker already makes those calls, so the value arrives free;
+    everything AFTER that is judgement, and each judgement is a way to be wrong:
+
+      * the day arithmetic must compare UTC DATES. A millisecond delta truncates, so
+        a token expiring at 09:33 tomorrow read at 23:00 tonight floors to 0 and the
+        warning says "expires today" when the truth is tomorrow;
+      * `unknown` must never be spelled 0, because 0 means "expiring now";
+      * an unknown value must consume NO dedupe key, or the one real warning is
+        silenced by a month in which nothing was observed;
+      * the alert must fire once a calendar month, not once a tick.
+
+    It also pins the `repo` field, so the dispatch target is provable from health
+    alone -- the exact gap that made the 2026-10-25 cutover unverifiable.
+    """
+
+    JS = Path(_TESTS) / "digest" / "worker_token_expiry.test.js"
+    # FIRST PIN, 2026-10-25: 11. The suite ships with eleven tests, one per behaviour
+    # listed in REQUIRED_BEHAVIOURS. There is no earlier value to raise: the suite is
+    # new, and the number is recorded here rather than copied back from a green run.
+    TAP_PLAN = 11
+    WORKER_OVERRIDE = "TOKEN_EXPIRY_WORKER"
+    WHAT_IT_GUARDS = (
+        "the token-expiry warning: UTC-date day arithmetic across the midnight "
+        "boundary, `unknown` as a literal state with null figures and never 0 or "
+        "NaN, an observation that survives an odd response, one alert per calendar "
+        "month at or under 14 days, no alert above it, no dedupe key burned by an "
+        "unknown value, and the repo slug that makes the dispatch target provable "
+        "from ?health=1.")
+    WHAT_NODE_MISSING = (
+        "the expiry warning is the only thing that tells the owner the PAT is about "
+        "to die before every dispatch starts returning 403, and the day arithmetic "
+        "is the part no static check can see; a skipped suite is a green run proving "
+        "nothing about either.")
+
+    REQUIRED_BEHAVIOURS = (
+        "days remaining compares UTC DATES: expiring tomorrow morning is 1, not 0",
+        "days remaining is exact and signed, and never NaN",
+        "an unparseable or nonexistent expiry is null, never NaN",
+        "with nothing observed, health says unknown with null figures",
+        "a real header is cached RAW, and health then reports days remaining",
+        "an absent or unparseable header leaves a known record untouched",
+        "the alert fires exactly once at the threshold; a second tick does not re-fire",
+        "no alert above the threshold, and no marker is burned",
+        "an unobserved token consumes NO dedupe key, so a later real value still alerts",
+        "?health=1 carries the repo slug and the token_expiry block",
+        "every GitHub repo URL in the Worker carries the slug health reports",
     )
 
 

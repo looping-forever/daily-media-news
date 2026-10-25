@@ -355,6 +355,14 @@ const MIN_INFO_WORDS = 4;
 const SPORT_GOSSIP_RE = /\b(match|score|goal|celebrity|box office)\b/gi;
 const SPORT_GOSSIP_SUPPRESS_HITS = 2;
 
+// THE REPOSITORY EVERY DISPATCH, PROBE AND CONTENTS READ IN THIS FILE TARGETS.
+// The URL literals below stay literal because operators and tests read them, so
+// this constant is not the source of the URLs -- it is the one place `?health=1`
+// can STATE the identity. tests/digest/worker_token_expiry.test.js fails if any
+// repo URL stops containing this slug, which is what stops the two drifting, and
+// that is why the cutover is now provable from health alone.
+const GITHUB_REPO_SLUG = "looping-forever/daily-media-news";
+
 const DISPATCH_URL =
   "https://api.github.com/repos/looping-forever/daily-media-news/dispatches";
 
@@ -1567,6 +1575,12 @@ async function dispatchTelemetry(env, key) {
 async function healthForEndpoint(env) {
   const out = {
     build: workerBuild(env),
+    // WHICH REPOSITORY THIS DEPLOYMENT ACTUALLY TALKS TO. Stated here because the
+    // 2026-10-25 cutover could not be proved from health at all: every dispatch
+    // field says an attempt happened, none said where it went. It is a constant,
+    // not a probe -- health stays network-free -- and the drift guard in
+    // tests/digest/worker_token_expiry.test.js binds it to the URL literals.
+    repo: GITHUB_REPO_SLUG,
     // THE DEPLOYED TRIGGERS, AND ONLY THOSE. This used to be the in-source
     // CRON_* constants, which meant it reported SEVEN crons while the Cloudflare
     // API had registered five — and that is precisely why the failed `40 1` /
@@ -1630,6 +1644,10 @@ async function healthForEndpoint(env) {
   // The runtime quota, so the owner can see the freeze state and the month's
   // charge even when Actions is unavailable. Reads the CACHED freeze flag only.
   out.budget = await budgetHealthFields(env, Date.now());
+  // The token's own expiry. Reads the CACHED observation only, so ?health=1 never
+  // makes a GitHub call and never goes dark when the API is down. `state` is
+  // `unknown` when nothing has been observed inside the 6h TTL.
+  out.token_expiry = await tokenExpiryHealthFields(env, Date.now());
   return out;
 }
 
@@ -1672,6 +1690,9 @@ async function dispatchAlert(env, candidate, totalTripped) {
         },
       }),
     });
+    // The token's own expiry rides on every authenticated response, so this
+    // dispatch is also the observation. No extra call is made for it.
+    await noteTokenExpiry(env, res);
     httpStatus = res.status;
     ok = res.ok;
   } catch (e) {
@@ -1843,6 +1864,10 @@ async function githubWorkflowDispatch(env, url, inputs, label) {
       cause: DISPATCH_CAUSE_TRANSPORT_ERROR, summary: summary,
     };
   }
+  // Same observation as the breaking dispatch: this authenticated response
+  // carries the token's expiry, so the digest ladder and the prebuild refresh it
+  // for free. It runs before the status branches, so a 401/403 is observed too.
+  await noteTokenExpiry(env, res);
   if (res.status === 401 || res.status === 403) {
     console.error(
       label + " REJECTED (HTTP " +
@@ -5320,6 +5345,7 @@ async function fetchRetryFileJson(env) {
   } catch (err) {
     return null;
   }
+  await noteTokenExpiry(env, res);
   if (!res.ok) return null;
   try {
     return JSON.parse(await res.text());
@@ -5531,6 +5557,9 @@ async function fetchBudgetFreezeLabel(env) {
         "User-Agent": "daily-media-news-breaking-worker",
       },
     });
+    // Observed on the freeze probe too: it is authenticated and it runs before
+    // every charged dispatch, so the expiry record stays fresh on a busy tick.
+    await noteTokenExpiry(env, res);
     if (!res.ok) return false;
     const arr = await res.json();
     return Array.isArray(arr) && arr.length > 0;
@@ -5557,6 +5586,7 @@ async function fetchRepoIsPublic(env) {
         "User-Agent": "daily-media-news-breaking-worker",
       },
     });
+    await noteTokenExpiry(env, res);
     if (!res.ok) return null;
     const body = await res.json();
     if (!body || typeof body.private !== "boolean") return null;
@@ -5662,6 +5692,186 @@ async function alertBudgetRefusedOnce(env, ms, job, decision, monthMinutes) {
       await env.KV.put(key, isoUtc(ms), { expirationTtl: BUDGET_MONTH_TTL_S });
     } catch (err) {
       // At worst one more alert next tick.
+    }
+  }
+  return !!(res && res.ok);
+}
+
+// WHEN DOES THE GITHUB TOKEN DIE? GitHub returns
+// `GitHub-Authentication-Token-Expiration` on an authenticated response made with
+// an EXPIRING token (fine-grained PATs) and omits it for a token that never
+// expires. NOTHING NEW IS CALLED FOR THIS: every authenticated fetch this Worker
+// already makes passes its response through noteTokenExpiry, so the answer arrives
+// as a side effect of work that was happening anyway.
+//
+// THE CACHE. One KV record, `token:expiry`, holding the RAW header and when it was
+// seen, with a 6-HOUR TTL. Worst-case staleness of `?health=1` is therefore 6
+// hours: after that the record is gone and health reports `unknown` rather than
+// repeating a figure from an older probe. The value itself changes only when the
+// token is replaced, so a longer TTL would be safe -- and would also let the field
+// sit stale for a week. 6h is the compromise, stated rather than implied.
+const TOKEN_EXPIRY_HEADER = "GitHub-Authentication-Token-Expiration";
+const TOKEN_EXPIRY_CACHE_KEY = "token:expiry";
+const TOKEN_EXPIRY_CACHE_TTL_S = 6 * 60 * 60;
+// One alert per calendar month, burned only on a SUCCESSFUL send -- the same rule
+// alertBudgetRefusedOnce follows, for the same reason: a failed alert is retried,
+// not lost.
+const TOKEN_EXPIRY_ALERT_KEY_PREFIX = "token:expiry-alert:";  // + YYYY-MM
+const TOKEN_EXPIRY_ALERT_DAYS = 14;
+const TOKEN_EXPIRY_UNKNOWN = "unknown";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// Parse the header into the UTC midnight of its expiry DATE, or null. Accepts the
+// shape GitHub actually sends (`2026-11-24 09:33:12 UTC`) and an ISO 8601 variant,
+// because the exact shape is GitHub's to change and a parser that knows only one
+// of them would turn a token warning into a health-endpoint failure.
+function parseTokenExpiry(value) {
+  const raw = String(value == null ? "" : value).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const ms = Date.UTC(y, mo - 1, d);
+  const back = new Date(ms);
+  // Date.UTC rolls a nonexistent 2026-02-31 forward into March, so a round-trip is
+  // the check that the date existed at all.
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 ||
+      back.getUTCDate() !== d) {
+    return null;
+  }
+  return { raw: raw, dayMs: ms };
+}
+
+function utcDayStartMs(ms) {
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+// WHOLE DAYS BETWEEN THE UTC DATES, which is the only comparison that answers the
+// question a human asks. A millisecond delta divided by a day TRUNCATES: a token
+// expiring at 09:33 tomorrow, read at 23:00 tonight, is 10.5 hours away and floors
+// to 0 ("expires today") when the truthful answer is 1.
+function daysUntilExpiry(value, nowMs) {
+  const parsed = parseTokenExpiry(value);
+  if (!parsed) return null;
+  const now = nowMs === undefined ? Date.now() : Number(nowMs);
+  if (!isFinite(now)) return null;
+  return Math.round((parsed.dayMs - utcDayStartMs(now)) / MS_PER_DAY);
+}
+
+// Record the header from a response this Worker already holds. NEVER throws, and
+// never overwrites a good record with a worse one:
+//   * header ABSENT     -> write nothing. A non-expiring token sends no header, and
+//                          an error response may omit it; neither disproves the
+//                          expiry already observed.
+//   * UNPARSEABLE value -> write nothing, so health reports `unknown` from the
+//                          absence of a record instead of NaN from a bad one.
+async function noteTokenExpiry(env, res) {
+  try {
+    if (!res || !res.headers || typeof res.headers.get !== "function") return;
+    const raw = res.headers.get(TOKEN_EXPIRY_HEADER);
+    if (!raw) return;
+    const parsed = parseTokenExpiry(raw);
+    if (!parsed) return;
+    if (!env || !env.KV) return;
+    await env.KV.put(
+      TOKEN_EXPIRY_CACHE_KEY,
+      JSON.stringify({
+        expires_at: parsed.raw,
+        observed_at: new Date().toISOString(),
+      }),
+      { expirationTtl: TOKEN_EXPIRY_CACHE_TTL_S }
+    );
+  } catch (err) {
+    // An observation that cannot be stored is not a failed tick.
+    console.log("token expiry observation skipped:", String(err));
+  }
+}
+
+async function readTokenExpiry(env) {
+  if (!env || !env.KV) return null;
+  try {
+    const raw = await env.KV.get(TOKEN_EXPIRY_CACHE_KEY);
+    if (!raw) return null;
+    const rec = JSON.parse(String(raw));
+    if (!rec || typeof rec.expires_at !== "string" || !rec.expires_at) return null;
+    return rec;
+  } catch (err) {
+    return null;
+  }
+}
+
+// The `?health=1` fields. `state` is a literal string and `days_remaining` is
+// null -- never NaN, never a guess -- whenever the answer is not known.
+async function tokenExpiryHealthFields(env, nowMs) {
+  const out = {
+    state: TOKEN_EXPIRY_UNKNOWN,
+    expires_at: null,
+    days_remaining: null,
+    observed_age_s: null,
+  };
+  const rec = await readTokenExpiry(env);
+  if (!rec) return out;
+  const days = daysUntilExpiry(rec.expires_at, nowMs);
+  if (days === null) return out;
+  const seen = Date.parse(rec.observed_at || "");
+  out.state = "known";
+  out.expires_at = rec.expires_at;
+  out.days_remaining = days;
+  out.observed_age_s = isNaN(seen)
+    ? null : Math.max(0, Math.floor((Number(nowMs) - seen) / 1000));
+  return out;
+}
+
+// Tell the owner ONCE per calendar month that the token is nearly dead. Reuses the
+// ntfy arm the owner already reads; there is no second notifier.
+//
+// UNKNOWN CONSUMES NOTHING. If no probe has been observed yet the answer is
+// `unknown`, and burning this month's key on it would silence the one alert that
+// matters when the record finally arrives -- so the key is only read and written
+// on a KNOWN answer at or under the threshold.
+async function alertTokenExpiryOnce(env, nowMs) {
+  const rec = await readTokenExpiry(env);
+  if (!rec) return false;
+  const days = daysUntilExpiry(rec.expires_at, nowMs);
+  if (days === null) return false;
+  if (days > TOKEN_EXPIRY_ALERT_DAYS) return false;
+  if (!env || !env.KV) return false;
+  const month = isoUtc(nowMs).slice(0, 7);
+  const key = TOKEN_EXPIRY_ALERT_KEY_PREFIX + month;
+  try {
+    if (await env.KV.get(key)) return false;
+  } catch (err) {
+    // An unreadable marker sends at most one extra alert, never a wrong one.
+  }
+  const when = days === 0
+    ? "TODAY"
+    : (days > 0 ? "in " + days + " day(s)" : Math.abs(days) + " day(s) AGO");
+  const message =
+    "The GitHub token this Worker dispatches with expires " + when + ". " +
+    "Expiry: " + rec.expires_at + ". " +
+    (days < 0
+      ? "IT HAS ALREADY EXPIRED, so every dispatch is failing right now. "
+      : "") +
+    "Replace the fine-grained PAT, then re-run scripts/set-actions-secret.ps1 " +
+    "and scripts/set-worker-secret.ps1. " +
+    "This is the only warning you get this month.";
+  const res = await publishToNtfy(env, {
+    topic: ntfyTopicOf(env),
+    title: days < 0
+      ? "GH_TOKEN has EXPIRED"
+      : "GH_TOKEN expires in " + days + " day(s)",
+    message: message,
+    priority: days <= 3 ? 5 : 4,
+    tags: days <= 3 ? ["rotating_light"] : ["warning"],
+  }, "dmn-token-expiry-" + month, "token expiry warning");
+  if (res && res.ok) {
+    try {
+      await env.KV.put(key, isoUtc(nowMs), { expirationTtl: BUDGET_MONTH_TTL_S });
+    } catch (err) {
+      // At worst one more alert this month.
     }
   }
   return !!(res && res.ok);
@@ -5838,6 +6048,16 @@ export default {
     // consequence. This is the 456-ticks-a-day path and it is the reason the
     // KV budget did not move when five crons became one.
     if (!jobs.length) return;
+    // THE TOKEN EXPIRY WARNING, on the ticks that are doing work anyway. It reads
+    // one cached KV record (no network) and is wrapped so a failure here can never
+    // cost the tick its real jobs. Placed AFTER the empty-tick return on purpose:
+    // the 456 quiet ticks a day stay free, and 480+ busy ticks are ample to deliver
+    // a monthly reminder.
+    try {
+      await alertTokenExpiryOnce(env, ms);
+    } catch (err) {
+      console.error("token expiry check failed:", String(err));
+    }
     await scheduledJobs(jobs, env, ctx, CRON_DISPATCHER, ms);
   },
 
