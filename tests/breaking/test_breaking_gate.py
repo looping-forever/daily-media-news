@@ -62,7 +62,7 @@ FIXTURE = os.path.join(REPO_ROOT, "tests", "breaking", "fixtures",
 EMERGENCY_RE_FROZEN_PATTERN = (
     r"\b(?:war|invasion|nuclear (?:test|accident|plant)|earthquake"
     r"|magnitude 6\.[5-9]|magnitude [7-9]|flood warning|landslide warning"
-    r"|national emergency|Araniko (?:highway )?(?:closed|blocked)"
+    r"|national emergency|Example Highway (?:closed|blocked)"
     r"|Example Bank (?:fraud|security|cyber)|bank of nepal.*cyber"
     r"|major outage)\b"
 )
@@ -355,7 +355,7 @@ class EmergencyReFrozenTest(unittest.TestCase):
 
     def test_emergency_re_uses_non_capturing_groups(self):
         """findall() must return WHOLE matches; a capturing group would make
-        `hits` a list of bare fragments ('closed' instead of 'Araniko highway
+        `hits` a list of bare fragments ('closed' instead of 'Example Highway
         closed') and quietly corrupt the audit trail the log row depends on."""
         self.assertEqual(
             re.compile(EMERGENCY_RE_FROZEN_PATTERN, re.IGNORECASE).groups, 0,

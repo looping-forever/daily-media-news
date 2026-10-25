@@ -552,8 +552,8 @@ PRE_GATE_TABLE = [
     # (text, expect_trip)
     ("Magnitude 6.7 earthquake hits Example District district", True),
     ("Flood warning issued for low-lying Example City wards", True),
-    ("Araniko highway blocked after night rains", True),
-    ("Araniko closed near Nala", True),
+    ("Example Highway blocked after night rains", True),
+    ("Example Highway closed near Example District", True),
     ("Example Bank cyber incident affects customers", True),
     ("Example Bank fraud case registered", True),
     ("Bank of Nepal systems hit by cyber attack", True),

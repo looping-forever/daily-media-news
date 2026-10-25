@@ -82,10 +82,14 @@ REPO_ROOT = os.path.dirname(SCRIPTS_DIR)
 #: Generated from the private map; regenerate it there, never from this file.
 VOCABULARY_SHA256 = (
     "1b29226934e647c506c97b905f5a02a85a51bf786a0c72cd601765e0e3d2ff2d",
+    "54e4a5e4bab5a4de087e7905bbc2e60331e9ca548c175b2c2be69fa280eea988",
     "6e1e44f7cd17203b7dfaa85a28abcd5b0dfe6064b243fb26cb5ef622bd4cf269",
     "803b1d947f50a926d8edb46134b5c3c52fbb49e48653ef78688bab756861f573",
     "93df9019bbeede01bd7ef25531cdf9359f3e319ead10c2e77e14ebe246077f25",
+    "bede073e92ac1ed30b52a0d0df01d6184146c620f3cd02acfd9173ed746199b5",
     "c16e389716b8165ba07f187308879df366d2b93e6aa7e9b15c9c0f443ec94df9",
+    "e96c7b1ef7bb485e2f97da16fbd3861af4efe81ae981d05cead3f82577d64e6a",
+    "f7ca0b531e7d38079e6d1f798e18e0d9b6ec584ede342702b6dbc56106dc3d28",
 )
 
 VOCABULARY_SET = frozenset(VOCABULARY_SHA256)

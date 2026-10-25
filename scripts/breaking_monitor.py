@@ -232,7 +232,7 @@ AI_MAX_MODELS = 4
 EMERGENCY_RE = re.compile(
     r"\b(?:war|invasion|nuclear (?:test|accident|plant)|earthquake"
     r"|magnitude 6\.[5-9]|magnitude [7-9]|flood warning|landslide warning"
-    r"|national emergency|Araniko (?:highway )?(?:closed|blocked)"
+    r"|national emergency|Example Highway (?:closed|blocked)"
     r"|Example Bank (?:fraud|security|cyber)|bank of nepal.*cyber"
     r"|major outage)\b",
     re.IGNORECASE,

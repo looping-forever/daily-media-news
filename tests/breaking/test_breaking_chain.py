@@ -114,7 +114,7 @@ GATE_FUNCS = ("gateBlob", "sportGossipHits", "allHits", "framingVetoApplies",
 #: message is a MEASUREMENT and not a remembered figure.
 OLD_NARROW_GATE = r"""
 const OLD_NARROW_EMERGENCY_RE =
-  /\b(war|invasion|nuclear (test|accident|plant)|earthquake|magnitude 6\.[5-9]|magnitude [7-9]|flood warning|landslide warning|national emergency|Araniko (highway )?(closed|blocked)|Example Bank (fraud|security|cyber)|major outage)\b/i;
+  /\b(war|invasion|nuclear (test|accident|plant)|earthquake|magnitude 6\.[5-9]|magnitude [7-9]|flood warning|landslide warning|national emergency|Example Highway (closed|blocked)|Example Bank (fraud|security|cyber)|major outage)\b/i;
 function oldNarrowGate(blob, title) {
   if (!OLD_NARROW_EMERGENCY_RE.test(blob)) return { tripped: false, why: "" };
   if (sportGossipHits(blob) >= SPORT_GOSSIP_SUPPRESS_HITS) {

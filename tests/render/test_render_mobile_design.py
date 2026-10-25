@@ -93,7 +93,7 @@ STORIES = [
      "label": "NEW", "source_url": "https://example.com/a",
      "image": {"url": "https://example.com/a.jpg"},
      "for_you": "Charge anything mains-powered before 10:00."},
-    {"title": "Video: the Araniko highway is closed at Kadamtale",
+    {"title": "Video: the Example Highway is closed at Kadamtale",
      "summary": "Footage from the landslide site.",
      "category": "nepal", "priority": 5, "published_at": DATE,
      "label": "DEVELOPING", "source_url": "https://example.com/b",

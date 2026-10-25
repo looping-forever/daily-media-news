@@ -309,7 +309,7 @@ const DEDUP_TTL_SECONDS = 21600; // 6h re-alert suppression window
 // binding constraint -- so every one of those 345 headlines was discarded here
 // and never reached the classifier. `importanceGate()` is the whole fix.
 const EMERGENCY_RE =
-  /\b(?:war|invasion|nuclear (?:test|accident|plant)|earthquake|magnitude 6\.[5-9]|magnitude [7-9]|flood warning|landslide warning|national emergency|Araniko (?:highway )?(?:closed|blocked)|Example Bank (?:fraud|security|cyber)|bank of nepal.*cyber|major outage)\b/i;
+  /\b(?:war|invasion|nuclear (?:test|accident|plant)|earthquake|magnitude 6\.[5-9]|magnitude [7-9]|flood warning|landslide warning|national emergency|Example Highway (?:closed|blocked)|Example Bank (?:fraud|security|cyber)|bank of nepal.*cyber|major outage)\b/i;
 
 // Tier 2 (coverage). Kept verbatim and UNIONED with EMERGENCY_RE, never
 // substituted for it. See breaking_monitor.py:214 for the contract.

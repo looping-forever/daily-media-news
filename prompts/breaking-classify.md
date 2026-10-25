@@ -59,7 +59,7 @@ scheduled digest.
 - LEVEL 3 — immediate-alert worthy, ONLY if substantively supported:
   war outbreak or major escalation between states · nuclear incident ·
   magnitude ≥6.5 earthquake or major disaster warning affecting Nepal or the
-  user's region · national emergency · major Araniko-highway / Example City
+  user's region · national emergency · major Example Highway / Example City
   infrastructure closure · Example Bank security incident affecting
   customers · confirmed major cyber incident affecting Nepali users.
 - LEVEL 2 — important, but the next scheduled digest is sufficient.
