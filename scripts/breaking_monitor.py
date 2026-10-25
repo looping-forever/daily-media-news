@@ -225,7 +225,13 @@ AI_TOTAL_BUDGET_SEC = 150
 
 #: Depth cap. A dead ladder costs its share of the budget, not a fixed 60s
 #: each, so depth is bounded as well as time.
-AI_MAX_MODELS = 4
+#:
+#: RAISED 4 -> 6 on 2026-10-25 WITH the ladder, deliberately: the seed has six
+#: rungs, and a cap below the seed means the last two are configured but can
+#: never be reached -- a model that is silently never tried. The cap must track
+#: the ladder; the budget still trims the tail (150s / 6 = 25s each is only hit
+#: on an all-silent day).
+AI_MAX_MODELS = 6
 
 # Deterministic pre-gate (contract regex — do not reword casually;
 # groups are non-capturing so findall() returns whole-match strings).

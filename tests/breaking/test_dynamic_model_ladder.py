@@ -285,16 +285,19 @@ def test_cooling_models_are_deprioritised_not_dropped_from_the_report():
 # ---------------------------------------------------------------------------
 
 def test_worst_case_time_is_bounded_by_the_budget_not_by_the_ladder():
-    """Old worst case: models x attempts x 60s = 3 x 2 x 60 = 360s.
-    New worst case: the stage budget, whatever the catalogue offers.
+    """Old worst case: models x attempts x 60s -- 360s on the three-model
+    ladder this was written against. New worst case: the stage budget,
+    whatever the catalogue offers.
 
     Simulated on a synthetic clock that CONSUMES the time each attempt is
     granted, which is what a real timeout does. The deadline is fixed once,
     exactly as ai_classify fixes it, so the bound is the budget and not the
     sum of per-attempt allowances.
     """
+    # Computed from the LIVE ladder, not pinned: the ladder is config, and a
+    # deliberate length change must not read as a regression in the maths.
     old = len(bm.AI_MODELS) * 2 * bm.AI_PER_ATTEMPT_TIMEOUT_SEC
-    assert old == 360, old
+    assert old > bm.AI_TOTAL_BUDGET_SEC, old
 
     now = 0.0
     deadline = bm.AI_TOTAL_BUDGET_SEC          # == now + budget
@@ -447,7 +450,7 @@ def test_the_cli_prints_only_models_on_stdout_so_mapfile_sees_models():
         % (lines,))
     assert "budget" in err.getvalue(), (
         "the human header belongs on stderr: %r" % (err.getvalue(),))
-    assert len(info["selected"]) == 10, info["selected"]
+    assert len(info["selected"]) == len(pool), (len(info["selected"]), len(pool))
     assert info["per_attempt_sec"] == ms.WALK_PER_ATTEMPT_SEC, info
     assert info["total_budget_sec"] == ms.WALK_TOTAL_BUDGET_SEC, info
     assert info["min_attempt_sec"] == ms.WALK_MIN_ATTEMPT_SEC, info

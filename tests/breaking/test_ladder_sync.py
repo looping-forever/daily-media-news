@@ -41,11 +41,35 @@ BREAKING_YML = os.path.join(REPO_ROOT, ".github", "workflows",
 EXPECTED_PIN = "opencode-ai@1.18.31"
 EXPECTED_MIN_VERSION = "1.17.0"
 EXPECTED_PROVIDER = "opencode"
+# CHANGED DELIBERATELY ON 2026-10-25, with the reason inline. The old seed
+# (big-pickle, mimo-v2.6, nemotron-3.5) was not the live ladder: CI discovered
+# seven IDs and four of them (muse-spark-1.3, muse-spark-1.2, ling-3.0-fin,
+# mimo-v2.5) were absent from the catalogue, each costing an attempt. This list
+# is the order the latency probe measured, and it is still only the SEED: live
+# discovery decides what exists at run time.
+# FOUR, NOT SIX became SIX, NOT FOUR on the same day, for the opposite reason:
+# breaking_monitor's AI_MAX_MODELS was raised 4 -> 6 in the same change, so the
+# cap can no longer silently make a configured rung unreachable. Keep the two in
+# step -- test_breaking_fast_path asserts selected >= len(AI_MODELS) and
+# <= AI_MAX_MODELS, which is the invariant that catches a drift either way.
 EXPECTED_LADDER = [
-    "opencode/big-pickle",
+    "opencode/deepseek-v4.1-flash-free",
     "opencode/mimo-v2.6-flash-free",
+    "opencode/flint-40b-free",
     "opencode/nemotron-3.5-lightning-free",
+    "opencode/beam-free",
+    "opencode/glm-5.3-flash-free",
 ]
+
+#: The four IDs CI tried on 2026-10-25 that the catalogue did not serve. This is
+#: a REGRESSION PIN for the config seed ONLY -- production never uses a denylist;
+#: discovery filters on the catalogue's own `status` field (see usable()).
+DEAD_IDS_2026_10_25 = (
+    "opencode/muse-spark-1.3-contributor-free",
+    "opencode/muse-spark-1.2-contributor-free",
+    "opencode/ling-3.0-flash-fin-free",
+    "opencode/mimo-v2.5-free",
+)
 EXPECTED_FLAGS = ["--auto", "--model"]
 
 # Stale identifiers that silently killed digests before. Case-sensitive:
@@ -177,6 +201,13 @@ def test_config_contract():
         "provider drift: %r" % (cfg.get("provider"),)
     assert cfg.get("ladder") == EXPECTED_LADDER, \
         "ladder drift: %r" % (cfg.get("ladder"),)
+    dead = [m for m in (cfg.get("ladder") or []) if m in DEAD_IDS_2026_10_25]
+    assert not dead, (
+        "the config ladder names model IDs the catalogue did not serve on "
+        "2026-10-25: %r. A seed rung that cannot answer is a three-second tax "
+        "on every walk that reaches it." % (dead,))
+    assert len(set(cfg.get("ladder") or [])) == len(cfg.get("ladder") or []), \
+        "the ladder must not repeat a rung"
     assert cfg.get("flags") == EXPECTED_FLAGS, \
         "flags drift: %r" % (cfg.get("flags"),)
     print("  PASS: test_config_contract")
@@ -235,6 +266,16 @@ def test_no_hardcoded_models_in_workflows():
             "the agent step must read %s back from the selector" % key
     assert "deadline" in step and 'timeout "$allow"' in step, \
         "the walk must be bounded by a deadline this step computes itself"
+    # ADDED 2026-10-25 with the circuit breaker, deliberately: the walk still
+    # owns its own deadline and `timeout`, but an attempt is now wrapped in the
+    # silence watchdog and its failure is CLASSIFIED before the next model is
+    # tried. Without these the breaker could be deleted and this guard would
+    # still pass.
+    assert "model_watchdog.py" in step and "--no-output-sec" in step, \
+        "each attempt must run under the no-progress watchdog"
+    assert "--classify" in step and "model_not_found" in step \
+        and "auth" in step, \
+        "the walk must classify each failure and act on model_not_found/auth"
     print("  PASS: test_no_hardcoded_models_in_workflows")
 
 

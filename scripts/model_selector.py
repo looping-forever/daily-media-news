@@ -246,8 +246,13 @@ def usable(model):
             or not _zero(cost.get("output")):
         return False, "not_free"
     status = meta.get("status")
-    if isinstance(status, str) and status and status != "active":
-        return False, "status:%s" % status
+    # EXPLICITLY ACTIVE, not "anything that is not called deprecated". A model
+    # whose record carries no status is unverifiable, and an unverifiable model
+    # is refused: this is the predicate that keeps a withdrawn ID out of the
+    # walk, and it reads `status` -- a field the CLI printed -- never the name.
+    if status != "active":
+        return False, "status:%s" % (
+            status if isinstance(status, str) and status else "missing")
     caps = meta.get("capabilities")
     if not isinstance(caps, dict):
         return False, "no_capabilities"
@@ -396,6 +401,14 @@ def _discover_live(provider, timeout_sec, run_cmd, info):
     return ids
 
 
+#: Cache shape marker. A cache written BEFORE the explicit-active gate cannot
+#: prove its ids were active when they were stored -- and the 2026-10-25 run
+#: showed four dead IDs reaching the walk. An ungated cache is therefore not
+#: trusted (tier falls to the config seed, which is visible in `source`), while
+#: every cache this version writes carries the marker and is re-validated here.
+CACHE_GATE = "active-agent-capable-v1"
+
+
 def _read_cache(cache_path, provider, now, ttl_sec):
     if not cache_path:
         return []
@@ -405,6 +418,10 @@ def _read_cache(cache_path, provider, now, ttl_sec):
     except (OSError, ValueError):
         return []
     if not isinstance(doc, dict) or doc.get("provider") != provider:
+        return []
+    if doc.get("gate") != CACHE_GATE:
+        # A PRE-GATE CACHE IS NOT EVIDENCE. Silently accepting it is how a dead
+        # ID survives in a file nobody re-inspects.
         return []
     ids = doc.get("models")
     if not isinstance(ids, list) or not ids \
@@ -443,8 +460,9 @@ def _write_cache(cache_path, provider, ids, fetched_at):
             os.makedirs(parent, exist_ok=True)
         tmp = "%s.%d.tmp" % (cache_path, os.getpid())
         with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump({"provider": provider, "fetched_at": fetched_at,
-                       "models": list(ids)}, fh, ensure_ascii=False, indent=2)
+            json.dump({"provider": provider, "gate": CACHE_GATE,
+                       "fetched_at": fetched_at, "models": list(ids)},
+                      fh, ensure_ascii=False, indent=2)
             fh.write("\n")
         os.replace(tmp, cache_path)
     except OSError:
@@ -618,6 +636,173 @@ WALK_MIN_ATTEMPT_SEC = 90
 #: candidates to classify keeps the full 1800s -- the budget follows what the
 #: run has to do, never the clock alone.
 WALK_NO_WORK_TOTAL_BUDGET_SEC = 300
+
+
+#: The no-progress watchdog, and the measurement behind the number.
+#:
+#: Measured on 2026-10-25: every live free model in the ladder answered with its
+#: first token in 12-20s. 90s is more than FOUR TIMES the slowest measured
+#: first token, so a model that is merely slow is never killed, while a model
+#: that will never answer is abandoned long before the 360s per-attempt cap --
+#: which is the whole point, because 360s is what a dead model used to cost.
+NO_OUTPUT_WATCHDOG_SEC = 90
+
+#: Marker the watchdog prints when it abandons a silent attempt. It is in the
+#: attempt log, so a later classification does not have to guess why the
+#: process died.
+WATCHDOG_MARKER = "__WATCHDOG_NO_OUTPUT__"
+
+#: Every failed attempt maps to exactly one of these. The set is closed: a new
+#: class is a deliberate change, not a fallback string.
+FAILURE_CLASSES = (
+    "model_not_found",
+    "quota_or_rate_limited",
+    "auth",
+    "provider_outage",
+    "slow_or_stalled",
+    "other",
+)
+
+#: The CLI says `UnknownError: Unexpected server error` for a missing model,
+#: which is ambiguous: the SAME string is printed for a real 5xx. So the
+#: not-found marker is required on its own -- the debug log carries
+#: `ProviderModelNotFoundError: Model not found: <id>` -- and UnknownError
+#: alone is provider_outage.
+_NOT_FOUND_MARKERS = ("providermodelnotfounderror", "model not found")
+#: `Free usage limit reached` is the string the provider used on 2026-10-25 when
+#: it rejected a call 1.0s in -- it contains no "quota" and no "rate limit", so
+#: without "usage limit" the single most expensive failure looked like "other".
+_QUOTA_MARKERS = ("rate limit", "rate_limit", "ratelimit", "quota", "usage limit",
+                  "too many requests", "retry-after", "retry after")
+_AUTH_MARKERS = ("unauthorized", "invalid api key", "invalid_api_key",
+                 "authentication failed", "invalid token", "forbidden")
+_OUTAGE_MARKERS = ("unknownerror", "unexpected server error",
+                   "internal server error", "bad gateway",
+                   "service unavailable", "gateway timeout",
+                   "econnreset", "econnrefused")
+
+#: HTTP status codes, matched with boundaries so a timestamp or a model id
+#: cannot be mistaken for one.
+_HTTP_RE = re.compile(r"(?<!\d)(401|403|429|500|502|503|504)(?!\d)")
+
+
+def classify_failure(text, returncode=0):
+    """Exactly one FAILURE_CLASSES value for a failed attempt.
+
+    ORDER IS THE CONTRACT, and each step exists because the strings overlap:
+
+      1. model_not_found -- ONLY when the not-found marker is present. The CLI
+         reports a missing model as `UnknownError: Unexpected server error`
+         (~3s), which is the same text a real 5xx produces, so UnknownError
+         alone must never be read as "this model is gone";
+      2. auth -- 401/403 and its wording. Terminal for the whole walk: retrying
+         another model with a bad credential only wastes the budget and hides
+         the cause;
+      3. quota_or_rate_limited -- 429/quota/Retry-After;
+      4. slow_or_stalled -- the watchdog marker, or rc 124 (what `timeout`
+         reports for its own kill);
+      5. provider_outage -- 5xx and `UnknownError` with NO not-found marker;
+      6. other -- everything else, including an exit 1 with no output.
+    """
+    low = (text or "").lower()
+
+    if any(m in low for m in _NOT_FOUND_MARKERS):
+        return "model_not_found"
+
+    codes = {int(c) for c in _HTTP_RE.findall(low)}
+    if codes & {401, 403} or any(m in low for m in _AUTH_MARKERS):
+        return "auth"
+    if codes & {429} or any(m in low for m in _QUOTA_MARKERS):
+        return "quota_or_rate_limited"
+    if WATCHDOG_MARKER.lower() in low or int(returncode or 0) == 124:
+        return "slow_or_stalled"
+    if codes & {500, 502, 503, 504} or any(m in low for m in _OUTAGE_MARKERS):
+        return "provider_outage"
+    return "other"
+
+
+def worst_case_all_fail_sec(models=6, overhead_sec=30):
+    """Worst-case seconds for a walk in which EVERY attempt fails SILENTLY.
+
+    Per attempt the CLI spends either ~3s (the measured not-found latency) or,
+    if it hangs, the watchdog window -- never the 360s per-attempt cap, because
+    a silent attempt is abandoned at NO_OUTPUT_WATCHDOG_SEC. So:
+
+        models x 90 + overhead = 6 x 90 + 30 = 570s = 9.5 min
+
+    `overhead_sec` covers CLI cold start plus process setup per attempt. This is
+    the SILENCE bound; a quota/not-found rejection is far cheaper -- see
+    fast_fail_all_fail_sec().
+    """
+    return int(models) * NO_OUTPUT_WATCHDOG_SEC + int(overhead_sec)
+
+
+#: Measured 2026-10-25: the provider answered `Free usage limit reached` 1.0s
+#: after the call started. The CLI printed it to its log and then NEVER EXITED,
+#: so both attempts burned their full 480s cap producing zero tokens. Streaming
+#: that line and killing on it is what turns a 480s loss into a ~2s one.
+FAST_FAIL_SEC = 2
+
+#: Classes that end the attempt the moment they appear on the stream. A
+#: provider_outage is NOT here: the CLI may recover from a 5xx by itself, so it
+#: keeps the 90s silence window instead of being cut at once.
+DECISIVE_CLASSES = ("model_not_found", "quota_or_rate_limited", "auth")
+
+#: Error-shaped lines, required before a decisive line may kill a live attempt.
+#:
+#: Without this, prose is a landmine: the digest's own article text can contain
+#: "rate limit", "quota" or "unauthorized", and killing a WORKING attempt
+#: because a news story mentioned one would be a new way to lose a run. The
+#: real failures are exception/log lines, and they say so.
+_ERROR_SHAPED = ("apicallerror", "providermodelnotfounderror", "unknownerror",
+                 "stream error", "error.error", "error:", "exception",
+                 "invalid api key", "authentication failed", "status code")
+
+#: A bare status line (`429 Too Many Requests`) is a real captured shape, so it
+#: counts as error-shaped -- but ONLY at the start of the line and ONLY with an
+#: HTTP reason phrase, because a digest sentence may legitimately contain a
+#: number: "The 429 passengers were rescued" must never kill an attempt.
+_STATUS_LINE = re.compile(r"^\s*(?:http[/ ]?\d(?:\.\d)?\s*)?(\d{3})\b")
+_REASON_PHRASES = ("too many requests", "unauthorized", "forbidden", "not found",
+                   "bad gateway", "service unavailable", "gateway timeout",
+                   "internal server error", "bad request", "rate limited")
+
+
+def _error_shaped(low):
+    if any(m in low for m in _ERROR_SHAPED):
+        return True
+    return bool(_STATUS_LINE.match(low)) and any(p in low
+                                                 for p in _REASON_PHRASES)
+
+
+def classify_stream_line(line):
+    """The failure class for a line ON THE STREAM, or None to let it run.
+
+    Two gates, both required, in this order:
+
+      1. the line must be error-shaped (see _ERROR_SHAPED) -- a digest sentence
+         is never decisive;
+      2. its class must be in DECISIVE_CLASSES -- an outage is not decisive.
+
+    Returns the class string only when the attempt should be killed NOW.
+    """
+    low = (line or "").lower()
+    if not low.strip():
+        return None
+    if not _error_shaped(low):
+        return None
+    kind = classify_failure(low, 1)
+    return kind if kind in DECISIVE_CLASSES else None
+
+
+def fast_fail_all_fail_sec(models=6, overhead_sec=30):
+    """Worst case when every attempt is REJECTED (quota / not-found), not silent.
+
+    This is the mode the 2026-10-25 probe measured: 6 x 2s + 30s = 42s. The
+    silence bound is still the real worst case, but this is the one that used to
+    cost 6 x 480s.
+    """
+    return int(models) * FAST_FAIL_SEC + int(overhead_sec)
 
 
 def attempt_timeout(deadline, now, per_attempt):
@@ -830,6 +1015,12 @@ def _main(argv=None):
     parser.add_argument("--per-attempt", type=int, default=WALK_PER_ATTEMPT_SEC,
                         help="per-attempt cap in seconds, reported to the "
                              "caller (default: %d)" % WALK_PER_ATTEMPT_SEC)
+    parser.add_argument("--classify", action="store_true",
+                        help="classify one failed attempt from its log/exit code")
+    parser.add_argument("--log", default=None,
+                        help="attempt log to classify (with --classify)")
+    parser.add_argument("--rc", type=int, default=0,
+                        help="attempt exit code (with --classify)")
     parser.add_argument("--no-work", action="store_true",
                         help="the caller has established there is nothing to "
                              "write, so state the no-work walk budget (%ds) "
@@ -849,6 +1040,21 @@ def _main(argv=None):
         save_health(args.health, doc)
         return 0
 
+    if args.classify:
+        # The log is read from the TAIL only: a runaway attempt log is not worth
+        # loading whole to find a marker that is always near the end.
+        text = ""
+        if args.log:
+            try:
+                with open(args.log, "rb") as fh:
+                    fh.seek(0, os.SEEK_END)
+                    fh.seek(max(0, fh.tell() - 262144))
+                    text = fh.read().decode("utf-8", "replace")
+            except OSError:
+                text = ""
+        print(classify_failure(text, args.rc))
+        return 0
+
     if args.select:
         config = load_config(args.config)
         health = load_health(args.health)
@@ -861,7 +1067,12 @@ def _main(argv=None):
         total_budget = args.budget
         if args.no_work:
             total_budget = min(args.budget, WALK_NO_WORK_TOTAL_BUDGET_SEC)
-        info["per_attempt_sec"] = args.per_attempt
+        # ONE ATTEMPT MAY NEVER BE GRANTED MORE THAN THE WHOLE WALK. Before this,
+        # `--no-work` stated a 300s budget beside a 360s per-attempt cap -- a
+        # single attempt could outlast its own walk, which is incoherent even
+        # though the caller clamped it with min(remaining, PER).
+        info["per_attempt_sec"] = min(args.per_attempt, total_budget)
+        info["no_output_sec"] = NO_OUTPUT_WATCHDOG_SEC
         info["total_budget_sec"] = total_budget
         info["min_attempt_sec"] = WALK_MIN_ATTEMPT_SEC
         if args.no_work:

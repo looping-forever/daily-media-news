@@ -970,12 +970,18 @@ jobs:
           BUDGET=$(jq -r '.total_budget_sec // 1800' state/digest_model_select.json 2>/dev/null || echo 1800)
           PER=$(jq -r '.per_attempt_sec // 360' state/digest_model_select.json 2>/dev/null || echo 360)
           MIN=$(jq -r '.min_attempt_sec // 90' state/digest_model_select.json 2>/dev/null || echo 90)
+          # The no-progress window is stated by the selector too. 90s is over 4x
+          # the measured 12-20s first token, so a slow model is never killed and
+          # a stuck one costs 90s instead of the 360s per-attempt cap.
+          NOOUT=$(jq -r '.no_output_sec // 90' state/digest_model_select.json 2>/dev/null || echo 90)
           case "$BUDGET" in ''|*[!0-9]*) BUDGET=1800;; esac
           case "$PER" in ''|*[!0-9]*) PER=360;; esac
           case "$MIN" in ''|*[!0-9]*) MIN=90;; esac
+          case "$NOOUT" in ''|*[!0-9]*) NOOUT=90;; esac
           deadline=$(( $(date +%s) + BUDGET ))
           tried=0
           last_err="unknown"
+          : > state/agent-attempts.log
           for model in "${models[@]}"; do
             remaining=$(( deadline - $(date +%s) ))
             allow=$(( remaining < PER ? remaining : PER ))
@@ -987,22 +993,70 @@ jobs:
             rm -f state/stories.json
             echo "=== Attempt $tried with $model (allow ${allow}s) ==="
             run_rc=0
-            if cat prompts/daily-digest.md | timeout "$allow" opencode run \
+            # The watchdog sits INSIDE `timeout`: timeout still owns the total
+            # allowance, and the watchdog owns BOTH the decisive error line (it
+            # kills at ~1-2s when the provider rejects the call, which is what
+            # used to burn the full 480s producing nothing) and silence (90s,
+            # over four times the 20.9s control-run latency).
+            if cat prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
+              --no-output-sec "$NOOUT" -- \
+              opencode run \
               --auto \
               --model "$model" \
               2>&1 | tee state/agent-log.txt; then
-              if [ -f state/stories.json ] && python3 -c "import json,sys; json.load(open('state/stories.json'))"; then
-                echo "Agent wrote valid state/stories.json on attempt $tried ($model)"
-                python3 scripts/model_selector.py --record "$model" ok || true
-                ok=1
-                break
-              fi
+              :
+            else
+              run_rc=$?
+            fi
+            # SUCCESS FIRST, AND FROM THE FILE, NOT THE EXIT CODE. Classifying
+            # before this check would discard a GOOD digest whose article text
+            # happens to contain "rate limit" or "quota" -- the classifier reads
+            # the CLI's own words, and a finished digest is full of words. One
+            # row per attempt still goes to the log, with kind=ok here.
+            if [ "$run_rc" = "0" ] && [ -f state/stories.json ] \
+              && python3 -c "import json,sys; json.load(open('state/stories.json'))"; then
+              printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
+                "$(date -u +%FT%TZ)" "$tried" "$model" "$run_rc" "$allow" \
+                >> state/agent-attempts.log
+              echo "Agent wrote valid state/stories.json on attempt $tried ($model)"
+              python3 scripts/model_selector.py --record "$model" ok || true
+              ok=1
+              break
+            fi
+            # CLASSIFY a real failure, then act. `UnknownError` alone is an
+            # outage and a missing model is a not-found ONLY when the marker is
+            # present. The watchdog already wrote its own marker into this log,
+            # so the decision is reproducible from the log alone.
+            kind=$(python3 scripts/model_selector.py --classify \
+              --log state/agent-log.txt --rc "$run_rc" 2>/dev/null || echo other)
+            case "$kind" in
+              model_not_found|quota_or_rate_limited|auth|provider_outage|slow_or_stalled|other) ;;
+              *) kind="other" ;;
+            esac
+            printf '%s attempt=%d model=%s kind=%s rc=%s allow=%s\n' \
+              "$(date -u +%FT%TZ)" "$tried" "$model" "$kind" "$run_rc" "$allow" \
+              >> state/agent-attempts.log
+            if [ "$kind" = "model_not_found" ] || [ "$kind" = "quota_or_rate_limited" ]; then
+              echo "Circuit breaker: $model -> $kind. Skipping to the next model without spending the allowance."
+              last_err="$kind on $model"
+              python3 scripts/model_selector.py --record "$model" transport || true
+              continue
+            fi
+            if [ "$kind" = "auth" ]; then
+              # STOP, deliberately. A bad credential is not a property of this
+              # model: every remaining attempt would fail the same way, burn the
+              # budget and bury the real cause.
+              echo "Circuit breaker: $model -> auth. Retrying other models would only hide the cause; stopping the walk."
+              last_err="auth: $model was rejected (credential), walk aborted"
+              python3 scripts/model_selector.py --record "$model" transport || true
+              break
+            fi
+            if [ "$run_rc" = "0" ]; then
               echo "Attempt $tried finished without a valid state/stories.json"
               last_err="no stories.json"
               python3 scripts/model_selector.py --record "$model" transport || true
             else
-              run_rc=$?
-              echo "Attempt $tried command failed (rc=$run_rc)"
+              echo "Attempt $tried command failed (rc=$run_rc, kind=$kind)"
               if [ "$run_rc" = "124" ]; then
                 last_err="timeout"
                 python3 scripts/model_selector.py --record "$model" timeout || true
@@ -2398,8 +2452,8 @@ jobs:
                   'world_major': 'WORLD \u2014 MAJOR EVENTS',
                   'local_city': 'LOCAL & CITY',
                   'education_tu': 'TU / BSC CSIT',
-                  'college_local': 'Example College / COLLEGE',
-                  'bank_local': 'MY BANK \u2014 EXAMPLE BANK',
+                  'college_local': 'COLLEGE',
+                  'bank_local': 'MY BANK',
                   'nepal': 'IMPORTANT NEPAL',
                   'gaming': 'GAMING',
                   'anime': 'ANIME',
@@ -2583,9 +2637,9 @@ jobs:
               CATEGORY_SHORT = {
                   'action': 'action item',
                   'world_major': 'world',
-                  'local_city': 'Example City',
+                  'local_city': 'Local',
                   'education_tu': 'TU',
-                  'college_local': 'Example College',
+                  'college_local': 'College',
                   'bank_local': 'bank',
                   'nepal': 'Nepal',
                   'gaming': 'gaming',

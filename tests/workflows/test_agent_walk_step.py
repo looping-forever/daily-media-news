@@ -101,6 +101,11 @@ def agent_step_run_block():
 #:   ok       write a VALID state/stories.json and exit 0
 #:   garbage  write INVALID JSON and exit 0 -- an exit code is not evidence
 #:   nofile   write nothing and exit 0
+#:   notfound the REAL measured shape: UnknownError on the surface and
+#:            ProviderModelNotFoundError in the debug text, exit 1
+#:   unknown  UnknownError with NO not-found marker -- ambiguous, an outage
+#:   quota    429 with Retry-After, exit 1
+#:   auth     401 invalid api key, exit 1
 #:   <n>      exit n (124 is what `timeout` reports for its own kill)
 #:
 #: A model with no plan entry exits 1, so an attempt nobody expected is loud
@@ -124,8 +129,22 @@ done
 if [ -z "$outcome" ]; then outcome="1"; fi
 case "$outcome" in
   ok)      printf '{"stories": [{"id": "stub"}]}\n' > state/stories.json ; exit 0 ;;
+  ok_prose)
+    # A SUCCESSFUL digest whose article text contains the classifier's own
+    # vocabulary. The walk must call this a success: classifying a finished
+    # attempt would throw it away as a quota skip.
+    printf '{"stories": [{"id": "stub"}]}\n' > state/stories.json
+    printf 'Draft note: the exchange kept the rate limit and the quota unchanged.\n'
+    exit 0 ;;
   garbage) printf '{"stories": [ not json\n' > state/stories.json ; exit 0 ;;
   nofile)  exit 0 ;;
+  notfound)
+    printf 'UnknownError: Unexpected server error\n' >&2
+    printf 'ProviderModelNotFoundError: Model not found: %s\n' "$model" >&2
+    exit 1 ;;
+  unknown) printf 'UnknownError: Unexpected server error\n' >&2 ; exit 1 ;;
+  quota)   printf '429 Too Many Requests (Retry-After: 30)\n' >&2 ; exit 1 ;;
+  auth)    printf '401 Unauthorized: invalid api key\n' >&2 ; exit 1 ;;
   *)       exit "$outcome" ;;
 esac
 """
@@ -143,6 +162,18 @@ esac
 _STUB_PYTHON3 = r"""#!/usr/bin/env bash
 set -u
 real="${STUB_REAL_PYTHON:?}"
+# THE WATCHDOG IS A TEST STAND-IN HERE, and only here: this shim replaces
+# `python3`, so it can hand the child straight to bash. The watchdog's own
+# silence behaviour is tested DIRECTLY against the real script (see
+# tests/workflows/test_model_circuit_breaker.py WatchdogTests); what these
+# walk tests exercise is the step's decision after an attempt fails.
+for arg in "$@"; do
+  if [ "${arg##*/}" = "model_watchdog.py" ]; then
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do shift; done
+    if [ $# -gt 0 ]; then shift; fi
+    exec "$@"
+  fi
+done
 is_selector=0
 for arg in "$@"; do
   if [ "${arg##*/}" = "model_selector.py" ]; then is_selector=1; fi
@@ -150,6 +181,12 @@ done
 if [ "$is_selector" -ne 1 ]; then
   exec "$real" "$@"
 fi
+# CLASSIFICATION IS NOT DISCOVERY. `--classify` is pure text analysis, so it is
+# forwarded to the real selector: stubbing it would replace the shipped
+# circuit breaker with a shim that always says "other".
+for arg in "$@"; do
+  if [ "$arg" = "--classify" ]; then exec "$real" "$@"; fi
+done
 info_out=""
 prev=""
 for arg in "$@"; do
@@ -213,6 +250,13 @@ timeout() {
 _STUB_PYTHON3_NO_WORK = r"""#!/usr/bin/env bash
 set -u
 real="${STUB_REAL_PYTHON:?}"
+for arg in "$@"; do
+  if [ "${arg##*/}" = "model_watchdog.py" ]; then
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do shift; done
+    if [ $# -gt 0 ]; then shift; fi
+    exec "$@"
+  fi
+done
 is_selector=0
 for arg in "$@"; do
   if [ "${arg##*/}" = "model_selector.py" ]; then is_selector=1; fi
@@ -220,6 +264,9 @@ done
 if [ "$is_selector" -ne 1 ]; then
   exec "$real" "$@"
 fi
+for arg in "$@"; do
+  if [ "$arg" = "--classify" ]; then exec "$real" "$@"; fi
+done
 budget="${STUB_BUDGET:?}"
 for arg in "$@"; do
   if [ "$arg" = "--no-work" ]; then budget="${STUB_NO_WORK_BUDGET:?}"; fi
@@ -277,6 +324,14 @@ class AgentWalkHarness(unittest.TestCase):
         # should fail loudly rather than be papered over with a stub.
         shutil.copy(str(REPO_ROOT / "prompts" / "daily-digest.md"),
                     str(self.tmp / "prompts" / "daily-digest.md"))
+        # The shipped step invokes scripts/model_watchdog.py by a path relative
+        # to the repository root, so the throwaway workspace must contain it for
+        # the same reason it contains the real prompt: a workspace missing a
+        # file the step uses tests a tree that is never shipped.
+        (self.tmp / "scripts").mkdir(exist_ok=True)
+        for name in ("model_watchdog.py", "model_selector.py"):
+            shutil.copy(str(REPO_ROOT / "scripts" / name),
+                        str(self.tmp / "scripts" / name))
         self.bin_dir = self.tmp / "bin"
         W.install_stub_on_path(
             self.bin_dir, _STUB_OPENCODE, name="opencode")
