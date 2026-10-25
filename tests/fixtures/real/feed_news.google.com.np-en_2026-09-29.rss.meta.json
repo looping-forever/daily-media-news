@@ -1,0 +1,8 @@
+{
+  "bytes": 145067,
+  "captured_at": "2026-09-29T12:16:59+00:00",
+  "note": "Genuine Google News RSS response for 'Nepal'/np-en, from the same sweep the digest runs. Real bytes, so the collector tests are proven against something the site actually served.",
+  "sha256": "0e185a029a3c88c1f22bddfcdace1a14a8741f6ff0362eebc3495067a96481f3",
+  "source_url": "https://news.google.com/rss/search?q=Nepal&hl=en&gl=NP&ceid=NP:en",
+  "trimmed": false
+}

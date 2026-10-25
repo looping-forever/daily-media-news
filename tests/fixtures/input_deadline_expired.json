@@ -1,0 +1,28 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Expired deadline: the story is dropped (deadline_expired) and the seeded matching event must transition to RESOLVED via expire semantics (deadline 2026-08-15 < yesterday).",
+  "stories": [
+    {
+      "title": "TU Exam Form Deadline Nears for CSIT Students",
+      "summary": "The exam form submission deadline for CSIT students has passed; late submissions are no longer accepted by the exam controller office.",
+      "why_it_matters": "Confirms the submission window is closed for affected students.",
+      "category": "education_tu",
+      "priority": 7,
+      "source_name": "Tribhuvan University",
+      "source_url": "https://tu.edu.np/exam-form-deadline",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": null,
+      "reliability": "tier2",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "TU students affected directly.",
+      "language": "en",
+      "event_key": "tu-exam-form-deadline",
+      "deadline": "2026-08-15",
+      "effective_date": null
+    }
+  ]
+}

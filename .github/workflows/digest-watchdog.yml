@@ -1,0 +1,2470 @@
+name: Digest Watchdog
+
+# Post-slot dead-man's switch: verifies the morning/evening digest actually
+# delivered and screams when it did not. Covers worker death, GH_TOKEN /
+# dispatch failure, and all-channel delivery death — cases the pipeline
+# itself cannot report because it never ran or every send failed.
+#
+# Fires 04:00/16:00 UTC = 09:45/21:45 NPT, ~1h55m after the 07:50/19:50 NPT
+# digest slots, so a late-but-successful run is not misreported.
+# The ~1h55m gap is what keeps the step's own DUE-WINDOW GATE safe: a watchdog
+# that starts on time is already past the digest's due time, so THAT GATE cannot
+# swallow a real alarm. That is a statement about that one gate and NOT a blanket
+# guarantee about this job. A second, separate way a slot can go unjudged is
+# known and is reported on every run where it applies: a firing delayed past the
+# NEXT firing of the same cron is re-attributed to the newer slot, and the
+# displaced slot's digest is then judged by nothing — see the DEFECT 5 block in
+# the marker step for why that cannot be detected from inside the step, and what
+# would be needed to close it. Check 19 re-derives the 1h55m from the two
+# workflows' crons and fails if it inverts.
+# Reuses the existing NTFY_TOPIC/NTFY_SERVER secrets — no new secrets.
+
+on:
+  schedule:
+    # 04:00 UTC = 09:45 NPT (morning check), 16:00 UTC = 21:45 NPT (evening).
+    - cron: '0 4,16 * * *'
+  # THE EMPTY-DIGEST RETRY LADDER MOVED TO THE WORKER (2026-10-20).
+  # It used to be a second entry here -- `17,32,47 * * * *`, 72 firings a day.
+  # Every one of those was a billed GitHub job-minute whose only work was to
+  # READ state/digest_retry.json and, almost always, find nothing due: the
+  # ladder's own gates are +15 min then +45 min after the empty digest, so 72
+  # checks a day serviced at most two real retries. The Worker already ticks
+  # every minute (`* * * * *`), so it now does that read for free, on the same
+  # :17/:32/:47 phase, and dials THIS workflow with ladder_only=true only when
+  # a retry is actually due. The 15-min resolution and the never-fires-early
+  # property (FROZEN CONTRACT 1d) are unchanged; who pays to check changed.
+  workflow_dispatch:
+    inputs:
+      ladder_only:
+        # Set true ONLY by the Worker's ladder arm, and it means "run the
+        # empty-digest retry job and nothing else". A plain manual dispatch
+        # (the default, false) must behave exactly as it always did and judge
+        # the slot -- so the default is false, not true.
+        description: 'Run only the empty-digest retry ladder (used by the Worker)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: digest-watchdog
+  cancel-in-progress: false
+
+permissions:
+  contents: read   # read the committed delivery marker
+  issues: write    # file an issue on a missed digest
+
+jobs:
+  empty_digest_retry:
+    # The empty-digest half of the dead-man's switch: when a digest ran and
+    # produced ZERO stories, the job above is silent by design (a slot can
+    # look "delivered" while carrying nothing), so this job owns that case.
+    #
+    # IT DOES NOT DELIVER. It re-dispatches daily-news.yml, which is the only
+    # thing that can produce a digest, and it alerts on the existing ntfy
+    # topic. No new channel, no new secret, no in-job retry loop: a retry that
+    # ran here would have no collector, no agent and no channels.
+    #
+    # SEVERITY IS DERIVED FROM empty_kind, which validate_stories.py computes
+    # from MEASURED source production and never from the agent's opinion:
+    # a quiet day is a priority-3 `::notice::` (nobody wants a 3am page for a
+    # newsless Tuesday), and a BROKEN digest -- every source empty or dark --
+    # is an immediate priority-5 `::error::`.
+    #
+    # TRIGGER (2026-10-20): this job runs on the 04/16 crons, on a manual
+    # dispatch, and on the Worker's ladder dispatch (ladder_only=true). The
+    # Worker dials it only when state/digest_retry.json says a retry is due,
+    # so the 15-minute GitHub cron that used to poll for that is gone.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write   # gh workflow run daily-news.yml
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # DEFECT 2 (2026-09-30): keep GITHUB_TOKEN out of .git/config for the
+        # whole job. "Retire the exhausted ladder" below injects it explicitly
+        # for its own pull/push only.
+        with:
+          persist-credentials: false
+
+      - name: Decide whether to retry
+        id: retry
+        env:
+          TZ: Asia/Kathmandu
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import datetime, json, os
+
+          out = os.environ['GITHUB_OUTPUT']
+          path = 'state/digest_retry.json'
+          now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+
+          def emit(**kw):
+              with open(out, 'a', encoding='utf-8') as fh:
+                  for k, v in kw.items():
+                      fh.write('%s=%s\n' % (k, v))
+
+          try:
+              with open(path, encoding='utf-8') as fh:
+                  data = json.load(fh)
+          except FileNotFoundError:
+              print('no empty-digest ladder on record — nothing to retry')
+              emit(act='no', reason='no_retry_file')
+              raise SystemExit(0)
+          except (OSError, ValueError) as exc:
+              print('::warning::%s unreadable (%s) — not retrying a state I '
+                    'cannot read' % (path, exc))
+              emit(act='no', reason='unreadable')
+              raise SystemExit(0)
+          if not isinstance(data, dict):
+              print('::warning::%s is not an object — not retrying' % path)
+              emit(act='no', reason='unreadable')
+              raise SystemExit(0)
+
+          try:
+              attempts = int(data.get('attempts') or 0)
+          except (TypeError, ValueError):
+              attempts = 0
+          try:
+              max_attempts = int(data.get('max_attempts') or 3)
+          except (TypeError, ValueError):
+              max_attempts = 3
+          slot = str(data.get('slot') or '')
+          date = str(data.get('date') or '')
+          kind = str(data.get('last_empty_kind') or 'quiet_day')
+          nxt = str(data.get('next_retry_at_npt') or '')
+
+          emit(slot=slot, date=date, kind=kind, attempts=str(attempts),
+               max_attempts=str(max_attempts))
+
+          # A digest that finally produced stories clears the ladder in
+          # daily-news.yml, but the deletion only reaches this repository on
+          # the NEXT commit. Until then the marker is the authority: if the
+          # latest run for this slot carried stories, the problem is gone.
+          try:
+              with open('state/last_digest_sent.json', encoding='utf-8') as fh:
+                  marker = json.load(fh)
+          except (OSError, ValueError):
+              marker = {}
+          if isinstance(marker, dict) and date and marker.get('date') == date \
+                  and slot and marker.get('time') == slot:
+              try:
+                  if int(marker.get('stories') or 0) > 0:
+                      print('the %s digest for %s now carries %s stories — '
+                            'clearing the ladder' % (slot, date, marker.get('stories')))
+                      emit(act='clear', reason='recovered')
+                      raise SystemExit(0)
+              except (TypeError, ValueError):
+                  pass
+
+          if attempts >= max_attempts:
+              # The 3rd attempt already happened and was still empty: stop.
+              # The fallback ladder in daily-news.yml owns it from here.
+              print('attempts %d >= max_attempts %d — ladder exhausted, '
+                    'handing over to the fallback' % (attempts, max_attempts))
+              emit(act='exhausted', reason='attempts_exhausted')
+              raise SystemExit(0)
+
+          nxt_dt = None
+          try:
+              nxt_dt = datetime.datetime.strptime(nxt, '%Y-%m-%d %H:%M')
+          except ValueError:
+              print('::warning::next_retry_at_npt %r is unparseable — '
+                      'retrying now rather than never' % nxt)
+          if nxt_dt is not None and now < nxt_dt.strftime('%Y-%m-%d %H:%M'):
+              print('waiting: now=%s next_retry_at=%s' % (now, nxt))
+              emit(act='wait', reason='too_early')
+              raise SystemExit(0)
+
+          attempt = attempts + 1
+          print('retrying: attempt %d of %d for %s %s (empty_kind=%s)'
+                % (attempt, max_attempts, slot, date, kind))
+          emit(act='retry', reason='ladder', attempt=str(attempt))
+          PY
+
+      - name: Re-dispatch the digest slot
+        if: steps.retry.outputs.act == 'retry'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLOT: ${{ steps.retry.outputs.slot }}
+        run: |
+          set -eo pipefail
+          # The slot is re-dispatched as ITSELF so the retry overwrites that
+          # slot's page, marker and archive entry instead of creating a second
+          # digest under a different slot. `retry_of` is the date of the empty
+          # digest, which daily-news.yml records in the run summary.
+          #
+          # `slot_date` is that SAME date, and it is passed for the same reason:
+          # this job can run past midnight NPT, and the receiving run must not
+          # date the retry off its own wall clock. A retry belongs to the slot
+          # that was empty, not to whichever Nepal day the runner wakes up on.
+          gh workflow run daily-news.yml \
+            -f digest_time="$SLOT" \
+            -f trigger_source=empty-retry \
+            -f retry_slot="$SLOT" \
+            -f retry_of="${{ steps.retry.outputs.date }}" \
+            -f slot_date="${{ steps.retry.outputs.date }}"
+          echo "re-dispatched the $SLOT digest slot"
+
+      - name: Alert on the empty digest
+        if: steps.retry.outputs.act == 'retry'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          SLOT: ${{ steps.retry.outputs.slot }}
+          DATE: ${{ steps.retry.outputs.date }}
+          KIND: ${{ steps.retry.outputs.kind }}
+          ATTEMPT: ${{ steps.retry.outputs.attempt }}
+          MAX_ATTEMPTS: ${{ steps.retry.outputs.max_attempts }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          slot = os.environ.get('SLOT', '')
+          date = os.environ.get('DATE', '')
+          kind = os.environ.get('KIND', 'quiet_day')
+          try:
+              attempt = int(os.environ.get('ATTEMPT') or 1)
+          except ValueError:
+              attempt = 1
+          try:
+              max_attempts = int(os.environ.get('MAX_ATTEMPTS') or 3)
+          except ValueError:
+              max_attempts = 3
+
+          # The frozen severity split. A quiet day is a notice; a broken
+          # digest and the final attempt are errors that page the owner.
+          #
+          # The TITLES are unchanged and are pinned exactly by
+          # tests/test_payload_io.py:1004/1019/1026, down to the priority.
+          # What changes here is the BODY: it now leads with what the miss
+          # MEANS for the owner and what happens next, and keeps the
+          # diagnostic identifiers below that first sentence. The four kinds
+          # stay as far apart as they were -- a notice that reads like an error
+          # trains the owner to ignore both.
+          if kind == 'broken':
+              title = 'Digest BROKEN: sources returned nothing usable — fallback will fire'
+              priority, note = 5, 'error'
+              lead = ("Today's %s digest could not be built: the sources answered "
+                      "but returned nothing usable, so nothing is readable in it "
+                      "and this is an outage, not a quiet news day. The fallback "
+                      "is armed and will resend shortly." % slot)
+          elif attempt >= max_attempts:
+              title = 'Digest: 0 stories after %d attempts — FALLING BACK NOW' % max_attempts
+              priority, note = 5, 'error'
+              lead = ("Today's %s digest came back empty after %d attempts, so it "
+                      "is not reaching you on the usual schedule. The fallback is "
+                      "firing now and will resend shortly; if nothing has arrived "
+                      "by the next slot, the digest pipeline needs attention."
+                      % (slot, max_attempts))
+          elif attempt == 1:
+              title = 'Digest: no stories (1/3) — sources were fine'
+              priority, note = 3, 'notice'
+              lead = ("Quiet news day: the sources answered normally and simply had "
+                      "nothing new, so today's %s digest is empty rather than "
+                      "broken. Trying again (attempt %d of %d). Nothing to do "
+                      "unless it is still empty at the last attempt."
+                      % (slot, attempt, max_attempts))
+          else:
+              title = 'Digest: no stories (%d/3) — retrying' % attempt
+              priority, note = 3, 'notice'
+              lead = ("Still nothing from the sources for today's %s digest "
+                      "(attempt %d of %d). The sources were answering, so this is "
+                      "still a quiet day rather than an outage; the retry ladder "
+                      "is armed and will keep trying. Nothing to do unless it "
+                      "reaches the final attempt." % (slot, attempt, max_attempts))
+
+          # The engineer line, kept in full and moved BELOW the consequence: the
+          # owner is technical and this is exactly where he looks when the
+          # first sentence is not enough. Nothing is dropped from it.
+          detail = ('Detail: slot=%s date=%s empty_kind=%s attempt=%d of %d. '
+                    'This run is NOT marked delivered, so the fallback stays '
+                    'armed.' % (slot, date, kind, attempt, max_attempts))
+          body = '%s\n\n%s' % (lead, detail)
+          print('::%s::%s. %s' % (note, title, lead))
+
+          topic = (os.environ.get('NTFY_TOPIC') or '').strip()
+          server = (os.environ.get('NTFY_SERVER') or '').strip()
+          if not (topic and server.startswith(('http://', 'https://'))):
+              print('::warning::ntfy secrets unset — annotation only, no push')
+              raise SystemExit(0)
+          data = json.dumps({'topic': topic, 'title': title, 'message': body,
+                             'priority': priority,
+                             'tags': ['warning'] if priority == 5 else ['arrows_counterclockwise']})
+          try:
+              req = urllib.request.Request(
+                  server.rstrip('/') + '/', data=data.encode('utf-8'),
+                  headers={'Content-Type': 'application/json',
+                           'Accept': 'application/json', 'Markdown': 'yes'})
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  resp.read()
+              print('empty-digest ntfy sent to topic %r' % topic)
+          except Exception as exc:
+              print('::warning::empty-digest ntfy failed: %s' % exc)
+          PY
+
+      - name: Retire the exhausted ladder
+        if: steps.retry.outputs.act == 'exhausted'
+        # After the 3rd attempt the ladder is deleted so it cannot alert again,
+        # and the run stays GREEN: an exhausted ladder is the fallback
+        # ladder's turn, and this job failing would only add a second red
+        # signal for the same condition. The escalation alert for the final
+        # attempt was already sent by the step above.
+        # DEFECT 2: the token is injected inside this step, not persisted in
+        # the workspace by the checkout above.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          echo "3 attempts exhausted for ${{ steps.retry.outputs.slot }} — retiring state/digest_retry.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # DEFECT 2: the checkout persists no credentials, so the token is
+          # injected here, for the network commands only, via `git -c`.
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          git rm --cached --ignore-unmatch state/digest_retry.json >/dev/null 2>&1 || true
+          rm -f state/digest_retry.json
+          if git diff --staged --quiet; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: retire exhausted empty-digest retry ladder [skip ci]"
+          if ! git "${auth[@]}" pull --ff-only origin master; then
+            git "${auth[@]}" pull --rebase -X theirs origin master || \
+              echo "Fast-forward and rebase both failed — proceeding without pulling"
+          fi
+          git "${auth[@]}" push
+
+  watchdog:
+    # GATED ON ITS OWN SCHEDULE, deliberately, because this job now shares a
+    # workflow with `empty_digest_retry` (a 15-min cron). The gate keeps this
+    # job's verdicts on the two slots it was built for; manual dispatches are
+    # always allowed, and a dispatch reads the same committed schedule to work
+    # out which slot to judge.
+    #
+    # DEFECT 4 (2026-10-05): this gate was NEVER the problem, and the comment
+    # that used to sit above it was. It claimed the job "derives the slot it
+    # expects from the UTC HOUR, not from the schedule", which was exactly the
+    # defect: `github.event.schedule` was available here all along — this very
+    # gate is what proves it, since the job could only have produced the false
+    # page if the comparison had matched. The step now reads that variable
+    # (and falls back to this file's own `on.schedule` on a dispatch) instead
+    # of the wall clock, so a firing delayed by hours still judges the slot it
+    # was scheduled for.
+    #
+    # THE GATE GUARDS THE WRONG CRON, DELAY GUARDS NOTHING ELSE. It stops the
+    # job from firing on the 15-minute ladder. What it cannot do is stop
+    # GitHub from starting a 16:00 UTC run at 19:19 UTC, which is what
+    # happened on 2026-10-04, so the step carries its own delay tolerance: the
+    # scheduled instant is derived from the cron, and the digest is only
+    # declared missing once that slot's own delivery time has actually passed.
+    #
+    # LADDER-ONLY DISPATCHES SKIP THIS JOB (2026-10-20). The Worker's ladder arm
+    # dials this workflow with ladder_only=true when a retry is due. A
+    # workflow_dispatch already satisfies `github.event_name != 'schedule'`, so
+    # WITHOUT the first clause a Worker ladder ask would run this job too -- and
+    # judging a slot that is not due is exactly the false page DEFECT 4 was
+    # about. The input defaults to false, so a plain manual dispatch still
+    # behaves as it always did.
+    if: github.event.inputs.ladder_only != 'true' && (github.event_name != 'schedule' || github.event.schedule == '0 4,16 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # DEFECT 2 (2026-09-30): a read-only job never commits, so there is
+        # no reason to leave GITHUB_TOKEN in .git/config for the whole run.
+        with:
+          persist-credentials: false
+
+      - name: Check delivery marker
+        # DEFECT 4 (2026-10-05): WHICH SLOT AND WHICH DATE THIS RUN CHECKS.
+        #
+        # The step used to derive both from the wall-clock moment the JOB RAN:
+        #     now_utc = datetime.datetime.now(datetime.timezone.utc)
+        #     npt = now_utc + timedelta(hours=5, minutes=45)
+        #     today = npt.strftime('%F')
+        #     expected = 'morning' if now_utc.hour < 12 else 'evening'
+        # which is only correct while a scheduled job starts within minutes of
+        # its cron. GitHub delayed the `0 4,16 * * *` firing to ~19:19 UTC
+        # (runs 37146641145, 37227803911). 19:19 UTC is 01:04 NPT on 2026-10-05,
+        # so the run announced itself as the 16:00 UTC evening firing while
+        # reading a NPT date that belonged to the NEXT day, and demanded an
+        # evening digest that was not due until 19:50 NPT 2026-10-05 — about 19
+        # hours early. It then emailed:
+        #     Digest watchdog: evening digest for 2026-10-05 (NPT) NOT delivered
+        # while the 2026-10-04 NPT evening digest HAD been delivered
+        # (daily-news run 37106181621, 2026-10-04T13:35:47Z = 19:20 NPT). A false
+        # page, twice a day, forever, because "which digest was due?" was
+        # answered with "what time is it now?".
+        #
+        # THE QUESTION IS "WHICH SLOT WAS DUE?", NOT "WHAT TIME IS IT?".
+        # GitHub tells us which cron entry fired: `github.event.schedule` is the
+        # schedule expression of the `schedule` event, and it is VERIFIED
+        # available here rather than assumed — this job's own `if:` gate
+        # compares against it, and the two runs above produced watchdog output,
+        # which is only reachable if the gate matched, i.e. if the variable
+        # really carried '0 4,16 * * *'. daily-news.yml's "Fallback no-op
+        # check" already binds its slot to the same variable, and the digest
+        # slots are late-proof in production because of it.
+        #
+        # A cron expression with two hours (`0 4,16 * * *`) names the SCHEDULE,
+        # not the individual firing, so it cannot be compared with `==` the way
+        # the job-level gate does. It is expanded into its (hour, minute) pairs
+        # and the most recent instant at or before the job's start is taken as
+        # "the firing this run belongs to". Delay moves the JOB, not the
+        # identity of the firing it belongs to.
+        #
+        # THE DUE WINDOW IS DECIDED FROM THE DIGEST'S OWN CRON, never from the
+        # job's start time. It is a second, INDEPENDENT input to the verdict
+        # rather than a restatement of the fix above: the slot comes from the
+        # scheduled firing, the due time from daily-news.yml's crons, and the
+        # two are compared against a clock. What that gate can and cannot do is
+        # stated honestly at the comparison itself (see step 5) rather than
+        # claimed here, and Check 19 in tests/workflows/test_workflow_lint.py
+        # re-derives both relationships from the committed crons and fails if
+        # they ever stop being true.
+        #
+        # Marker shapes mirror the daily-news.yml fallback guard: current
+        # {date, time, delivered} plus the legacy {slot: date} shape; a missing
+        # `delivered` field means delivered (old code wrote the marker only
+        # after a successful send).
+        #
+        # A MANUAL DISPATCH has no `github.event.schedule`, so the schedule is
+        # read out of this workflow file's own committed `on.schedule` block.
+        # If that is unreadable too, the step cannot tell which slot it is
+        # looking at, and it FAILS CLOSED — red, loudly, as a broken watchdog —
+        # rather than guessing a slot and paging about a digest nobody asked
+        # about.
+        id: watch
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          # U8. The same two credentials the seal job reads the delivery ledger
+          # with, and BOTH ALREADY EXIST for the Cloudflare deploy -- no new
+          # secret is introduced. They are used for ONE thing: reading the live
+          # `digest:ledger` so this step can prefer KV over the git mirror and
+          # log every disagreement. Absent, the step falls back to the mirror,
+          # which is still KV's content and still better than the single-slot
+          # marker it replaces.
+          CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import datetime, json, os, re, urllib.request
+
+          # Nepal is UTC+05:45 with NO DST, so one constant covers every
+          # conversion below. NPT_OFFSET_MINUTES is the same 345 the lint suite
+          # pins in CRON_NPT_TABLE, and Check 19 re-derives it from the crons.
+          NPT_OFFSET_MINUTES = 345
+          UTC = datetime.timezone.utc
+
+          def emit(**kw):
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  for k, v in kw.items():
+                      fh.write('%s=%s\n' % (k, v))
+
+          def note(text):
+              print(text)
+              summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+              if summary:
+                  with open(summary, 'a', encoding='utf-8') as fh:
+                      fh.write('## Digest Watchdog\n\n- %s\n' % text)
+
+          def cron_field(field, maximum):
+              """Expand one 5-field cron field to a sorted list of ints."""
+              values = set()
+              for part in field.split(','):
+                  step = 1
+                  if '/' in part:
+                      part, _sep, step_text = part.partition('/')
+                      step = int(step_text)
+                  if part == '*':
+                      start, end = 0, maximum
+                  elif '-' in part:
+                      low, _sep, high = part.partition('-')
+                      start, end = int(low), int(high)
+                  else:
+                      start = end = int(part)
+                  values.update(range(start, end + 1, step))
+              return sorted(values)
+
+          def daily_utc_slots(expr, allow_busy=False):
+              """[(hour, minute)] of a cron that fires on EVERY day.
+
+              Raises on anything else on purpose. A cron that restricts the
+              date fields cannot be reasoned about by "take the most recent
+              matching instant" — and a wrong slot guess here means a page
+              about a digest the owner never missed, which is the defect this
+              rewrite exists to remove.
+
+              `allow_busy` exists for ONE caller: the manual-dispatch fallback,
+              which reads this workflow's own `on.schedule` and therefore also
+              sees the 15-minute retry ladder. That ladder is 72 firings a day
+              and belongs to a different job, so on that path a busy entry is
+              IGNORED with a printed note rather than treated as a fatal
+              schedule — and if ignoring them leaves nothing, the step fails
+              closed below. On the `github.event.schedule` path this job's own
+              `if:` gate has already excluded every other cron, so a busy entry
+              there really is a schedule this watchdog cannot reason about, and
+              it raises.
+              """
+              fields = expr.split()
+              if len(fields) != 5:
+                  raise ValueError('not a 5-field cron: %r' % expr)
+              minute, hour, dom, month, dow = fields
+              if (dom, month, dow) != ('*', '*', '*'):
+                  raise ValueError(
+                      'cron %r restricts the date fields, so the most recent '
+                      'matching instant is not answerable' % expr)
+              minutes = cron_field(minute, 59)
+              hours = cron_field(hour, 23)
+              per_day = len(minutes) * len(hours)
+              if per_day > 48:
+                  if not allow_busy:
+                      raise ValueError(
+                          'cron %r fires %d times a day; that is not a watchdog '
+                          'slot' % (expr, per_day))
+                  print('  (ignoring %r: %d firings/day belongs to the 15-minute '
+                        'retry ladder, which this job does not run on)'
+                        % (expr, per_day))
+                  return []
+              return [(h, m) for h in hours for m in minutes]
+
+          def cron_exprs_in(text):
+              """The `cron:` values under an `on:` -> `schedule:` block.
+
+              A four-line scan of RAW text on purpose: this step is stdlib-only
+              (no PyYAML on a runner by default), and the schedule it needs is
+              two string literals. Line-anchored so a `cron:` mentioned in a
+              comment or a heredoc cannot be mistaken for a schedule entry.
+              """
+              crons = []
+              inside = False
+              for line in text.splitlines():
+                  if re.match(r'^\s*schedule:\s*(#.*)?$', line):
+                      inside = True
+                      continue
+                  if inside:
+                      found = re.match(r"^\s*-?\s*cron:\s*'?([^'#]+?)'?\s*(#.*)?$",
+                                        line)
+                      if found:
+                          crons.append(found.group(1).strip())
+                      elif not line.strip() or line.lstrip().startswith('#'):
+                          continue
+                      else:
+                          inside = False
+              return crons
+
+          def most_recent_firing(slots, now_utc):
+              """The latest instant <= now_utc at which this cron fires.
+
+              Walks back over four days rather than assuming the firing is
+              within the hour: the whole point is that the job can start hours
+              late, so a search that only looked at the current hour would
+              repeat the defect it is fixing.
+              """
+              best = None
+              for back in range(0, 4):
+                  day = (now_utc - datetime.timedelta(days=back)).date()
+                  for hour, minute in slots:
+                      candidate = datetime.datetime(day.year, day.month, day.day,
+                                                    hour, minute, tzinfo=UTC)
+                      if candidate <= now_utc and (best is None or candidate > best):
+                          best = candidate
+              if best is None:
+                  raise ValueError(
+                      'no firing of this schedule is at or before %s, so this '
+                      'run cannot be attributed to one' % now_utc.isoformat())
+              return best
+
+          def digest_due(digest_slots, npt_date, expected):
+              """When the `expected` digest for `npt_date` (NPT) is DUE, in UTC.
+
+              Anchored on the Nepal date and the slot NAME, and on neither the
+              job's clock nor the watchdog's scheduled instant. That is what
+              makes it an INDEPENDENT guard rather than a restatement of the
+              identity fix above: if a schedule change ever put a digest LATER
+              than the watchdog firing meant to catch it, the comparison below
+              sees a due time in the future and stays silent, instead of
+              demanding a digest that is not late yet.
+
+              A digest is named by its NEPALI wall clock, not its UTC hour:
+              07:50 NPT is the morning slot and 19:50 NPT is the evening one,
+              which is exactly the split daily-news.yml's own fallback uses to
+              pick a digest_time. Using UTC hours here would call the evening
+              digest "morning" for six and three quarter hours of the day.
+              """
+              due = []
+              for back in range(0, 4):
+                  day = npt_date - datetime.timedelta(days=back)
+                  for hour, minute in digest_slots:
+                      candidate = datetime.datetime(day.year, day.month, day.day,
+                                                    hour, minute, tzinfo=UTC)
+                      local = candidate + datetime.timedelta(
+                          minutes=NPT_OFFSET_MINUTES)
+                      if local.date() != npt_date:
+                          continue
+                      if ('morning' if local.hour < 12 else 'evening') != expected:
+                          continue
+                      due.append(candidate)
+              if not due:
+                  raise ValueError(
+                      'daily-news.yml has no %s digest on %s (NPT), so "was it '
+                      'due?" cannot be answered from the real cron boundary'
+                      % (expected, npt_date))
+              # Earliest, so an extra later digest for the same slot can never
+              # make the watchdog wait past the first one it could have caught.
+              return min(due)
+
+          # -- the clock --------------------------------------------------
+          # WATCHDOG_NOW_UTC pins the instant for the offline regression test
+          # in tests/workflows/test_workflow_lint.py, which executes THIS BODY
+          # at the two frozen instants the false page was observed at. It is
+          # unset in CI, so production always reads the real clock. The delay
+          # bug lived in "what time is it now?", so the one thing a test has to
+          # control is exactly that.
+          raw_now = (os.environ.get('WATCHDOG_NOW_UTC') or '').strip()
+          if raw_now:
+              now_utc = datetime.datetime.fromisoformat(
+                  raw_now.replace('Z', '+00:00'))
+              if now_utc.tzinfo is None:
+                  now_utc = now_utc.replace(tzinfo=UTC)
+              now_utc = now_utc.astimezone(UTC)
+              print('clock pinned by WATCHDOG_NOW_UTC=%s -> %s (test harness)'
+                    % (raw_now, now_utc.isoformat()))
+          else:
+              now_utc = datetime.datetime.now(UTC)
+          # HAZARD, NAMED SO IT CANNOT BE CREATED BY ACCIDENT: this variable is
+          # read from the ENVIRONMENT, so a repository- or organisation-level
+          # variable of this name would freeze the watchdog's clock permanently
+          # and silently disarm it -- every future run would judge the same
+          # fixed instant, and nothing would say so. It is deliberately NOT
+          # settable from this workflow's own committed `env:` block below,
+          # which is reviewed in every diff. Never define WATCHDOG_NOW_UTC at
+          # repository or organisation level.
+
+          # -- 1. which schedule entry was this run fired by? -------------
+          event_name = (os.environ.get('EVENT_NAME') or '').strip()
+          schedule = (os.environ.get('EVENT_SCHEDULE') or '').strip()
+          if schedule:
+              # The `schedule` event payload carries the ONE cron string that
+              # fired this run, comma expansion and all ('0 4,16 * * *'). It is
+              # never split on commas: that comma is part of the hour list.
+              entries = [schedule]
+              source = 'github.event.schedule'
+          else:
+              # A manual dispatch carries no `schedule`. Fall back to this
+              # workflow's own committed schedule so a dispatch judges the same
+              # slot the cron would have judged.
+              here = os.path.join(
+                  os.environ.get('GITHUB_WORKSPACE') or '.',
+                  '.github', 'workflows', 'digest-watchdog.yml')
+              try:
+                  with open(here, encoding='utf-8') as fh:
+                      entries = cron_exprs_in(fh.read())
+              except OSError as exc:
+                  print('::error::Digest watchdog: this run cannot tell which '
+                        'scheduled slot it belongs to (event=%r, schedule=%r, '
+                        'and the committed `on.schedule` could not be read: %s). '
+                        'Refusing to guess a slot: a watchdog that demands a '
+                        'digest nobody missed is worse than a red badge.'
+                        % (event_name, schedule, exc))
+                  raise SystemExit(1)
+              if not entries:
+                  print('::error::Digest watchdog: no cron could be read from '
+                        '.github/workflows/digest-watchdog.yml, so no slot can '
+                        'be identified for this %s dispatch.'
+                        % (event_name or 'manual'))
+                  raise SystemExit(1)
+              source = "this workflow's committed on.schedule"
+              print('no github.event.schedule (%s dispatch) - using the '
+                    'committed on.schedule of this workflow: %r'
+                    % (event_name or 'manual', entries))
+
+          # -- 2. the scheduled instant this run belongs to ---------------
+          # Every entry is expanded and the LATEST firing across all of them at
+          # or before now wins. On a scheduled run there is exactly one entry
+          # and it is this job's own cron; on a dispatch the list may hold
+          # several, and the ones that belong to the retry ladder are dropped
+          # by daily_utc_slots(allow_busy=True) with a printed note.
+          watch_slots = []
+          for entry in entries:
+              try:
+                  # allow_busy only on the dispatch fallback, which is the one
+                  # path that sees another job's cron (the retry ladder).
+                  watch_slots.extend(
+                      daily_utc_slots(entry.strip(), allow_busy=not schedule))
+              except ValueError as exc:
+                  print('::error::Digest watchdog: unusable watchdog schedule %r '
+                        '(%s). Refusing to guess which slot this run belongs to.'
+                        % (entry.strip(), exc))
+                  raise SystemExit(1)
+          if not watch_slots:
+              print('::error::Digest watchdog: no cron in %s describes a watchdog '
+                    'firing slot (%r), so no slot can be identified for this run.'
+                    % (source, entries))
+              raise SystemExit(1)
+
+          try:
+              sched_utc = most_recent_firing(watch_slots, now_utc)
+          except ValueError as exc:
+              print('::error::Digest watchdog: %s' % exc)
+              raise SystemExit(1)
+          # most_recent_firing compares `<= now_utc`, and that boundary is load-bearing
+          # in the direction that matters: a run that starts a SECOND after its
+          # scheduled minute must still be attributed to the firing it belongs
+          # to rather than to the previous day's one, or every delayed evening
+          # run would judge the evening before last.
+          late_by = int((now_utc - sched_utc).total_seconds())
+          delayed = 'on time' if late_by < 60 else 'DELAYED by %dm%02ds' % (
+              late_by // 60, late_by % 60)
+          npt_date = (sched_utc + datetime.timedelta(
+              minutes=NPT_OFFSET_MINUTES)).date()
+
+          # -- 3. which slot, and when was it due? -----------------------
+          # THE SLOT COMES FROM THE SCHEDULED HOUR, NOT FROM ANY HOUR THE JOB
+          # OBSERVED. 04 UTC is the morning firing and 16 UTC is the evening
+          # one -- the same 12:00 split daily-news.yml's own fallback uses to
+          # name a digest_time, applied to the instant this run was scheduled
+          # for instead of to the instant it happened to start at. That one
+          # substitution is the whole of DEFECT 4.
+          expected = 'morning' if sched_utc.hour < 12 else 'evening'
+
+          # DEFECT 5 (2026-10-05), CLOSED BY U8 (2026-10-10).
+          #
+          # THE GAP THIS BLOCK USED TO REPORT AND NOW JUDGES. `most_recent_firing`
+          # takes the LATEST firing at or before now. Correct for every plausible
+          # delay; wrong for exactly one case: once the NEXT firing has also
+          # happened, the answer becomes the newer one. With `0 4,16 * * *` the
+          # gap is 12h and the boundary was measured, not guessed:
+          #     now = 2026-10-05T15:59:00Z -> morning / 2026-10-05 / miss=true
+          #     now = 2026-10-05T16:01:00Z -> evening / 2026-10-05 / miss=false
+          # In the second case the run judges the evening slot, and the 04:00 UTC
+          # firing's morning digest — genuinely absent — is judged by NOTHING.
+          # A SWALLOWED ALARM IS WORSE THAN A FALSE ONE.
+          #
+          # WHAT U8 CHANGED, AND IT IS NOT "THE STEP NOW KNOWS WHICH FIRING IT
+          # IS". It still does not, and nothing in this step's inputs can tell
+          # it: GitHub's `schedule` event carries the cron STRING, not the
+          # instant a delayed run was queued for, so a run that really is the
+          # 16:00 firing started one minute late and a run displaced from 04:00
+          # arriving at the same minute are byte-identical inputs.
+          #
+          # WHAT CHANGED IS THE SOURCE. `state/last_digest_sent.json` holds ONE
+          # slot and is OVERWRITTEN by the next run, so by 16:00 the morning slot
+          # is gone from it and a delivered morning digest is indistinguishable
+          # from an absent one. `state/digest_slot_ledger.json` — the git mirror
+          # of the Worker's `digest:ledger` — keeps the last 7 NPT days x 2
+          # slots, so the preceding slot is still answerable. So the preceding
+          # firing is no longer merely REPORTED as unjudged: it is JUDGED, below,
+          # against that ledger.
+          #
+          # DIRECTION OF TRUTH, restated here because this is the step that acts
+          # on it, and because a reader who lands on a verdict without the rule
+          # that produced it will eventually "fix" it the wrong way round:
+          #   KV IS AUTHORITATIVE FOR DELIVERY. Git never decides whether a push
+          #   happened; only the Worker witnessed that.
+          #   GIT IS AUTHORITATIVE FOR BUILD (built_at, story_count,
+          #   source_health_state); only the run that built it witnessed that.
+          # Where the two can disagree, KV wins and the disagreement is logged
+          # below. The mirror is a record, not an authority — which is exactly
+          # why a missing entry in it is a question, not a verdict.
+          try:
+              prev_utc = most_recent_firing(
+                  watch_slots, sched_utc - datetime.timedelta(seconds=1))
+              prev_date = (prev_utc + datetime.timedelta(
+                  minutes=NPT_OFFSET_MINUTES)).date()
+          except ValueError:  # pragma: no cover - defensive
+              prev_utc, prev_date = None, None
+          displaced = prev_date is not None and prev_date == npt_date
+          if displaced:
+              # Only ever the same Nepal day, which is the ONLY case a delay
+              # large enough to cross a 12h gap can produce. A morning run's
+              # preceding firing is yesterday's evening, a different NPT date,
+              # and judges nothing — this note is not daily noise.
+              print('Watchdog coverage: this run is judging the %02d:%02d UTC firing '
+                    '(%s digest for %s NPT). The preceding %02d:%02d UTC firing '
+                    '(%s digest for %s NPT) is judged separately below, against the '
+                    'delivery ledger rather than the single-slot marker.'
+                    % (sched_utc.hour, sched_utc.minute, expected, npt_date,
+                       prev_utc.hour, prev_utc.minute,
+                       'morning' if prev_utc.hour < 12 else 'evening',
+                       prev_date))
+
+          # daily-news.yml is the ground truth for when a digest is DUE: it is
+          # the workflow that produces them. Its crons are read here rather
+          # than restated as literals in this file, because a restated digest
+          # time is a second copy of a fact that Check 19 already watches.
+          digest_workspace = os.environ.get('GITHUB_WORKSPACE') or '.'
+          digest_path = os.path.join(digest_workspace, '.github', 'workflows',
+                                     'daily-news.yml')
+          try:
+              with open(digest_path, encoding='utf-8') as fh:
+                  digest_exprs = cron_exprs_in(fh.read())
+              digest_slots = []
+              for expr in digest_exprs:
+                  try:
+                      digest_slots.extend(daily_utc_slots(expr))
+                  except ValueError as exc:
+                      print('::error::Digest watchdog: daily-news.yml carries a '
+                            'schedule this watchdog cannot reason about: %s' % exc)
+                      raise SystemExit(1)
+              if not digest_slots:
+                  raise ValueError('no usable daily cron in daily-news.yml')
+          except (OSError, ValueError) as exc:
+              print('::error::Digest watchdog: the digest schedule could not be '
+                    'read from .github/workflows/daily-news.yml (%s), so "is this '
+                    'slot due yet?" cannot be answered from the real cron '
+                    'boundary. Failing closed rather than reporting a missed '
+                    'digest nobody can verify.' % exc)
+              raise SystemExit(1)
+
+          try:
+              due_utc = digest_due(digest_slots, npt_date, expected)
+          except ValueError as exc:
+              print('::error::Digest watchdog: %s' % exc)
+              raise SystemExit(1)
+
+          # -- 4. the marker -----------------------------------------------
+          marker = {}
+          try:
+              with open('state/last_digest_sent.json', encoding='utf-8') as fh:
+                  marker = json.load(fh)
+          except (OSError, ValueError) as exc:
+              print('marker unreadable: %s' % exc)
+
+          # Not a verdict, just the shape of what was there.
+          ok = False
+          if isinstance(marker, dict):
+              current = (marker.get('time') == expected
+                         and marker.get('date') == npt_date.isoformat())
+              legacy = marker.get(expected) == npt_date.isoformat()
+              if (current or legacy) and marker.get('delivered', True):
+                  ok = True
+
+          # -- 4b. THE DELIVERY LEDGER (U8) ---------------------------------
+          # TWO SOURCES, ONE AUTHORITY. `state/digest_slot_ledger.json` is the
+          # git mirror of the Worker's `digest:ledger`, written by
+          # digest-prebuild.yml's "Mirror the delivery ledger into git" step
+          # from the KV payload that step just read.
+          #
+          # KV WINS, ALWAYS, AND THE DISAGREEMENT IS LOGGED. The mirror is a
+          # RECORD of what KV said, not an authority of its own: the seal job
+          # commits it after the render that reads it, so it lags by up to ~12h
+          # and is blind to the newest push. Whenever this step can read live KV
+          # and the two differ on a slot's delivery, KV's answer is used and the
+          # difference is printed. Git cannot turn a KV-recorded miss into a
+          # KV-recorded delivery, in either direction.
+          #
+          # FALLBACK, NOT PREFERENCE. When CF_PAGES_API_TOKEN / CF_ACCOUNT_ID are
+          # absent (they were absent on the first seal run, per the workflow's
+          # own graceful-degradation path) the mirror is the only ledger
+          # available. Using it is strictly better than the marker it replaces:
+          # it retains 7 days x 2 slots where the marker retains one, and it is
+          # still KV's content. What it CANNOT do is prove freshness, so
+          # `mirror_as_of` is checked against the slot's due time below and an
+          # absent entry under a stale mirror is reported as UNKNOWN, never as a
+          # miss. That is the difference between a lagging record and a verdict.
+          workspace = os.environ.get('GITHUB_WORKSPACE') or '.'
+          CF_TOKEN = (os.environ.get('CF_LEDGER_TOKEN') or '').strip()
+          CF_ACCOUNT = (os.environ.get('CF_ACCOUNT_ID') or '').strip()
+          MIRROR_PATH = os.path.join(
+              os.environ.get('GITHUB_WORKSPACE') or '.', 'state',
+              'digest_slot_ledger.json')
+          KV_LEDGER_KEY = 'digest:ledger'
+          KV_API = 'https://api.cloudflare.com/client/v4'
+
+          def kv_namespace(workspace):
+              """The KV namespace id from the config `wrangler deploy` binds."""
+              path = os.path.join(workspace, 'deploy', 'wrangler.toml')
+              try:
+                  with open(path, encoding='utf-8-sig') as fh:
+                      text = fh.read()
+              except OSError:
+                  return ''
+              found = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
+                                text, re.S)
+              return found.group(1) if found else ''
+
+          mirror = {}
+          try:
+              with open(MIRROR_PATH, encoding='utf-8') as fh:
+                  mirror = json.load(fh)
+          except (OSError, ValueError) as exc:
+              print('delivery ledger mirror unavailable: %s' % exc)
+          if not isinstance(mirror, dict):
+              mirror = {}
+          mirror_days = mirror.get('days') if isinstance(mirror.get('days'), dict) else {}
+
+          def slot_entry(days, date, slot_name):
+              day = days.get(date) if isinstance(days, dict) else None
+              if not isinstance(day, dict):
+                  return None
+              entry = day.get(slot_name)
+              return entry if isinstance(entry, dict) else None
+
+          def delivered(entry):
+              """Did this slot's push reach the owner? Read from one entry.
+
+              `ntfy_sent_at` is the Worker's own record of a completed send, and
+              every push kind sets it — `delivered`, `partial`,
+              `fallback_last_good` and `unavailable` alike. That is deliberate
+              here: this check answers "was the owner PUSHED FOR?", not "was the
+              push a good digest". A `partial` push is something the owner has
+              and the supersede arm owns repairing it; calling it a MISSED
+              digest would page for a push that arrived.
+              """
+              if not isinstance(entry, dict):
+                  return False
+              return bool(entry.get('ntfy_sent_at'))
+
+          def read_kv_ledger(ws):
+              """The LIVE `digest:ledger`, or None. Never raises.
+
+              None means "cannot read KV", which is a DIFFERENT thing from "the
+              ledger is empty" and is handled differently: the mirror is used
+              and the fallback is named. Reading a delivery record from a mirror
+              when KV was merely unreachable is fine; reading one when KV said
+              the slot was NOT delivered would be a lie, so the two paths are
+              kept apart on purpose.
+              """
+              if not (CF_TOKEN and CF_ACCOUNT):
+                  return None
+              namespace = kv_namespace(ws)
+              if not namespace:
+                  return None
+              url = ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
+                     % (KV_API, CF_ACCOUNT, namespace, KV_LEDGER_KEY))
+              request = urllib.request.Request(
+                  url, headers={'Authorization': 'Bearer ' + CF_TOKEN,
+                                'Accept': 'text/plain'})
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      raw = response.read().decode('utf-8', errors='replace')
+              except Exception as exc:
+                  print('live KV ledger unreadable (%s: %s) - falling back to the '
+                        'git mirror, which lags by up to one seal but is still '
+                        "KV's own content" % (exc.__class__.__name__, exc))
+                  return None
+              try:
+                  parsed = json.loads(raw) if raw.strip() else {}
+              except ValueError:
+                  return None
+              return parsed if isinstance(parsed, dict) else None
+
+          kv_ledger = read_kv_ledger(workspace)
+          # `kv_days is None` is the flag that decides whose answer is used, and
+          # it means "KV could not be consulted" -- NOT "KV said nothing". An
+          # empty KV ledger is `{}`, whose `days` is absent, and that still
+          # counts as consulted.
+          kv_consulted = kv_ledger is not None
+          kv_days = (kv_ledger.get('days')
+                     if kv_consulted and isinstance(kv_ledger.get('days'), dict)
+                     else None)
+          if not kv_consulted:
+              kv_days = None
+
+          def reconcile(date, slot_name, kv_entry, mirror_entry, source):
+              """One slot's delivery answer, with KV winning and the delta logged.
+
+              THE RULE, IN ONE PLACE, because it is the only place it is
+              applied. When KV was consulted its entry is THE answer -- even
+              when that entry is absent, which means "KV recorded nothing for
+              this slot". When KV could not be consulted the mirror's entry
+              stands and the fallback is named. Every disagreement is printed:
+              that log line is the evidence that git is not deciding delivery.
+              """
+              if kv_consulted:
+                  # BOTH DISAGREEMENT SHAPES ARE LOGGED, and the asymmetric one
+                  # is the dangerous one. It is easy to check only "both sides
+                  # have an entry and differ"; that misses the case where the
+                  # mirror claims a send and KV holds NO entry for the slot at
+                  # all -- which is precisely what a mirror that predates the
+                  # push looks like, and precisely the case where following git
+                  # would swallow a real miss. One log line covers all three
+                  # (KV-only, mirror-only, and both-with-different-values)
+                  # because a human debugging this needs the same sentence
+                  # every time.
+                  kv_sent = delivered(kv_entry)
+                  mirror_sent = delivered(mirror_entry)
+                  if (kv_entry is None) != (mirror_entry is None):
+                      print('::warning::Digest watchdog: the git delivery ledger '
+                            'and live KV DISAGREE about %s %s (KV: %s | git mirror: '
+                            '%s, mirror as_of=%r). KV IS AUTHORITATIVE FOR '
+                            'DELIVERY and its answer is used; the mirror is a '
+                            'record that lags by up to one seal.'
+                            % (slot_name, date,
+                               'no entry' if kv_entry is None
+                               else 'sent=%s kind=%r' % (kv_sent,
+                                                         kv_entry.get('kind')),
+                               'no entry' if mirror_entry is None
+                               else 'sent=%s kind=%r' % (mirror_sent,
+                                                         mirror_entry.get('kind')),
+                               mirror.get('as_of')))
+                  elif mirror_entry is not None and (
+                          kv_sent != mirror_sent
+                          or kv_entry.get('kind') != mirror_entry.get('kind')):
+                      print('::warning::Digest watchdog: the git delivery ledger '
+                            'and live KV DISAGREE about %s %s (KV: sent=%s '
+                            'kind=%r | git mirror: sent=%s kind=%r, mirror '
+                            'as_of=%r). KV IS AUTHORITATIVE FOR DELIVERY and '
+                            'its answer is used; the mirror is a record that '
+                            'lags by up to one seal.'
+                            % (slot_name, date, kv_sent, kv_entry.get('kind'),
+                               mirror_sent, mirror_entry.get('kind'),
+                               mirror.get('as_of')))
+                  return kv_entry, 'KV'
+              print('  (%s %s judged from the git delivery-ledger mirror: live KV '
+                    'could not be consulted)' % (source, date))
+              return mirror_entry, 'the git mirror'
+
+          # -- 4c. THE DISPLACED SLOT (U8). THE RESIDUAL THIS CLOSES. ------
+          #
+          # Judged from the LEDGER, never from `last_digest_sent.json`. The
+          # marker holds ONE slot and is overwritten by the next run, so on a
+          # healthy evening it names the evening and says nothing at all about
+          # the morning -- and the morning is precisely the slot a >=12h-delayed
+          # firing left unjudged. Asking the marker would produce one of two
+          # wrong answers: a miss on every healthy evening, or silence. The
+          # ledger keeps both slots, so neither happens.
+          #
+          # THE THREE VERDICTS ARE DISTINCT ON PURPOSE, and the middle one is
+          # what the mirror is FOR:
+          #   DELIVERED  the ledger records a send for that exact (date, slot).
+          #   MISSING    the ledger has NO entry for it AND the ledger is known
+          #              fresh enough to have recorded one. Only this alarms.
+          #   UNKNOWN    no entry, and the ledger's own `as_of` predates that
+          #              slot's due time, so it cannot testify either way. A
+          #              lagging record is not a failed push.
+          # Collapsing UNKNOWN into MISSING would page the owner nightly until
+          # the mirror caught up; collapsing it into DELIVERED would swallow
+          # exactly the alarm this step exists to raise. Both are the failure
+          # this repository has already paid for.
+          displaced_verdict = 'not applicable'
+          displaced_slot = ''
+          if displaced:
+              displaced_slot = 'morning' if prev_utc.hour < 12 else 'evening'
+              prev_due = None
+              try:
+                  prev_due = digest_due(digest_slots, prev_date, displaced_slot)
+              except ValueError as exc:
+                  # No due time means no freshness test is possible, so no
+                  # verdict is justified. UNKNOWN, loudly.
+                  print('::warning::Digest watchdog: %s' % exc)
+              entry, entry_origin = reconcile(
+                  prev_date.isoformat(), displaced_slot,
+                  slot_entry(kv_days, prev_date.isoformat(), displaced_slot)
+                  if kv_days is not None else None,
+                  slot_entry(mirror_days, prev_date.isoformat(), displaced_slot),
+                  'displaced slot')
+              # THE FRESHNESS TEST, COMPUTED ONCE, BECAUSE TWO ARMS BELOW NEED
+              # IT. It answers one question: was the mirror read at or after this
+              # slot's due time, so that it COULD have witnessed the push? `as_of`
+              # is when the mirror was read, not when KV was last written
+              # (digest-prebuild.yml defines it exactly so), so the comparison
+              # asks "could this copy know?" and nothing else.
+              #
+              # WHY THE ENTRY-EXISTS ARM BELOW NEEDS IT TOO, which is the half
+              # that was missing. The mirror step CREATES an entry for the slot it
+              # is sealing -- the build half, with no `ntfy_sent_at` -- at 06:40
+              # and 18:40 NPT, forty minutes BEFORE that slot's delivery, because
+              # it writes the build fields out of the artifact it has just sealed.
+              # So a mirror can hold a present-but-sendless entry for a slot whose
+              # push it predates, and reading that as a recorded miss pages the
+              # owner for a delivery the mirror could not see yet. Live shape,
+              # 2026-10-18: the committed mirror's `2026-10-18 morning` bucket
+              # holds only built_at/story_count/source_health_state with
+              # as_of 01:03:59Z, while that morning's due time is 01:35Z -- and
+              # that morning digest WAS delivered. FROM KV the same entry shape
+              # stays a verdict, which is why the arm keeps it for KV.
+              mirror_as_of = str(mirror.get('as_of') or '')
+              fresh = False
+              if mirror_as_of and prev_due is not None:
+                  try:
+                      mirror_moment = datetime.datetime.fromisoformat(
+                          mirror_as_of.replace('Z', '+00:00'))
+                      if mirror_moment.tzinfo is None:
+                          mirror_moment = mirror_moment.replace(tzinfo=UTC)
+                      fresh = mirror_moment.astimezone(UTC) >= prev_due
+                  except ValueError:
+                      fresh = False
+              if delivered(entry):
+                  displaced_verdict = 'DELIVERED'
+                  displaced_detail = ('%s records a send at %s'
+                                      % (entry_origin, entry.get('ntfy_sent_at')))
+              elif entry is not None and (kv_consulted or fresh):
+                  # An entry exists and carries no send. From KV that is a
+                  # RECORDED OUTCOME -- the authority itself saying it pushed
+                  # nothing for this slot -- and freshness does not apply to it.
+                  # From a mirror it is only an outcome if the mirror was read at
+                  # or after the slot's due time; before that it is a build half
+                  # that cannot testify either way, and it is UNKNOWN below.
+                  displaced_verdict = 'MISSING'
+                  displaced_detail = ('%s holds an entry for this slot with '
+                                      'kind=%r and no ntfy_sent_at'
+                                      % (entry_origin, entry.get('kind')))
+              elif entry is not None:
+                  displaced_verdict = 'UNKNOWN'
+                  displaced_detail = (
+                      'only the git mirror holds an entry for this slot, it '
+                      'records no send, and the mirror as_of=%r predates its due '
+                      'time (%s), so it cannot testify: a build half written '
+                      'before the delivery is not a missed push'
+                      % (mirror_as_of,
+                         prev_due.strftime('%Y-%m-%dT%H:%M:%SZ')
+                         if prev_due else 'unknown'))
+              else:
+                  # NO ENTRY ON EITHER SIDE. If KV was consulted, that is KV
+                  # itself saying it recorded nothing, which is a verdict and
+                  # needs no freshness test. If KV could NOT be consulted we
+                  # are reading the mirror alone, and a mirror that predates
+                  # the slot cannot testify -- hence UNKNOWN.
+                  if kv_consulted:
+                      displaced_verdict = 'MISSING'
+                      displaced_detail = ('live KV holds no entry at all for this '
+                                          'slot -- the authoritative record says '
+                                          'nothing was pushed for it')
+                  elif fresh:
+                      displaced_verdict = 'MISSING'
+                      displaced_detail = (
+                          'the git mirror is current (as_of=%s) and holds no entry '
+                          'at all for this slot' % mirror_as_of)
+                  else:
+                      displaced_verdict = 'UNKNOWN'
+                      displaced_detail = (
+                          'no ledger holds an entry for this slot and the mirror '
+                          'as_of=%r predates its due time (%s), so it cannot '
+                          'testify: a lagging record is not a missed push'
+                          % (mirror_as_of,
+                             prev_due.strftime('%Y-%m-%dT%H:%M:%SZ')
+                             if prev_due else 'unknown'))
+              displaced_line = ('Watchdog (displaced slot): %s digest for %s NPT — %s '
+                                '(%s; from the %02d:%02d UTC firing, which this run '
+                                'does not judge as its own)'
+                                % (displaced_slot, prev_date, displaced_verdict,
+                                   displaced_detail, prev_utc.hour, prev_utc.minute))
+              print(displaced_line)
+              note(displaced_line)
+              if displaced_verdict == 'MISSING':
+                  print('::warning::%s' % displaced_line)
+
+          # -- 5. is the slot actually due? --------------------------------
+          # A missing marker for a slot that is not due yet is not a missed
+          # digest, and calling it one is what paged the owner at 01:04 NPT for
+          # a 19:50 NPT digest. `due_utc` comes from the digest's own cron and
+          # `now_utc` from this step's clock, so this is an INDEPENDENT input to
+          # the verdict rather than a restatement of the identity fix above.
+          #
+          # HONEST LIMIT, because a guard that cannot fire must not be dressed
+          # up as one that can: with the slot anchored to the SCHEDULED firing,
+          # this gate is STRUCTURALLY OPEN. The firing is at or before now by
+          # construction, and the digest it judges is 1h55m before the firing,
+          # so `now_utc >= due_utc` holds for every reachable state of the
+          # shipped crons. It is kept for the one configuration in which it
+          # does fire: a digest cron moved to a time LATER than the watchdog
+          # that is meant to catch it (evening digest at 16:05 UTC, watchdog at
+          # 16:00 UTC), where demanding delivery would be premature every single
+          # night. That is a silent inversion, and this gate is what turns it
+          # into a quiet step instead of a nightly false page.
+          #
+          # Check 19 in tests/workflows/test_workflow_lint.py re-derives the
+          # 115-minute gap from the two workflows' committed crons and fails if
+          # it inverts, so the assumption this gate rests on cannot quietly stop
+          # being true.
+          due_yet = now_utc >= due_utc
+          if not due_yet:
+              # Nothing has been missed yet, so nothing is MISSED. `ok=True` is
+              # not leniency: the honest verdict for a digest that has not been
+              # produced yet is "not a miss", and the run stays green so the
+              # real check is the next firing of this slot.
+              ok = True
+              remaining = int((due_utc - now_utc).total_seconds())
+              reason = ('NOT DUE YET (the %s digest for %s NPT is due at %s, '
+                        'in %dm%02ds; this run started %s)'
+                        % (expected, npt_date,
+                           due_utc.strftime('%Y-%m-%d %H:%M UTC'),
+                           remaining // 60, remaining % 60, delayed))
+          elif ok:
+              reason = 'delivered'
+          else:
+              reason = 'no delivered marker'
+
+          # Three words, not two: a slot that is not due yet is NOT "delivered", and
+          # printing DELIVERED for a digest that does not exist yet is the same
+          # class of lie as printing MISSING for one that has. The gate on the
+          # alerting step below reads `miss`, which stays 'false' here.
+          verdict = 'MISSING' if not ok else ('NOT DUE YET' if not due_yet
+                                              else 'DELIVERED')
+          line = ('Watchdog: %s digest for %s NPT — %s (%s; scheduled %s, %s; '
+                  'digest due %s; marker=%s)'
+                  % (expected, npt_date, verdict, reason,
+                     sched_utc.strftime('%Y-%m-%d %H:%M UTC'), delayed,
+                     due_utc.strftime('%Y-%m-%d %H:%M UTC'),
+                     json.dumps(marker, ensure_ascii=False)[:300]))
+          print(line)
+          note(line)
+          # U8: THE `miss` OUTPUT IS NOW THE DISJUNCTION OF BOTH JUDGEMENTS.
+          # A displaced slot that the ledger proves undelivered IS a missed
+          # digest, and the alerting step below must fire for it -- otherwise
+          # the residual is closed on paper only. `miss_slot`/`miss_date` name
+          # WHICH slot is missing so the alert text is not about the wrong one,
+          # which is the exact mis-attribution this work set out to remove.
+          miss = not ok
+          miss_slot, miss_date = expected, npt_date.isoformat()
+          if displaced_verdict == 'MISSING' and not miss:
+              miss = True
+              miss_slot, miss_date = displaced_slot, prev_date.isoformat()
+          emit(miss='true' if miss else 'false', slot=miss_slot,
+               today=miss_date, judged_slot=expected,
+               displaced_verdict=displaced_verdict or 'not applicable')
+          if not ok:
+              print('::warning::%s' % line)
+          PY
+
+      - name: Check academic monitor health
+        # F8 — the academic dead-man's switch, as an ARM OF THIS EXISTING JOB.
+        # No new cron, no new runner minutes: it rides the same 04:00/16:00 UTC
+        # slots, and it reads committed state only.
+        #
+        # IT CANNOT CAUSE A FALSE DIGEST ALARM. Three properties guarantee that:
+        #   1. it writes its own outputs under `academic` and never touches
+        #      `steps.watch.outputs`, which is the ONLY input to the "Alert on
+        #      missed digest" gate below;
+        #   2. continue-on-error keeps a violation from failing the job, so the
+        #      digest verdict below is unaffected;
+        #   3. it reads state/academic_state.json + state/exam_selfcheck.json,
+        #      which the digest marker step never touches.
+        #
+        # Asserts: schema_version == 2, last_poll_time within 24h, no host in
+        # hosts_down for more than 6h, and a successful exam-source self-check
+        # within 7 days. This is what makes a dead result monitor impossible to
+        # mistake for a quiet week.
+        id: academic
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          # NOTE: no `set -e` around the python block. A violation must still
+          # reach the alerting code below; continue-on-error must not be the
+          # thing that swallows it.
+          set -o pipefail
+          set +e
+          python3 - <<'PY'
+          import datetime, json, os
+
+          now = datetime.datetime.now(datetime.timezone.utc)
+          npt = now + datetime.timedelta(hours=5, minutes=45)
+          # Findings are split into HARD (the monitor is blind or the state is
+          # unusable -> alarm) and SOFT (a transitional state that will
+          # self-heal -> note it, do not alarm). An arm that alarms on a
+          # not-yet-migrated state file guarantees a false alarm on its very
+          # first run, and an owner who gets one false alarm learns to ignore
+          # the arm entirely.
+          problems = []
+          notes = []
+
+          # --- 1) academic state: schema + poll recency + host outages ------
+          state = {}
+          try:
+              with open('state/academic_state.json', encoding='utf-8') as fh:
+                  state = json.load(fh)
+          except (OSError, ValueError) as exc:
+              state = {}
+              problems.append('state/academic_state.json unreadable: %s' % exc)
+
+          if isinstance(state, dict) and state:
+              version = state.get('schema_version')
+              if version == 1:
+                  # SOFT: the tracked state is still the legacy schema. The
+                  # migration to schema 2 is in-memory + automatic and happens
+                  # on the next monitor run, so this is a pending migration,
+                  # not a broken monitor. The watchdog must not scream about it
+                  # on the same morning it is introduced.
+                  notes.append('schema_version is 1: the no-burn state model '
+                               'migrates on the next monitor run (pending, not '
+                               'a failure)')
+              elif version != 2:
+                  problems.append(
+                      'schema_version is %r, expected 2 - the state file is not '
+                      'a shape this monitor understands' % (version,))
+
+              last_poll = str(state.get('last_poll_time') or '')
+              age_h = None
+              try:
+                  polled = datetime.date.fromisoformat(last_poll)
+                  age_h = (npt.date() - polled).days * 24
+              except ValueError:
+                  problems.append('last_poll_time %r is not a YYYY-MM-DD date'
+                                  % last_poll)
+              if age_h is not None and age_h > 24:
+                  problems.append(
+                      'result monitor has not completed a run for ~%dh '
+                      '(last_poll_time %s NPT) - a result can be published with '
+                      'nobody watching' % (age_h, last_poll))
+
+              for host, since in sorted((state.get('hosts_down') or {}).items()):
+                  down_h = None
+                  text = str(since or '')
+                  try:
+                      parsed = datetime.datetime.fromisoformat(
+                          text.replace('Z', '+00:00'))
+                      if parsed.tzinfo is None:
+                          parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+                      down_h = (now - parsed).total_seconds() / 3600.0
+                  except ValueError:
+                      down_h = None
+                  if down_h is None:
+                      problems.append('host %s down with an unreadable '
+                                      'first-seen stamp %r' % (host, since))
+                  elif down_h > 6:
+                      problems.append('host %s has been failing for ~%.0fh'
+                                      % (host, down_h))
+
+              deferred = sorted(
+                  k for k, v in (state.get('examined') or {}).items()
+                  if isinstance(v, dict) and v.get('outcome') == 'deferred')
+              if deferred:
+                  # SOFT, ALWAYS. A deferred notice is the no-burn invariant
+                  # WORKING: the run could not read it, so it refused to
+                  # advance past it and will retry. While the board is
+                  # unreachable there is always at least one, so raising this
+                  # as a hard problem would be permanently noisy and would
+                  # train the owner to ignore this arm. It is reported, not
+                  # alarmed.
+                  notes.append('%d notice(s) deferred and awaiting retry '
+                               '(this is the no-burn invariant holding, not a '
+                               'failure): %s'
+                               % (len(deferred), ', '.join(deferred[:10])))
+          elif not problems:
+              problems.append('no academic state file - the result monitor has '
+                              'never run')
+
+          # --- 2) exam-source self-check recency ---------------------------
+          last_ok = None
+          selfcheck_seen = False
+          try:
+              with open('state/exam_selfcheck.json', encoding='utf-8') as fh:
+                  for line in fh:
+                      line = line.strip()
+                      if not line:
+                          continue
+                      try:
+                          rec = json.loads(line)
+                      except ValueError:
+                          continue  # a short/corrupt line must not kill us
+                      if not isinstance(rec, dict):
+                          continue
+                      selfcheck_seen = True
+                      if not rec.get('ok'):
+                          continue
+                      try:
+                          at = datetime.datetime.fromisoformat(
+                              str(rec.get('at', '')).replace('Z', '+00:00'))
+                          if at.tzinfo is None:
+                              at = at.replace(tzinfo=datetime.timezone.utc)
+                      except ValueError:
+                          continue
+                      if last_ok is None or at > last_ok:
+                          last_ok = at
+          except FileNotFoundError:
+              # SOFT on the first run. The self-check writes this file from its
+              # very first execution; until then there is nothing to judge. It
+              # becomes HARD only once a record exists and has gone stale.
+              notes.append('no exam-source self-check on record yet - the '
+                           'check writes one on its first run')
+          except (OSError, ValueError) as exc:
+              problems.append('state/exam_selfcheck.json unreadable: %s' % exc)
+
+          if last_ok is not None:
+              days = (now - last_ok).days
+              if days >= 7:
+                  problems.append('no successful exam-source self-check for %d '
+                                  'days - the notice matchers may be stale'
+                                  % days)
+          elif selfcheck_seen:
+              problems.append('exam-source self-check has run but has NEVER '
+                              'succeeded - the notice matchers may be stale')
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as fh:
+                  fh.write('## Academic Monitor Health\n\n')
+                  if problems:
+                      for problem in problems:
+                          fh.write('- ❌ %s\n' % problem)
+                  else:
+                      fh.write('- ✅ result monitor is healthy '
+                               '(polled within 24h, no stuck host, no stale '
+                               'self-check)\n')
+                  for note in notes:
+                      fh.write('- ℹ️ %s\n' % note)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write('problems=%d\n' % len(problems))
+              for problem in problems:
+                  fh.write('problem=%s\n' % problem.replace('\n', ' '))
+
+          if not problems:
+              for note in notes:
+                  print('::warning::academic monitor (informational): %s' % note)
+              print('Academic monitor health: OK (%d note(s))' % len(notes))
+              raise SystemExit(0)
+
+          for problem in problems:
+              print('::error::academic monitor: %s' % problem)
+          for note in notes:
+              print('::warning::academic monitor (informational): %s' % note)
+          raise SystemExit(1)
+          PY
+          RC=$?
+          set -e
+          if [ "$RC" -eq 0 ]; then
+            echo "Academic monitor health: OK"
+            exit 0
+          fi
+          PROBLEMS="${{ steps.academic.outputs.problems }}"
+          PROBLEM="${{ steps.academic.outputs.problem }}"
+          # LEAD FIRST, then the diagnosis. The old message opened with
+          # "Academic result monitor is NOT healthy (2 problem(s))" -- the
+          # component name and a count -- and put the sentence that actually
+          # matters last, so it was the part a phone notification truncated.
+          # One verdict sentence, then one Detail line; the files and fields an
+          # operator opens moved to the log below, where a developer looks.
+          LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy (${PROBLEMS} problem(s))."
+          DETAIL="Detail: ${PROBLEM}"
+          MSG="${LEAD} ${DETAIL}"
+          BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
+          echo "::error::$MSG"
+          echo "::warning::academic monitor operator detail — check state/academic_state.json (schema_version / last_poll_time / hosts_down) and state/exam_selfcheck.json. The monitor exiting non-zero means a result may be UNSEEN, not that there is no result."
+          if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
+            curl -sS -m 15 \
+              -H "Title: A TU result could go out with nobody watching" \
+              -H "Priority: 5" \
+              -H "Tags: warning,rotating_light" \
+              -d "$BODY" \
+              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+              || echo "::warning::academic watchdog ntfy ping failed"
+          else
+            echo "::warning::NTFY secrets unset — skipping ntfy ping (issue still filed)"
+          fi
+          TITLE="Academic result monitor unhealthy"
+          OPEN="$(gh issue list --state open --search "$TITLE in:title" --json number --jq 'length' || echo 1)"
+          # The raw records stay in the LOG, where a developer looks. They used
+          # to be dumped into the issue body, which the owner reads on a phone.
+          echo "academic monitor records — state/academic_state.json: $(cat state/academic_state.json 2>/dev/null || echo '(unreadable)')"
+          echo "academic monitor records — tail of state/exam_selfcheck.json: $(tail -5 state/exam_selfcheck.json 2>/dev/null || echo '(unreadable)')"
+          if [ "$OPEN" = "0" ]; then
+            gh issue create --title "$TITLE" --body "${LEAD}
+
+          ${DETAIL}
+
+          Investigate: recent academic-result workflow runs, Cloudflare worker dispatch logs, TU notice-board reachability, and the channel secrets."
+          else
+            echo "An open academic-health issue already exists — not duplicating"
+          fi
+          exit 0
+
+      - name: Check worker heartbeat (dead-man's switch, external arm)
+        # THE REVERSE ARM OF THE DEAD-MAN'S SWITCH, and the reason this arm is
+        # not optional. The Worker now keeps its own liveness keys and pages the
+        # owner when a sweep cron goes silent — but a Worker-side switch cannot
+        # detect its OWN total death. If the deployment is deleted, the cron
+        # trigger removed, or the account suspended, no cron fires, so nothing
+        # inside the Worker can scream. This step is the outside voice: it polls
+        # the Worker's ?health=1 endpoint and pages when the reported heartbeat
+        # ages pass the staleness limit.
+        #
+        # As an ARM OF THIS EXISTING JOB, so: no new cron, no new runner
+        # minutes, no new secret. It rides the 04:00/16:00 UTC slots the job
+        # already occupies.
+        #
+        # IT CANNOT AFFECT THE DIGEST VERDICT. Same three guarantees as the
+        # academic arm above:
+        #   1. it writes its own outputs under `worker` and never touches
+        #      `steps.watch.outputs`, the only input to the "Alert on missed
+        #      digest" gate below;
+        #   2. continue-on-error keeps a violation from failing the job;
+        #   3. it reads deploy/schedule.json and $RUNNER_TEMP only — never
+        #      state/last_digest_sent.json, which the marker step owns.
+        #
+        # It deliberately ends `exit 0` on both paths: this job's verdict is the
+        # digest's, and a red watchdog caused by the thing it watches would
+        # train the owner to ignore it.
+        id: worker
+        continue-on-error: true
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          set +e
+          HEALTH_FILE="$RUNNER_TEMP/worker_health.json"
+          URL=""
+          CODE=""
+          CURL_RC=99
+          URL="$(jq -r '.health_url // empty' deploy/schedule.json)"
+          if [ -n "$URL" ]; then
+            # -m 15 is a hard ceiling: a hung endpoint must not eat this job's
+            # timeout-minutes budget and take the digest verdict with it.
+            CODE="$(curl -sS -m 15 -o "$HEALTH_FILE" -w '%{http_code}' "$URL")"
+            CURL_RC=$?
+            echo "GET $URL -> HTTP '$CODE' (curl exit $CURL_RC)"
+          else
+            echo "::error::deploy/schedule.json carries no health_url — cannot poll the worker"
+          fi
+          WORKER_URL="$URL" WORKER_CODE="$CODE" WORKER_CURL_RC="$CURL_RC" \
+            WORKER_HEALTH_FILE="$HEALTH_FILE" python3 - <<'PY'
+          import json, os
+
+          # The staleness limit is the Worker's own HEARTBEAT_STALE_MS (3600s),
+          # read from the endpoint rather than duplicated here: a second copy of
+          # this number is exactly the drift class this whole check set exists
+          # to remove.
+          LIMIT = 3600
+          problems = []
+          notes = []
+
+          url = os.environ.get('WORKER_URL', '')
+          code = str(os.environ.get('WORKER_CODE', ''))
+          curl_rc = int(os.environ.get('WORKER_CURL_RC', '99') or 99)
+          path = os.environ.get('WORKER_HEALTH_FILE', '')
+
+          health = {}
+          if not url:
+            problems.append('no health_url in deploy/schedule.json')
+          elif curl_rc != 0 or code != '200':
+            problems.append('GET %s failed (curl exit %s, HTTP %r) — the worker '
+                            'is unreachable, the deployment is gone, or the '
+                            'account is suspended' % (url, curl_rc, code))
+          else:
+              raw_body = ''
+              try:
+                  with open(path, encoding='utf-8', errors='replace') as fh:
+                      raw_body = fh.read()
+              except OSError as read_exc:
+                  problems.append('?health=1 body could not be read (%s)'
+                                  % read_exc)
+              try:
+                  health = json.loads(raw_body)
+              except ValueError as exc:
+                  problems.append('?health=1 returned %d byte(s) that are not '
+                                  'parsable JSON (%s): %r'
+                                  % (len(raw_body), exc, raw_body[:120]))
+
+          if health:
+              if not isinstance(health, dict):
+                  problems.append('?health=1 returned %s, not a JSON object'
+                                  % type(health).__name__)
+                  health = {}
+              limit = health.get('stale_after_s')
+              if isinstance(limit, int) and limit > 0:
+                  LIMIT = limit
+              else:
+                  notes.append('endpoint did not report stale_after_s; using the '
+                               'documented %ds default' % LIMIT)
+              for field, label in (('breaking_heartbeat_age_s', 'breaking sweep'),
+                                   ('academic_heartbeat_age_s', 'academic sweep')):
+                  if field not in health:
+                      problems.append('?health=1 does not report %s, so the '
+                                      '%s cron cannot be judged' % (field, label))
+                      continue
+                  if health.get(field.replace('_age_s', '_unreadable')):
+                      # Deliberately NOT a problem. A KV read failure is treated
+                      # as "not stale" by the Worker itself so a KV blip cannot
+                      # storm the owner; the same reasoning applies here. It is
+                      # reported as a note so it is visible in the log.
+                      notes.append('%s heartbeat is UNREADABLE (KV read failed) '
+                                   '— not alarmed on, by design' % label)
+                      continue
+                  age = health.get(field)
+                  if age is None:
+                      problems.append('%s heartbeat was NEVER RECORDED — the '
+                                      '%s cron has not run since this build was '
+                                      'deployed' % (label, label))
+                  elif not isinstance(age, (int, float)):
+                      problems.append('%s heartbeat age is %r, not a number'
+                                      % (label, age))
+                  elif age > LIMIT:
+                      problems.append('%s cron heartbeat is %d min old (limit '
+                                      '%d min) — breaking-news detection is not '
+                                      'running, so no breaking alert can fire'
+                                      % (label, age // 60, LIMIT // 60))
+                  else:
+                      notes.append('%s cron heartbeat is %d min old (healthy)'
+                                   % (label, age // 60))
+              build = str(health.get('build') or '')
+              if not build or build == 'unset':
+                  notes.append('worker build stamp is "unset" — this deployment '
+                               'was published without --var WORKER_BUILD:<sha>')
+              else:
+                  notes.append('worker build stamp: %s' % build)
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as fh:
+                  fh.write('## Worker Heartbeat (external arm)\n\n')
+                  if problems:
+                      for problem in problems:
+                          fh.write('- ❌ %s\n' % problem)
+                  else:
+                      fh.write('- ✅ both sweep crons are alive\n')
+                  for note in notes:
+                      fh.write('- ℹ️ %s\n' % note)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write('problems=%d\n' % len(problems))
+              for problem in problems:
+                  fh.write('problem=%s\n' % problem.replace('\n', ' '))
+              fh.write('notes=%d\n' % len(notes))
+
+          for note in notes:
+              print('::warning::worker heartbeat (informational): %s' % note)
+          if not problems:
+              print('Worker heartbeat: OK (%d note(s))' % len(notes))
+              raise SystemExit(0)
+          for problem in problems:
+              print('::error::worker heartbeat: %s' % problem)
+          raise SystemExit(1)
+          PY
+          RC=$?
+          set -e
+          if [ "$RC" -eq 0 ]; then
+            echo "Worker heartbeat: OK — both sweep crons are firing"
+            exit 0
+          fi
+          PROBLEMS="${{ steps.worker.outputs.problems }}"
+          PROBLEM="${{ steps.worker.outputs.problem }}"
+          # LEAD FIRST, then the diagnosis. The old message opened with
+          # "breaking-monitor worker heartbeat FAILED (2 problem(s))" and put
+          # the consequence -- no breaking alert can fire -- inside the
+          # per-cron problem string, several words in. One verdict sentence and
+          # one Detail line reach the phone; the surfaces and the wrangler
+          # command an operator runs moved to the log below.
+          LEAD="Breaking-news detection is not running, so NO BREAKING ALERT CAN FIRE right now -- a flood, an outage or a landslide will pass silently."
+          DETAIL="Detail: ${PROBLEM}"
+          MSG="${LEAD} ${DETAIL}"
+          BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
+          echo "::error::$MSG"
+          echo "::warning::breaking-monitor operator detail — check Cloudflare Workers -> breaking-monitor -> Cron Triggers (is the cron still listed/enabled?), then wrangler deployments list -c deploy/wrangler.toml to see which commit is actually deployed. The Worker keeps its own dead-man's switch, but it cannot report its own total death — this arm is that report."
+          if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
+            curl -sS -m 15 \
+              -H "Title: Breaking-news detection is not running" \
+              -H "Priority: 5" \
+              -H "Tags: warning,skull" \
+              -d "$BODY" \
+              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+              || echo "::warning::worker watchdog ntfy ping failed"
+          else
+            echo "::warning::NTFY secrets unset — annotation only (the ::error:: above still stands)"
+          fi
+          exit 0
+
+      - name: Check breaking dispatch chain (delivery arm, external)
+        # THE ARM THAT WAS MISSING, and the reason this repository certified a
+        # dead pipeline as healthy for six weeks.
+        #
+        # WHAT THE HEARTBEAT ARM ABOVE PROVES: the Worker's cron FIRED. Nothing
+        # more. A fresh heartbeat means "the detector ran", and the detector
+        # running says nothing about whether it ever FOUND anything. Those are
+        # different questions, and only the second one decides whether a real
+        # alert would have been sent.
+        #
+        # ==== THE FALSE PAGE THIS ARM WAS PUSHING, AND WHY IT WAS FALSE ====
+        # On 2026-10-13 this arm escalated `breaking_dispatch_ever: false` as
+        # "THE BREAKING CHAIN HAS NEVER RUN ... Every breaking alert is being
+        # missed silently." THAT SENTENCE WAS FACTUALLY FALSE. Four level-3
+        # alerts were delivered to ntfy on 2026-10-11 and 2026-10-12, each
+        # logging `breaking ntfy delivered (HTTP 2xx)`:
+        #   2026-10-11T06:01:32Z  Flash flood in Gorkha sweeps away houses, bridges; villages evacuated
+        #   2026-10-11T13:07:05Z  Fresh flash flood in Nepal sweeps away homes and bridges
+        #   2026-10-11T22:09:19Z  Nepal flash floods prompt evacuations; bridge swept away
+        #   2026-10-12T06:12:02Z  Major flash flood in Nepal; 150+ tourists stranded, six bridges collapse
+        #
+        # THE CAUSE, in one line: `breaking_dispatch_ever` measures the WORKER'S
+        # TRIGGER LEG, while breaking-monitor.yml's own `schedule` cron is the
+        # SENDER (it was `20 */6 * * *` then; daily `20 1 * * *` since
+        # 2026-10-19). All-history census of breaking-monitor.yml is 27
+        # schedule / 1 push / 1 workflow_dispatch / 0 repository_dispatch. The
+        # designated primary path had never run; the fallback path was the only
+        # one that had ever worked. A TRIGGER LEG IS NOT A DELIVERY RECORD, and
+        # this arm reported it as one -- so it re-paged on every run, forever.
+        #
+        # ==== WHAT THIS ARM MEASURES NOW ====
+        #   1. THE DELIVERY RECEIPT. `state/breaking_delivery.json`, written by
+        #      scripts/breaking_monitor.py at the moment ntfy returns 2xx, read
+        #      from this job's own checkout by the same mechanism the digest arms
+        #      already use for `state/last_digest_sent.json`. Its `last_delivery`
+        #      is a POSITIVE FACT produced by the code that performed the send.
+        #   2. THE LAST ATTEMPT. `last_attempt.ok === false` is a RECORDED
+        #      failure -- a chain that runs and fails is a chain that never
+        #      alerts, and that remains a loud fault. It is loud because it was
+        #      recorded, never because something was missing.
+        #   3. THE WORKER'S TRIGGER LEG, as a NOTE ONLY. Its own telemetry is
+        #      still reported and a failed handoff is still a problem, because a
+        #      broken high-frequency detector degrades latency even while the
+        #      schedule net carries delivery -- but it is worded as exactly that,
+        #      and it can no longer assert that alerts are being missed.
+        #
+        # WHAT A GENUINE FAULT LOOKS LIKE AFTER THIS CHANGE -- stated here so the
+        # next reader knows the arm is still armed:
+        #   * `state/breaking_delivery.json` is missing, unreadable, or carries
+        #     no `last_delivery`  ->  "we have no evidence any breaking alert was
+        #     EVER delivered". This is the one remaining inference from an
+        #     absence, and it is legitimate: it can only be reached before any
+        #     alert has ever been sent, which is a real and alarming state.
+        #     The file ships seeded with the four verified deliveries above, so
+        #     this cannot fire on a healthy checkout.
+        #   * `last_attempt.ok === false`  ->  a send was ATTEMPTED and the
+        #     channel refused it. Unambiguous, and it can only fire after a real
+        #     failed delivery.
+        #   * the health endpoint is unreadable, non-200, or does not carry the
+        #     fields  ->  UNKNOWN, which is never printed as healthy.
+        #
+        # WHAT IT STILL DOES NOT DO, stated rather than left implied:
+        #   * It does NOT alarm on the AGE of the last delivery. A quiet news
+        #     week is the normal state; an age-based alarm would page the owner
+        #     every day forever, and an alarm that always fires is an alarm
+        #     nobody reads. The age is a note and nothing more.
+        #   * It does NOT alarm on `breaking_dispatch_ever: false`. That is the
+        #     specific false page this change removes.
+        #
+        # FAIL CLOSED. An unreadable endpoint, a non-200, a missing field or a
+        # missing receipt is a PROBLEM, never a pass. "I cannot tell" and "it is
+        # fine" must not print the same thing -- that is precisely how a silent
+        # chain passed for six weeks. The one deliberate exception is an
+        # unreadable KV read inside the Worker, which yields an UNKNOWN verdict
+        # reported as a note: a KV blip must not storm the owner, and the
+        # heartbeat arm already covers whether the Worker itself is alive.
+        #
+        # It cannot take the digest verdict down with it: it writes only its own
+        # `chain` outputs, never `steps.watch.outputs`, it carries
+        # continue-on-error, and the shell ends `exit 0` on both paths.
+        id: chain
+        if: always()
+        continue-on-error: true
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          set +e
+          HEALTH_FILE="$RUNNER_TEMP/chain_health.json"
+          # The delivery receipt, from this job's own checkout. Same source the
+          # digest arms read `state/last_digest_sent.json` from; `contents: read`
+          # is already granted for exactly that.
+          DELIVERY_FILE="${CHAIN_DELIVERY_FILE:-state/breaking_delivery.json}"
+          URL=""
+          CODE=""
+          CURL_RC=99
+          URL="$(jq -r '.health_url // empty' deploy/schedule.json)"
+          if [ -n "$URL" ]; then
+            # -m 15, same hard ceiling and the same reason as the arm above.
+            CODE="$(curl -sS -m 15 -o "$HEALTH_FILE" -w '%{http_code}' "$URL")"
+            CURL_RC=$?
+            echo "GET $URL -> HTTP '$CODE' (curl exit $CURL_RC)"
+          else
+            echo "::error::deploy/schedule.json carries no health_url — the dispatch chain cannot be judged"
+          fi
+          CHAIN_URL="$URL" CHAIN_CODE="$CODE" CHAIN_CURL_RC="$CURL_RC" \
+            CHAIN_HEALTH_FILE="$HEALTH_FILE" CHAIN_DELIVERY_FILE="$DELIVERY_FILE" \
+            python3 - <<'PY'
+          import datetime as _dt
+          import json, os
+
+          problems = []
+          notes = []
+          unknown = []
+
+          url = os.environ.get('CHAIN_URL', '')
+          code = str(os.environ.get('CHAIN_CODE', ''))
+          curl_rc = int(os.environ.get('CHAIN_CURL_RC', '99') or 99)
+          path = os.environ.get('CHAIN_HEALTH_FILE', '')
+          receipt_path = os.environ.get('CHAIN_DELIVERY_FILE',
+                                        'state/breaking_delivery.json')
+
+          # ---- 1. THE DELIVERY RECEIPT: the positive record ------------------
+          # A POSITIVE fact written by the sender at the moment it sent, never
+          # inferred from an absence. This is the signal the whole arm now
+          # turns on; the Worker's trigger leg is demoted to a note below.
+          receipt = {}
+          receipt_err = ''
+          try:
+              with open(receipt_path, encoding='utf-8') as fh:
+                  receipt = json.load(fh)
+          except FileNotFoundError:
+              receipt_err = 'the file does not exist'
+          except (OSError, ValueError) as exc:
+              receipt_err = str(exc)
+          if not isinstance(receipt, dict):
+              if receipt:
+                  receipt_err = ('it parsed as %s, not a JSON object'
+                                % type(receipt).__name__)
+              receipt = {}
+
+          delivered = receipt.get('last_delivery')
+          attempt = receipt.get('last_attempt')
+
+          def _age_hours(iso):
+              try:
+                  at = _dt.datetime.strptime(str(iso), '%Y-%m-%dT%H:%M:%SZ')
+                  at = at.replace(tzinfo=_dt.timezone.utc)
+                  return int((_dt.datetime.now(_dt.timezone.utc) - at)
+                             .total_seconds() // 3600)
+              except (TypeError, ValueError):
+                  return None
+
+          if receipt_err:
+              problems.append(
+                  'the breaking DELIVERY RECEIPT (%s) could not be read (%s) — '
+                  'so there is no positive evidence that a breaking alert has '
+                  'ever actually reached you, and "I cannot tell" is never '
+                  'printed as healthy. This is the failure this arm exists to '
+                  'catch, and it is now the ONLY thing that can mean it.'
+                  % (receipt_path, receipt_err))
+          elif not delivered:
+              problems.append(
+                  'THERE IS NO EVIDENCE THAT A BREAKING ALERT WAS EVER '
+                  'DELIVERED. %s carries no last_delivery, so since this '
+                  'receipt existed no alert has been confirmed sent to ntfy. A '
+                  'flood, an avalanche or a major outage may pass silently.'
+                  % receipt_path)
+          else:
+              hours = _age_hours(delivered.get('at'))
+              when = ('%s h ago' % hours if hours is not None
+                      else 'at an unparsed time %r' % delivered.get('at'))
+              notes.append('DELIVERY CONFIRMED: the last breaking alert reached '
+                           'ntfy %s (%s). Age is a note, never an alarm — a '
+                           'quiet news week is normal.'
+                           % (when, (delivered.get('title') or '')[:110]))
+              src = str(delivered.get('source') or '')
+              if src.startswith('backfill'):
+                  notes.append('that delivery row is a BACKFILL from the '
+                               'breaking-monitor run log, not a row this build '
+                               'wrote: %s' % src[:110])
+
+          # A recorded FAILED attempt is loud, and loudly for a real reason: it
+          # happened. It cannot fire without an actual refused send.
+          if isinstance(attempt, dict) and attempt.get('ok') is False:
+              hours = _age_hours(attempt.get('at'))
+              when = ('%s h ago' % hours if hours is not None else 'at an '
+                      'unparsed time')
+              problems.append(
+                  'THE MOST RECENT BREAKING DELIVERY ATTEMPT FAILED (%s ago, '
+                  '%s). The pipeline ran and the channel refused it, so that '
+                  'alert never arrived — detection running is not delivery '
+                  'working.' % (when, str(attempt.get('note') or '')[:160]))
+
+          # ---- 2. THE WORKER'S TRIGGER LEG: reported, never escalated -------
+          health = {}
+          if not url:
+              problems.append('no health_url in deploy/schedule.json, so the '
+                              'breaking dispatch chain cannot be judged at all')
+          elif curl_rc != 0 or code != '200':
+              problems.append('GET the worker health endpoint failed (curl exit '
+                              '%s, HTTP %r) — whether the Worker is alive is '
+                              'UNKNOWN, and unknown is not healthy'
+                              % (curl_rc, code))
+          else:
+              raw_body = ''
+              try:
+                  with open(path, encoding='utf-8', errors='replace') as fh:
+                      raw_body = fh.read()
+              except OSError as exc:
+                  problems.append('health body could not be read (%s)' % exc)
+              try:
+                  health = json.loads(raw_body)
+              except ValueError as exc:
+                  problems.append('health endpoint returned %d byte(s) that are '
+                                  'not parsable JSON (%s), so the Worker\'s '
+                                  'state is UNKNOWN' % (len(raw_body), exc))
+
+          if health and not isinstance(health, dict):
+              problems.append('health endpoint returned %s, not a JSON object'
+                              % type(health).__name__)
+              health = {}
+
+          if health and 'breaking_dispatch_ever' not in health:
+              # Fail closed. The field is how the Worker describes its own
+              # trigger leg; a payload without it cannot be described at all.
+              problems.append('the health endpoint does not report '
+                              'breaking_dispatch_ever, so the Worker\'s own '
+                              'telemetry cannot be read — this build of the '
+                              'Worker predates it')
+          elif health:
+              if health.get('breaking_dispatch_unreadable'):
+                  unknown.append('the Worker\'s own dispatch telemetry is '
+                                 'UNREADABLE (KV read failed inside the worker) '
+                                 '— verdict UNKNOWN, not alarmed on, by design')
+              elif health.get('breaking_dispatch_ever'):
+                  age = health.get('breaking_dispatch_age_s')
+                  notes.append('the Worker tripwire HAS dispatched: its last '
+                               'handoff to the workflow was %s min ago. This is '
+                               'the TRIGGER leg only — it is not evidence of '
+                               'delivery, and it is never escalated on its own.'
+                               % (age // 60 if isinstance(age, (int, float))
+                                  else 'an unreported number of'))
+                  if health.get('breaking_last_dispatch_ok') is False:
+                      problems.append(
+                          'the Worker tripwire\'s hand-off to the workflow is '
+                          'FAILING (HTTP %r). Delivery is unaffected — the '
+                          'schedule net still runs and the receipt above is '
+                          'what proves it — but the high-frequency detector can '
+                          'no longer wake the pipeline, so detection latency is '
+                          'now however often that cron fires.'
+                          % health.get('breaking_dispatch_http_status'))
+                  else:
+                      notes.append('the Worker tripwire\'s most recent '
+                                   'hand-off succeeded')
+              else:
+                  # THE LINE THAT USED TO PAGE, AND NOW DOES NOT. The Worker has
+                  # never dispatched and that is a NOTE, because delivery is
+                  # proven by the receipt above and by breaking-monitor.yml's own
+                  # schedule cron, not by this field.
+                  notes.append('the Worker tripwire has never dispatched '
+                               '(breaking_dispatch_ever=false). NOT a fault: '
+                               'this is the trigger leg, and breaking-monitor.'
+                               'yml\'s own schedule cron is the sender that has '
+                               'been delivering. Escalating this exact field is '
+                               'the false page of 2026-10-13.')
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as fh:
+                  fh.write('## Breaking Dispatch Chain (delivery arm)\n\n')
+                  if problems:
+                      for problem in problems:
+                          fh.write('- ❌ %s\n' % problem)
+                  else:
+                      fh.write('- ✅ a breaking alert is CONFIRMED delivered to '
+                               'ntfy (see the note below for when)\n')
+                  for item in unknown + notes:
+                      fh.write('- ℹ️ %s\n' % item)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write('problems=%d\n' % len(problems))
+              for problem in problems:
+                  fh.write('problem=%s\n' % problem.replace('\n', ' '))
+              # Parenthesised on purpose. `'notes=%d\n' % len(notes) + len(unknown)`
+              # is a TypeError -- the % binds tighter than +, so that raised
+              # BEFORE the ::error:: annotations below were printed and made the
+              # arm exit non-zero on EVERY run, healthy chain included. That is
+              # the worst possible shape for a watchdog: a permanent false
+              # alarm on the one arm whose credibility depends on staying quiet
+              # when there is nothing wrong. Caught by
+              # tests/breaking/test_breaking_chain.py, which executes this
+              # block rather than reading it.
+              fh.write('notes=%d\n' % (len(notes) + len(unknown)))
+
+          for item in unknown:
+              print('::warning::breaking chain (informational): %s' % item)
+          for note in notes:
+              print('::warning::breaking chain (informational): %s' % note)
+          if not problems:
+              print('Breaking dispatch chain: OK (%d note(s))' % (len(notes) + len(unknown)))
+              raise SystemExit(0)
+          for problem in problems:
+              print('::error::breaking dispatch chain: %s' % problem)
+          raise SystemExit(1)
+          PY
+          RC=$?
+          set -e
+          if [ "$RC" -eq 0 ]; then
+            echo "Breaking dispatch chain: OK — a breaking alert is confirmed delivered to ntfy"
+            exit 0
+          fi
+          PROBLEMS="${{ steps.chain.outputs.problems }}"
+          PROBLEM="${{ steps.chain.outputs.problem }}"
+          LEAD="A breaking alert is not confirmed delivered, or the last send was refused — a flood, an avalanche or a major outage can pass without you seeing it."
+          DETAIL="Detail: ${PROBLEM} (${PROBLEMS} problem(s))."
+          BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
+          echo "::error::${BODY}"
+          # The operator's half: which file is judged, what a blank means, and
+          # how this arm differs from the heartbeat arm. Kept, in the log.
+          echo "::warning::breaking-chain operator detail — this arm judges state/breaking_delivery.json, the receipt scripts/breaking_monitor.py writes when ntfy actually answers 2xx, so 'no delivery recorded' means no alert has ever been CONFIRMED, not that a heartbeat is missing. The worker cron heartbeat is a SEPARATE signal and a separate arm: it proves the detector ran, never that it found anything and never that anything arrived."
+          if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
+            # NTFY_TOPIC is a publish/subscribe capability: referenced by NAME,
+            # never echoed. Only the server's answer is reported.
+            curl -sS -m 15 \
+              -H "Title: Breaking-news alert delivery is not confirmed" \
+              -H "Priority: 5" \
+              -H "Tags: warning,skull" \
+              -d "$BODY" \
+              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+              && echo "breaking-chain ntfy sent" \
+              || echo "::warning::breaking-chain ntfy ping failed"
+          else
+            echo "::warning::NTFY secrets unset — annotation only (the ::error:: above still stands)"
+          fi
+          exit 0
+
+      - name: Alert on missed digest
+        # ntfy ping (best-effort) + ::error:: annotation + one deduped
+        # issue, then fail loudly so the missed slot stays visible.
+        if: steps.watch.outputs.miss == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          SLOT: ${{ steps.watch.outputs.slot }}
+          TODAY: ${{ steps.watch.outputs.today }}
+        run: |
+          set -eo pipefail
+          # TWO PARTS, IN THIS ORDER, ON PURPOSE.
+          #   LEAD    -- what this means for the owner, one sentence, first.
+          #   DETAIL  -- one short line, below it.
+          # The owner reads this on a phone, where only the opening shows
+          # collapsed, so the important sentence must not be the third one.
+          # The single-line form is deliberate -- it is also the ::error::
+          # annotation, so both stay one line.
+          LEAD="Today's ${SLOT} digest for ${TODAY} (NPT) never arrived. The fallback will resend it shortly; if nothing has arrived by the next slot, the digest pipeline needs attention."
+          DETAIL="Detail: check the daily-news workflow runs for this slot and the worker dispatch that triggers them."
+          MSG="${LEAD} ${DETAIL}"
+          BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
+          echo "::error::$MSG"
+          if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
+            curl -sS -m 15 \
+              -H "Title: Today's ${SLOT} digest never arrived" \
+              -H "Priority: 5" \
+              -H "Tags: warning,rotating_light" \
+              -d "$BODY" \
+              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+              || echo "::warning::watchdog ntfy ping failed"
+          else
+            echo "::warning::NTFY secrets unset — skipping ntfy ping (issue still filed)"
+          fi
+          TITLE="Digest watchdog: ${SLOT} digest missing for ${TODAY} (NPT)"
+          OPEN="$(gh issue list --state open --search "$TITLE in:title" --json number --jq 'length')"
+          # The marker goes to the LOG, where a developer looks. It used to be
+          # dumped into the issue body, which the owner reads on a phone.
+          echo "digest marker state/last_digest_sent.json: $(cat state/last_digest_sent.json 2>/dev/null || echo '(unreadable)')"
+          if [ "$OPEN" = "0" ]; then
+            gh issue create --title "$TITLE" --body "The ${SLOT} digest for ${TODAY} (Asia/Kathmandu) has no delivered marker.
+
+          ${LEAD}
+
+          Investigate: recent daily-news workflow runs, Cloudflare worker dispatch logs, and channel secrets (ntfy/Pages/Gmail/Telegram). The marker state/last_digest_sent.json is printed in this run's log."
+          else
+            echo "An open issue for this slot already exists — not duplicating"
+          fi
+          exit 1
+
+      - name: Check prebuild artifact (dead-man's switch, prebuild arm)
+        # U6a. THE ARM THAT MAKES A BROKEN PREBUILD LOUD.
+        #
+        # WHAT THE OTHER ARMS CANNOT SEE. Everything above judges the digest the
+        # owner was SENT. This one judges the digest that was BUILT AHEAD OF
+        # TIME, and it is the only thing that can tell the difference between a
+        # prebuild that worked and a prebuild that failed silently. Once U5
+        # flips the slot crons from `dispatchDigest` to the delivery arm, the
+        # slot's push becomes a KV lookup: if nothing was sealed, the push
+        # discovers that at 07:20 -- which is the latency problem the prebuild
+        # was built to remove. Without this arm the SAME failure is invisible
+        # forever, because the fallback ladder then does exactly what it is
+        # supposed to do and no job anywhere goes red. A latency problem
+        # becomes a silent-outage problem, and that is the worst outcome
+        # available here.
+        #
+        # IT FAILS CLOSED, AND IT FAILS CLOSED ON THREE DIFFERENT THINGS. The
+        # repository's rule is that a blank must never read like good news, and
+        # the three states below are three DIFFERENT blanks:
+        #
+        #   ABSENT      the key was read and held nothing. The prebuild did not
+        #               seal. This is a real failure and it goes red.
+        #   UNREADABLE  the read itself threw. The Worker reports the KV key in
+        #               `unreadable`. This is NOT reported as "absent" -- it is a
+        #               different fault with a different fix, and conflating them
+        #               would send the owner to the wrong place. It is also not
+        #               treated as healthy: the arm cannot see, so it cannot
+        #               report "fine". It goes red.
+        #   NOT REPORTED  the deployment does not carry the field at all, i.e.
+        #               the Worker this arm is polling predates U3. Also red,
+        #               with a message that names the cause instead of blaming
+        #               the prebuild for a deployment that never had the concept.
+        #
+        # The other arms in this job deliberately end `exit 0` so a red watchdog
+        # caused by the thing it watches cannot train the owner to ignore it.
+        # THIS ONE DELIBERATELY DOES NOT, and the difference is the point: those
+        # arms produce a report, this one produces a proof, and a proof that
+        # cannot fail is decoration. It is placed LAST so it cannot skip the
+        # digest-miss alert above, and `if: always()` so a red digest verdict
+        # does not suppress it either.
+        if: always()
+        env:
+          SLOT: ${{ steps.watch.outputs.slot }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -eo pipefail
+          HEALTH_FILE="$RUNNER_TEMP/prebuild_health.json"
+          URL="$(jq -r '.health_url // empty' deploy/schedule.json)"
+          CODE=""
+          CURL_RC=99
+          if [ -n "$URL" ]; then
+            # -m 15 is a hard ceiling so a hung endpoint cannot eat this job's
+            # timeout-minutes budget and take the digest verdict with it.
+            CODE="$(curl -sS -m 15 -o "$HEALTH_FILE" -w '%{http_code}' "$URL")"
+            CURL_RC=$?
+            echo "GET $URL -> HTTP '$CODE' (curl exit $CURL_RC)"
+          else
+            echo "::error::deploy/schedule.json carries no health_url, so the prebuild arm cannot poll the worker at all"
+          fi
+          PREBUILD_HEALTH_FILE="$HEALTH_FILE" \
+            PREBUILD_HEALTH_URL="$URL" \
+            PREBUILD_HEALTH_CODE="$CODE" \
+            PREBUILD_HEALTH_CURL_RC="$CURL_RC" \
+            PREBUILD_SLOT="$SLOT" \
+            PREBUILD_SCHEDULE_FILE="deploy/schedule.json" \
+            PREBUILD_EVENT_NAME="$EVENT_NAME" \
+            python3 - <<'PY'
+          import datetime, json, os, sys
+
+          NPT_OFFSET_MINUTES = 345
+          UTC = datetime.timezone.utc
+
+          # HOW LONG AFTER THE PREBUILD THE ARTIFACT IS DUE. The prebuild is
+          # dispatched ONCE per slot, 40 min ahead of it, and its measured
+          # duration is 5-9 min (22 on one run), so 90 min is a generous
+          # ceiling rather than a tight one. The watchdog firings at
+          # 09:45/21:45 NPT are 185 min past their prebuilds, so this gate is
+          # satisfied structurally; it exists so a MANUAL dispatch early in
+          # the window cannot page the owner about a build that is not late.
+          # The TOLERANCE lives here. The SCHEDULE does not: it is read from
+          # deploy/schedule.json below, so this constant can never be what
+          # decides when a prebuild was due.
+          PREBUILD_GRACE_MIN = 90
+
+          def fail(problems):
+              # The verdict and nothing else: this line is read by a person, and
+              # the specifics follow it in `problems` and in the step summary.
+              lead = ("The %s digest was never sealed, so the %s push has to "
+                      "build it from scratch and the punctuality this prebuild "
+                      "was for is gone." % (slot or '?', slot or '?'))
+              print('::error::%s Detail: %s' % (lead, ' | '.join(problems)))
+              summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+              if summary:
+                  with open(summary, 'a', encoding='utf-8') as fh:
+                      fh.write('## Prebuild Artifact (U6a arm)\n\n')
+                      fh.write('- ❌ %s\n' % lead)
+                      for problem in problems:
+                          fh.write('  - %s\n' % problem)
+              sys.exit(1)
+
+          def note(text):
+              print('::warning::prebuild artifact (informational): %s' % text)
+
+          url = os.environ.get('PREBUILD_HEALTH_URL', '')
+          code = str(os.environ.get('PREBUILD_HEALTH_CODE', ''))
+          curl_rc = int(os.environ.get('PREBUILD_HEALTH_CURL_RC', '99') or 99)
+          path = os.environ.get('PREBUILD_HEALTH_FILE', '')
+          slot = (os.environ.get('PREBUILD_SLOT') or '').strip()
+          schedule_file = os.environ.get('PREBUILD_SCHEDULE_FILE', '')
+
+          if slot not in ('morning', 'evening'):
+              fail(['this run could not establish which slot it is judging '
+                    '(slot=%r), so it cannot judge the prebuild for either one. '
+                    'Guessing is what produced the 19-hours-early page.'
+                    % slot])
+
+          # -- the clock, pinnable for the offline test --------------------
+          # WATCHDOG_NOW_UTC is the marker step's own harness variable and is
+          # read here for the same reason: the defect was entirely about time,
+          # so the one thing a test must control is the instant. Unset in CI.
+          raw_now = (os.environ.get('WATCHDOG_NOW_UTC') or '').strip()
+          if raw_now:
+              now_utc = datetime.datetime.fromisoformat(raw_now.replace('Z', '+00:00'))
+              if now_utc.tzinfo is None:
+                  now_utc = now_utc.replace(tzinfo=UTC)
+              now_utc = now_utc.astimezone(UTC)
+              print('clock pinned by WATCHDOG_NOW_UTC=%s -> %s (test harness)'
+                    % (raw_now, now_utc.isoformat()))
+          else:
+              now_utc = datetime.datetime.now(UTC)
+
+          npt_now = now_utc + datetime.timedelta(minutes=NPT_OFFSET_MINUTES)
+          npt_date = npt_now.strftime('%Y-%m-%d')
+
+          # -- when was this slot's prebuild due? --------------------------
+          # DERIVED FROM deploy/schedule.json, NEVER FROM A NUMBER HERE.
+          #
+          # It used to be read out of `digest-prebuild.yml` with a regex over
+          # its `cron:` lines, and that was correct while the prebuild fired
+          # from GitHub's own scheduler. It does not any more: GitHub-hosted
+          # SCHEDULED runs measured 4.5-7h late across 96 firings (mean 306.8
+          # min, max 708.3), so the Cloudflare Worker now dispatches this
+          # workflow on its own punctual clock and the workflow declares NO
+          # schedule of its own. Reading a cron list that is deliberately empty
+          # would either hard-fail this arm every night or -- worse, if the
+          # lookup were made to tolerate an empty list -- quietly become "no
+          # deadline at all", which reads exactly like a prebuild that cannot
+          # be late.
+          #
+          # So the deadline comes from the ONE record that says when the Worker
+          # asks for a prebuild: `dispatcher_crons.digest_prebuild`. It is the
+          # same file this step already reads for `health_url`, so there is no
+          # second place to correct. If the prebuild schedule changes, the
+          # deadline moves with it, and every state below fails CLOSED.
+          def cron_field(field, maximum):
+              values = set()
+              for part in field.split(','):
+                  step = 1
+                  if '/' in part:
+                      part, _sep, step_text = part.partition('/')
+                      step = int(step_text)
+                  if part == '*':
+                      start, end = 0, maximum
+                  elif '-' in part:
+                      low, _sep, high = part.partition('-')
+                      start, end = int(low), int(high)
+                  else:
+                      start = end = int(part)
+                  values.update(range(start, end + 1, step))
+              return sorted(values)
+
+          try:
+              with open(schedule_file, encoding='utf-8') as fh:
+                  schedule_text = fh.read()
+          except OSError as exc:
+              fail(['%s could not be read (%s), so this arm does not know when the '
+                    'prebuild was due and cannot judge it' % (schedule_file, exc)])
+
+          try:
+              schedule = json.loads(schedule_text)
+          except ValueError as exc:
+              fail(['%s is not parsable JSON (%s), so the prebuild schedule it '
+                    'records cannot be read. A file that cannot be parsed is '
+                    'not a file that reports "nothing to do" -- it is this arm '
+                    'being unable to see.' % (schedule_file, exc)])
+          if not isinstance(schedule, dict):
+              fail(['%s is a %s, not a JSON object, so the prebuild schedule '
+                    'cannot be read from it' % (schedule_file, type(schedule).__name__)])
+
+          dispatcher = schedule.get('dispatcher_crons')
+          block = dispatcher.get('digest_prebuild') if isinstance(dispatcher, dict) else None
+          if not isinstance(block, dict):
+              fail(['%s carries no dispatcher_crons.digest_prebuild block, so '
+                    'nothing records when the prebuild for either slot is asked '
+                    'for. That is the trigger itself being unrecorded, and an '
+                    'unrecorded trigger must never read as "no deadline".'
+                    % schedule_file])
+
+          expr = block.get(slot)
+          if not isinstance(expr, str) or not expr.strip():
+              fail(['the committed prebuild schedule names no %r cron (it holds '
+                    '%s), so this arm has nothing to judge the %s artifact '
+                    'against. An EMPTY prebuild schedule is not an absent '
+                    'prebuild: it is a schedule that cannot say when the build '
+                    'was due, and it goes red rather than waiting forever.'
+                    % (slot, sorted(k for k in block if not k.startswith('_')) or 'nothing',
+                       slot)])
+
+          fields = expr.split()
+          if len(fields) != 5 or tuple(fields[2:]) != ('*', '*', '*'):
+              fail(['prebuild cron %r is not a plain daily 5-field cron, so its '
+                    'Nepal Time is not answerable' % expr])
+
+          # Nepal hour -> the slot that hour belongs to. Below noon is morning,
+          # which is the same cutoff the marker step and WATCHDOG_SLOT_TABLE use.
+          slot_cron_minutes = []
+          for hour in cron_field(fields[1], 23):
+              for minute in cron_field(fields[0], 59):
+                  npt_total = minute + NPT_OFFSET_MINUTES + (hour * 60)
+                  npt_hour = (npt_total // 60) % 24
+                  npt_minute = npt_total % 60
+                  label = 'morning' if npt_hour < 12 else 'evening'
+                  if label == slot:
+                      slot_cron_minutes.append((npt_hour, npt_minute))
+          if not slot_cron_minutes:
+              resolved = []
+              for hour in cron_field(fields[1], 23):
+                  for minute in cron_field(fields[0], 59):
+                      npt_total = minute + NPT_OFFSET_MINUTES + (hour * 60)
+                      resolved.append(((npt_total // 60) % 24, npt_total % 60))
+              fail(['the committed %s prebuild cron %r resolves to %s Nepal '
+                    'Time, which is not the %s slot -- so the schedule records '
+                    'a prebuild for the other half of the day and this arm would '
+                    'judge the %s artifact against a deadline that belongs to '
+                    'something else.'
+                    % (slot, expr,
+                       ', '.join('%02d:%02d' % t for t in sorted(set(resolved))) or 'no instant',
+                       slot, slot)])
+
+          if len(slot_cron_minutes) > 1:
+              fail(['the committed %s prebuild cron %r resolves to %d Nepal '
+                    'instants (%s), so there is no single instant this arm can '
+                    'measure a deadline from. One slot gets ONE prebuild: a '
+                    'cron that fires several times a day is how a slot ends up '
+                    'sealed more than once, and this arm must not quietly '
+                    'judge the earliest of them.'
+                    % (slot, expr, len(slot_cron_minutes),
+                       ', '.join('%02d:%02d' % t for t in slot_cron_minutes))])
+
+          # The prebuild is dispatched once per slot, so there is no retry to
+          # rank. The deadline is the dispatch plus the tolerance above,
+          # measured in UTC because that is the axis this step compares on.
+          npt_hour, npt_minute = min(slot_cron_minutes)
+          # THE DUE INSTANT IS ANCHORED TO THE NPT DATE BEING JUDGED, NOT TO
+          # TODAY'S UTC DATE. This is the defect the delivery arm already fixed
+          # arriving here through a different door: the old code took the
+          # prebuild's UTC time-of-day and pasted it onto `now_utc`'s OWN utc
+          # date. Under Actions cron drift -- measured 4.5-7h late on this repo,
+          # which is why the Worker dispatches the prebuild on its own punctual
+          # clock instead -- a firing meant for 18:00 NPT runs after midnight
+          # NPT, so the NPT date has already rolled to the next day while the
+          # deadline is still being resolved on the PREVIOUS utc date. That puts
+          # `due_utc` in the PAST, `now_utc >= due_utc` is true the moment the
+          # job starts, and the gate below waved the run straight through to
+          # demand an evening artifact roughly 17 hours before its slot was due.
+          # Once a day, every day, with every job in the repository green.
+          #
+          # `npt_date` is the date this arm is JUDGING, so the deadline belongs
+          # to THAT date. Anchoring there is what makes the `now_utc >= due_utc`
+          # gate mean what it says -- which is the entire reason that gate
+          # exists, and the reason the delivery arm keeps one.
+          #
+          # `npt_hour`/`npt_minute` are still derived from the committed cron
+          # above and never from a number written here.
+          npt_day = datetime.date.fromisoformat(npt_date)
+          due_utc = (
+              datetime.datetime.combine(npt_day, datetime.time(0, 0), tzinfo=UTC)
+              + datetime.timedelta(minutes=npt_hour * 60 + npt_minute)
+              - datetime.timedelta(minutes=NPT_OFFSET_MINUTES)
+              + datetime.timedelta(minutes=PREBUILD_GRACE_MIN))
+          print('slot %s: %s asks for the prebuild at %02d:%02d NPT (%s), '
+                'artifact due by %s UTC'
+                % (slot, os.path.basename(schedule_file), npt_hour, npt_minute,
+                   expr, due_utc.isoformat()))
+
+          if now_utc < due_utc:
+              print('prebuild arm: %s is not due until %s UTC (now %s); no verdict'
+                    % (slot, due_utc.isoformat(), now_utc.isoformat()))
+              raise SystemExit(0)
+
+          # -- read ?health=1 ----------------------------------------------
+          health = {}
+          if not url:
+              fail(['deploy/schedule.json carries no health_url, so the prebuild '
+                    'arm cannot see the artifact at all'])
+          elif curl_rc != 0 or code != '200':
+              fail(['GET %s failed (curl exit %s, HTTP %r): the worker is '
+                    'unreachable, the deployment is gone, or the account is '
+                    'suspended' % (url, curl_rc, code)])
+          else:
+              raw_body = ''
+              try:
+                  with open(path, encoding='utf-8', errors='replace') as fh:
+                      raw_body = fh.read()
+              except OSError as read_exc:
+                  fail(['the ?health=1 body could not be read (%s)' % read_exc])
+              try:
+                  health = json.loads(raw_body)
+              except ValueError as exc:
+                  fail(['?health=1 returned %d byte(s) that are not parsable JSON '
+                        '(%s)' % (len(raw_body), exc)])
+
+          if not isinstance(health, dict):
+              fail(['?health=1 returned %s, not a JSON object'
+                    % type(health).__name__])
+
+          present_field = 'artifact_%s_present' % slot
+          age_field = 'artifact_%s_age_s' % slot
+          artifact_key = 'digest:artifact:%s:%s' % (npt_date, slot)
+
+          # THE DIGEST FIELDS ARE NESTED, NOT TOP-LEVEL. THE DEFECT (2026-10-13).
+          #
+          # ?health=1 builds its top level from healthForEndpoint(): `build`,
+          # `crons`, `stale_after_s`, `<short>_heartbeat_age_s`, `breaking_*`.
+          # The digest half is attached as ONE OBJECT -- `out.digest =
+          # await digestHealthFields(env, Date.now())` -- so artifact_*_present,
+          # artifact_*_age_s, unreadable, ledger_age_s and last_delivery live
+          # UNDER `digest`, beside nothing.
+          #
+          # This arm read all three at the TOP level. `present_field not in
+          # health` was therefore true on every run of a perfectly healthy
+          # deployment: the arm could never pass, and its message blamed the
+          # Worker and told the reader not to look at digest-prebuild.yml --
+          # a red light on a live arm, pointing at a cause that did not exist.
+          # Worse than silence, because it sent the owner to the wrong repo.
+          #
+          # The three failures below are now DISTINCT so this cannot recur as
+          # one undifferentiated red: no `digest` block at all (the arm is
+          # reading the wrong shape again), a `digest` block without the field
+          # (a genuinely old deployment), and a field that is present but false
+          # (a genuinely missing artifact).
+          digest_block = health.get('digest')
+          if not isinstance(digest_block, dict):
+              fail(['?health=1 carries no `digest` object, so it does not report '
+                    '%s at all. The Worker reports the digest half NESTED under '
+                    '`digest` (not at the top level beside `stale_after_s`), so '
+                    'this is THIS ARM reading the wrong shape of a healthy '
+                    'endpoint -- not a prebuild failure, and not something '
+                    'digest-prebuild.yml can fix. Top-level keys present: %s'
+                    % (present_field,
+                       ', '.join(sorted(str(k) for k in health)) or 'nothing')])
+
+          if present_field not in digest_block:
+              fail(['?health=1 reports a `digest` block that does not carry %s, so '
+                    'this deployment predates the digest artifact fields and the '
+                    'prebuild cannot be judged at all. This is a WORKER DEPLOYMENT '
+                    'problem, not a prebuild failure -- do not go looking at '
+                    'digest-prebuild.yml. The block carries: %s'
+                    % (present_field,
+                       ', '.join(sorted(str(k) for k in digest_block)) or 'nothing')])
+
+          # ABSENT vs UNREADABLE, decided BEFORE the boolean is read. A KV read
+          # failure leaves `present` false, exactly as a missing key does, so
+          # reading the boolean first would report every KV blip as "the prebuild
+          # failed" -- and the fix for that is not in digest-prebuild.yml at all.
+          # Read from the NESTED block: at the top level there is no `unreadable`
+          # key at all, so this list used to be permanently empty and the whole
+          # distinction was dead code that looked alive.
+          unreadable = digest_block.get('unreadable')
+          unreadable = unreadable if isinstance(unreadable, list) else []
+          if artifact_key in unreadable:
+              fail(['the %s artifact key could not be READ from KV (it is listed in '
+                    '?health=1 `digest.unreadable`). That is NOT the same as the '
+                    'artifact being absent and it has a different fix: this is a '
+                    'KV read failure on the Worker, so no verdict about the '
+                    'prebuild can be drawn at all.' % artifact_key])
+
+          if digest_block.get(present_field) is not True:
+              fail(['the %s artifact is ABSENT: ?health=1 reports digest.%s=false '
+                    'for %s, so no digest was sealed for %s %s. The prebuild ran '
+                    'and handed nothing over. (Due %s, judged at %s -- the due '
+                    'gate above has already established that this slot really is '
+                    'due, so this is a late prebuild and not a premature demand.)'
+                    % (slot, present_field, npt_date, npt_date, slot,
+                       due_utc.isoformat(), now_utc.isoformat())])
+
+          age = digest_block.get(age_field)
+          if age is None:
+              fail(['the %s artifact is present but digest.%s is null, so it carries no '
+                    'usable build stamp and its age cannot be established. The '
+                    'Worker treats a null age as "not present or not readable" and '
+                    'never as 0, so this is deliberately not a pass.'
+                    % (slot, age_field)])
+          if not isinstance(age, (int, float)) or isinstance(age, bool):
+              fail(['the %s artifact is present but digest.%s is %r, not a number'
+                    % (slot, age_field, age)])
+
+          print('prebuild arm: %s artifact for %s is present, built %d min ago '
+                '(healthy)' % (slot, npt_date, age // 60))
+          summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as fh:
+                  fh.write('## Prebuild Artifact (U6a arm)\n\n')
+                  fh.write('- ✅ %s artifact for %s sealed, %d min old\n'
+                           % (slot, npt_date, age // 60))
+          PY

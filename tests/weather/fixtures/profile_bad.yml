@@ -1,0 +1,66 @@
+# tests/weather/fixtures/profile_bad.yml — MUST be rejected by
+# `python.exe scripts/weather_advice.py --check` with exit code 1.
+#
+# Every defect below is real and each is load-bearing, not decorative:
+#
+#   location.latitude: 141.3   outside [-90, 90]
+#   schedule.outdoor_windows[0]: ["12:00", "07:00"]   start >= end
+#   weather_advice.max_lines: 99                      outside [0, 50]
+#   weather_advice.threshhholds:  TYPO -- an unknown key must not be
+#                                 tolerated, because a misspelt key reads as
+#                                 a key that was never set and silently
+#                                 disables the threshold it was meant to be
+#   thresholds.umbrella: 90 with wash_no: 40
+#                                 VIOLATES MONOTONICITY: umbrella >= wash_no
+#                                 INVERTS the two bands, so the umbrella line
+#                                 fires only when the wash line already did
+#                                 and the deliberate silence between them
+#                                 closes. Written as an inversion rather than
+#                                 as "a wide band" (umbrella 40 / wash_no 90
+#                                 is legal) so this fixture actually proves
+#                                 the rule it claims to prove.
+#   thresholds.warm_strong_c: 20 VIOLATES MONOTONICITY: warm_strong_c >=
+#                                 warm_mild_c leaves no silence band, so a
+#                                 19C morning would demand a warm jacket
+#   for_you.min_length: 200 / max_length: 60
+#                                 VIOLATES MONOTONICITY: max_length <=
+#                                 min_length leaves no satisfiable story
+#
+# None of these are syntax errors. The file parses cleanly. That is the
+# point: a profile that merely parses is not a profile that is right, and a
+# silently-defaulted profile would hand the owner confident advice for the
+# wrong place.
+
+location:
+  city: Example City
+  latitude: 141.3
+  longitude: 85.3
+  timezone: "Asia/Kathmandu"
+
+schedule:
+  outdoor_windows: [["12:00", "07:00"], ["17:00", "20:00"]]
+  wash_window: ["07:00", "18:00"]
+  unavailable_windows: []
+
+weather_advice:
+  enabled: true
+  max_age_hours: 3
+  max_lines: 99
+  thresholds:
+    wash_no: 40
+    umbrella: 90
+    precip_wet_mm: 1.0
+    warm_strong_c: 20
+    warm_mild_c: 15
+    wind_kmh: 30
+    visibility_m: 1000
+    threshhholds: 50
+
+for_you:
+  enabled: true
+  min_length: 200
+  max_length: 60
+  min_personal_relevance: 7
+  max_stories: 8
+  categories: [action, local_city]
+  reliability_tiers: [tier1, tier2]

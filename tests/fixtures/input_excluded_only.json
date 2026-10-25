@@ -1,0 +1,25 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Excluded-keyword-only fixture: the single story hits 'LEGO' so the run must exit 2 with an empty payload.",
+  "stories": [
+    {
+      "title": "New LEGO Racing Game Announced for Consoles",
+      "summary": "Confirmed: a new brick-racing title was announced during a showcase event.",
+      "why_it_matters": "Excluded by personal keyword policy despite being gaming news.",
+      "category": "gaming",
+      "priority": 7,
+      "source_name": "Gematsu",
+      "source_url": "https://www.gematsu.com/2026/08/lego-racing-announced",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": null,
+      "reliability": "tier1",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Excluded keyword demo.",
+      "language": "en"
+    }
+  ]
+}

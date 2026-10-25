@@ -1,0 +1,8 @@
+{
+  "bytes": 713,
+  "captured_at": "2026-09-29T12:17:03+00:00",
+  "note": "shape-only: the PDF itself was NOT committed, so the extracted text was deliberately dropped Hash/bytes re-recorded 2026-09-30: previous values were the pre-commit bytes and differed only in CRLF/LF (see the manifest note). Content unchanged.",
+  "sha256": "5ee69482b5be6cd78350c1e00c7da64bf5eb1f512058ac487bb3114f3b1dfce6",
+  "source_url": "https://portal.tu.edu.np/notice/15673/1790601157.pdf",
+  "trimmed": true
+}

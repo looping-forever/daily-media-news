@@ -1,0 +1,7 @@
+{
+  "digest_time": "evening",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Empty-result fixture: zero stories must still write the out-payload and exit 2.",
+  "stories": []
+}

@@ -1,0 +1,18 @@
+{
+  "_why": "Pinned post-gate catalogue for tests that must prove the model ladder is resolved DYNAMICALLY (from what the provider actually serves) rather than falling back to the 3-model config seed. Copied verbatim from state/model_cache.json, which is what _write_cache stores: the post-gate id list, so no free/active/text filtering is skipped by using it. Read only via MODEL_SELECTOR_PIN, and only when the `opencode` CLI is genuinely absent. No committed workflow sets that variable - pinned by tests/workflows/test_workflow_lint.py - so production cannot reach this file and a genuinely broken selector in production still degrades loudly to the seed.",
+  "provider": "opencode",
+  "models": [
+    "opencode/big-pickle",
+    "opencode/cat-jam-free",
+    "opencode/exo-free",
+    "opencode/ling-3.0-flash-fin-free",
+    "opencode/ling-3.1-flash-free",
+    "opencode/longcat-2.5-preview-free",
+    "opencode/mimo-v2.6-flash-free",
+    "opencode/muse-spark-1.3-contributor-free",
+    "opencode/nemotron-3-ultra-free",
+    "opencode/nemotron-3.5-lightning-free",
+    "opencode/space-bunny-free",
+    "opencode/step-5-preview-free"
+  ]
+}

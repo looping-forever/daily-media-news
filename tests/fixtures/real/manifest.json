@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-29T12:17:03+00:00",
+  "generated_by": "tests/fixtures/real/capture.py",
+  "policy": {
+    "no_student_data": "A TU result sheet lists other students' names, roll numbers and marks. No PDF bytes and no extracted text are ever committed; PDF evidence is metadata only.",
+    "real_bytes_only": "Every capture is verbatim bytes from the live site. A hand-written `<rss><channel><item><title>Headline N` fixture proves nothing about the site and is rejected by tests/collection/test_collector_retry.py.",
+    "manifest_is_the_index": "The manifest, not the directory listing, is the source of truth. An unindexed fixture is one nobody reads and the freshness guard fails it."
+  },
+  "samples": [
+    {
+      "file": "notice_list_iost.tu.edu.np_2026-09-29.html",
+      "kind": "notice_list",
+      "origin": "iost.tu.edu.np",
+      "source_url": "https://iost.tu.edu.np/notices?notice_type=21",
+      "captured_at": "2026-09-29T12:16:53+00:00",
+      "sha256": "053a6de58ae99c666543790f029033df093191bab2e56cb8da19f03b38efca4f",
+      "bytes": 74052,
+      "guard": "parse_notice_list still reads the live board's list page",
+      "expect": {
+        "min_notices": 3,
+        "notice_ids": [
+          15323,
+          15362,
+          15398,
+          15442,
+          15443,
+          15444,
+          15515,
+          15565,
+          15591,
+          15671,
+          15672,
+          15673,
+          15696,
+          15697
+        ],
+        "any_id": 15673
+      },
+      "note": "The critical result feed. selfcheck_exam_sources.py SKIPS this feed, so before this capture nothing in this repository had ever read its bytes."
+    },
+    {
+      "file": "notice_detail_iost.tu.edu.np.15673_2026-09-29.html",
+      "kind": "notice_detail",
+      "origin": "iost.tu.edu.np",
+      "source_url": "https://iost.tu.edu.np/notices/15673",
+      "captured_at": "2026-09-29T12:16:54+00:00",
+      "sha256": "6820d1c99b08147924763d56b87bfadfd63af7cc776129f4a257a341eb6aabce",
+      "bytes": 67615,
+      "guard": "is_site_constant_title must keep rejecting the board's constant, and classify_semester must keep reading this title",
+      "expect": {
+        "title_present": true,
+        "title_degraded": false,
+        "script": "latin",
+        "classify_status": "match",
+        "semester": 1
+      },
+      "note": "Live detail page 15673."
+    },
+    {
+      "file": "notice_detail_iost.tu.edu.np.15696_2026-09-29.html",
+      "kind": "notice_detail",
+      "origin": "iost.tu.edu.np",
+      "source_url": "https://iost.tu.edu.np/notices/15696",
+      "captured_at": "2026-09-29T12:16:56+00:00",
+      "sha256": "cf7caa4b56d50f68af8af1aed75da338ab54fce8402be6ae34ee4f5e027ea2cc",
+      "bytes": 68525,
+      "guard": "the Devanagari token set: 15696 read `unknown` once and deferred forever, so its verdict is pinned here",
+      "expect": {
+        "title_present": true,
+        "title_degraded": false,
+        "script": "devanagari",
+        "classify_status": "no_match",
+        "semester": null,
+        "devanagari_title": true
+      },
+      "note": "Live detail page 15696."
+    },
+    {
+      "file": "notice_detail_iost.tu.edu.np.15642_2026-09-29.html",
+      "kind": "notice_detail",
+      "origin": "iost.tu.edu.np",
+      "source_url": "https://iost.tu.edu.np/notices/15642",
+      "captured_at": "2026-09-29T12:16:58+00:00",
+      "sha256": "2465dab30ff5300f9ceb618a3c42c09f2b151cbbdc714bbae9e54091d859dcd6",
+      "bytes": 742436,
+      "guard": "is_site_constant_title must keep rejecting the board's constant, and classify_semester must keep reading this title",
+      "expect": {
+        "title_present": true,
+        "title_degraded": false,
+        "script": "devanagari",
+        "classify_status": "no_match",
+        "semester": null
+      },
+      "note": "Live detail page 15642."
+    },
+    {
+      "file": "feed_news.google.com.np-en_2026-09-29.rss",
+      "kind": "feed",
+      "origin": "news.google.com",
+      "source_url": "https://news.google.com/rss/search?q=Nepal&hl=en&gl=NP&ceid=NP:en",
+      "captured_at": "2026-09-29T12:16:59+00:00",
+      "sha256": "0e185a029a3c88c1f22bddfcdace1a14a8741f6ff0362eebc3495067a96481f3",
+      "bytes": 145067,
+      "guard": "the RSS reader still reads a live feed body",
+      "expect": {
+        "min_items": 5,
+        "max_bytes": 5000000,
+        "items_look_hand_written": false,
+        "root_element": "rss",
+        "min_distinct_titles": 20
+      },
+      "note": "Genuine Google News RSS response for 'Nepal'/np-en, from the same sweep the digest runs. Real bytes, so the collector tests are proven against something the site actually served."
+    },
+    {
+      "file": "pdf_shape_iost.tu.edu.np.15673_2026-09-29.json",
+      "kind": "pdf_shape",
+      "origin": "iost.tu.edu.np",
+      "source_url": "https://portal.tu.edu.np/notice/15673/1790601157.pdf",
+      "captured_at": "2026-09-29T12:17:03+00:00",
+      "sha256": "5ee69482b5be6cd78350c1e00c7da64bf5eb1f512058ac487bb3114f3b1dfce6",
+      "bytes": 713,
+      "guard": "sheet_text_is_readable must keep accepting the column-split roll the real sem-1 sheet prints",
+      "expect": {
+        "roll_shaped_tokens_present": true,
+        "readable_by_sheet_text_is_readable": true,
+        "student_data_committed": false
+      },
+      "note": "METADATA ONLY, ON PURPOSE. A result sheet is a table of other students' names, roll numbers and marks. The bytes stay out of git; what is committed is how the sheet SHAPES, so sheet_text_is_readable is proven against a real sheet without mirroring a single student's record."
+    }
+  ]
+}

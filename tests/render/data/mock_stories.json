@@ -1,0 +1,46 @@
+{
+  "digest_time": "evening",
+  "date": "2026-08-28",
+  "stories": [
+    {
+      "title": "Nepal launches new digital payment initiative",
+      "summary": "The government announced a new digital payment system to modernize banking across the country.",
+      "why_it_matters": "Affects daily banking for all Nepali citizens.",
+      "source_name": "Kathmandu Post",
+      "source_url": "https://example.com/nepal-digital-payment",
+      "reliability": "tier1",
+      "category": "nepal",
+      "priority": 8,
+      "personal_relevance": 7,
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Direct impact on banking",
+      "language": "en",
+      "published_at": "2026-08-28",
+      "event_date": null,
+      "location": "Kathmandu",
+      "effective_date": null,
+      "supporting_sources": []
+    },
+    {
+      "title": "TU BSc CSIT semester results announced",
+      "summary": "Tribhuvan University released the BSc CSIT semester results for all campuses.",
+      "why_it_matters": "Students can now check their results online.",
+      "source_name": "TU Official",
+      "source_url": "https://example.com/tu-results",
+      "reliability": "tier1",
+      "category": "education_tu",
+      "priority": 9,
+      "personal_relevance": 10,
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Directly relevant to studies",
+      "language": "en",
+      "published_at": "2026-08-28",
+      "event_date": null,
+      "location": "Kathmandu",
+      "effective_date": null,
+      "supporting_sources": []
+    }
+  ]
+}

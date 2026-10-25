@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal News Informer — Digest Archive</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #0E1014;
+      color: #ECEEF2;
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-text-size-adjust: 100%;
+    }
+    /* 390px column, centred, 20px gutters -> a 350px row, which is what the
+       approved render measures. Fixed px type and one column throughout: no
+       viewport-fluid type function, no min-width media query, no multi-column
+       grid. Phone-only, by decision. */
+    .container { max-width: 390px; margin: 0 auto; padding: 32px 20px 40px 20px; }
+
+    /* HEADER: no card, no background, no border of its own. */
+    .archive-head {
+      padding-bottom: 16px;
+      border-bottom: 1px solid #272B34;
+    }
+    .archive-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: #FF7A59;
+    }
+    .archive-title {
+      font-size: 21px;
+      font-weight: 700;
+      color: #ECEEF2;
+      line-height: 1.25;
+      margin-top: 5px;
+    }
+    .archive-subtitle {
+      font-size: 12px;
+      color: #9BA1AC;
+      margin-top: 3px;
+    }
+
+    /* ONE HAIRLINE PER BOUNDARY. The first group drops its own top rule so it
+       does not stack a second line on the header's. */
+    .date-group { border-top: 1px solid #272B34; }
+    .date-group:first-of-type { border-top: 0; }
+    .date-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #6C727C;
+      padding: 20px 0 10px;
+    }
+    .date-heading::before {
+      content: '';
+      display: block;
+      flex: 0 0 6px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #FF7A59;
+    }
+
+    /* A ROW, NOT A CARD: no background, no border, no radius.
+       NO HAIRLINE ON THE ROW EITHER, and that is measured, not stylistic. The
+       approved render's within-group row pitch is exactly 88.00px = a 64px
+       thumbnail + 12px + 12px, so two digests on the same date are separated by
+       24px of background and NOTHING else; a `border-top` here would add ~1px
+       per row and put a line where the approved design has none. The separators
+       are the hairline above each date group and the one under the header. */
+    .digest-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      text-decoration: none;
+      color: inherit;
+    }
+    /* THE RESERVED 64px SQUARE. Rendered with or without an image, so a digest
+       with no thumbnail keeps its row height instead of collapsing it. */
+    .digest-thumb {
+      flex: 0 0 64px;
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #1F232C;
+    }
+    .digest-thumb .digest-thumb-img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    /* min-width:0 so a long word or a long category list wraps INSIDE this
+       column instead of widening the row and pushing the chevron off screen. */
+    .digest-body { flex: 1 1 auto; min-width: 0; }
+    .digest-row-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .digest-card-label {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ECEEF2;
+    }
+    .digest-count {
+      font-size: 12px;
+      font-weight: 600;
+      color: #FF7A59;
+    }
+    .digest-card-summary {
+      display: block;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #9BA1AC;
+      margin-top: 2px;
+    }
+    .digest-chevron {
+      flex: 0 0 14px;
+      width: 14px;
+      height: 14px;
+      color: #6C727C;
+    }
+    .empty-state {
+      padding: 40px 0;
+      font-size: 13px;
+      color: #9BA1AC;
+    }
+    .archive-footer {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid #272B34;
+      font-size: 11px;
+      color: #6C727C;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="archive-head">
+      <div class="archive-eyebrow">Archive</div>
+      <h1 class="archive-title">Digest Archive</h1>
+      <p class="archive-subtitle">0 briefings</p>
+    </header>
+    <div class="empty-state">No digests yet. Run the pipeline to generate your first briefing.</div>
+    <footer class="archive-footer">
+      Newest first · 14-day email retention
+    </footer>
+  </div>
+</body>
+</html>

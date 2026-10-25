@@ -1,0 +1,28 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Deadline freshness exemption: old pubDate (2026-07-01) must NOT drop this story because its deadline (2027-12-31) is still in the future.",
+  "stories": [
+    {
+      "title": "TU Exam Form Registration Window Extended Through December",
+      "summary": "Tribhuvan University extended the undergraduate exam form submission window through December 31 2027 for pending backlogs.",
+      "why_it_matters": "Students with backlog forms get a long, clearly bounded submission window.",
+      "category": "education_tu",
+      "priority": 7,
+      "source_name": "Tribhuvan University",
+      "source_url": "https://tu.edu.np/notices/exam-form-window-extension",
+      "published_at": "2026-07-01",
+      "event_date": null,
+      "location": null,
+      "reliability": "tier2",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "TU students affected directly.",
+      "language": "en",
+      "event_key": "tu-form-window",
+      "deadline": "2027-12-31",
+      "effective_date": "2026-08-25"
+    }
+  ]
+}

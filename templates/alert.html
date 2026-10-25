@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breaking Alert</title>
+</head>
+<body style="margin:0; padding:0; background:#f4f4f5; font-family:Arial,Helvetica,sans-serif; color:#18181b; -webkit-text-size-adjust:100%;">
+  <div style="max-width:600px; margin:0 auto; padding:16px 12px;">
+
+    <!-- Header: dark-red accent -->
+    <div style="background:#7f1d1d; color:#ffffff; padding:16px 20px; border-radius:8px 8px 0 0;">
+      <div style="font-size:19px; font-weight:bold; letter-spacing:0.3px;">🚨 Breaking Alert</div>
+      <div style="font-size:12px; color:#fecaca; margin-top:4px;">Level {{LEVEL}} &middot; high-urgency watch</div>
+    </div>
+
+    <!-- Confidence badge (single neutral amber span; text is the token value) -->
+    <div style="background:#ffffff; padding:12px 20px 0 20px;">
+      <span style="display:inline-block; background:#b45309; color:#ffffff; font-size:12px; font-weight:bold; padding:4px 12px; border-radius:999px;">{{CONFIDENCE}}</span>
+    </div>
+
+    <!-- Title -->
+    <div style="background:#ffffff; padding:10px 20px 16px 20px;">
+      <h1 style="margin:0; font-size:20px; line-height:1.35; color:#111111;">{{TITLE}}</h1>
+    </div>
+
+    <!-- Summary -->
+    <div style="background:#ffffff; padding:0 20px 16px 20px;">
+      <div style="font-size:11px; font-weight:bold; color:#71717a; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Summary</div>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#27272a;">{{SUMMARY}}</p>
+    </div>
+
+    <!-- Why urgent -->
+    <div style="background:#fef2f2; border-left:4px solid #b91c1c; padding:12px 16px; margin:0 12px;">
+      <div style="font-size:11px; font-weight:bold; color:#b91c1c; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Why urgent</div>
+      <p style="margin:0; font-size:13px; line-height:1.5; color:#450a0a;">{{WHY_URGENT}}</p>
+    </div>
+
+    <!-- Sources: script injects pre-rendered li/a list lines below -->
+    <div style="background:#ffffff; padding:16px 20px; margin-top:12px;">
+      <div style="font-size:11px; font-weight:bold; color:#71717a; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Sources</div>
+      <ul style="margin:0; padding-left:20px; font-size:13px; line-height:1.6; color:#27272a;">{{SOURCES}}</ul>
+    </div>
+
+    <!-- Footer -->
+    <!-- Event-driven alert: the label is the REAL NPT fire time, never a
+         digest slot word (slots belong to the scheduled 2x/day digest). -->
+    <div style="background:#f4f4f5; border-radius:0 0 8px 8px; padding:14px 20px; font-size:12px; color:#52525b; line-height:1.5;">
+      <div style="font-weight:bold; color:#18181b;">Alert fired: {{FIRED_NPT}}</div>
+      <div>Information checked through: {{CUTOFF_NPT}} NPT</div>
+      <div style="color:#b91c1c; font-weight:bold; margin-top:6px;">{{DEVELOPING_NOTICE}}</div>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Event-tracking run 1: first sighting of the Silksong launch-date event (label must be NEW).",
+  "stories": [
+    {
+      "title": "Silksong Release Date Announced by Team Cherry",
+      "summary": "Team Cherry has announced that Silksong launches worldwide on September 20 2026 for PC and all major consoles.",
+      "why_it_matters": "One of the most anticipated games of the year finally has a launch date.",
+      "category": "gaming",
+      "priority": 8,
+      "source_name": "Team Cherry Blog",
+      "source_url": "https://teamcherry.example.com/news/silksong-launch-date",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": null,
+      "reliability": "tier1",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Major gaming release date.",
+      "language": "en",
+      "event_key": "silksong-release-date"
+    }
+  ]
+}

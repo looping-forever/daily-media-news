@@ -1,0 +1,42 @@
+# tests/weather/fixtures/profile_ok.yml — a MINIMAL VALID profile for
+# scripts/weather_advice.py --check. Deliberately smaller than
+# config/profile.yml so a failure here cannot be blamed on the real file.
+#
+# Legality is enforced by validate_profile(): coordinates in range, timezone a
+# string, every window [start, end] with start < end, every threshold inside
+# its physical band, and the three monotonicity rules that keep the silent
+# middle band intact (wash_no < umbrella, warm_strong_c < warm_mild_c,
+# max_length < min_length).
+
+location:
+  city: Example City
+  latitude: 27.7
+  longitude: 85.3
+  timezone: "Asia/Kathmandu"
+
+schedule:
+  outdoor_windows: [["07:00", "12:00"], ["17:00", "20:00"]]
+  wash_window: ["07:00", "18:00"]
+  unavailable_windows: []
+
+weather_advice:
+  enabled: true
+  max_age_hours: 3
+  max_lines: 3
+  thresholds:
+    wash_no: 50
+    umbrella: 40
+    precip_wet_mm: 1.0
+    warm_strong_c: 10
+    warm_mild_c: 15
+    wind_kmh: 30
+    visibility_m: 1000
+
+for_you:
+  enabled: true
+  min_length: 20
+  max_length: 140
+  min_personal_relevance: 7
+  max_stories: 8
+  categories: [action, local_city, education_tu, college_local, bank_local, tech_career]
+  reliability_tiers: [tier1, tier2]

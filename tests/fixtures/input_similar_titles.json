@@ -1,0 +1,44 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Similar titles but genuinely different events: title overlap stays below the 0.7 intra-run dedup threshold and below the 0.6 state merge threshold, so both survive as separate events.",
+  "stories": [
+    {
+      "title": "Example City Municipality Announces New Water Supply Schedule",
+      "summary": "The municipality published a revised water supply timetable for all wards starting next week.",
+      "why_it_matters": "Households need the new supply windows for daily planning.",
+      "category": "local_city",
+      "priority": 7,
+      "source_name": "Example City Municipality",
+      "source_url": "https://example.example.gov.np/notices/water-schedule",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": "Example City",
+      "reliability": "tier1",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Direct local utility impact.",
+      "language": "en",
+      "event_key": "example-water-schedule"
+    },
+    {
+      "title": "Example City Municipality Announces New Road Repair Schedule",
+      "summary": "Ward-level road repair works are scheduled across Example City with temporary diversions during works.",
+      "why_it_matters": "Commuters should expect short diversions on repaired stretches.",
+      "category": "local_city",
+      "priority": 6,
+      "source_name": "Example City Municipality",
+      "source_url": "https://example.example.gov.np/notices/road-repair-schedule",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": "Example City",
+      "reliability": "tier2",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Local traffic impact.",
+      "language": "en",
+      "event_key": "example-road-repair"
+    }
+  ]
+}

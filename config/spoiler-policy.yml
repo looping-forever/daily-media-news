@@ -1,0 +1,42 @@
+# Spoiler policy for entertainment categories (gaming | anime | manga_manhwa_manhua).
+#
+# HOW THIS FILE IS USED
+# ---------------------
+# validate_stories.py applies a DETERMINISTIC spoiler veto (regex on title+summary)
+# regardless of this file: any entertainment story marked spoiler_level medium|high,
+# or matching spoiler patterns (dies/died/death/killed/passes away/ending explained/
+# leak(s)/leaked/datamine(d)/raw scan/scanlation/spoiler, "turns out to be",
+# "revealed to be", "identity reveal", "final boss") is dropped.
+#
+# This file exists so the user can later declare per-series status so the research
+# agent can tailor coverage (e.g. avoid manga-chapter news for series whose anime
+# the user is still watching). It is a PLACEHOLDER today: `series` is empty.
+
+default_policy: strict   # unknown titles treated strictly
+
+series: []
+# Fill from your MAL/Komikku data. Format per entry:
+#
+# - title: "One Piece"
+#   mediums: [anime, manga]
+#   status: {anime: watching, manga: not_started}   # watching|completed|reading|caught_up|not_started|dropped
+#   policy: strict        # strict|conservative|relaxed
+#
+# STATUS MEANINGS
+# ---------------
+#   watching    : currently following the anime episode-by-episode
+#   completed   : finished the anime entirely
+#   reading     : currently following the manga/manhwa/manhua chapter-by-chapter
+#   caught_up   : read everything published so far (manga side)
+#   not_started : have not begun that medium at all
+#   dropped     : abandoned that medium; spoilers acceptable
+#
+# POLICY MEANINGS
+# ---------------
+#   strict       : drop ALL plot-progress news for this series (any medium ahead of you)
+#   conservative : allow release-date/casting/announcement news, drop chapter/episode
+#                  plot details and leaks
+#   relaxed      : allow general news; only drop explicit ending/major-twist reveals
+#
+# INSTRUCTION: fill the `series` list from your MAL (anime) and Komikku (manga/
+# manhwa/manhua) libraries — one entry per series you care about.

@@ -1,0 +1,454 @@
+# Stories matching any of these keywords are NEVER included, in any category
+excluded_keywords:
+  - LEGO
+  - Lego
+
+games:
+  enabled: true
+  interests:
+    - Hollow Knight
+    - Silksong
+    - Blasphemous
+    - Denshattack!
+    - Hi-Fi RUSH
+    - Wolfenstein (The New Order, The Old Blood, The New Colossus)
+    - Bulletstorm
+    - Dishonored
+    - DOOM (2016, Eternal)
+    - Titanfall 2
+    - Neon White
+    - Katana ZERO
+    - Bayonetta
+    - Devil May Cry
+    - Hades
+    - Lies of P
+    - Dark Souls
+    - Sekiro
+    - God of War
+    - 'Nier: Automata'
+    - Nier Replicant
+    - Cuphead
+    - Ghost of Tsushima
+    - Ender Lilies / Ender Magnolia
+    - Dead Cells
+    - Shovel Knight
+    - Brutal Legend
+    - GTA V
+    - 'Phoenix Wright: Ace Attorney'
+    - 'Shinchan: Shiro and Coal Town'
+    - DORAEMON STORY OF SEASONS
+    - Wandering Sword
+    - Astral Ascent
+    - Darksiders
+    - Okami
+    - Yakuza / Like a Dragon (0, Kiwami, Kiwami 2, 3, 4, 5, 6, 7)
+    # Developers
+    - Team Cherry
+    - Team Ladybug
+    - Ryu Ga Gotoku Studio
+    - PlatinumGames
+    - FromSoftware
+    - Supergiant Games
+    - Neowiz
+    - Santa Monica Studio
+    - Square Enix
+    - Team Ninja
+    - Grasshopper Manufacture
+    - CAPCOM
+    - Arc System Works
+    - Team Ico
+    - Devolver Digital
+
+anime:
+  enabled: true
+  interests:
+    - One Piece
+    - Bleach
+    - Naruto
+    - Death Note
+    - Ossan Adventure
+    - Konosuba
+    - 91 Days
+    - '91 Days: Toki no Asase/Subete no Kinou/Ashita, Mata Ashita'
+    - Akame ga Kill!
+    - Akudama Drive
+    - Bakemonogatari
+    - Baki
+    - Baki-dou
+    - 'Baki: Dai Raitaisai-hen'
+    - 'Bleach: Sennen Kessen-hen'
+    - 'Bleach: Sennen Kessen-hen - Ketsubetsu-tan'
+    - 'Bleach: Sennen Kessen-hen - Soukoku-tan'
+    - Boku no Kanojo ga Majimesugiru Sho-bitch na Ken
+    - Dorohedoro
+    - Dororo
+    - Dungeon Meshi
+    - Edomae Elf
+    - 'Fate/stay night: Unlimited Blade Works'
+    - Fate/Zero
+    - Fate/Zero 2nd Season
+    - Gakuen Babysitters
+    - Grappler Baki (TV)
+    - 'Grappler Baki: Saidai Tournament-hen'
+    - 'Hanma Baki: Son of Ogre'
+    - 'Hanma Baki: Son of Ogre 2nd Season'
+    - High School DxD
+    - High School DxD BorN
+    - High School DxD Hero
+    - High School DxD New
+    - Highschool of the Dead
+    - 'Highschool of the Dead: Drifters of the Dead'
+    - Itazura na Kiss
+    - Kakegurui
+    - Kakegurui××
+    - Kanojo mo Kanojo
+    - Katanagatari
+    - Kemono Jihen
+    - Kishuku Gakkou no Juliet
+    - Kono Oto Tomare!
+    - Kono Oto Tomare! Part 2
+    - Kono Subarashii Sekai ni Bakuen wo!
+    - Kono Subarashii Sekai ni Shukufuku wo!
+    - Kono Subarashii Sekai ni Shukufuku wo! 2
+    - 'Kono Subarashii Sekai ni Shukufuku wo! 2: Kono Subarashii Geijutsu ni Shukufuku wo!'
+    - 'Kono Subarashii Sekai ni Shukufuku wo! Movie: Kurenai Densetsu'
+    - 'Kono Subarashii Sekai ni Shukufuku wo!: Kono Subarashii Choker ni Shukufuku wo!'
+    - Majo to Yajuu
+    - Mamahaha no Tsurego ga Motokano datta
+    - Monster Musume no Iru Nichijou
+    - Monster Musume no Iru Nichijou OVA
+    - Monster Musume no Oishasan
+    - 'Naruto: Shippuuden'
+    - Nazo no Kanojo X
+    - 'Nazo no Kanojo X: Nazo no Natsu Matsuri'
+    - Ore Monogatari!!
+    - Oruchuban Ebichu
+    - Plunderer
+    - Seishun Buta Yarou wa Bunny Girl Senpai no Yume wo Minai
+    - Seishun Buta Yarou wa Odekake Sister no Yume wo Minai
+    - Seishun Buta Yarou wa Randoseru Girl no Yume wo Minai
+    - Seishun Buta Yarou wa Yumemiru Shoujo no Yume wo Minai
+    - Seitokai no Ichizon
+    - Seitokai Yakuindomo
+    - Seitokai Yakuindomo OVA
+    - Seitokai Yakuindomo*
+    - Seitokai Yakuindomo* OVA
+    - Senpai ga Uzai Kouhai no Hanashi
+    - Shimoneta to Iu Gainen ga Sonzai Shinai Taikutsu na Sekai
+    - Shinmai Ossan Boukensha, Saikyou Party ni Shinu hodo Kitaerarete Muteki ni Naru.
+    - Sono Bisque Doll wa Koi wo Suru
+    - Sunohara-sou no Kanrinin-san
+    - Tejina-senpai
+    - The Fable
+    - 'The Last: Naruto the Movie'
+    - Tsurezure Children
+    - Undead Girl Murder Farce
+    - Violet Evergarden
+    - Violet Evergarden Movie
+    - Wotaku ni Koi wa Muzukashii
+    - Wotaku ni Koi wa Muzukashii OVA
+
+manga:
+  enabled: true
+  interests:
+    - +99 Reinforced Wooden Stick
+    - 20th Century Boys
+    - 21st Century Boys
+    - 300-nen Fuuin Sareshi Jaryuu-chan to Tomodachi ni Narimashita
+    - A Dance of Swords in the Night
+    - A Man's Man
+    - A Returner's Magic Should Be Special
+    - Absolute Master of the Senate
+    - After Ten Millennia in Hell
+    - Again My Life
+    - Amano Megumi wa Sukidarake!
+    - Atsumare! Fushigi Kenkyuubu
+    - Black Paradox
+    - Blue Lock
+    - Boku no Kanojo ga Majimesugiru Shojo Bitch na Ken
+    - Bonnouji
+    - Boyish Kanojo ga Kawaisugiru
+    - Cheonhwa Archive's Young Master
+    - Chronicles of the Demon Faction
+    - Class Maid
+    - Dagashi Kashi
+    - Descended from Divinity
+    - Descent of the Demon Master
+    - Devil Returns to School Days
+    - Doom Breaker
+    - Dorohedoro
+    - Doubt
+    - Dungeon Odyssey
+    - Enrolling in the Transcendent Academy
+    - Fukushuu wo Koinegau Saikyou Yuusha wa, Yami no Chikara de Senmetsu Musou suru
+    - Gal Gamer ni Homeraretai
+    - Ghost King
+    - Gosu
+    - 'Gyo: Ugomeku Bukimi'
+    - Heavenly Demon Reborn!
+    - Hellper
+    - Hideout
+    - I Am the Sorcerer King
+    - I Get Stronger the More I Eat
+    - I Was the Final Boss
+    - I'm the Max-Level Newbie
+    - Ibitsu
+    - Imamade Ichido mo Onnaatsukai sareta Koto ga Nai Onna Kishi wo Onnaatsukai suru Manga
+    - Imawa no Kuni no Alice
+    - Imawa no Kuni no Alice Retry
+    - 'Infinite Leveling: Murim'
+    - 'Jigokuhen: Aru Jigoku Eshi no Kokuhaku'
+    - Jumyou wo Kaitotte Moratta. Ichinen ni Tsuki, Ichimanen de.
+    - Kagurabachi
+    - Kami no Kodomo
+    - Kill the Hero
+    - Kiraboshi Ojousama no Kyuukon
+    - Kiriko
+    - Kiriko Kill
+    - Kiss x Sis
+    - Kouishou Radio
+    - Kuchi ga Saketemo Kimi ni wa
+    - 'Legend of an Asura: The Poison Dragon'
+    - Level Up with the Gods
+    - Leveling Beyond the Max
+    - Life Game
+    - Log-in Murim
+    - Maou desu. Onna Yuusha no Hahaoya to Saikon shita node, Onna Yuusha ga Giri no Musume ni Narimashita. @comic
+    - Mashle
+    - Maybe Meant to Be
+    - Monster Musume no Oishasan
+    - Murim RPG Simulation
+    - My Master Is a Backseat Gamer
+    - Mythic Item Obtained
+    - Nan Hao Shang Feng
+    - Nano Machine
+    - Nazo no Kanojo X
+    - Nebula's Civilization
+    - Omniscient Reader's Viewpoint
+    - 'Osananajimi Kanojo no Morahara ga Hidoin de Zetsuen Sengen shite Yatta: Jibunrashiku Ikiru Koto ni Shitara, Nazeka Tonari no Seki no Kakure Bishoujo kara Kokuhaku sareta'
+    - Otaku ni Yasashii Gal wa Inai!?
+    - Pigpen
+    - Psychopath in Murim
+    - Reborn as a Scholar
+    - Return of the King of Hell
+    - Return of the Mad Demon
+    - Revenge of the Baskerville Bloodhound
+    - Second Life Ranker
+    - Sensor
+    - Seoul Station's Necromancer
+    - Shachiku Succubus no Hanashi
+    - 'Shimoneta to Iu Gainen ga Sonzai shinai Taikutsu na Sekai: Manmaru-hen'
+    - Shokuryou Jinrui
+    - Shotgun Boy
+    - SSS-Class Revival Hunter
+    - Surviving the Game as a Barbarian
+    - Sweet Home
+    - Tale of a Scribe Who Retires to the Countryside
+    - Tejina-senpai
+    - The Academy's Genius Swordsman
+    - The Advanced Player of the Tutorial Tower
+    - The Archmage Returns After 4000 Years
+    - The Bad Son
+    - The Boxer
+    - The Dang Clan's Swordmaster Heir Just Wants a Normal Life
+    - The Ember Knight
+    - The Grand Mudang Saga
+    - The Great Wizard Transcendent
+    - The Greatest Estate Developer
+    - The Knight King Who Returned with a God
+    - The Knight Only Lives Today
+    - The Legend of the Northern Blade
+    - The Lone Necromancer
+    - 'The Mage: Swallowed the Dragon'
+    - The Martial God Who Regressed Back to Level 2
+    - The Max Level Hero Strikes Back
+    - The Player Who Can't Level Up
+    - The Reaper
+    - The Reborn Ranker Chronicles
+    - The Reborn Young Lord Is an Assassin
+    - The Skeleton Soldier Failed to Defend the Dungeon
+    - The SSS-Ranker Returns
+    - The Swordmaster's Son
+    - The Tutorial Is Too Tough!
+    - Time-Limited Genius Dark Knight
+    - Tomb Raider King
+    - Tomie
+    - Tomodachi Game
+    - Totsuidekita Yome ga Aisouwarai Bakari shiteru
+    - Tyrant of the Tower Defense Game
+    - Ultimate Outcast
+    - Usotsuki Android
+    - Uzumaki
+    - War of Corpses
+    - Way to Heaven
+    - Wotaku ni Koi wa Muzukashii
+    - Youkai Kyoushitsu
+    - Becoming a Cheat-Level Skill Thief
+
+manhwa:
+  enabled: true
+  interests:
+    - The Unbeatable Dungeon's Lazy Boss Monster
+    - The Reborn Young Lord Is an Assassin
+    - The Martial God Who Regressed Back to Level 2
+    - 'The Mage: Swallowed the Dragon'
+    - The Knight King Who Returned With a God
+    - The Grand Mudang Saga
+    - The Dang Clan’s Swordmaster Heir Just Wants a Normal Life
+    - The Archmage Returns After 4000 Years
+    - Surviving the Game as a Barbarian
+    - Revenge of the Baskerville Bloodhound
+    - Return of the Blossoming Blade
+    - Reincarnated as an Unruly Heir
+    - Pick Me Up, Infinite Gacha
+    - Nano Machine
+    - Mythic Item Obtained
+    - Log into the Future
+    - Level Up with the Gods
+    - Kagurabachi
+    - 'Infinite Leveling: Murim'
+    - I Was the Final Boss
+    - Gals Can't Be Kind to Otaku!
+    - Descended from Divinity
+    - Centuria
+    - Blue Lock
+    - A Man's Man
+    - '66,666 Years: Advent of the Dark Mage'
+    - Murim Psychopath
+    - Boyish Girlfriend
+    - The Reborn Ranker Chronicles
+    - Tyrant of the Tower Defense Game
+    - Time-Limited Genius Dark Knight
+    - The Swordmaster's Son
+    - The Player Who Can't Level Up
+    - The Ember Knight
+    - The Academy's Genius Swordsman
+    - Heavenly Grand Archive's Young Master
+    - Even if You Slit My Mouth
+    - Dungeon Odyssey
+    - Soon, You'll Paint Your Heart Out
+    - The Legend of the Northern Blade
+    - Return of the Mad Demon
+    - Return of the King of Hell
+    - Murim Login
+    - Chronicles of the Demon Faction
+    - How to Survive as a Wandering Knight
+    - Warble
+    - Tomodachi Game
+    - Tomb Raider King
+    - The Knight Who Only Lives Today
+    - The Greatest Estate Developer
+    - The Boxer
+    - The Advanced Player of the Tutorial Tower
+    - Sweet Home
+    - Solo Leveling
+    - Shotgun Boy
+    - Second Life Ranker
+    - SSS-Class Revival Hunter
+    - PIGPEN
+    - Nebula's Civilization
+    - My Master is a Backseat Gamer
+    - My Daughter Is the Final Boss
+    - Murim RPG Simulation
+    - Maybe Meant to Be
+    - Liar Game
+    - I'm the Max-Level Newbie
+    - I Get Stronger the More I Eat
+    - Hellper
+    - GOSU
+    - Enrolling in the Transcendent Academy
+    - Dorohedoro
+    - Dagashi Kashi
+    - Call of the Night
+    - After Ten Millennia in Hell
+    - A Returner's Magic Should Be Special
+    - 21st Century Boys
+    - 20th Century Boys
+    - +99 Reinforced Wooden Stick
+    - Again My Life
+    - Omniscient Reader
+    - The SSS-Ranker Returns
+    - Mashle - Magic and Muscles
+    - The Servant Is the Demon King?!
+    - The Skeleton Soldier Failed to Defend the Dungeon
+    - How to Live as a Villain
+    - Descent of the Demon Master
+    - Past Life Regressor
+    - War of Corpses
+    - The Tale of the Skeleton Messenger
+    - Level 999 Goblin
+    - Earthbound God's School Life
+    - Yongbi the Invincible
+    - What a Bountiful Harvest, Demon Lord!
+    - Volcanic Age
+    - Vagabond
+    - Tower of God
+    - There Are No Bad Warriors in This World
+    - The World After the Fall
+    - The Villain's Survival Route
+    - The Top Dungeon Farmer
+    - The Superhuman Era
+    - The Stellar Swordmaster
+    - The Return of the Disaster-Class Hero
+    - The Regressed Mercenary Has a Plan
+    - The Max Level Hero Strikes Back
+    - The Lazy Lord Masters the Sword
+    - The God of High School
+    - The Frozen Player Returns
+    - The Fable
+    - The Extra's Academy Survival Guide
+    - The Executioner
+    - The Climber
+    - The Academy’s Sashimi Sword Master
+    - Teenage Mercenary
+    - Seoul Station's Necromancer
+    - Sawaranaide Kotesashi-kun
+    - 'STAR: Strike it Rich'
+    - Returned by the King
+    - Return of the Calamity-Class Death Knight
+    - Reincarnated Murim Lord
+    - Regression of the Yong Clan Heir
+    - Reborn as a Scholar
+    - Peaceful Camping Life in Another World
+    - Nisekoi - False Love
+    - Myst, Might, Mayhem
+    - My Little Sister Is the Demon Lord!
+    - My Dad Is Too Strong
+    - Make the Exorcist Fall in Love
+    - 'Latna Saga: Survival of a Sword King'
+    - Ichi the Witch
+    - I Killed the Main Player
+    - I Am the Sorcerer King
+    - Hero Killer
+    - Gilgamesh
+    - Fight Class 3
+    - Father, Unrivaled
+    - Death's Game
+    - Claymore
+    - Childhood Friend of the Zenith
+    - Blink Master of the Magic Academy
+    - Becoming the Monarch
+    - Bastard
+    - Bad Born Blood
+    - Absolute Sword Sense
+    - Absolute Reign
+    - Absolute Regression
+    - A Dragonslayer's Peerless Regression
+    - DEAD Tube
+    - The Genius Murim Fitness Trainer
+    - Leviathan (LEE Gyuntak)
+    - I'm a Mom
+    - Heavenly Demon Reborn!
+    - The Gwichon Village Mystery
+    - Hellper 2 - Killberos
+    - I Became A Married Man in Another World
+    - Doubt (TONOGAI Yoshiki)
+
+manhua:
+  enabled: true
+  interests:
+    []
+
+other:
+  enabled: true
+  interests: []

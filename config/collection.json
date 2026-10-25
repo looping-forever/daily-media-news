@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "critical_hosts": [
+    "tu.edu.np",
+    "iost.tu.edu.np",
+    "news.google.com"
+  ],
+  "timeout_sec": {
+    "default": 10,
+    "tu.edu.np": 20,
+    "iost.tu.edu.np": 20
+  },
+  "retry": {
+    "attempts": 2,
+    "backoff_sec": [
+      0.75
+    ],
+    "retry_on": [
+      "timeout",
+      "connection",
+      "dns",
+      "tls",
+      "throttled",
+      "http_5xx"
+    ],
+    "resolve_timeout_sec": 5.0
+  },
+  "soft_budget_sec": 75.0,
+  "max_workers": 8,
+  "min_items_per_source": 1
+}

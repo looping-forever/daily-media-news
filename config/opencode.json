@@ -1,0 +1,14 @@
+{
+  "pin": "opencode-ai@1.18.31",
+  "min_version": "1.17.0",
+  "provider": "opencode",
+  "ladder": [
+    "opencode/big-pickle",
+    "opencode/mimo-v2.6-flash-free",
+    "opencode/nemotron-3.5-lightning-free"
+  ],
+  "flags": [
+    "--auto",
+    "--model"
+  ]
+}

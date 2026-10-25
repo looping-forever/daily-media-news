@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "verified_against_live": false,
+  "verified_at": null,
+  "feeds": [
+    {
+      "id": "iost_result",
+      "label": "IOST result notices",
+      "url": "https://iost.tu.edu.np/notices?notice_type=21",
+      "notice_type": 21,
+      "kind": "result",
+      "require_marker": true,
+      "critical": true,
+      "union_url": "https://iost.tu.edu.np/notices",
+      "follow_rel_next": true,
+      "max_pages": 3
+    },
+    {
+      "id": "iost_all",
+      "label": "IOST all notices",
+      "url": "https://iost.tu.edu.np/notices",
+      "notice_type": null,
+      "kind": "exam_notice",
+      "require_marker": false,
+      "critical": true
+    }
+  ],
+  "result_path": {
+    "_comment": "Coverage metadata for the RESULT path, which the exam_notice matchers cannot see. The whole result pipeline - fetch a detail page, read its authoritative title, classify it, download a PDF, extract a roll-shaped token - was never exercised by the self-check, which is why it could stay completely broken while the self-check exited green. A feed marked critical:true MUST be probed end to end here. scripts/selfcheck_exam_sources.py consumes this block; the monitor itself does not.",
+    "enabled": true,
+    "require_detail_page": true,
+    "require_pdf": true,
+    "timeout": 30,
+    "max_probed_notices": 3,
+    "known_result_notice_id": 15673,
+    "known_result_title": "B.Sc.CSIT I Semester-2082 Exam Result",
+    "expected_sheet_roll_token": "1357 2468"
+  },
+  "matchers": {
+    "marker_terms": [
+      "CSIT",
+      "B.Sc",
+      "BSc"
+    ],
+    "notice_terms": [
+      "exam",
+      "examination",
+      "routine",
+      "schedule",
+      "form",
+      "admission card",
+      "registration",
+      "re-exam",
+      "back",
+      "supplementary",
+      "result",
+      "viva",
+      "project",
+      "internship",
+      "calendar"
+    ],
+    "deadline_terms": [
+      "deadline",
+      "last date",
+      "on or before",
+      "apply by",
+      "submit"
+    ]
+  },
+  "self_check": {
+    "enabled": true,
+    "max_notices": 10,
+    "require_exam_match": true
+  }
+}

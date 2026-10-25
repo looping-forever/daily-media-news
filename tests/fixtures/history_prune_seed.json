@@ -1,0 +1,16 @@
+{
+  "stories": [
+    {
+      "title": "ancient entry to prune",
+      "url": "https://example.com/ancient-entry",
+      "date": "2026-07-01"
+    },
+    {
+      "url_normalized": "example.com/recent-entry",
+      "title_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      "title": "recent kept entry",
+      "category": "nepal",
+      "date_sent": "2026-08-28"
+    }
+  ]
+}

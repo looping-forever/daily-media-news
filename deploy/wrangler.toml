@@ -1,0 +1,50 @@
+name = "breaking-monitor"
+main = "cloudflare-worker.js"
+compatibility_date = "2026-08-26"
+preview_urls = false
+
+# THE DEPLOYED SCHEDULE. Applied by `wrangler deploy`, not by hand in the
+# dashboard. Mirrored in deploy/schedule.json and in the CRON_DISPATCHER
+# constant of deploy/cloudflare-worker.js; Check 16 in
+# tests/workflows/test_workflow_lint.py fails if those three ever disagree, so do
+# not restate an interval in a comment elsewhere -- point at this file instead.
+#
+# ONE cron, not five. Cloudflare Workers Free allows 5 cron triggers per account
+# and this account hit that limit (`account has reached the Workers Free limit of
+# 5 cron triggers per account`, code 10072), which left a half-applied deploy:
+# the code shipped, the re-fire crons did not register. The jobs are merged into
+# a dispatcher instead of upgrading to a paid plan.
+#
+# WHY EVERY MINUTE AND NOT EVERY FIVE. The breaking sweep is `*/3`, so a
+# five-minute dispatcher would fire it a third as often and the effective sweep
+# frequency would drop by more than half. `* * * * *` reproduces the previous
+# schedule exactly; the dispatcher decides per tick, and a tick with nothing due
+# costs one clock comparison and no KV or network I/O at all.
+#
+# Deploy with the build stamp so a deployment from a stale checkout becomes
+# visible (?health=1 reports it, and drift-canary.yml compares it to master HEAD):
+#   wrangler deploy -c deploy/wrangler.toml --var WORKER_BUILD:<short sha>
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "KV"
+id = "abcdefabcdefabcdefabcdefabcdefab"
+
+[vars]
+# Reviewable in git on purpose: the ntfy SERVER is not a secret, it is an
+# address, and a hardcoded literal in the Worker is the kind of drift Check 16
+# exists to catch.
+NTFY_SERVER = "https://ntfy.sh"
+
+# NTFY_TOPIC is deliberately NOT here. An ntfy topic name is a publish/subscribe
+# capability: anyone holding it can both publish to and read the alert stream.
+# It is a wrangler SECRET and is never committed:
+#   wrangler secret put NTFY_TOPIC -c deploy/wrangler.toml
+# Rotating it needs no code redeploy. If the topic VALUE changes, the matching
+# GitHub Actions secret (same name) must change too, or the two arms page
+# different streams.
+#
+# WORKER_BUILD is likewise absent: it is injected per-deploy with --var so it
+# can never be hand-typed and go stale here. Its in-source default is "unset",
+# which the drift canary reads as "this deployment was never stamped".

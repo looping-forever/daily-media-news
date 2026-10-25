@@ -1,0 +1,295 @@
+name: Actions Budget Sentinel
+
+# THE RUNTIME HALF OF THE BUDGET. `scripts/check_actions_budget.py` is the
+# static half: it projects a month from what the tree DECLARES and fails a
+# commit that raises it. This workflow is the other half: it measures what the
+# account actually spent, so a month that drifts away from the declaration is
+# seen on the day it drifts rather than when the allowance runs out.
+#
+# WHY IT EXISTS AT ALL. On 2026-10-18 the account was refused at
+# runner-assignment: October had consumed about 2,016 minutes by the 18th,
+# i.e. about 3,360 in a month, against an allowance of 2,000. Nothing was
+# watching, so the first signal was the refusal itself. The owner cannot buy
+# more (no USD access from Nepal), which makes being refused a hard stop rather
+# than a bill.
+#
+# THIS IS AN ESTIMATE, NOT GITHUB'S METER, AND THE DIFFERENCE IS STATED
+# PLAINLY. GitHub reports the account's real consumption through billing
+# endpoints that the token here cannot read -- they require the `user` scope,
+# which a repository GITHUB_TOKEN does not have -- so no endpoint exists that
+# can be asked "how many minutes has this month cost". What this measures
+# instead is the one number that reconstructs the meter exactly: Actions bills
+# PER JOB PER MINUTE, ROUNDED UP, so summing ceil(seconds/60) over every job of
+# every run in a window reproduces the bill for that window. The billing rule
+# is the meter; this step applies it by hand.
+#
+# THE WINDOW IS PART OF THE ANSWER. It enumerates the last WINDOW_DAYS days of
+# runs and projects the month from the resulting daily rate, so every figure
+# printed is scoped and the scope is printed with it. It is not a month-to-date
+# ledger and it does not claim to be.
+#
+# ONE KNOWN COST OF THIS DESIGN, RECORDED RATHER THAN HIDDEN: enumerating jobs
+# is one API call per run, and this repository produces roughly 30 runs a day,
+# so the step is ~200 calls and its wall time grows with the repository's
+# volume. `actions/workflows/{id}/timing` returns the billable figure for a
+# workflow in a single call and would collapse that to six, and it is the
+# obvious improvement -- it is NOT shipped here because it could not be
+# exercised against the live API from the machine this was written on, and an
+# untested second path in the only guard against a hard stop is worse than a
+# slow one. The step prints its own call count and elapsed time.
+#
+# THE FOUR LEVELS, AND WHAT EACH ONE IS FOR:
+# TWO NUMBERS, AND ONLY ONE OF THEM IS ENFORCED (2026-10-20).
+# The DESIGN TARGET (`design_target_minutes`, 1,400) is an ASPIRATION: REPORTED,
+# never enforced -- if the month is over it the job says so in a warning and
+# still exits 0. Refusing at 1,400 would stop work with 600 minutes of allowance
+# still unspent. The HARD CEILING (`hard_ceiling_minutes`, 1,800 = allowance
+# 2,000 - a 200 reserve) is the number every level below is a fraction OF. Since
+# 2026-10-25 it is REPORTED here but no longer refused on by the Worker: this
+# repository is public, standard runners are free, and
+# `config/actions-budget.json` carries `enforcement.enabled: false`. Flipping that
+# flag back to true re-arms the refusal; nothing in THIS job changes either way.
+#   80% of the CEILING -- issue + ntfy. Information: the month is trending over.
+#   90% of the CEILING -- issue labelled `budget-freeze` + ntfy. The FLAG. This is
+#                        the level that asks for a DECISION (pause discretionary
+#                        dispatches) while there is still headroom to act in.
+#   100% of the CEILING -- ::error::, issue, and the job FAILS, on purpose. A
+#                        budget guard that cannot go red is a report.
+#   below              -- prints the numbers and exits 0.
+#
+# WHY THE FREEZE FLAG IS A LABEL, AND WHO READS IT. The flag is the presence of
+# an OPEN issue labelled `budget-freeze` -- one switch, two readers: a human sees
+# it on their phone, and the Worker's runtime quota reads it through the GitHub
+# API and reports it on `?health=1`. While enforcement was ON it also SHED the
+# discretionary dispatches (drift, academic, breaking, prebuild) FIRST, keeping
+# the digest build and the watchdog LAST. With enforcement OFF -- the shipped
+# state -- the Worker still reports the flag and refuses nothing, because a
+# public repository has no minutes to save. The label is machine-readable rather
+# than decorative, and no new secret is needed to write it.
+#
+# WHY IT NO LONGER GOES RED EVERY DAY. Until 2026-10-20 the 100% arm measured
+# against the 1,400 DESIGN TARGET, which this tree exceeds by design (1,746), so
+# the job failed every single day -- and a guard that is red every day is one the
+# owner starts ignoring, which digest-watchdog.yml says plainly about its own
+# worker arm. The number this job measures against is now the hard ceiling
+# (1,800), which 1,746 is UNDER by 54 minutes, so a good month is GREEN and a red
+# means the tree is genuinely past its own declared ceiling.
+
+on:
+  schedule:
+    # 06:23 UTC is 12:08 Nepal time, one firing a day. Not on the hour:
+    # GitHub's scheduled-run queue congests badly at :00.
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: actions-budget-sentinel
+  cancel-in-progress: false
+
+permissions:
+  contents: read   # the committed cap in config/actions-budget.json
+  actions: read    # gh run list / gh api .../runs/{id}/jobs -- the durations
+  issues: write    # the level issue this files
+
+jobs:
+  budget:
+    runs-on: ubuntu-latest
+    # Generous, because the step's cost is one API call per run in the window
+    # and that count follows the repository's volume. The step prints its own
+    # elapsed time, so a slow month is visible rather than mysterious.
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # Read-only job: never commits, so GITHUB_TOKEN does not need to sit in
+        # .git/config for the whole run.
+        with:
+          persist-credentials: false
+
+      - name: Measure the month and report the level
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import datetime
+          import json
+          import math
+          import os
+          import subprocess
+          import sys
+          import time
+
+          #: How much history the daily rate is measured over, and therefore
+          #: what the projection is worth. Stated in the log, not just here.
+          WINDOW_DAYS = 7
+          #: A bound on the API calls the step makes, not an expected cap.
+          MAX_RUNS = 400
+
+          def gh_json(args):
+              out = subprocess.run(["gh"] + args, capture_output=True, text=True)
+              if out.returncode != 0:
+                  print("::error::gh %s failed: %s"
+                        % (" ".join(args), (out.stderr or "").strip()))
+                  sys.exit(2)
+              return json.loads(out.stdout or "null")
+
+          with open("config/actions-budget.json", encoding="utf-8") as fh:
+              budget = json.load(fh)
+          target = float(budget.get("design_target_minutes")
+                         or budget["repo_soft_cap_minutes"])
+          ceiling = float(budget.get("hard_ceiling_minutes")
+                          or budget["included_minutes"])
+          warn_ratio = float(budget.get("warn_ratio", 0.8))
+          freeze_ratio = float(budget.get("freeze_ratio", 0.9))
+          days_in_month = int(budget["days_per_month"])
+
+          started = time.time()
+          now = datetime.datetime.now(datetime.timezone.utc)
+          since = (now - datetime.timedelta(days=WINDOW_DAYS)).strftime(
+              "%Y-%m-%dT%H:%M:%SZ")
+          print("window: runs created since %s (%d days), until %s"
+                % (since, WINDOW_DAYS, now.strftime("%Y-%m-%dT%H:%M:%SZ")))
+
+          runs = gh_json(["run", "list", "--created", ">=" + since,
+                          "--limit", str(MAX_RUNS),
+                          "--json", "databaseId,workflowName,createdAt"])
+          if len(runs) >= MAX_RUNS:
+              print("::warning::the window is TRUNCATED at %d runs, so every "
+                    "figure below is a LOWER BOUND" % MAX_RUNS)
+
+          total_minutes = 0
+          per_workflow = {}
+          calls = 0
+          for run in runs:
+              rid = run["databaseId"]
+              jobs = gh_json(["api", "--paginate",
+                              "repos/{owner}/{repo}/actions/runs/%d/jobs" % rid])
+              calls += 1
+              # PER JOB, CEILED. This is the billing rule, not an approximation
+              # of it: a 5-second job costs a whole minute, and a run with four
+              # jobs costs at least four.
+              for job in (jobs or {}).get("jobs") or []:
+                  start = job.get("started_at")
+                  end = job.get("completed_at")
+                  if not start or not end:
+                      continue
+                  fmt = "%Y-%m-%dT%H:%M:%SZ"
+                  seconds = (datetime.datetime.strptime(end, fmt)
+                             - datetime.datetime.strptime(start, fmt)).total_seconds()
+                  minutes = max(1, math.ceil(seconds / 60.0))
+                  total_minutes += minutes
+                  name = run["workflowName"] or "(unknown)"
+                  per_workflow[name] = per_workflow.get(name, 0) + minutes
+
+          rate = total_minutes / float(WINDOW_DAYS)
+          projected = rate * days_in_month
+          ratio = projected / ceiling if ceiling else 0.0
+          over_target = projected > target
+          elapsed = time.time() - started
+
+          print("enumerated %d run(s) in %d API call(s) in %.0fs"
+                % (len(runs), calls, elapsed))
+          for name in sorted(per_workflow, key=per_workflow.get, reverse=True):
+              print("  %-28s %6.0f min in the window" % (name, per_workflow[name]))
+          print("  measured in window: %.0f min over %d days = %.1f min/day"
+                % (total_minutes, WINDOW_DAYS, rate))
+          print("  projected month:    %.0f min (x%d days)" % (projected, days_in_month))
+          print("  design target:      %.0f min%s"
+                % (target, ("  *** OVER by %.0f (reported, NOT enforced) ***"
+                            % (projected - target)) if over_target else ""))
+          print("  hard ceiling:       %.0f min" % ceiling)
+          print("  level:              %.0f%% of the HARD CEILING" % (ratio * 100))
+          if over_target:
+              print("::warning::the projected month is %.0f min against the DESIGN "
+                    "TARGET of %.0f (+%.0f). Reported, not enforced: this does NOT "
+                    "fail the job; the enforced number is the hard ceiling of %.0f."
+                    % (projected, target, projected - target, ceiling))
+
+          if ratio >= 1.0:
+              level = 100
+          elif ratio >= freeze_ratio:
+              level = 90
+          elif ratio >= warn_ratio:
+              level = 80
+          else:
+              level = 0
+
+          if level == 0:
+              print("  the projected month fits the hard ceiling; nothing to file.")
+              sys.exit(0)
+
+          title = ("Actions budget at %d%% of the hard ceiling (projected %.0f "
+                   "min/month vs %.0f)" % (level, projected, ceiling))
+          lead = ("The projected Actions month is %.0f minutes against a HARD "
+                  "CEILING of %.0f (%d%% of it; the DESIGN TARGET is %.0f and that "
+                  "overage is reported, not enforced)."
+                  % (projected, ceiling, level, target))
+          detail = ("Measured %.0f minutes over the last %d days (%.1f min/day), "
+                    "projected with the %d-day month in "
+                    "config/actions-budget.json. Hard ceiling = allowance %.0f - "
+                    "reserve %.0f. That figure is an ESTIMATE: it sums every job's "
+                    "ceil(seconds/60) over the window, which is the billing rule, "
+                    "because the real billing endpoint needs the `user` scope this "
+                    "token does not have."
+                    % (total_minutes, WINDOW_DAYS, rate, days_in_month,
+                       float(budget["included_minutes"]),
+                       float(budget.get("budget_reserve_minutes") or 0)))
+          action = {
+              80: "Information only. The month is trending toward the hard ceiling; "
+                  "no action is required yet.",
+              90: "FREEZE FLAG. The Worker's runtime quota reports this issue's "
+                  "`budget-freeze` label on ?health=1 and, while enforcement is "
+                  "ON, sheds the discretionary dispatches (drift, academic, "
+                  "breaking, prebuild) FIRST, keeping the digest build and the "
+                  "watchdog LAST. Enforcement is currently OFF (the repository is "
+                  "public), so nothing is shed: pause them by hand if needed.",
+              100: "The hard ceiling is breached. This job FAILED on purpose. "
+                   "Reduce dispatch volumes before the account is refused at "
+                   "runner-assignment, which is a hard stop with no bill to pay.",
+          }[level]
+          body = "%s\n\n%s\n\n%s\n" % (lead, detail, action)
+
+          print("::warning::%s" % lead)
+          if level == 100:
+              print("::error::%s" % lead)
+
+          if os.environ.get("NTFY_TOPIC") and os.environ.get("NTFY_SERVER"):
+              import urllib.request
+              req = urllib.request.Request(
+                  "%s/%s" % (os.environ["NTFY_SERVER"].rstrip("/"),
+                             os.environ["NTFY_TOPIC"]),
+                  data=body.encode("utf-8"),
+                  headers={"Title": "Actions budget at %d%%" % level,
+                           "Priority": "5" if level >= 90 else "3",
+                           "Tags": "warning,moneybag"})
+              try:
+                  urllib.request.urlopen(req, timeout=15).read()
+              except Exception as exc:  # noqa: BLE001
+                  print("::warning::ntfy ping failed: %s" % exc)
+          else:
+              print("::warning::NTFY secrets unset -- annotation only (issue "
+                    "still filed)")
+
+          labels = ["actions-budget"]
+          if level >= 90:
+              labels.append("budget-freeze")
+          existing = subprocess.run(
+              ["gh", "issue", "list", "--state", "open", "--label", "actions-budget",
+               "--search", "%d%% in:title" % level, "--json", "number",
+               "--jq", "length"],
+              capture_output=True, text=True)
+          if (existing.stdout or "0").strip() == "0":
+              subprocess.run(["gh", "issue", "create", "--title", title,
+                              "--body", body, "--label", ",".join(labels)],
+                             check=True)
+          else:
+              print("an open issue for the %d%% level already exists -- not "
+                    "duplicating" % level)
+
+          if level == 100:
+              sys.exit(1)
+          PY

@@ -1,0 +1,14 @@
+# Byte-truth for captured real-world fixtures.
+#
+# tests/fixtures/real/manifest.json records a sha256 for every captured file,
+# and tests/fixtures/real/test_manifest_freshness.py fails the moment a file on
+# disk stops matching its recorded hash. Git's line-ending conversion broke that
+# guarantee: core.autocrlf=true (inherited from the PortableGit etc/gitconfig on
+# this machine) stripped the CR bytes from two fixtures at COMMIT time, so the
+# blob stored in the repo no longer matched the working-tree file and the
+# byte-truth guard failed on CI while passing locally.
+#
+# `-text` marks these files opaque: git stores and checks out their bytes
+# verbatim, applying no eol normalization in either direction. This closes the
+# whole class rather than re-recording the two hashes that happened to trip it.
+tests/fixtures/real/** -text

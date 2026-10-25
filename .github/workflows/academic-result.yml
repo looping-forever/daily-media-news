@@ -1,0 +1,1012 @@
+name: Academic Result Monitor
+
+# Triggers: manual dispatch (fallback/testing) + repository_dispatch from
+# Cloudflare Worker (primary detection, every 2 min).
+#
+# The Cloudflare Worker tripwire (deploy/cloudflare-worker.js) does cheap
+# deterministic detection of new CSIT semester-result notices on the TU IOST
+# Result feed every 2 minutes and hands off here via repository_dispatch
+# (type: academic-result). This workflow runs scripts/check_academic_result.py,
+# which downloads the result PDF, searches for the tracked roll number, updates
+# state/academic_state.json, and emits a notification payload. Actual delivery
+# (ntfy + website) happens here, not in the worker.
+on:
+  repository_dispatch:
+    types: [academic-result]
+  schedule:
+    # F7 — dead-man's run, TWICE A DAY. The Cloudflare Worker dispatches on
+    # detection (every 2 min), but a dispatch is a *notification*, not a
+    # guarantee: if the worker dies, its KV binding is unbound, GH_TOKEN is
+    # invalid, or the whole tu.edu.np DNS zone is SERVFAIL (the current state of
+    # the world), NOTHING dispatches and this workflow never runs. The schedule
+    # is the backstop that makes the monitor's own failure state observable
+    # instead of silent.
+    #
+    # WHY 2x/DAY AND NOT HOURLY: the Worker is the sensor and it sweeps every 2
+    # minutes, so the backstop's only job is to make a DEAD monitor visible.
+    # Hourly did that 24 times a day at ~2 minutes a run, on an account that had
+    # already been refused at runner-assignment. Two firings do it at the latency
+    # that matters, because a result notice is published inside TU office hours.
+    # The cost is latency, stated plainly: a silently dead monitor is now noticed
+    # within ~12 hours instead of within one.
+    #
+    # Minute 17 is deliberate: GitHub's scheduled-run queue congests badly on
+    # :00, and a run that queues for an hour is a run that misses a result.
+    # Hours 4 and 10 UTC are 10:02 and 16:02 Nepal time, inside office hours.
+    - cron: '17 4,10 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (write state/academic_notify_preview.json instead of live delivery)'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: academic-result
+  # MUST stay false. A scheduled run and a Worker dispatch for the SAME new
+  # notice can overlap; cancelling the in-flight one would cancel a real
+  # detection mid-flight. Protection against that race is idempotency
+  # (the examined map / the dispatched dedup keys), not cancellation.
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # bot state commit-back
+
+jobs:
+  academic-result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # fetch-depth: 0 (full history), same rationale as breaking-monitor.yml:
+          # the final commit step pushes state back to master from this checkout
+          # and a full clone keeps that bot push reliable.
+          fetch-depth: 0
+          # DEFECT 2 (P1 security). Without this, `actions/checkout` writes an
+          # `http.https://github.com/.extraheader` entry carrying GITHUB_TOKEN
+          # into `.git/config` IN THE WORKSPACE, and it stays there for the
+          # whole job. Any process in this job -- including a `run: opencode
+          # run --auto` step fed by untrusted RSS text, or anything a shell
+          # command reached from that text evaluates -- could `git push` with
+          # `contents: write`. The token is still used for the initial fetch;
+          # only the on-disk persistence is switched off. The final commit
+          # step injects the token explicitly, for its own two commands only.
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PDF/OCR dependencies
+        # pypdf/pdfplumber for direct text extraction, pytesseract + the
+        # tesseract-ocr system binary for scanned-image fallback. Wrapped in
+        # continue-on-error: check_academic_result.py degrades gracefully when
+        # OCR is unavailable (it treats an unextractable PDF as "unknown" and
+        # never marks the student failed), so a missing OCR lib must not kill
+        # the run.
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          pip install pypdf pdfplumber pytesseract
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+
+      - name: Self-check exam-notice sources
+        # F5 — runs BEFORE the monitor, deliberately isolated:
+        #   continue-on-error: true  -> it can never fail the job
+        #   timeout-minutes: 3       -> a hung TU fetch cannot delay a result
+        # It writes only state/exam_selfcheck.json and never touches
+        # state/academic_state.json, so it cannot delay or prevent a result
+        # check. Exit 1 means "exam_notice matchers matched nothing" — the
+        # matcher set is stale and the owner is told so loudly.
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PYTHONIOENCODING: utf-8
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          python3 scripts/selfcheck_exam_sources.py \
+            --config config/exam_notices.json \
+            --state state/exam_selfcheck.json \
+            --timeout 15
+
+      - name: Run academic result monitor
+        # The dry_run input reaches the shell ONLY via the DRY_RUN env var
+        # (never interpolated into the command string); the guard below maps it
+        # to the --dry-run flag. DRY_RUN is resolved for BOTH event types:
+        # workflow_dispatch honors the dry_run input (default true), while
+        # repository_dispatch runs resolve to literal false, so the monitor
+        # runs live. PYTHONIOENCODING=utf-8 keeps the emoji-laden payload
+        # output from tripping on the runner's default ASCII locale.
+        #
+        # In live mode the monitor prints the notification payload JSON to
+        # stdout as JSON-LINES -- one COMPACT object per line, `indent` NOT
+        # used -- and we tee it to state/academic_live_payload.jsonl so the
+        # delivery steps below have a single source of truth. In dry-run mode
+        # the monitor writes state/academic_notify_preview.json (a JSON list)
+        # instead.
+        #
+        # WHY .jsonl AND NOT .json. The old shape printed each payload with
+        # indent=2 and tee'd the CONCATENATION into one file, so N payloads
+        # produced a file that was not one JSON document: json.load failed
+        # with "Extra data: line 33", the ntfy step's try/except turned that
+        # into "no payload available", and ntfy + render + Pages all skipped
+        # while the job exited 0. One compact object per line makes the file
+        # trivially parseable per line AND makes the payload COUNT visible,
+        # which is what delivery_assert needs to prove every payload was
+        # delivered. The old .json name is never written again; it stays in
+        # the artifact list as an ignore entry so a stale copy committed
+        # before this change can never be picked up.
+        #
+        # id: monitor + continue-on-error + an explicit `exit $rc`: the step
+        # still shows RED on a non-zero exit (the honest signal) but the job
+        # keeps going so the degraded-run step below can turn a silent failure
+        # into a notification.
+        id: monitor
+        continue-on-error: true
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          PYTHONIOENCODING: utf-8
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="--dry-run"
+          fi
+          echo "Academic monitor: dry_run=${DRY_RUN:-false}"
+          set +e
+          # $ARGS is intentionally unquoted: it is only ever empty or the
+          # literal "--dry-run" built above, never external input.
+          if [ "$DRY_RUN" = "true" ]; then
+            python3 scripts/check_academic_result.py \
+              --state-file state/academic_state.json \
+              $ARGS
+            rc=$?
+          else
+            # Live: capture the printed payload (one COMPACT JSON object per
+            # line) to a file for the delivery steps. The monitor prints the
+            # payload with separators=(",", ":") and no indent, so every
+            # payload is exactly one line; the delivery steps parse it with
+            # scripts/payload_io.read_payloads, which is total-or-raise.
+            python3 scripts/check_academic_result.py \
+              --state-file state/academic_state.json \
+              $ARGS | tee state/academic_live_payload.jsonl
+            rc=${PIPESTATUS[0]}
+          fi
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "Academic monitor exit code: $rc"
+          exit "$rc"
+
+      - name: Record degraded run
+        # Acceptance criterion 6. Until now a monitor failure reached the owner
+        # as NOTHING AT ALL — no ntfy, no email, no page. This step always
+        # runs, writes state/academic_last_run.json, and on a non-zero exit
+        # builds a degraded payload + pings ntfy, so the downstream ntfy /
+        # render / Pages steps have something real to publish instead of all
+        # skipping together.
+        if: always()
+        continue-on-error: true
+        id: degraded
+        env:
+          MONITOR_EXIT: ${{ steps.monitor.outputs.exit_code }}
+          PYTHONIOENCODING: utf-8
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          python3 - <<'PY'
+          import json, os, sys, urllib.request
+          from datetime import datetime, timezone
+
+          exit_code = os.environ.get('MONITOR_EXIT') or '0'
+          try:
+              code = int(exit_code)
+          except ValueError:
+              code = 0
+          degraded = code != 0
+          reasons = {
+              1: 'config/state save failure (exit 1)',
+              2: 'transient network failure — the notice board could not be '
+                 'fetched, so NOTHING was concluded about your result',
+              3: 'corrupt state file — refused to overwrite (exit 3)',
+          }
+          reason = reasons.get(code, 'unexpected exit code %s' % code)
+
+          artifact = {'exit_code': code, 'checked_at':
+                      datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                      'last_poll_time': None, 'hosts_down': {},
+                      'pending_overflow': False}
+          try:
+              with open('state/academic_state.json', encoding='utf-8') as fh:
+                  state = json.load(fh)
+              artifact['last_poll_time'] = state.get('last_poll_time')
+              artifact['hosts_down'] = state.get('hosts_down') or {}
+              artifact['pending_overflow'] = bool(state.get('pending_overflow'))
+              artifact['schema_version'] = state.get('schema_version')
+              artifact['last_examined_notice_id'] = state.get(
+                  'last_examined_notice_id')
+              artifact['deferred'] = sorted(
+                  k for k, v in (state.get('examined') or {}).items()
+                  if isinstance(v, dict) and v.get('outcome') == 'deferred')
+          except (OSError, ValueError) as exc:
+              print('could not read academic_state.json: %s' % exc)
+
+          with open('state/academic_last_run.json', 'w', encoding='utf-8') as fh:
+              json.dump(artifact, fh, ensure_ascii=False, indent=2)
+              fh.write('\n')
+          print('academic_last_run: %s' % json.dumps(artifact, ensure_ascii=False))
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write('degraded=%s\n' % ('true' if degraded else 'false'))
+
+          if not degraded:
+              print('monitor completed normally (exit 0)')
+              sys.exit(0)
+
+          message = ('Academic result monitor did not complete (exit %d).\n\n%s'
+                     % (code, reason))
+          print('::error::%s' % message.replace('\n', ' '))
+          payload = {
+              'kind': 'degraded',
+              'semester': None,
+              'roll_number': '',
+              'result_date': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+              'title': 'Academic result monitor degraded (exit %d)' % code,
+              'message': message,
+              'ntfy': {'title': '⚠️ Academic monitor DEGRADED (exit %d)' % code,
+                       'message': message,
+                       # `pipeline` first: this is a GATE notice about the
+                       # monitor, not a result. It shares priority 5 and the
+                       # warning tag with a CRITICAL breaking alert, so without
+                       # a class tag the owner cannot tell the two apart.
+                       'tags': ['pipeline', 'warning', 'rotating_light'],
+                       'priority': 5,
+                       'click': '', 'actions': []},
+              'website': {'path': 'docs/academic/'
+                          + datetime.now(timezone.utc).strftime('%Y-%m-%d')
+                          + '-degraded.html'},
+          }
+          with open('state/academic_degraded_payload.json', 'w',
+                    encoding='utf-8') as fh:
+              # DEFECT 5. This used to be `json.dump(payload, indent=2)` --
+              # a PRETTY-PRINTED SINGLE OBJECT. `payload_io.read_payloads` is
+              # JSON-Lines-or-list and RAISES on that shape: the file starts
+              # with `{`, not `[`, so every line is parsed on its own and line 1
+              # is `{`, which is not JSON. The chain that followed was silent:
+              # the ntfy step caught PayloadFormatError, printed "No
+              # notification payload available", recorded 0 and returned 0; the
+              # render step's count_payloads raised, degraded became -1, and
+              # finish(False) fired. On a DEGRADED run -- the one run that must
+              # be loudest -- nothing published and delivery_assert saw
+              # emitted=0 and exited 0. One compact object per line is the
+              # contract `scripts/check_academic_result.py` already writes and
+              # `scripts/emit_notification` now writes; this writes the same.
+              fh.write(json.dumps(payload, ensure_ascii=False,
+                                  separators=(',', ':')))
+              fh.write('\n')
+
+          topic = (os.environ.get('NTFY_TOPIC') or '').strip()
+          server = (os.environ.get('NTFY_SERVER') or '').strip()
+          if topic and server.startswith(('http://', 'https://')):
+              body = json.dumps({'topic': topic,
+                                 'title': payload['ntfy']['title'],
+                                 'message': message,
+                                 'tags': payload['ntfy']['tags'],
+                                 'priority': 5}).encode('utf-8')
+              try:
+                  req = urllib.request.Request(
+                      server.rstrip('/') + '/', data=body,
+                      headers={'Content-Type': 'application/json',
+                               'Accept': 'application/json',
+                               'Markdown': 'yes'})
+                  with urllib.request.urlopen(req, timeout=15) as resp:
+                      resp.read()
+                  print('degraded-run ntfy sent')
+              except Exception as exc:
+                  print('::warning::degraded-run ntfy failed: %s' % exc)
+          else:
+              print('::warning::NTFY secrets unset — degraded payload written '
+                    'to state/academic_degraded_payload.json for the delivery '
+                    'steps, but no direct ntfy ping')
+          PY
+
+      - name: Check for emitted notification payload
+        # The monitor writes state/academic_notify_preview.json (dry-run, a
+        # JSON list) or prints JSON-Lines to stdout, captured to
+        # state/academic_live_payload.jsonl (live). If no payload was emitted
+        # (silent tick) the delivery steps no-op.
+        #
+        # `found` is now DERIVED from a real count instead of "the file is
+        # non-empty", and `count` is published because delivery_assert needs
+        # the number of payloads that were PROMISED in order to prove they
+        # were all delivered.
+        #
+        # A malformed payload file is an ERROR, not a skip. The old step asked
+        # nothing of the file's contents, so a file that could not be parsed
+        # still read as "found" and the failure surfaced three steps later as
+        # a swallowed ntfy skip. read_payloads is total-or-raise, so this is
+        # the first place a broken file can be named -- with the file and the
+        # line number -- and the job goes red here.
+        id: payload_check
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
+          import payload_io
+
+          dry_run = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+          path = ('state/academic_notify_preview.json' if dry_run
+                  else 'state/academic_live_payload.jsonl')
+          try:
+              payloads = payload_io.read_payloads(path)
+          except payload_io.PayloadFormatError as exc:
+              print('::error::%s' % exc)
+              print('academic payload file %s is not readable as payloads: '
+                    'delivery is BROKEN, not skipped' % path)
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  fh.write('found=false\n')
+                  fh.write('count=0\n')
+              sys.exit(1)
+          count = len(payloads)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write('count=%d\n' % count)
+              fh.write('found=%s\n' % ('true' if count > 0 else 'false'))
+          if count:
+              print('Found %d notification payload(s) in %s' % (count, path))
+              for payload in payloads:
+                  print('  - %s' % ((payload.get('ntfy') or {}).get('title')
+                                   or payload.get('title') or '(untitled)'))
+          else:
+              print('No notification payload emitted (%s)' % path)
+          PY
+
+      - name: Publish to ntfy
+        # PRIMARY channel. Posts EACH payload as its own ntfy message to the
+        # NTFY_SERVER root (NOT /topic) with the Markdown: yes header,
+        # mirroring the daily-news.yml ntfy step. continue-on-error keeps the
+        # job alive so the website deploy can still fire when ntfy hard-fails.
+        #
+        # fires on a REAL payload OR on a degraded run: a failed monitor used
+        # to make every delivery step below skip together, which is how a dead
+        # monitor became complete silence. The degraded payload is a candidate
+        # too, so the ntfy block below has something to post.
+        #
+        # ONE MESSAGE PER PAYLOAD, each with its OWN 4096-byte budget. The
+        # budget is per payload, not aggregate, so the single-payload case is
+        # byte-for-byte the old behaviour while the four-payload case no
+        # longer needs the file to parse as one document. `payload = data[-1]`
+        # is gone: that line dropped payloads 1..N-1 without a word.
+        if: steps.payload_check.outputs.found == 'true' || steps.degraded.outputs.degraded == 'true'
+        continue-on-error: true
+        id: publish_ntfy
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          PAYLOAD_COUNT: ${{ steps.payload_check.outputs.count }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import json, os, sys, urllib.request
+          sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
+          import payload_io
+
+          def record(delivered, titles, truncated):
+              data = {'delivered': delivered, 'titles': titles,
+                      'truncated': truncated}
+              with open('state/academic_ntfy.json', 'w', encoding='utf-8') as fh:
+                  json.dump(data, fh, ensure_ascii=False, indent=2)
+                  fh.write('\n')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  fh.write('delivered=%d\n' % delivered)
+              return data
+
+          def main():
+              topic = (os.environ.get('NTFY_TOPIC') or '').strip()
+              server = (os.environ.get('NTFY_SERVER') or '').strip()
+              dry_run = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+
+              # Load the notification payloads: dry-run writes the preview
+              # file (a JSON list), live writes the captured JSON-Lines file.
+              # The degraded payload is a FALLBACK only -- a real result
+              # payload always wins.
+              payload_file = ('state/academic_notify_preview.json' if dry_run
+                              else 'state/academic_live_payload.jsonl')
+              payloads = []
+              try:
+                  payloads = payload_io.read_payloads(payload_file)
+              except payload_io.PayloadFormatError as exc:
+                  print('::error::%s' % exc)
+                  print('FATAL: payload file %s is unreadable; not falling '
+                        'back to the degraded payload' % payload_file)
+                  record(0, [], [])
+                  sys.exit(1)
+              if not payloads:
+                  try:
+                      degraded = payload_io.read_payloads(
+                          'state/academic_degraded_payload.json')
+                  except payload_io.PayloadFormatError as exc:
+                      print('::error::%s' % exc)
+                      degraded = []
+                  payloads = [p for p in degraded if p.get('kind') == 'degraded']
+
+              if not payloads:
+                  print('No notification payload available — ntfy skipped')
+                  record(0, [], [])
+                  return
+
+              if not (topic and server.startswith(('http://', 'https://'))):
+                  print('WARNING: NTFY_TOPIC/NTFY_SERVER not usable — ntfy '
+                        'unavailable (%r/%r)' % (topic, server))
+                  record(0, [], [])
+                  return
+
+              delivered = 0
+              titles = []
+              truncated = []
+              for index, payload in enumerate(payloads, start=1):
+                  body = payload_io.payload_to_ntfy_body(payload, topic)
+                  body, was_truncated = payload_io.fit_ntfy_body(body)
+                  title = body.get('title') or ''
+                  if dry_run:
+                      print('DRY RUN — ntfy notification not sent (payload %d/%d)'
+                            % (index, len(payloads)))
+                      print(json.dumps(body, ensure_ascii=False, indent=2))
+                      continue
+                  url = server.rstrip('/') + '/'
+                  data = json.dumps(body).encode('utf-8')
+                  try:
+                      req = urllib.request.Request(url, data=data, headers={
+                          'Content-Type': 'application/json',
+                          'Accept': 'application/json',
+                          'Markdown': 'yes',
+                      })
+                      with urllib.request.urlopen(req, timeout=15) as resp:
+                          result = json.loads(resp.read().decode('utf-8',
+                                                               errors='replace'))
+                      if isinstance(result, dict) and result.get('id'):
+                          print('ntfy notification sent to topic %r (id=%s)'
+                                % (topic, result['id']))
+                          delivered += 1
+                          titles.append(title)
+                      else:
+                          desc = (str(result.get('description') or result)
+                                  if isinstance(result, dict) else str(result))
+                          print('WARNING: ntfy reported: %s' % desc[:200])
+                  except Exception as exc:
+                      print('WARNING: ntfy publish failed for payload %d/%d: %s'
+                            % (index, len(payloads), exc))
+                  if was_truncated:
+                      print('WARNING: payload %d message body truncated to fit '
+                            'the ntfy byte budget (title kept in full)' % index)
+                      truncated.append(title)
+              record(delivered, titles, truncated)
+              print('ntfy delivered %d of %d payload(s)' % (delivered, len(payloads)))
+
+          try:
+              main()
+          except SystemExit:
+              raise
+          except Exception as exc:
+              print('FATAL: unexpected ntfy step error: %s' % exc)
+              record(0, [], [])
+          PY
+
+      - name: Render academic result page
+        # Renders the result notification into a self-contained HTML page under
+        # docs/academic/. Best-effort: a render failure is logged but never
+        # blocks the ntfy send or the state commit. render_academic.py picks
+        # its template from the payload's `kind`: "result" (unchanged,
+        # byte-identical), "exam_deadline" (routine/form/deadline, NO verdict)
+        # and "degraded" (the monitor failed — publish that too).
+        #
+        # EVERY payload is rendered, not just the last one, and the page is
+        # told how many results it is carrying (`--payload-count`), so a
+        # four-payload run cannot present itself as one result. DEFECT 1: the
+        # rendered pages are NOT published to Pages any more (see the step
+        # below, which now refuses to publish) and never were to be -- they
+        # reach only the run's 7-day artifact. The rendering still runs on
+        # every payload, so render_academic.py stays exercised in production.
+        #
+        # The degraded payload is a fallback for "no payload at all", NEVER a
+        # cover for "the payload file is broken": a broken file falls through
+        # as a failure so delivery_assert can turn the run red.
+        if: steps.payload_check.outputs.found == 'true' || steps.degraded.outputs.degraded == 'true'
+        continue-on-error: true
+        id: render_page
+        env:
+          PYTHONIOENCODING: utf-8
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
+          import payload_io
+          import render_academic
+
+          # DEFECT 6. `page_ok` is written to $GITHUB_OUTPUT exactly ONCE per
+          # step, and this guard is what makes that structural rather than
+          # aspirational. GitHub takes the LAST value for a repeated output
+          # key, so a second write does not add information -- it silently
+          # REPLACES a correct one, which is how a step that rendered 5 pages
+          # successfully ended up reporting page_ok=false. `Assert academic
+          # delivery` then failed the run with "academic page render failed
+          # despite 5 payload(s)": correct reading of a corrupted value.
+          _wrote_page_ok = []
+
+          def finish(ok):
+              if _wrote_page_ok:
+                  print('FATAL: finish() reached twice in one step; page_ok '
+                        'was already written as %s and cannot be written '
+                        'again' % ('true' if _wrote_page_ok[0] else 'false'))
+                  sys.exit(1)
+              _wrote_page_ok.append(bool(ok))
+              with open('state/.academic_page_ok', 'w', encoding='utf-8') as fh:
+                  fh.write('true' if ok else 'false')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  fh.write('page_ok=%s\n' % ('true' if ok else 'false'))
+              if not ok:
+                  sys.exit(1)
+
+          dry_run = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+          primary = ('state/academic_notify_preview.json' if dry_run
+                     else 'state/academic_live_payload.jsonl')
+          try:
+              count = len(payload_io.read_payloads(primary))
+          except payload_io.PayloadFormatError as exc:
+              print('::error::%s' % exc)
+              print('FATAL: %s is not parseable; refusing to substitute the '
+                    'degraded page for a broken result payload' % primary)
+              finish(False)
+          # DEFECT 6 (2026-10-02), the five-red-runs defect. This was an
+          # `if count:` with NO `else:`, so on a healthy run -- count > 0,
+          # render succeeds, `finish(rc == 0)` writes page_ok=true and RETURNS
+          # (it only calls sys.exit(1) on failure) -- control FELL THROUGH
+          # into the degraded-payload fallback below. `count_payloads`
+          # returns -1 for a missing file, and the degraded payload file
+          # only exists on degraded runs, so `degraded = -1`, `degraded <= 0`
+          # was true, and `finish(False)` overwrote state/.academic_page_ok
+          # and appended a SECOND page_ok=false to $GITHUB_OUTPUT. GitHub
+          # takes the LAST value, so `Assert academic delivery` correctly read
+          # page_ok=false and failed the run with
+          #     "academic page render failed despite 5 payload(s)"
+          # after the page had in fact rendered 5 pages successfully.
+          #
+          # The `else:` is the fix, and it is the right one: it makes the
+          # degraded fallback reachable ONLY when the monitor emitted nothing.
+          # Making `finish()` exit unconditionally would also have stopped the
+          # double write, but it papers over the fall-through and would leave
+          # the step unable to report anything after it. The assert is NOT to
+          # be weakened -- it is the only reason this was visible at all.
+          if count:
+              rc = render_academic.main(['--payload', primary,
+                                         '--out-dir', 'docs/academic',
+                                         '--payload-count', str(count)])
+              finish(rc == 0)
+          else:
+              # The degraded payload is a fallback for "the monitor emitted
+              # nothing", never a cover for "a render failed": the failure case
+              # is the `finish(rc == 0)` above, which already exits non-zero.
+              print('No payload in %s; falling back to the degraded page' % primary)
+              try:
+                  degraded = payload_io.count_payloads(
+                      'state/academic_degraded_payload.json')
+              except payload_io.PayloadFormatError as exc:
+                  print('::error::%s' % exc)
+                  degraded = -1
+              if degraded <= 0:
+                  print('WARNING: nothing to render (no payload, no degraded page)')
+                  finish(False)
+              rc = render_academic.main(['--payload',
+                                         'state/academic_degraded_payload.json',
+                                         '--out-dir', 'docs/academic',
+                                         '--payload-count', str(degraded)])
+              finish(rc == 0)
+          PY
+
+      - name: Assert academic delivery
+        # The step that makes "detected but delivered nothing, exit 0"
+        # IMPOSSIBLE. It runs `always()` and it has NO continue-on-error: if
+        # the monitor emitted payloads, the run is only allowed to be green
+        # when every emitted payload was confirmed by ntfy AND the page
+        # rendered. The floor-advance logic is deliberately NOT consulted
+        # here -- a delivery failure must not un-decide a result (that would
+        # re-alert forever), it just turns the run red and visible so a human
+        # re-runs the delivery.
+        #
+        # `emitted == 0` is a silent tick: nothing was promised, so nothing
+        # is asserted and the run stays green.
+        #
+        # DEFECT 5, second half. `emitted == 0` was ALSO what a degraded run
+        # looked like, because the monitor emitted nothing AND the degraded
+        # payload file was unreadable (see "Record degraded run"). So the one
+        # run that must be loudest was the one run this step waved through
+        # with "nothing to assert" and exit 0. A degraded run is now a
+        # DELIVERY obligation of its own: the degraded payload must exist and
+        # parse, the failure page must render, and (outside a dry run) one
+        # notification must actually be confirmed. Each failure is its own
+        # reason, so the record says WHICH channel went quiet.
+        #
+        # `DEGRADED` is derived from TWO sources on purpose: the step output
+        # AND the monitor's own exit code. `Record degraded run` carries
+        # continue-on-error, so if that step itself crashes the output is
+        # empty; reading MONITOR_EXIT too means the assert still goes red
+        # instead of inheriting the silence it was written to prevent.
+        if: always()
+        env:
+          EMITTED: ${{ steps.payload_check.outputs.count }}
+          DELIVERED: ${{ steps.publish_ntfy.outputs.delivered }}
+          PAGE_OK: ${{ steps.render_page.outputs.page_ok }}
+          DEGRADED: ${{ steps.degraded.outputs.degraded }}
+          MONITOR_EXIT: ${{ steps.monitor.outputs.exit_code }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+          from datetime import datetime, timedelta, timezone
+
+          # DEFECT 3. This used to be `timezone.utc.utcoffset(None)`, which is
+          # `timedelta(0)` -- an offset of ZERO, in a field named `at_npt`.
+          # Nepal is a FIXED UTC+05:45 with NO DST, so every at_npt this step
+          # ever wrote was 5h45m behind the wall clock it claimed to name
+          # (observed: "2026-09-30T11:28:45+0000" for a true 17:13:45+0545).
+          # The value below is seconds, identical to
+          # `check_academic_result.KATHMANDU_OFFSET = 5*3600 + 45*60`.
+          KATHMANDU = timedelta(seconds=5 * 3600 + 45 * 60)
+          try:
+              emitted = int(os.environ.get('EMITTED') or 0)
+          except ValueError:
+              emitted = 0
+          try:
+              delivered = int(os.environ.get('DELIVERED') or 0)
+          except ValueError:
+              delivered = 0
+          page_ok = str(os.environ.get('PAGE_OK') or '').lower() == 'true'
+          dry_run = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+          monitor_exit = str(os.environ.get('MONITOR_EXIT') or '').strip()
+          degraded = (str(os.environ.get('DEGRADED') or '').lower() == 'true'
+                      or monitor_exit not in ('', '0'))
+
+          titles = []
+          try:
+              with open('state/academic_ntfy.json', encoding='utf-8') as fh:
+                  titles = json.load(fh).get('titles') or []
+          except (OSError, ValueError):
+              titles = []
+
+          # The degraded payload file is counted with the SAME reader the ntfy
+          # and render steps use, so "it exists" and "it is readable as
+          # payloads" can never disagree. A count of -1 or 0 means there is no
+          # failure channel at all.
+          degraded_count = -1
+          try:
+              sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
+              import payload_io
+              degraded_count = payload_io.count_payloads(
+                  'state/academic_degraded_payload.json')
+          except Exception as exc:
+              print('::warning::could not count the degraded payload file: '
+                    '%s' % exc)
+
+          now = datetime.now(timezone.utc).astimezone(
+              timezone(KATHMANDU)).strftime('%Y-%m-%dT%H:%M:%S%z')
+
+          # A degraded run owes at least ONE delivery even though the monitor
+          # emitted nothing; a healthy run owes exactly what it emitted.
+          required = max(emitted, 1) if degraded else emitted
+
+          reason = 'nothing_emitted'
+          ok = True
+          if degraded and degraded_count <= 0:
+              ok = False
+              reason = 'degraded_payload_missing'
+              message = ('::error::monitor DEGRADED (exit %s) and '
+                         'state/academic_degraded_payload.json holds no '
+                         'readable payload (count=%s). There is nothing to '
+                         'render and nothing to publish -- this run would be '
+                         'silent.' % (monitor_exit or '?', degraded_count))
+          elif degraded and not page_ok:
+              ok = False
+              reason = 'degraded_page_render_failed'
+              message = ('::error::monitor DEGRADED (exit %s) and the failure '
+                         'page did not render (page_ok=%s). A degraded run '
+                         'that publishes nothing is the silence this step '
+                         'exists to prevent.'
+                         % (monitor_exit or '?',
+                            str(os.environ.get('PAGE_OK') or '(unset)')))
+          elif required <= 0:
+              message = 'No payload was emitted this run; nothing to assert.'
+          elif not dry_run and delivered < required:
+              ok = False
+              reason = 'ntfy_incomplete'
+              if degraded:
+                  message = ('::error::academic delivery incomplete on a '
+                             'DEGRADED run: the monitor failed (exit %s), %d '
+                             'notification(s) owed, %d confirmed by ntfy'
+                             % (monitor_exit or '?', required, delivered))
+              else:
+                  message = ('::error::academic delivery incomplete: %d payload(s) '
+                             'emitted, %d confirmed by ntfy' % (emitted, delivered))
+          elif not page_ok:
+              ok = False
+              reason = 'page_render_failed'
+              message = ('::error::academic page render failed despite %d '
+                         'payload(s)' % emitted)
+          else:
+              reason = 'degraded_delivered' if degraded else 'delivered'
+              message = ('academic delivery complete: %d payload(s) owed, %d '
+                         'confirmed by ntfy, page rendered%s.'
+                         % (required, delivered,
+                            ' (degraded run)' if degraded else ''))
+
+          # `deliveries_owed`, `degraded`, `monitor_exit_code` and
+          # `degraded_payload_count` are ADDITIVE keys; `schema_version` stays
+          # at 1 deliberately. Nothing in scripts/ reads this file (the
+          # workflow, the artifact, the state commit and the tests are the only
+          # consumers), and tests/test_payload_io.py freezes the value at 1 --
+          # so the shape grows without the version pretending it did.
+          record = {'schema_version': 1, 'at_npt': now, 'emitted': emitted,
+                    'deliveries_owed': required, 'ntfy_delivered': delivered,
+                    'page_ok': page_ok, 'dry_run': dry_run, 'ok': ok,
+                    'reason': reason, 'degraded': degraded,
+                    'monitor_exit_code': monitor_exit,
+                    'degraded_payload_count': degraded_count,
+                    'payload_titles': titles}
+          with open('state/academic_delivery.json', 'w', encoding='utf-8') as fh:
+              json.dump(record, fh, ensure_ascii=False, indent=2)
+              fh.write('\n')
+          print(message)
+          print('academic_delivery: %s' % json.dumps(record, ensure_ascii=False))
+          if not ok:
+              sys.exit(1)
+          PY
+
+      - name: Academic page is NOT published (private result stays private)
+        # --- P0: THE ACADEMIC PAGE IS NOT PUBLISHED, AND MUST NEVER BE ---
+        #
+        # DEFECT 1 (2026-09-30). This step USED to be:
+        #
+        #     cp -r docs/academic "$stage_dir/academic"
+        #     npx wrangler pages deploy "$stage_dir" \
+        #       --project-name daily-digest --branch master
+        #
+        # That publishes a page titled "CSIT Sem 1 Result: PASSED" carrying
+        # the owner's ROLL NUMBER, the result date and a link to the official
+        # TU result PDF, to a Pages origin that serves every unauthenticated
+# client. A `digest-auth` Worker used to sit in front and return 401, but it
+         # was only a PROXY: `daily-digest.example.pages.dev` was reachable
+         # directly and bypassed it entirely. That Worker has since been
+         # deleted, and `functions/_middleware.js` now enforces Basic auth AT
+         # this origin - so the origin refusing an unauthenticated client is
+         # now the correct signal rather than a bypass.
+        #
+        # The exposure was intermittent and that is exactly what made it
+        # dangerous: `wrangler pages deploy` REPLACES the whole deployment, and
+        # daily-news.yml re-deploys only `docs/digests` + `docs/index.html`.
+        # So every digest run wiped the academic directory and every academic
+        # run re-exposed it, on a trivially guessable filename. An owner-
+        # approved decision now kills it outright: the owner already receives
+        # the result by ntfy, Telegram and email, so the web page added
+        # nothing and the roll number has no business on a public origin.
+        #
+        # What deliberately SURVIVES: scripts/render_academic.py, its tests,
+        # the render step above, and `docs/academic/` in the artifact upload.
+        # The rendering is still exercised every run -- it is simply never
+        # published. What is gone is the CAPABILITY to publish it, so it
+        # cannot come back by accident.
+        #
+        # This step is kept as a tripwire in the Actions UI at the exact place
+        # the defect lived. It reads the workspace, refuses to publish, and
+        # cannot reach the network: there is no `wrangler` invocation, and the
+        # Cloudflare secrets are no longer passed to this step at all.
+        if: always()
+        run: |
+          set -eo pipefail
+          echo "NOTICE: the academic result page is deliberately NOT deployed."
+          echo "  The roll number and the official TU result link are private"
+          echo "  and this Pages project serves unauthenticated clients."
+          echo "  Delivery is ntfy + Telegram + email (see Publish to ntfy)."
+          if [ ! -d docs/academic ]; then
+            echo "  docs/academic does not exist -- nothing was rendered, nothing to publish."
+          else
+            bytes="$(du -sb docs/academic 2>/dev/null | cut -f1 || echo 0)"
+            echo "  docs/academic/ holds $(ls -A docs/academic | wc -l) rendered file(s), ${bytes:-0} bytes."
+          fi
+          echo "  Rendered pages are attached to this run's artifacts for 7 days and nowhere else."
+          if [ -f state/academic_delivery.json ]; then
+            echo "  Delivery record: $(cat state/academic_delivery.json | tr -d '\n')"
+          fi
+
+      - name: Upload academic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: academic-result-${{ github.run_id }}
+          path: |
+            state/academic_state.json
+            state/academic_notify_preview.json
+            state/academic_live_payload.jsonl
+            !state/academic_live_payload.json
+            state/academic_last_run.json
+            state/academic_degraded_payload.json
+            state/academic_delivery.json
+            state/academic_ntfy.json
+            state/exam_selfcheck.json
+            docs/academic/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Guard -- no roll-shaped number may enter git history
+        # WHY THIS GATE EXISTS, AND WHY IT IS NO LONGER A VISIBILITY CHECK.
+        # This repository is PUBLIC. An 8-digit TU roll number committed to
+        # state/ or docs/ is world-readable forever: git history cannot be
+        # un-published, so a later "make it private again" does not undo it.
+        # The previous version of this step asked the GitHub API whether the
+        # repository was private and failed if it was not -- correct for a
+        # private repo, useless here, because this one is public by design.
+        #
+        # So the control is now on the CONTENT instead: whatever this run has
+        # staged is scanned for a roll-shaped token (four digits, optional
+        # space, four digits -- the joined and column-split forms both occur
+        # in the official sheet). If one appears, the job fails before the
+        # commit and nothing reaches history.
+        #
+        # The roll itself is supplied at run time from the ACADEMIC_ROLL_NUMBER
+        # secret and is never written to a committed file.
+        #
+        # `docs/academic/` is deliberately NOT staged any more (see the commit
+        # step below); the 7-day artifact upload above is the private channel
+        # for the rendered page, and it expires instead of accumulating.
+        run: |
+          set -eo pipefail
+          if git diff --cached --quiet; then
+            echo "Nothing staged; nothing to guard."
+            exit 0
+          fi
+          offenders="$(git diff --cached -U0 | grep -E '^\+' \
+            | grep -Ev '^\+\+\+' \
+            | grep -Eo '\b[0-9]{4} ?[0-9]{4}\b' || true)"
+          if [ -n "${offenders}" ]; then
+            echo "::error::a roll-shaped number is staged for commit."
+            echo "Matched token(s): $(echo "${offenders}" | sort -u | tr '\n' ' ')"
+            echo "This repository is public, so committing it publishes the owner's roll number permanently."
+            echo "Do not commit state files that carry the roll; read it from the ACADEMIC_ROLL_NUMBER secret instead."
+            exit 1
+          fi
+          echo "No roll-shaped token in the staged diff."
+
+      - name: Commit academic state
+        # Bot identity + scoped staging mirror breaking-monitor.yml's commit
+        # step. Only the durable monitor-owned state files are staged, and
+        # only if they exist. The preview/live/degraded payloads are uploaded
+        # as artifacts but deliberately NOT committed (transient per-run); the
+        # rendered docs/academic/ pages ARE committed so the website archive
+        # persists in the repo, and state/academic_delivery.json is committed
+        # with them so a silent-delivery run is visible in the repository
+        # history and not only in a 7-day artifact.
+        #
+        # DEFECT 1, NOW REMOVED RATHER THAN GATED. `docs/academic/` used to be
+        # committed, which was safe only while the repository was private. This
+        # repository is PUBLIC, so the rendered page (owner roll number, result
+        # date, official PDF link) is no longer staged here at all. The 7-day
+        # artifact upload above is the private channel, and it is also the one
+        # that expires. `state/academic_state.json` is likewise NOT staged: it
+        # carries the roll number, and a committed state file would publish it
+        # just as effectively as the page did. The roll is read at run time from
+        # the ACADEMIC_ROLL_NUMBER secret.
+        #
+        # state/academic_live_payload.json is in the artifact list as an
+        # IGNORE entry on purpose: it is never written again (the live payload
+        # file is state/academic_live_payload.jsonl), and a stale copy
+        # committed before the JSON-Lines change must not be uploaded as if it
+        # were this run's payload.
+        #
+        # state/exam_selfcheck.json IS committed: the digest-watchdog reads its
+        # recency as a dead-man's switch, so it must survive the run that
+        # wrote it. config/exam_notices.json is read-only to the pipeline.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # DEFECT 2. The checkout sets persist-credentials: false, so
+          # GITHUB_TOKEN is NOT in .git/config for this job. It is injected
+          # here instead, for the two network commands only, via `git -c`: it
+          # reaches the process argv, never the filesystem, and is gone when
+          # the step ends. `auth` stays empty if the token is unset, which
+          # degrades to a plain `git push` rather than a syntax error.
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          if [ -f state/academic_last_run.json ]; then
+            git add state/academic_last_run.json
+          fi
+          if [ -f state/academic_delivery.json ]; then
+            git add state/academic_delivery.json
+          fi
+          if [ -f state/exam_selfcheck.json ]; then
+            git add state/exam_selfcheck.json
+          fi
+          if git diff --staged --quiet; then
+            echo "No academic-state changes to commit"
+          else
+            git commit -m "chore: update academic result state [skip ci]"
+            # Attempt fast-forward pull; if it fails, try rebase; if that also fails, warn and continue
+            if ! git "${auth[@]}" pull --ff-only; then
+              echo "Fast-forward pull failed, attempting rebase..."
+              if ! git "${auth[@]}" pull --rebase; then
+                echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
+              fi
+            fi
+            git "${auth[@]}" push
+          fi
+
+      - name: Summarize run outcome
+        if: always()
+        # A summary step must never be able to fail a job whose real work
+        # already succeeded. That is exactly how Bug B (2026-09-27) killed the
+        # monitor: an `if: always()` step with a heredoc, no continue-on-error,
+        # failing AFTER the monitor had done its job. This step is reporting
+        # only, so it can never be load-bearing.
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo "## Academic Result Monitor" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f state/academic_state.json ]; then
+          python3 - <<'PY'
+          import json, os
+          try:
+              with open('state/academic_state.json', encoding='utf-8') as fh:
+                  state = json.load(fh)
+              cur = state.get('current_semester')
+              roll = state.get('roll_number')
+              sems = state.get('semesters') or {}
+              lines = ['- Roll number: %s' % roll, '- Current semester: %s' % cur]
+              for key in sorted(sems, key=lambda k: int(k) if str(k).isdigit() else 0):
+                  sem = sems[key]
+                  lines.append('- Sem %s: %s' % (key, sem.get('status', 'unknown')))
+              lines.append('- Schema version: %s'
+                           % state.get('schema_version'))
+              lines.append('- Last examined notice id: %s'
+                           % state.get('last_examined_notice_id'))
+              lines.append('- Last poll: %s' % state.get('last_poll_time'))
+              lines.append('- Pending overflow: %s'
+                           % state.get('pending_overflow'))
+              hosts = state.get('hosts_down') or {}
+              lines.append('- Hosts down: %s'
+                           % (', '.join('%s since %s' % (h, t)
+                                        for h, t in sorted(hosts.items()))
+                              if hosts else 'none'))
+              deferred = sorted(
+                  k for k, v in (state.get('examined') or {}).items()
+                  if isinstance(v, dict) and v.get('outcome') == 'deferred')
+              lines.append('- Deferred (will retry): %s'
+                           % (', '.join(deferred) if deferred else 'none'))
+              report = '\n'.join(lines)
+              print(report)
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as fh:
+                  fh.write(report + '\n')
+          except Exception as exc:
+              print('Could not summarize state: %s' % exc)
+          PY
+          else
+            echo "- No academic state file present" >> "$GITHUB_STEP_SUMMARY"
+          fi

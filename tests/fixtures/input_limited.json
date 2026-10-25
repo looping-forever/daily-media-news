@@ -1,0 +1,25 @@
+{
+  "digest_time": "evening",
+  "date": "2026-08-25",
+  "research_status": "limited",
+  "notes": "Limited-research fixture: research_status must pass through untouched; title doubles as an XSS escaping canary for build_email.",
+  "stories": [
+    {
+      "title": "CSIT Notice <script>alert('xss')</script> Update",
+      "summary": "Confirmed: the department posted a routine notice update; the odd title is an intentional injection canary.",
+      "why_it_matters": "Verifies HTML escaping end to end.",
+      "category": "college_local",
+      "priority": 5,
+      "source_name": "Example College Example City Notices",
+      "source_url": "https://examplecollege.example.edu.np/notices/update?tag=<b>",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": null,
+      "reliability": "tier3",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Escaping canary.",
+      "language": "en"
+    }
+  ]
+}

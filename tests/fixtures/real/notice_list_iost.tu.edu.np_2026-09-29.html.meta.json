@@ -1,0 +1,8 @@
+{
+  "bytes": 74052,
+  "captured_at": "2026-09-29T12:16:53+00:00",
+  "note": "The critical result feed. selfcheck_exam_sources.py SKIPS this feed, so before this capture nothing in this repository had ever read its bytes.",
+  "sha256": "053a6de58ae99c666543790f029033df093191bab2e56cb8da19f03b38efca4f",
+  "source_url": "https://iost.tu.edu.np/notices?notice_type=21",
+  "trimmed": false
+}

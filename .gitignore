@@ -1,0 +1,142 @@
+# Secrets and credentials
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# Dependencies
+node_modules/
+vendor/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.target/
+out/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Database
+*.sqlite
+*.db
+*.sqlite3
+
+# Docker
+.docker/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Misc
+*.bak
+*.backup
+
+# Transient / ephemeral breaking-monitor state
+scripts/__pycache__/
+state/breaking_pending.json
+
+# Ephemeral / scratch state (never commit)
+state/breaking_log.json
+state/stories.json
+state/stories.validated.json
+state/mock_email.txt
+state/mock_stories.json
+state/last-digest/
+docs/digests-test/
+
+# Dynamic model selection runtime memory (2026-10-13). Both are caches of
+# what the PROVIDER told us on this machine, not repository facts:
+#   model_cache.json -- the last live `opencode models` listing (6h TTL).
+#                       Committing it would freeze today's catalogue into the
+#                       repository, which is precisely the hardcoded-ladder
+#                       brittleness this replaced.
+#   model_health.json -- per-model success/failure counters and cooldowns,
+#                       measured on this machine's own runs. Committing it
+#                       would make one machine's provider luck another
+#                       machine's starting ranking.
+# Both are safe to delete: a missing file is a cold cache, and a cold cache
+# re-discovers live on the next run.
+state/model_cache.json
+state/model_health.json
+
+# U6. The ntfy payload a prebuild writes so digest-prebuild.yml's seal job can
+# build the artifact. It is a hand-over between two steps in one run, never a
+# repository fact: the "Clean transient state files" step removes it and the
+# state commit stages a fixed path list that never named it. Listed here anyway,
+# because a run killed between the write and the cleanup would otherwise leave
+# a build's notification payload sitting in the working tree.
+state/ntfy_payload.json
+
+# Test / dry-run artifacts (never commit)
+state/email.txt
+pytest_output.txt
+
+# Wrangler local cache (contains Cloudflare account id)
+deploy/.wrangler/
+
+# Wrangler's local secrets file. `.dev.vars` holds real secret values in
+# plaintext for `wrangler dev`; it must never be committed or uploaded.
+deploy/.dev.vars
+deploy/.dev.vars.*
+
+# Root-level wrangler cache. `deploy/.wrangler/` above covers the nested one,
+# but wrangler also writes `<repo-root>/.wrangler/` when a Pages/Workers command
+# is run from the repository root, and that copy is NOT covered by the nested
+# pattern -- it showed up as untracked in `git status` on 2026-09-30, holding a
+# Cloudflare account id and miniflare cache/kv sqlite files. This is the ONE
+# tracked-file/ignore-consistency fix: nothing under it is ever meant to be
+# committed, and an unlisted cache directory is how a credential gets committed
+# by accident. (The tracked-but-ignored `state/*.json` files are deliberately
+# NOT "fixed" here: they are a separate report-only finding, because
+# un-tracking them is a `git rm`, which is out of scope for an ignore change.)
+.wrangler/
+
+# MyAnimeList personal watch-list exports. These are DOWNLOADED ARTEFACTS from
+# MyAnimeList.net and contain a personal account profile (<myinfo>: user_id,
+# user_name) plus a per-title status history. They are inputs to
+# scripts/mal_status.py, but they are personal data and must never be published.
+# The function degrades gracefully when they are absent (an empty status map, no
+# crash), so the MAL status filter is simply inert in the public copy. The
+# private working copy keeps its own exports.
+config/mal/*.xml.gz

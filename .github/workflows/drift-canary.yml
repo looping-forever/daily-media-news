@@ -1,0 +1,1005 @@
+name: Drift Canary
+
+# Pre-slot early warning: CLI/ladder/flag drift must never silently kill the
+# morning digest again. Fires 00:30 UTC = 06:15 NPT, ~95 min before the
+# 07:50 NPT morning slot, so a drift failure pages before the real run.
+# Free-tier only, no new secrets: pin/ladder/floor all come from
+# config/opencode.json (single source of truth).
+#
+# ONE JOB AND ONE FIRING A DAY since 2026-10-19, for Actions minutes. This
+# repository is private, so every job bills a minute however short it is: four
+# jobs in parallel cost four billed minutes a run, and the four checks here are
+# cheap individually. The CHECKS are all still here and all still run -- they
+# are steps of one job now, and every check that is independent of the ones
+# before it carries `if: always()` so a red step cannot turn the rest dark.
+# What was given up is the SECOND firing (`17 3 * * *`, 09:02 NPT): a mid-day
+# re-check, so drift introduced after 06:15 NPT is now first seen by the next
+# day's 06:15 NPT run instead of the same day at 09:02 NPT.
+
+on:
+  schedule:
+    # 00:30 UTC = 06:15 NPT (UTC+5:45).
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: drift-canary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  docs-lint:
+    # THE WHOLE DRIFT CANARY IN ONE JOB, since 2026-10-19. The id is historical
+    # and is kept deliberately (tests and tooling key on it); what it runs now is
+    # every check this workflow used to run as four parallel jobs: the lint
+    # steps below, the flag-drift canary, the live parser canary, and the full
+    # suite. Item 7's typo/flag lint + ladder-sync test + PKB freshness note are
+    # the first steps of it.
+    #
+    # `timeout-minutes: 25` replaces four separate budgets (5 + 60 + 12 + 10).
+    # The 60 belonged to the flag-drift job's `gh run watch` wait, which was
+    # removed on 2026-10-19: a hung job there could bill a whole hour for nothing.
+    # 25 covers the serial worst case of the four checks and is well under the 87
+    # those budgets added up to.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # DEFECT 2 (2026-09-30): a read-only job never commits, so there is
+        # no reason to leave GITHUB_TOKEN in .git/config for the whole run.
+        #
+        # `fetch-depth: 0` — REQUIRED BY DEFECT 3 (2026-10-05), not a nicety.
+        # The worker drift canary below decides ancestry with
+        # `git merge-base --is-ancestor`, and on a shallow clone that command
+        # answers from an incomplete history: it can report "not an ancestor"
+        # for a commit that IS one, because the connecting commit is not in
+        # the clone. A verdict computed on a shallow clone is not a weak
+        # verdict, it is a wrong one. The default depth of 1 cannot support
+        # the question the step asks.
+        #
+        # ON THE COST: this repository's full history is small (hundreds of
+        # commits, no LFS, no vendored binaries), so the extra transfer is
+        # seconds against a 5-minute job budget. If it ever becomes material,
+        # `fetch-depth: 0` + `fetch-tags: false` is the first lever -- but
+        # dropping it silently would disarm the drift canary, which is the
+        # only check in this repository that can see the deployed artefact.
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run ladder-sync drift test
+        # Fails on stale model IDs / the v2-only run flag in *.yml, *.py,
+        # prompts/* (allowlist-aware) and on any ladder/floor/pin drift
+        # between config/opencode.json, the workflows and the scripts.
+        run: python3 tests/breaking/test_ladder_sync.py
+
+      - name: Typo sweep (prose/config surfaces)
+        # Code paths (.github/scripts/prompts/tests) are covered by the
+        # ladder-sync test above. This sweep covers the remaining
+        # prose/config surfaces for reintroduced stale IDs, the v2-only
+        # flag, and the classic `nfty` typo. docs/PKB.md is excluded: it
+        # keeps dated history by design (see its freshness check below).
+        run: |
+          set -eo pipefail
+          if grep -rnE --exclude=PKB.md 'hy3-free|nemotron-3-ultra|--standalone|nfty' \
+            docs README.md templates deploy config state; then
+            echo "FATAL: stale CLI/ladder/flag identifiers or ntfy typos found above"
+            exit 1
+          fi
+          echo "Typo sweep clean"
+
+      - name: Worker build/schedule drift canary
+        # THE DRIFT CLASS, KILLED AT THE ROOT.
+        #
+        # Everything else in this repository is offline lint over committed
+        # files, which is exactly why the drift this check catches survived: no
+        # offline check can tell you what is DEPLOYED. A deploy from a stale
+        # checkout produced an identical working tree and an identical green
+        # suite.
+        #
+        # Two assertions, both about the deployed artefact rather than the repo:
+        #   1. `build` (the WORKER_BUILD var stamped at deploy time) must be an
+        #      ANCESTOR-OR-EQUAL of the commit this run checked out, decided by
+        #      `git merge-base --is-ancestor`. That is what makes "I deployed
+        #      from an old branch" visible for the first time — an ancestor that
+        #      is merely BEHIND master is the healthy, expected state, because
+        #      the Worker is deployed separately from git and legitimately lags
+        #      master. An "unset" stamp means the deploy never passed --var,
+        #      which is itself the drift this canary is for; a stamp that is
+        #      not hex AT ALL is refused even earlier, because git would resolve
+        #      a ref name and a ref is not a deployed commit (DEFECT 5 below);
+        #      and a stamp that cannot be resolved in the fetched history is
+        #      UNVERIFIABLE, which FAILS CLOSED rather than passing.
+        #   2. the crons the deployed Worker REPORTS must equal deploy/
+        #      schedule.json. The Worker derives that list from its own CRON_*
+        #      constants, so this compares the deployed code against the
+        #      committed record, across the network, from outside.
+        #
+        # DEFECT 3 (2026-10-05): assertion 1 was WRONG on the ground, and its
+        # comment above was already right — the code said `head.startswith(build)`
+        # where `head` is a 40-char sha and `build` is a 7-char short sha. That
+        # is an EXACT CURRENT-HEAD PREFIX MATCH wearing the words "ancestor", so
+        # the check could ONLY pass when the Worker had been deployed at precisely
+        # the checked-out commit. Every commit landing on master turned it red
+        # with zero drift:
+        #     worker drift canary DRIFTED: the deployed build stamp '6aadfc0' is
+        #     not an ancestor of this checkout (646212b5c94c).
+        # runs 37182008636, 37193122408, 37270387471, 37296164969. The GitHub
+        # compare API says 6aadfc0...646212b5c94c is ahead, behind_by=0,
+        # ahead_by=16, merge_base=6aadfc0f0594b75a788bcda2b227e59d7d858776: the
+        # deployed stamp IS the merge base, a clean direct ancestor. A FALSE
+        # POSITIVE, twice a day, on crons 30 0 and 17 3 — essentially the whole
+        # owner's email volume. This step is now the check it always claimed to
+        # be, and Check 18 in tests/workflows/test_workflow_lint.py fails if a
+        # short-sha prefix/equality comparison is ever put back in place of the
+        # real ancestry test.
+        #
+        # NO continue-on-error here, on purpose: this step exists to go red.
+        # The failure text distinguishes UNREACHABLE (a Cloudflare edge or
+        # account problem, not a drift) from DRIFTED (the deployment does not
+        # match this checkout) so a red job is diagnosable from the log alone.
+        # It is NOT made unable to fail: a diverged stamp, an unresolvable
+        # stamp and an unset stamp all still go red.
+        #
+        # This job is otherwise offline; this step makes it a live check. That
+        # is a deliberate trade: it is the only check that can see the deployed
+        # artefact, and 00:30 UTC is early enough for a drift page to land well
+        # before the 07:50 NPT morning slot. `curl -m 15` bounds the cost, and
+        # the job's timeout-minutes still applies as the backstop.
+        run: |
+          set -eo pipefail
+          HEALTH_FILE="$RUNNER_TEMP/worker_health.json"
+          URL="$(jq -r '.health_url // empty' deploy/schedule.json)"
+          EXPECTED_CRONS="$(jq -c '.crons' deploy/schedule.json)"
+          if [ -z "$URL" ]; then
+            echo "::error::deploy/schedule.json carries no health_url — the drift canary cannot run"
+            exit 1
+          fi
+          set +e
+          CODE="$(curl -sS -m 15 -o "$HEALTH_FILE" -w '%{http_code}' "$URL")"
+          CURL_RC=$?
+          set -e
+          echo "GET $URL -> HTTP '$CODE' (curl exit $CURL_RC)"
+          EXPECTED_CRONS="$EXPECTED_CRONS" HEALTH_URL="$URL" \
+            WORKER_CODE="$CODE" WORKER_CURL_RC="$CURL_RC" \
+            WORKER_HEALTH_FILE="$HEALTH_FILE" \
+            HEAD_SHA="$GITHUB_SHA" python3 - <<'PY'
+          import json, os, re, subprocess
+
+          # DEFECT 5 (2026-10-05): the deployed stamp is SHAPED, not merely
+          # "whatever git can resolve". WORKER_BUILD is stamped at deploy time
+          # with `$(git rev-parse --short HEAD)` — 7 or more hex digits and
+          # nothing else. `git rev-parse --verify '<x>^{commit}'` will happily
+          # resolve a REF NAME: a stamp of `master` resolved to f1dc9dc and the
+          # step reported "deployed build f1dc9dc IS this checkout", exit 0.
+          # That is worse than the defect it replaced: the pre-fix prefix test
+          # went RED on `master`, so the ancestry fix WIDENED a pass path, and
+          # a ref name is not proof of WHICH commit was deployed — a branch can
+          # have moved since, which is exactly the staleness this canary exists
+          # to catch. The message then also FABRICATED a healthy-looking sha out
+          # of a nonsense stamp, which is the part an operator cannot forgive:
+          # it reads as a verified result. So the shape is checked FIRST and a
+          # non-hex stamp fails closed with a message that says WHY.
+          #
+          # Uppercase hex is accepted because git accepts it: `A1B2C3D4` names
+          # the same commit as `a1b2c3d4`, and refusing it would be refusing a
+          # correct stamp.
+          BUILD_STAMP_RE = re.compile(r'[0-9a-fA-F]{7,40}\Z')
+
+          url = os.environ.get('HEALTH_URL', '')
+          code = str(os.environ.get('WORKER_CODE', ''))
+          curl_rc = int(os.environ.get('WORKER_CURL_RC', '99') or 99)
+          path = os.environ.get('WORKER_HEALTH_FILE', '')
+          head = str(os.environ.get('HEAD_SHA', ''))
+          repo = os.environ.get('REPO_DIR') or '.'
+
+          def git(*args):
+              """(returncode, stdout.strip(), stderr.strip()) for one git call.
+
+              Deliberately a helper rather than shell-outs: the return code is
+              the ANSWER (`merge-base --is-ancestor` is 0 for yes, 1 for no),
+              so it has to survive into the verdict instead of being flattened
+              into `set -e` swallowing it. `text=True` with `errors='replace'`
+              because these messages carry an em dash and a runner locale
+              would otherwise raise while merely reading a commit subject.
+              """
+              proc = subprocess.run(['git'] + list(args), cwd=repo,
+                                    capture_output=True, text=True,
+                                    errors='replace')
+              return proc.returncode, (proc.stdout or '').strip(), \
+                  (proc.stderr or '').strip()
+
+          try:
+              expected = set(json.loads(os.environ.get('EXPECTED_CRONS', '[]')))
+          except ValueError:
+              expected = set()
+
+          if curl_rc != 0 or code != '200':
+              print('::error::worker drift canary UNREACHABLE (not a drift verdict): '
+                    'GET %s -> HTTP %r, curl exit %d. The Worker could not be '
+                    'reached at all, so nothing about its build or schedule '
+                    'could be checked.' % (url, code, curl_rc))
+              raise SystemExit(1)
+          try:
+              with open(path, encoding='utf-8') as fh:
+                  health = json.load(fh)
+          except (OSError, ValueError) as exc:
+              print('::error::worker drift canary: ?health=1 returned unparsable '
+                    'JSON (%s) — the deployed artefact cannot be judged' % exc)
+              raise SystemExit(1)
+
+          build = str(health.get('build') or '')
+          reported = set(health.get('crons') or [])
+          problems = []
+          relationship = 'not checked'
+
+          # `head` is the commit this run checked out. GITHUB_SHA is it on a
+          # scheduled run; rev-parse HEAD is the fallback so the ancestry
+          # question is still answerable if that variable is ever absent.
+          if not head:
+              rc, resolved, _err = git('rev-parse', 'HEAD')
+              head = resolved if rc == 0 else ''
+
+          if not head:
+              problems.append(
+                  'DRIFTED (UNVERIFIABLE, fails closed): this checkout has no '
+                  'resolvable HEAD (%r), so there is no commit to compare the '
+                  'deployed build against and drift cannot be ruled out.'
+                  % os.environ.get('HEAD_SHA', ''))
+          elif not build or build == 'unset':
+              problems.append(
+                  'DRIFTED: the deployed build stamp is "unset", so this '
+                  'deployment was published without --var WORKER_BUILD:<sha> '
+                  'and its source commit is unknown. Redeploy with '
+                  '`wrangler deploy -c deploy/wrangler.toml --var WORKER_BUILD:'
+                  '$(git rev-parse --short HEAD)` from a clean checkout of master.')
+          elif not BUILD_STAMP_RE.match(build):
+              # DEFECT 5. Refused BEFORE git is asked, because git would answer
+              # and the answer would be about a REF, not about a deployed
+              # commit. Failing here means the stamp is unverifiable BY
+              # DEFINITION, which is the same class as a stamp that resolves to
+              # nothing, and it fails closed the same way.
+              problems.append(
+                  'DRIFTED (UNVERIFIABLE, fails closed): the deployed build '
+                  'stamp %r is not a commit sha at all. WORKER_BUILD is stamped '
+                  'with `$(git rev-parse --short HEAD)`, which is 7 or more hex '
+                  'digits and nothing else, so a stamp like this means the '
+                  'deploy passed something that is NOT a commit — most likely a '
+                  'branch or tag name, or a value truncated or corrupted in '
+                  'transit. This is deliberately NOT handed to git: '
+                  '`rev-parse --verify` resolves a ref name happily, and a ref '
+                  'name is not proof of which commit was deployed, because a '
+                  'branch can move since. Redeploy with '
+                  '`wrangler deploy -c deploy/wrangler.toml --var WORKER_BUILD:'
+                  '$(git rev-parse --short HEAD)` from a clean checkout of '
+                  'master.' % build)
+          else:
+              # DEFECT 3. THE REAL ANCESTRY TEST. `build` is a SHORT sha, so it
+              # is resolved against the fetched history first (the checkout sets
+              # `fetch-depth: 0`, which is what makes this answerable at all),
+              # and then `merge-base --is-ancestor` decides the real question:
+              # is that commit on the path TO this checkout? Exit 0 = ancestor
+              # or equal, 1 = definitively not, anything else = git could not
+              # decide, which fails closed like a real drift because an
+              # undecidable ancestry question is not a pass.
+              rc, full, err = git('rev-parse', '--verify', '--quiet',
+                                  '%s^{commit}' % build)
+              if rc != 0 or len(full) < 40:
+                  problems.append(
+                      'DRIFTED (UNVERIFIABLE, fails closed): the deployed build '
+                      'stamp %r does not resolve to a commit in the fetched '
+                      'history of this checkout (%s), so whether it is an '
+                      'ancestor of %s CANNOT be established. An unverifiable '
+                      'stamp is not a passing stamp: redeploy from a clean '
+                      'master, or check whether that commit was '
+                      'garbage-collected or force-pushed away (git said: %s).'
+                      % (build, head[:12], head[:12], err or 'unknown commit'))
+              else:
+                  short = full[:7]
+                  verdict, _out, verr = git('merge-base', '--is-ancestor',
+                                            full, head)
+                  if verdict == 0:
+                      if full == head:
+                          relationship = ('deployed build %s IS this checkout '
+                                          '(%s)' % (short, head[:12]))
+                      else:
+                          behind = git('rev-list', '--count',
+                                       '%s..%s' % (full, head))[1] or '?'
+                          # THIS IS THE HEALTHY STATE, and it is the state the
+                          # old prefix test called drift. The Worker is deployed
+                          # separately from git, so it is EXPECTED to be older
+                          # than master. Saying so is what stops a red badge from
+                          # teaching the owner to ignore this job.
+                          relationship = (
+                              'deployed build %s is an ANCESTOR of %s (%s '
+                              'commit(s) behind master) — the deployed Worker is '
+                              'simply older than master, which is expected'
+                              % (short, head[:12], behind))
+                  elif verdict == 1:
+                      base, _bo, berr = git('merge-base', full, head)
+                      problems.append(
+                          'DRIFTED: the deployed build stamp %r resolves to %s, '
+                          'which is NOT an ancestor of this checkout (%s) '
+                          '(merge base %s). The deployment came from a commit on a '
+                          'DIVERGED or unrelated line of history — redeploy from a '
+                          'clean master. %s'
+                          % (build, short, head[:12],
+                             base[:12] if base else 'none',
+                             ('git said: %s' % berr) if berr else ''))
+                  else:
+                      problems.append(
+                          'DRIFTED (git could not decide, fails closed): '
+                          '`git merge-base --is-ancestor %s %s` exited %d, so '
+                          'ancestry is UNKNOWN. An unknown relationship is not a '
+                          'passing one. (git said: %s)'
+                          % (short, head[:12], verdict, verr or 'no stderr'))
+
+          if expected and reported != expected:
+              problems.append(
+                  'DRIFTED: the deployed Worker reports crons %s but '
+                  'deploy/schedule.json declares %s. Missing from the DEPLOYED '
+                  'copy: %s. Deployed but not declared in git: %s.'
+                  % (sorted(reported), sorted(expected),
+                     sorted(expected - reported) or 'none',
+                     sorted(reported - expected) or 'none'))
+
+          print('worker drift canary: %s' % relationship)
+          print('worker drift canary: deployed build=%s crons=%s ; checkout=%s crons=%s'
+                % (build, sorted(reported), head[:12] or '(unknown)',
+                   sorted(expected)))
+          for problem in problems:
+              print('::error::worker drift canary %s' % problem)
+          raise SystemExit(1 if problems else 0)
+          PY
+
+      - name: Digest archive is not publicly readable (origin auth canary)
+        if: always()
+        # THE GUARD AGAINST "SOMEBODY DEPLOYED AND THE PROTECTION VANISHED".
+        #
+        # Everything else in this repository is offline lint over committed
+        # files, which is exactly why the hole this canary exists to catch
+        # survived: no offline check can tell you what the DEPLOYED origin
+        # serves. daily-news.yml's deploy step carries `continue-on-error:
+        # true` by design (so a failed website publish still lets ntfy and the
+        # backup channels fire), which means a deploy can go wrong while the
+        # job stays green — and if `functions/_middleware.js` were ever missing
+        # or undetected, the job would republish the entire archive UNPROTECTED
+        # with no error anywhere.
+        #
+        # THE QUESTION IS "IS ARCHIVE CONTENT SERVED TO AN UNAUTHENTICATED
+        # CLIENT?", NOT "IS THE STATUS EXACTLY 401?". The natural check is
+        # "the origin returns 200 with the archive", but that cannot
+        # distinguish "correctly unprotected" from "protected and I am being
+        # redirected", and a probe that passes on an unexpected status is
+        # worse than no probe. So the ONLY passing answers are:
+        #
+        #   401 / 403                      -> the guard is in place. PASS.
+        #   a Cloudflare Access gate in the redirect chain, serving no digest
+        #                                     content -> Access is gating. PASS.
+        #   the served bytes contain digest content -> FAIL, loudly, with the
+        #                                     byte count. This is the breach.
+        #   anything else, INCLUDING a 200  -> FAIL, loudly.
+        #   curl could not reach the host at all -> FAIL. Never pass.
+        #
+        # WHY Access counts as protected (this step failed on every scheduled
+        # run before it, which is worse than useless: a guard that cries wolf
+        # on the correct state teaches the owner to ignore it, and the one
+        # thing it exists to notice is then never noticed). The canary probes
+        # TWO hostnames and only one of them is answered by the middleware:
+        #
+        #   daily-digest.example.pages.dev        -> 401 from functions/_middleware.js
+        #   master.daily-digest.example.pages.dev  -> 302 to
+        #        daily-digest.pages.cloudflareaccess.com/cdn-cgi/access/login/...
+        #
+        # Access intercepts AHEAD of the Pages Function, so on the second
+        # hostname the middleware never runs and 401 is not reachable. An
+        # unauthenticated client that ends up on an Access login page has still
+        # been given nothing: refusing that as a failure asserts that the ONLY
+        # legitimate gate is the one this repository happens to own.
+        #
+        # WHY THE VERDICT IS TAKEN FROM WHAT WAS SERVED, NOT FROM A STATUS
+        # CODE. Two independent reasons, and the second is the load-bearing
+        # one:
+        #
+        #   1. it survives Cloudflare changing redirect behaviour. Access may
+        #      answer 302, chain on to an external identity provider, or serve
+        #      a login page with 200 at its own host. All of those leave
+        #      `cloudflareaccess.com` in the chain — in a response header, in the
+        #      final resolved URL, or both — so none of them cries wolf.
+        #   2. it means the guard cannot be disarmed by an edit. A 2xx that is
+        #      neither a refusal nor an Access gate still FAILS, so renaming a
+        #      marker in a template cannot silently turn this into a canary that
+        #      no longer recognises the archive. The markers are a second line
+        #      of defence, never the only one.
+        #
+        # NO CREDENTIALS ARE SENT. That is the measurement: this is what an
+        # anonymous client gets. Sending the owner's password would test
+        # authentication working, which is the opposite of what is being
+        # checked, and would put a credential in a CI log on a failed request.
+        # `--disable` additionally ignores any `.curlrc` on the runner, so no
+        # ambient config can quietly attach credentials to this probe.
+        #
+        # `if: always()` — ADDED 2026-10-04, AFTER THIS STEP WAS SEEN SKIPPED.
+        # This is the only line in the file that makes the step run at all,
+        # and until it existed the step had NEVER EXECUTED ONCE.
+        #
+        # GitHub Actions gives a step with no `if:` the implicit condition
+        # `success()`, so an upstream failure SKIPS it — silently, with a
+        # green-ish "skipped" badge and no warning. That is what happened:
+        # this step was skipped in BOTH Drift Canary failures on 2026-10-03/04,
+        # downstream of the worker drift canary above, and has never run since
+        # it was written. The previous version of this comment claimed
+        # "`set -euo pipefail` plus an explicit `exit 1` means the check cannot
+        # be skipped silently". THAT WAS FALSE, and it is recorded here
+        # deliberately: nothing inside a step body can prevent the skip, because
+        # on a skipped step the body never starts. `set -euo pipefail` cannot
+        # run a step, and no amount of shell strictness is a substitute for the
+        # one YAML key that schedules the step. `if: always()` is the fix.
+        #
+        # NO `continue-on-error` HERE, and that is the load-bearing half of the
+        # pair — the two must be read together:
+        #
+        #   `if: always()` ALONE WOULD BE WORSE THAN THE DEFECT. With
+        #   `continue-on-error: true` the step would run, detect a PUBLICLY
+        #   READABLE archive, exit 1… into a GREEN job, and page nobody. A
+        #   breach that cannot turn the run red cannot be actioned, so
+        #   "runs but cannot alert" is a more dangerous state than "does not
+        #   run", not a safer one.
+        #
+        # So this step keeps the ability to fail the job, which is why it
+        # carries an entry in ALWAYS_STEP_EXEMPTIONS in
+        # tests/workflows/test_workflow_lint.py — Check 7's documented escape
+        # hatch for a step whose purpose IS to go red — instead of
+        # `continue-on-error: true`. This comment, that table entry and Check 7
+        # are one decision in three places; change one and you must change the
+        # others, or the lint starts lying about which steps can go red.
+        #
+        # Check 17 in the same file is what stops this from regressing: it
+        # requires a declared-always-run diagnostic to carry `if: always()`,
+        # and this step's own comment ("failed on every scheduled run") is
+        # enough for it to be caught if the key is ever deleted again.
+        #
+        # TWO HOSTNAMES ON PURPOSE, AND NEITHER ARM IS DROPPED.
+        # `daily-digest.example.pages.dev` is the production hostname, and
+        # `master.daily-digest.example.pages.dev` is a SECOND public hostname serving
+        # the same Pages project from the same deployment. A guard that only
+        # checked the first would leave the second as an unmonitored way in, and
+        # the whole point here is that an unmonitored way in is how the archive
+        # stayed public for months. Both are probed — and the second arm is
+        # exactly what would notice the day that Cloudflare Access application is
+        # removed and `master.*` becomes a second PUBLIC hostname. From that day
+        # it answers 200 with the archive in the body, and the FIRST check below
+        # is whether archive content was served at all.
+        #
+        # This is a PUBLIC endpoint probe, so `curl -m 15` bounds it,
+        # `--max-redirs 5` bounds the redirect chain, and the job's
+        # timeout-minutes remains the backstop.
+        run: |
+          set -euo pipefail
+          HOSTS="daily-digest.example.pages.dev master.daily-digest.example.pages.dev"
+          # Markers that appear in this archive's OWN html and nowhere else.
+          # `Personal News Informer` is the <title>/<h1> of the index AND of
+          # every digest page (scripts/render_digest.py), so it catches a single
+          # leaked digest as well as a leaked index. Neither the middleware's
+          # 401 body nor a Cloudflare Access login page contains either string,
+          # which is what makes their absence meaningful. `LC_ALL=C` forces
+          # byte matching, so a stray non-UTF-8 byte in a served page can never
+          # turn the check into a silent no-op, and `-a` keeps it working on
+          # content curl decided was binary.
+          ARCHIVE_MARKERS='Personal News Informer|Digest Archive'
+          FAILED=""
+          for host in $HOSTS; do
+            url="https://$host/"
+            body="$RUNNER_TEMP/digest_probe_${host}.html"
+            hdrs="$RUNNER_TEMP/digest_probe_${host}.headers"
+            set +e
+            # `-L` follows the chain so the verdict is taken on the bytes an
+            # anonymous client would actually end up with; `-D` keeps every
+            # hop's response headers, which is how an Access gate is recognised
+            # even if the chain continues on to an identity provider;
+            # `--disable` ignores any runner `.curlrc`, so nothing ambient can
+            # attach credentials to a probe whose whole point is sending none.
+            code="$(curl --disable -sS -m 15 -L --max-redirs 5 \
+              -o "$body" -D "$hdrs" \
+              -w '%{http_code} %{num_redirects} %{url_effective}' "$url")"
+            curl_rc=$?
+            set -e
+            http_code="${code%% *}"
+            remainder="${code#* }"
+            hops="${remainder%% *}"
+            effective="${remainder#* }"
+            bytes=0
+            [ -f "$body" ] && bytes="$(wc -c < "$body")"
+            echo "GET $url -> HTTP '$http_code' after $hops redirect hop(s), final URL '$effective', ${bytes} body bytes, curl exit $curl_rc"
+            # A transport failure is NOT a pass. Reporting "the site is
+            # protected" because we could not reach it is the exact inversion
+            # that lets a real exposure hide behind an outage. A 404 and a DNS
+            # failure are the same thing for this purpose: an origin that
+            # refuses to be measured has not been measured.
+            if [ "$curl_rc" -ne 0 ]; then
+              echo "::error::digest archive origin UNREACHABLE (not a verdict): $url — curl exit $curl_rc. The guard's state is UNKNOWN, not 'protected'."
+              FAILED="$FAILED $host(unreachable)"
+              continue
+            fi
+            served_archive=no
+            if [ -s "$body" ] && LC_ALL=C grep -aEq "$ARCHIVE_MARKERS" "$body"; then
+              served_archive=yes
+            fi
+            access_gate=no
+            if [ -s "$hdrs" ] && LC_ALL=C grep -aq 'cloudflareaccess\.com' "$hdrs"; then
+              access_gate=yes
+            fi
+            case "$effective" in
+              *cloudflareaccess.com*) access_gate=yes ;;
+            esac
+            echo "  served archive content: $served_archive | Cloudflare Access gate in the chain: $access_gate"
+            # CHECKED FIRST, so no status and no redirect can excuse it. This is
+            # the breach; everything else is a detail of how it is spelled.
+            if [ "$served_archive" = yes ]; then
+              echo "::error::digest archive PUBLICLY READABLE at $url — an unauthenticated request received digest content (HTTP $http_code after $hops hop(s), ${bytes} bytes, final URL $effective). The archive is NOT protected. If functions/_middleware.js is deployed, check that _routes.json is committed with include:[\"/*\"] and exclude:[] and that the Pages project is set to Settings -> Runtime -> Fail CLOSED."
+              FAILED="$FAILED $host(archive-content-served)"
+              continue
+            fi
+            if [ "$access_gate" = yes ]; then
+              echo "  gated by Cloudflare Access before any archive bytes were served — protected"
+              continue
+            fi
+            case "$http_code" in
+              401|403)
+                echo "  refused as expected — the archive is auth-gated"
+                ;;
+              2*)
+                echo "::error::digest archive origin $url answered HTTP $http_code (${bytes} bytes, final URL $effective) with no refusal and no Access gate. No digest marker was matched, but a 2xx from this origin is not a proof of protection: treat it as unprotected until proven otherwise."
+                FAILED="$FAILED $host(HTTP-$http_code-not-a-refusal)"
+                ;;
+              3*)
+                echo "::error::digest archive origin $url returned HTTP $http_code to an unauthenticated client and the redirect chain shows no Cloudflare Access gate. Only an Access login counts as a legitimate gate; any other redirect leaves the guard unconfirmed."
+                FAILED="$FAILED $host(HTTP-$http_code-redirect-not-access)"
+                ;;
+              *)
+                echo "::error::digest archive origin $url returned HTTP $http_code (expected 401/403). Unexpected status from an unauthenticated probe; the guard cannot be confirmed."
+                FAILED="$FAILED $host(HTTP-$http_code)"
+                ;;
+            esac
+          done
+          if [ -n "$FAILED" ]; then
+            echo "::error::digest archive origin auth canary FAILED for:$FAILED"
+            exit 1
+          fi
+          echo "Digest archive origin canary: no hostname served archive content to an unauthenticated client."
+
+      - name: PKB verified-date staleness note
+        if: always()
+        # Soft note only (never fails): warns when the PKB contract section
+        # has not been re-verified for >30 days.
+        #
+        # `if: always()` + `continue-on-error: true`, added 2026-10-04 in the
+        # same pass that gave the origin auth canary above its `if: always()`.
+        # Same defect, lower stakes: a step with no `if:` carries the implicit
+        # `success()` condition, so it is SKIPPED the moment anything above it
+        # goes red. The one piece of this job that reports on the REPOSITORY
+        # rather than on the deployed artefact therefore went dark on exactly
+        # the runs a human is most likely to open — the failing ones — which is
+        # the wrong direction for a freshness warning.
+        #
+        # `continue-on-error: true` is required here by Check 7 in
+        # tests/workflows/test_workflow_lint.py (the step has a heredoc, so it
+        # can fail), and it is independently correct: this step's contract is
+        # "warn, never fail". It reads a file and computes a date, so it CAN
+        # still fail — docs/PKG.md unreadable, or a "Verified" marker that is not
+        # a date — and a note about stale documentation must never be the thing
+        # that turns a green run red.
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import datetime, re
+
+          text = open('docs/PKB.md', encoding='utf-8').read()
+          m = re.search(r"Verified (\d{4}-\d{2}-\d{2})", text)
+          if not m:
+              print('::warning::PKB has no "Verified YYYY-MM-DD" marker — freshness unknown')
+              raise SystemExit(0)
+          verified = datetime.date.fromisoformat(m.group(1))
+          age = (datetime.date.today() - verified).days
+          print('PKB verified date: %s (%d days ago)' % (verified, age))
+          if age > 30:
+              print('::warning::PKB verified date %s is %d days old (>30) — refresh the contract section' % (verified, age))
+          PY
+
+      # ---- flag-drift canary -------------------------------------------------
+      # Item 5: install pin -> verify-gate -> tight breaking dry-run. Catches
+      # drift the static checks cannot (renamed/removed CLI flags, dead models,
+      # broken agent invocation).
+      #
+      # These were a SECOND JOB until 2026-10-19; they are steps of this job now,
+      # and the single checkout above serves them (fetch-depth: 0 already, which
+      # the worker drift canary needs).
+      #
+      # The "full daily dry-run" leg was REMOVED on 2026-10-19 for Actions
+      # minutes: it dispatched daily-news.yml twice a day to run the real digest
+      # end to end ahead of the morning slot, at ~420 minutes a month on an
+      # account that had already been refused at runner-assignment. The
+      # flag-drift canary below and the shell/step lint later in this job still
+      # catch that class statically; what is given up is a LIVE pre-slot run, so
+      # a daily-news.yml break that appears only at runtime is now first seen by
+      # the 07:50 slot itself, and then by digest-watchdog. Nothing in this
+      # workflow dispatches any more, so it holds no `actions: write`.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install OpenCode CLI
+        # Exact pin from config/opencode.json — never `latest`.
+        run: npm install -g "$(jq -r .pin config/opencode.json)"
+
+      - name: Verify OpenCode installation
+        # Same fail-fast gate as daily-news.yml: version floor plus the
+        # flag-drift canary (--auto/--model present, --standalone absent).
+        run: |
+          set -eo pipefail
+          opencode --version
+          ver="$(opencode --version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          req="$(jq -r .min_version config/opencode.json)"
+          [ "$(printf '%s\n%s\n' "$req" "$ver" | sort -V | head -n1)" = "$req" ] || { echo "FATAL: opencode $ver < required $req (config/opencode.json)"; exit 1; }
+          help_out="$(opencode run --help 2>&1)"
+          printf '%s' "$help_out" | grep -q -- --auto || { echo "FATAL: opencode run lacks --auto (config/opencode.json flags)"; exit 1; }
+          printf '%s' "$help_out" | grep -q -- --model || { echo "FATAL: opencode run lacks --model (config/opencode.json flags)"; exit 1; }
+          if printf '%s' "$help_out" | grep -q -- --standalone; then echo "FATAL: opencode run exposes --standalone (v2-only flag drift)"; exit 1; fi
+          echo "OpenCode verify OK: $ver (min $req), flags --auto/--model present, --standalone absent"
+
+      - name: Breaking monitor dry-run (tight window)
+        # Exercises the breaking path end to end without sending anything:
+        # --dry-run skips SMTP, and no Telegram token is passed so fan-out
+        # is skipped. State writes land in this ephemeral checkout only.
+        run: |
+          set -eo pipefail
+          python3 scripts/breaking_monitor.py \
+            --state-dir state \
+            --config-dir config \
+            --dry-run \
+            --window-min 5 \
+            --max-candidates 5
+
+      # ---- live parser canary (real parsers, live sites) ---------------------
+      # WHY THIS CHECK EXISTS. A sibling bug cost the owner a semester-1 exam
+      # result for ~19 hours: a parser read a plausible-but-wrong value from the
+      # wrong place, decided "no match", and the product treated that as a
+      # CONFIRMED negative -- permanently burning the result. It shipped because
+      # not one test in this repository had ever run against a real captured
+      # feed, notice page or PDF. Every test fed a hand-written fixture shaped
+      # like what the parser SHOULD see, so a parser that had drifted from the
+      # live site still agreed with the fixture perfectly.
+      #
+      # This runs the REAL parsers against the LIVE sites and fails loudly when
+      # they stop agreeing with reality. Fifteen assertions:
+      #   D1-D7  the digest side -- the collector's own output, through
+      #          `source_health.compute_source_health` and the digest's own
+      #          `section_status_line`, not a reimplementation of either.
+      #   A1-A8  the academic side -- `parse_notice_list`,
+      #          `is_site_constant_title`, `classify_semester`,
+      #          `extract_pdf_text`, `sheet_text_is_readable`,
+      #          `ocr_capability` and the critical-feed coverage that
+      #          `selfcheck_exam_sources.py` SKIPS while exiting green.
+      #
+      # `if: always()`, AND IT IS LOAD-BEARING (added 2026-10-19 when this became
+      # a step of the job above rather than a job of its own). It reaches the
+      # internet and shares nothing with the static checks before it, so a red
+      # static step must not turn it dark: the run is already paid for, and a
+      # canary that is skipped on exactly the runs where something ELSE is wrong
+      # is a canary that reports nothing. It can never block a digest or a result
+      # check either -- nothing in this workflow has a `needs` edge into a
+      # product workflow, and no digest depends on this file.
+      #
+      # The red X is this job's now, not this step's: one job means one badge for
+      # the whole canary. Each check still prints its own `canary <id>` line and
+      # its own `::error::`, so the log names the failing check even though the
+      # badge no longer does.
+      #
+      # THE ANTI-FLAKE RULE IS THE POINT, so read it before "fixing" a run that
+      # reports INCONCLUSIVE. `scripts/live_canary.py` classifies a fetch failure
+      # with the product's own `classify_reason` codes and, when the fetches
+      # really did fail (net_ok == 0, or >=50% failed), prints
+      # `::warning::live-canary INCONCLUSIVE` and exits 0: an unreachable
+      # upstream makes the canary's answer meaningless, not failing. But the
+      # inverse is the whole reason this step exists -- A 200 THAT PARSES TO ZERO
+      # ITEMS IS NOT A NETWORK FAILURE and must fail the run loudly, because
+      # from the outside it is indistinguishable from the burn. Conflating the
+      # two is what makes a canary untrustworthy in BOTH directions.
+      #
+      # NO `continue-on-error` here, on purpose. This exists to go red.
+      #
+      # NO PINNED ASSERTION COUNT. Each check prints its own `canary <id> ok`
+      # or `::error::canary <id> ...` line, and that line is the authoritative
+      # record; a count in this comment would start lying the moment an
+      # assertion is added and nothing would fail when it does.
+      #
+      # It wants a 75s collector soft budget plus at most two 10.5 MB PDFs. The
+      # job's `timeout-minutes` covers that generously and is still short enough
+      # that a hung upstream cannot occupy a runner for the default six hours.
+      - name: Live parser canary (real parsers, live sites)
+        if: always()
+        # Same bare `python3` the other jobs in this file use. The canary is
+        # stdlib-only by design: no pip install, no setup-python, no model
+        # ladder, no agent. It reuses the product's own `collect_news` network
+        # injection point and the product's own parsers, so what it reports is
+        # what the digest will do, not what a reimplementation would do.
+        #
+        # `--notify` is the noise ramp's escalation switch and is OFF by
+        # default: `scripts/live_canary.py` only reaches for ntfy at strike 2
+        # and above, and the run passes --notify so a genuinely dead canary
+        # can page. Strike 1 is `::warning::` and exit 0, recorded in
+        # state/canary_history.json; strikes 2-3 are `::error::` + ntfy +
+        # exit 1; 4+ is `::error::` + ntfy priority 5 "CANARY DEAD for <n>
+        # days". A canary that has been broken for a week must not stay loud
+        # forever, and a green run resets the count to zero.
+        env:
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 scripts/live_canary.py --notify
+
+      - name: Canary assertion suite (offline)
+        if: always()
+        # The pure half of this unit, a step of the same job as the live canary
+        # rather than a job of its own. Its `run_suite` list is a committed
+        # inventory elsewhere; a canary whose assertions were only ever proven
+        # locally would be a canary nobody runs after the next refactor. These
+        # are stdlib-only and fully offline -- `collect()` is never called from a
+        # test, which is what keeps the suite instant and deterministic.
+        run: python3 -m unittest tests.test_live_canary
+
+      - name: Real-fixture manifest guard (offline)
+        if: always()
+        # (a) sha256 mismatch = HARD FAIL, (b) captured_at older than 90 days =
+        # WARNING, (c) an unindexed capture file = HARD FAIL. A lying fixture is
+        # worse than no fixture, so (a) has teeth; a stale one is merely old, so
+        # (b) does not, because a guard that cries wolf gets ignored.
+        run: python3 -m unittest tests.fixtures.real.test_manifest_freshness
+
+      # ---- the full suite ----------------------------------------------------
+      # Enforces the whole suite on the same 06:15 NPT schedule as the canary.
+      # Until this existed the ONLY test enforcement in this repository was
+      # `python3 tests/breaking/test_ladder_sync.py`, run as an earlier step of
+      # this job; every other suite could rot silently and nothing would ever
+      # report it. The rebuild that added the rest is what turned the museum back
+      # into a suite, and this is where it stops rotting again.
+      #
+      # `if: always()`, AND IT IS THE POINT (added 2026-10-19 when this became a
+      # step rather than a job of its own). This is the only thing in the
+      # repository that runs the rest of the suite, so it must run even when an
+      # earlier step in this job went red: the run is already paid for, and a
+      # suite that went dark on exactly the runs where something else broke would
+      # stop being the enforcement it was added to be.
+      - name: Run full test suite (stdlib suites, offline)
+        if: always()
+        # Same bare `python3` the other jobs in this file already use (the
+        # ladder-sync step and the breaking dry-run) — no setup-python, no
+        # `pip install`. Every suite is stdlib-only, which is also what keeps
+        # them provably offline.
+        #
+        # OFFLINE, verified by reading the suites:
+        #   - collection: collect_news.fetch_bytes is the single network
+        #     injection point and is monkeypatched in every test; the backoff
+        #     sleep is patched too. `socket` is imported only to construct
+        #     socket.gaierror fixtures.
+        #   - render: urllib.request.urlopen is poisoned to raise on contact,
+        #     and the ntfy heredoc is exec'd with DRY_RUN=true so it returns
+        #     before the send; the test asserts that DRY RUN branch ran.
+        #   - breaking_monitor: smtplib is imported only to raise
+        #     SMTPException from a fake relay.
+        #   - media: enrich_media.urllib.request.urlopen is patched with a
+        #     side_effect fake and em.time.sleep is patched.
+        # Every write lands in a tempfile.mkdtemp() directory, never the repo.
+        # NO SUITE IS EXCLUDED — all of them are offline-safe.
+        #
+        # There is one more suite in this job, `workflow_lint`, but it is a
+        # SEPARATE STEP below rather than another line here. It is not a
+        # Python-pipeline suite: it lints the shell and YAML in this very
+        # directory, including the block that runs these commands, so
+        # keeping it in its own step keeps its output readable. It is
+        # offline and stdlib-only on the same terms as the rest.
+        #
+        # No `continue-on-error` here, on purpose. Every suite is still
+        # attempted so one run reports the whole picture, and the step then
+        # exits 1 if any of them failed.
+        #
+        # THE GATE IS THE EXIT CODES. No test count is pinned, asserted or even
+        # named anywhere in this file, and that is deliberate rather than an
+        # oversight. The previous revision of this job carried
+        # "collection (expect 82)", "academic (expect 103)", an "expected total
+        # 362" note and a "362 tests" step name, and every one of those numbers
+        # was already wrong - two independent reviewers found the drift in the
+        # same build. A pinned count is a comment that begins lying the moment a
+        # test is added, and nothing fails when it does, so it is strictly worse
+        # than no count. Each suite reports its own "Ran N tests" line in the
+        # step log; that is the authoritative number and it cannot go stale.
+        # The step NAME above used to read "(7 stdlib suites, offline)" for the
+        # same reason it is now unnumbered: a suite count in a label goes stale
+        # the moment a suite is added, and nothing fails when it does.
+        timeout-minutes: 10
+        run: |
+          set -uo pipefail
+          FAILED=""
+          run_suite() {
+            name="$1"; shift
+            echo "::group::$name"
+            if "$@"; then
+              echo "PASS  $name"
+            else
+              rc=$?
+              echo "FAIL  $name (exit $rc)"
+              FAILED="$FAILED $name"
+            fi
+            echo "::endgroup::"
+          }
+
+          run_suite "render"            python3 -m unittest discover -s tests/render -t . -v
+          run_suite "collection"        python3 -m unittest discover -s tests/collection -t . -v
+          run_suite "validate"          python3 -m unittest discover -s tests/validate -t . -v
+          run_suite "weather"           python3 -m unittest discover -s tests/weather -t . -v
+          run_suite "academic"          python3 -m unittest discover -s tests/academic -t . -v
+          run_suite "ai"                python3 tests/ai/test_ai_classifier.py
+          run_suite "breaking_monitor"  python3 tests/breaking/test_breaking_monitor.py
+          # The breaking chain's own guard, registered 2026-10-08. All three ran
+          # LOCALLY ONLY until then, which is exactly how the gate-parity defect
+          # survived: the Worker tripped 33 rows where Python tripped 378, and
+          # every registered suite stayed green because none of them executed the
+          # Worker's OWN gate. `breaking_chain` runs that gate under node over the
+          # frozen 616-row corpus and compares it row by row with Python's
+          # importance_gate; `breaking_gate` freezes the Python gate itself and
+          # `worker_gate_parity` pins the shared gateBlob. Registering them here is
+          # the only thing that stops them rotting again — a registration that is
+          # not in this list is a suite nobody runs.
+          run_suite "breaking_gate"     python3 -m unittest tests.breaking.test_breaking_gate -v
+          run_suite "breaking_chain"    python3 -m unittest tests.breaking.test_breaking_chain -v
+          run_suite "worker_gate_parity" python3 -m unittest tests.breaking.test_worker_gate_parity -v
+          run_suite "ladder_sync"       python3 tests/breaking/test_ladder_sync.py
+          # The 2026-10-13 mass-casualty loss, executed. On that run the Worker
+          # tripped a 139-death headline, both ladder models failed, the honesty
+          # gate fired and NO alert was sent. Registered in the same change as the
+          # suite, for the same reason as the three above: a registration that is
+          # not in this list is a suite nobody runs, and the whole point of this
+          # file is that the fast path must be re-proved on every run rather than
+          # trusted once.
+          run_suite "breaking_fast_path" python3 tests/breaking/test_hard_evidence_fast_path.py
+          # Dynamic model selection: live discovery, health memory with decay,
+          # the never-veto invariant, and the stage time budget. Registered in
+          # the same change as the suite and for the same reason — the ladder
+          # is now resolved at run time instead of written down, so the
+          # properties that keep it safe (free/active/text gates read from what
+          # the CLI reported, a timeout demoting a model without silencing the
+          # run, worst case bounded by the budget) have to be re-proved on every
+          # run rather than trusted once.
+          run_suite "dynamic_ladder"  python3 tests/breaking/test_dynamic_model_ladder.py
+          run_suite "media"             python3 tests/media/test_media_extraction.py
+          run_suite "workflow_lint"     python3 -m unittest discover -s tests/workflows -t . -v
+          # The two literal ntfy step names, pinned by the suite that depends
+          # on them. tests/render/test_render_honesty.py slices daily-news.yml
+          # between "- name: Publish to ntfy (primary)" and
+          # "- name: Send digest via Gmail (backup)", then execs the heredoc it
+          # recovers. A rename therefore breaks every ntfy test with a
+          # ValueError from str.index rather than an assertion failure, and the
+          # message never mentions step names. Later phases of the punctuality
+          # work edit that workflow, so this guard ships BEFORE the rename risk
+          # does. Offline: the ntfy heredoc runs under DRY_RUN with urlopen
+          # poisoned, and every write lands in a temp dir.
+          run_suite "digest"            python3 -m unittest discover -s tests/digest -t . -v
+          # The dead-man's switch, executed for real. The Worker's heartbeat is
+          # only load-bearing if it is written from the CRON path and NOT from
+          # `?run=1`, if the throttle really suppresses writes, and if a KV read
+          # failure really does NOT page the owner — none of which is visible by
+          # reading the code. The JS suite runs the Worker's own functions under
+          # node against a fake KV; this Python wrapper exists so the runner
+          # needs no node setup step and fails LOUDLY (not "skips") when node is
+          # missing, because a liveness switch that is never executed is
+          # decoration. Four behaviours, each with a committed mutation proof
+          # against a deliberately broken Worker copy.
+          run_suite "worker_heartbeat" python3 -m unittest tests.breaking.test_worker_heartbeat -v
+          # The digest archive's access control, executed for real. The Pages
+          # origin serves every static file, so `functions/_middleware.js` is the
+          # ONLY thing that can gate it — the digest-auth Worker only proxies and
+          # is bypassed by hitting the origin directly (probe 2026-10-02: HTTP
+          # 200, unauthenticated, 72 digest pages). Three of the behaviours here
+          # are invisible to code reading and would each reopen the archive
+          # without failing anything else: an internal throw escaping into
+          # Cloudflare's documented env.ASSETS.fetch() fallback, an unset
+          # DIGEST_PASSWORD failing OPEN instead of closed, and the comparison
+          # silently regressing to a timing-leaking `===`. This wrapper exists so
+          # the runner needs no node setup step and fails LOUDLY (not "skips")
+          # when node is missing — a security control that is never executed is
+          # decoration.
+          run_suite "pages_middleware_auth" python3 -m unittest tests.security.test_pages_middleware_auth -v
+          # The digest DELIVERY guard, executed for real. Both of its properties
+          # are invisible to code reading: that the write-ahead `pending` marker
+          # lands on disk before the first POST, and that `?deliver_now=1` — a
+          # manual probe — cannot reach the ledger writer at all, so one probe
+          # cannot permanently mask a real double push. A third property is only
+          # visible from outside: that the ntfy topic value never reaches a log
+          # line, an error string or a ledger field, which the suite asserts by
+          # searching captured logs for the topic value across every delivery
+          # path. This Python wrapper exists so the runner needs no node setup
+          # step and fails LOUDLY (not "skips") when node is missing, and asserts
+          # node's own TAP plan line — a suite that prints nothing and exits 0 is
+          # decoration, and the one thing this guard must never be is decoration.
+          run_suite "digest_delivery" python3 -m unittest tests.digest.test_digest_delivery -v
+          # The ntfy wire-shape guard, executed for real. It is its own suite and
+          # not an addition to an existing one because the pinned suite counts
+          # (digest 215, academic 362, breaking_monitor 57) are asserted by other
+          # suites; growing one to carry this would move a number whose whole job
+          # is to catch a suite that lost a test. What only this suite can see:
+          # `payload_to_ntfy_body` coerces NEITHER field, so a payload whose
+          # `ntfy` block ever carried a string would reach ntfy as a string and
+          # be answered HTTP 400 — the 2026-10-12 outage — with nothing else in
+          # the repo able to notice. So it drives every notification site to the
+          # exact bytes it would POST and asserts the serialised form, which is
+          # the only place a list and a string differ. Its own RED case is
+          # required to be detectable, so the guard cannot decay into decoration.
+          run_suite "notification_wire_shape" python3 -m unittest tests.notifications.test_ntfy_wire_shape_guard -v
+          # The delivery marker and the retry ladder, against broken input. This
+          # suite existed and was in NEITHER list, so the properties it is the
+          # only proof of -- that an unreadable or structurally-wrong
+          # state/stories.validated.json can neither clear nor advance the
+          # ladder, that a genuine `"stories": []` quiet day still arms it, and
+          # that broken input reddens the run -- were never executed on CI. A
+          # suite nobody invokes is not a passing suite; registered in the same
+          # change as the fixes it guards, as the entries above were.
+          run_suite "payload_io" python3 -m unittest tests.test_payload_io -v
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::failing test suites:$FAILED"
+            exit 1
+          fi
+          echo "All suites green (exit codes 0; per-suite counts are in the log above)."
+
+      - name: Workflow shell/YAML lint gate
+        # The lint suite, split out so the reason it exists is visible in the
+        # Actions UI and not buried inside the log of a step that runs every
+        # other suite.
+        #
+        # This is the guardrail for the two production outages of 2026-09-27
+        # that 425 passing Python tests did not catch, because every one of
+        # those tests looked at Python and none of them looked at the shell
+        # embedded in this directory:
+        #   Bug A -- the opencode flag gate grepped STDOUT for `--auto` while
+        #     the CLI had moved `run --help` to STDERR, so a working flag read
+        #     as missing and the digest died at its pre-spend gate.
+        #   Bug B -- a `python3 - <<'PY'` heredoc had its body and `PY`
+        #     terminator indented inside a YAML block scalar, so bash never
+        #     found a column-0 terminator and the step died with
+        #     `here-document ... delimited by end-of-file`.
+        #
+        # Same command, run locally, exactly as below:
+        #   python3 -m unittest discover -s tests/workflows -t . -v
+        #
+        # It is stdlib-only and fully offline: no network, no GitHub API, no
+        # Cloudflare, no real `opencode` (the CLI is replaced by a real
+        # executable stub placed first on PATH inside a temp dir, so the
+        # regression test exercises this repository's own gate shell rather
+        # than a reimplementation of it). Writes land in a
+        # tempfile.mkdtemp() directory, never the repo.
+        #
+        # `bash -n` every `run:` block, require every heredoc terminator to
+        # be at column 0 of the PARSED string, require every Python heredoc
+        # body to compile, run the real opencode gate against a stubbed CLI
+        # on all four stream/flag combinations, require every referenced
+        # script and test path to exist, require every `secrets.*` to be on a
+        # committed allowlist, require every `if: always()` step that can
+        # fail after the work succeeded to carry `continue-on-error: true`,
+        # require every step that declares itself an always-run diagnostic to
+        # actually carry `if: always()` (which is what keeps THIS file's origin
+        # auth canary from being skipped again), require every cron to match a
+        # committed Nepal Time (UTC+05:45) table, and REPORT whether a dry run
+        # can mark a digest slot delivered.
+        #
+        # No `continue-on-error` here, and no pinned test count. The gate is
+        # the exit code, for the same reason the step above has no count: a
+        # pinned number starts lying the moment a test is added and nothing
+        # fails when it does. A lint that can go quietly red is worse than
+        # no lint, so this step fails the job like any other.
+        timeout-minutes: 5
+        run: python3 -m unittest discover -s tests/workflows -t . -v

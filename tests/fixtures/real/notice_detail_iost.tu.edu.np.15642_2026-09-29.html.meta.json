@@ -1,0 +1,8 @@
+{
+  "bytes": 742436,
+  "captured_at": "2026-09-29T12:16:58+00:00",
+  "note": "Live detail page 15642. Hash/bytes re-recorded 2026-09-30: previous values were the pre-commit bytes and differed only in CRLF/LF (see the manifest note). Content unchanged.",
+  "sha256": "2465dab30ff5300f9ceb618a3c42c09f2b151cbbdc714bbae9e54091d859dcd6",
+  "source_url": "https://iost.tu.edu.np/notices/15642",
+  "trimmed": false
+}

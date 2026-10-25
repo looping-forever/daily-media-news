@@ -1,0 +1,148 @@
+# Profile for the daily media digest. Committed values are a GENERIC default:
+# no real person's location is in this file. A deployment injects the real
+# place at runtime from the environment (see the override block below) and the
+# digest still builds on the default when nothing is injected.
+# Used by downstream tooling / the research agent to localize and prioritize stories.
+# NOTE: privacy.minimize_location_exposure=true means digests should prefer
+# district/province-level phrasing over precise street-level location.
+
+location:
+  # Generic city-centre default. Overridden at runtime, when present, by
+  # DIGEST_PROFILE_CITY / _DISTRICT / _PROVINCE / _LAT / _LON. Nothing here is
+  # anyone's real address, and a missing override is not an error.
+  #
+  # The four human-readable keys must not be dropped: the research prompt cites
+  # them and privacy.minimize_location_exposure means digests phrase the
+  # location at district/province level, never by these coordinates.
+  city: Kathmandu
+  district: Kathmandu
+  province: Kathmandu
+  country: Nepal
+  latitude: 27.7
+  longitude: 85.3
+  timezone: "Asia/Kathmandu"
+
+education:
+  program: "BSc CSIT"
+  university: "Tribhuvan University"
+  semester: 1
+  institution: "Example College"
+
+bank:
+  name: "Example Bank"
+
+privacy:
+  minimize_location_exposure: true
+
+priorities:
+  local_daily_life: 10        # outages, water, roads, weather in the local area
+  education_deadlines: 10     # exam forms, routines, results, campus notices
+  bank_customer_notices: 9    # bank rates, KYC, outages, branches
+  national_practical: 8       # Nepal-wide policy/infrastructure that affects daily life
+  entertainment_personal: 7   # gaming / anime / manga / manhwa / manhua
+
+# ---------------------------------------------------------------------------
+# When the owner is actually outdoors, and how long clothes stay out.
+# Whole hours, [start, end) -- 07:00-12:00 means hours 7 through 11.
+# ---------------------------------------------------------------------------
+
+schedule:
+  outdoor_windows: [["07:00", "12:00"], ["17:00", "20:00"]]
+  wash_window: ["07:00", "18:00"]
+  unavailable_windows: []
+
+# ---------------------------------------------------------------------------
+# Deterministic weather advice. Every threshold lives HERE and nowhere else;
+# scripts/weather_advice.py has no copy of any of these numbers, because a
+# number in both the code and the config is a pair of copies that drift.
+#
+# The band between wash_no and umbrella is deliberately EMPTY. A 40-49% day
+# produces an umbrella line and no washing verdict at all, because "maybe
+# don't wash" is the wording that teaches him to ignore the line.
+#
+# precip_wet_mm is the WETTING FLOOR: the rain rules need BOTH a probability
+# and an amount in the same hour. Probability alone made this engine prohibit
+# washing over drizzle -- 88% chance paired with 0.2 mm, three days running,
+# over 1.7 mm of total drizzle. Calibrated against 27 days of real Example City data
+# (2026-09-13..2026-10-09), not guessed: across 12 WMO drizzle days (codes
+# 51/53) the largest hourly amount in any hour these rules can read was
+# 0.8 mm, and the largest in an outdoor window was 0.6 mm. Anything below that
+# reproduces the same defect on a different day. 1.0 mm leaves two 0.1 mm grid
+# steps of headroom over the measured drizzle ceiling.
+# `python.exe scripts/weather_advice.py --check config/profile.yml` exits 1
+# if any of this stops being legal.
+# ---------------------------------------------------------------------------
+
+weather_advice:
+  enabled: true
+  max_age_hours: 3
+  max_lines: 3
+  thresholds:
+    wash_no: 50          # >= this over the wash window: don't wash today
+    umbrella: 40         # >= this over an outdoor window: carry one
+    precip_wet_mm: 1.0   # ...and >= this much water in that same hour
+    warm_strong_c: 10    # apparent temp <= this: wear a warm jacket
+    warm_mild_c: 15      # between the two: a jacket in the bag, say nothing
+    wind_kmh: 30         # Beaufort strong-breeze band: umbrellas invert
+    visibility_m: 1000   # WMO fog boundary: drivers change behaviour
+
+# ---------------------------------------------------------------------------
+# Per-story selection for the "for you" section.
+# ---------------------------------------------------------------------------
+
+for_you:
+  enabled: true
+  min_length: 20
+  max_length: 140
+  min_personal_relevance: 7
+  max_stories: 8
+  categories: [action, local_city, education_tu, college_local, bank_local, tech_career]
+  reliability_tiers: [tier1, tier2]
+  # The two word lists live HERE and nowhere else. scripts/validate_stories.py
+  # reads them from this file and has no copy of either, because a word list in
+  # both places is a pair that drifts and the code quietly stops meaning what
+  # the config says. Remove either one and the screen FAILS CLOSED: every
+  # `for_you` line is stripped and the run prints a WARNING, rather than an
+  # unscreened line reaching the owner. Matched case-insensitively, on word
+  # boundaries; `banned_openers` only at the START of the line.
+  banned_openers:
+    - this may
+    - this could
+    - this is significant
+    - this signals
+    - this indicates
+    - this reflects
+    - this development
+    - this news
+    - it is important to note
+    - it is worth noting
+    - it should be noted
+    - in conclusion
+    - overall
+    - could potentially
+    - may potentially
+    - users should
+    - readers should
+    - stay informed
+    - interestingly
+    - remarkably
+    - importantly
+    - furthermore
+    - moreover
+    - additionally
+  hedge_markers:
+    - may
+    - might
+    - could
+    - possibly
+    - potentially
+    - reportedly
+    - allegedly
+    - rumour
+    - rumor
+    - suggests that
+    - signals
+    - indicates that
+    - is expected to
+    - appears to
+    - seems to

@@ -1,0 +1,409 @@
+{
+  "_readme": [
+    "Expected-results manifest for tests/fixtures. Consumed by an external throwaway",
+    "verification runner (not committed): it copies fixtures to a temp dir, runs the",
+    "three scripts via the py launcher, and asserts every expectation below.",
+    "reason_contains values are substrings of the filter_log 'reason' field.",
+    "History fixture dates are FIXED (recent=2026-08-24, stale=2026-07-20, prune=2026-07-01);",
+    "refresh them if this suite is run long after authoring.",
+    "expected_priorities (optional) maps survivor title -> expected priority int",
+    "(asserts demotion/capping without dropping). expected_log_entries (optional)",
+    "is a list of {title, reason_contains} that must appear in filter_log even",
+    "when the story SURVIVES (e.g. foreign_promo_demoted).",
+    "spoiler_scope_and_forecast_dedup pins the entertainment-only spoiler veto",
+    "and same-day-only forecast dedup (recurring open-meteo URL, not 7-day TTL)."
+  ],
+  "validate_cases": [
+    {
+      "name": "full_matrix",
+      "input": "input_full_matrix.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 22,
+      "expected_survivor_titles": [
+        "Emergency Road Repair Closes Example City-Kathmandu Route Tonight",
+        "NEA Announces Load Shedding Schedule Change for Example City",
+        "Konosuba Season 3 Premiere Date Announced by Studio",
+        "Example Bank KYC Verification Requirement for All Customers",
+        "Example Bank Revises Fixed Deposit Interest Rates",
+        "TU Publishes Revised BSc CSIT Exam Routine",
+        "TU Exam Form Deadline Extended for CSIT Students",
+        "Federal Government Announces New Digital Education Policy",
+        "Example College Example City Releases CSIT Semester Exam Notice",
+        "Scheduled Water Outage in Example City Municipality Wards 5-7 This Weekend",
+        "TU Announces BSc CSIT Fourth Semester Results",
+        "Protesters Assault Drivers as Highway Blocked at Thankot",
+        "Example Bank Mobile Banking Outage Resolved",
+        "WorldLink Outage Hits Example City Customers For Third Time This Month",
+        "Hollow Knight Anniversary Sale Live on Steam"
+      ],
+      "expected_drops": [
+        { "title": "Beloved NPC Dies in Silksong Update Cutscene", "reason_contains": "spoiler_veto" },
+        { "title": "One Piece Episode 1140: Luffy Turns Out To Be The Sun God's Heir", "reason_contains": "spoiler_veto" },
+        { "title": "Bleach TYBW Identity Reveal Scene Breaks The Internet", "reason_contains": "spoiler_veto" },
+        { "title": "Kagurabachi Chapter 180 Raw Scan Leaks Surface Online", "reason_contains": "spoiler_veto" },
+        { "title": "Silksong True Ending Explained In New Video Essay", "reason_contains": "spoiler_veto" },
+        { "title": "Datamined Files Reveal New Blasphemous Boss", "reason_contains": "spoiler_veto" },
+        { "title": "Lies of P DLC Leaked Ahead of Official Announcement", "reason_contains": "spoiler_veto" },
+        { "title": "Omniscient Reader's Viewpoint Ending Explained By Author Interview", "reason_contains": "spoiler_veto" },
+        { "title": "Veteran Nepali Folk Singer Dies at 80", "reason_contains": "below_priority_cap" },
+        { "title": "Wallet Theft Reported at Kathmandu Bus Park", "reason_contains": "crime_filter" },
+        { "title": "Opposition Lawmaker Assaulted Journalist During Committee Row", "reason_contains": "crime_filter" },
+        { "title": "Road Rage Scuffle Leaves Scooter Rider Assaulted at Suryabinayak Junction", "reason_contains": "crime_filter" },
+        { "title": "Mobile Phone Theft Reported at Example City Bus Park", "reason_contains": "crime_filter" },
+        { "title": "TU Research Team Studies LEGO Bricks in Engineering Classrooms", "reason_contains": "excluded_keyword" },
+        { "title": "Example College Hosts LEGO Robotics Promo Event This Weekend", "reason_contains": "excluded_keyword" },
+        { "title": "Example Bank Funds LEGO Exhibition Under CSR Initiative", "reason_contains": "excluded_keyword" },
+        { "title": "Google Summer of Code Results Announced for 2026", "reason_contains": "below_priority_cap" },
+        { "title": "Heavy Rainfall Warning Issued for Bagmati Province", "reason_contains": "below_priority_cap" },
+        { "title": "Example Bank Example City Branch Relocated to New Building", "reason_contains": "below_priority_cap" },
+        { "title": "Example City Under Heavy Rain Warning Tonight", "reason_contains": "below_priority_cap" },
+        { "title": "Example College Example City Classes Cancelled Tomorrow for Freshers Orientation", "reason_contains": "below_priority_cap" },
+        { "title": "Local Schools Closed Friday Due to Weather Alert", "reason_contains": "below_priority_cap" }
+      ]
+    },
+    {
+      "name": "dedup_cases",
+      "input": "input_dedup_cases.json",
+      "history": "input_history_dedup.json",
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 3,
+      "expected_survivor_titles": [
+        "Silksong Release Date Finally Announced by Team Cherry",
+        "Old Story From July Returns With Sequel Announcement"
+      ],
+      "expected_drops": [
+        { "title": "Team Cherry Finally Announces Silksong Release Date", "reason_contains": "duplicate_in_run" },
+        { "title": "Team Cherry Announced Silksong Release Date Today", "reason_contains": "duplicate_in_run" },
+        { "title": "Hollow Knight Major Update Released With New Boss", "reason_contains": "duplicate_of_history" }
+      ]
+    },
+    {
+      "name": "spoiler_scope_and_forecast_dedup",
+      "input": "input_spoiler_scope.json",
+      "history": "input_forecast_history.json",
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 3,
+      "expected_survivor_titles": [
+        "Nepal Flood Crisis: Death Toll Above 800",
+        "Weather Forecast Example City (3-day forecast)"
+      ],
+      "expected_drops": [
+        { "title": "Beloved NPC Dies in Silksong Update Cutscene", "reason_contains": "spoiler_veto" },
+        { "title": "Silksong True Ending Explained In New Video Essay", "reason_contains": "spoiler_veto" },
+        { "title": "Weather Forecast Example City (3-day forecast) - duplicate", "reason_contains": "duplicate_in_run" }
+      ]
+    },
+    {
+      "name": "excluded_only",
+      "input": "input_excluded_only.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 2,
+      "expected_filtered_count": 1,
+      "expected_survivor_titles": [],
+      "expected_drops": [
+        { "title": "New LEGO Racing Game Announced for Consoles", "reason_contains": "excluded_keyword" }
+      ]
+    },
+    {
+      "name": "malformed_stories",
+      "input": "input_malformed.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 6,
+      "expected_survivor_titles": [
+        "TU Workshop Notice: Python Basics Session"
+      ],
+      "expected_drops": [
+        { "title": "", "reason_contains": "schema:" },
+        { "title": "National Sports Team Wins Friendly Match", "reason_contains": "schema:" },
+        { "title": "Priority Out Of Range Story", "reason_contains": "schema:" },
+        { "title": "Bad Source URL Scheme Story", "reason_contains": "schema:" },
+        { "title": "Invalid Reliability Tier Story", "reason_contains": "schema:" },
+        { "title": "123", "reason_contains": "schema:" }
+      ]
+    },
+    {
+      "name": "empty_result",
+      "input": "input_empty.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 2,
+      "expected_filtered_count": 0,
+      "expected_survivor_titles": [],
+      "expected_drops": [],
+      "expect_out_payload_written": true,
+      "expect_out_stories_empty": true
+    },
+    {
+      "name": "invalid_json",
+      "input": "input_invalid_json.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 1,
+      "expect_out_payload_written": false
+    },
+    {
+      "name": "limited_passthrough",
+      "input": "input_limited.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 0,
+      "expected_research_status": "limited",
+      "expected_survivor_titles": [
+        "CSIT Notice <script>alert('xss')</script> Update"
+      ],
+      "expected_drops": []
+    },
+    {
+      "name": "event_merge_two_runs",
+      "runs": [
+        {
+          "input": "input_event_run1.json",
+          "history": null,
+          "config_dir": "config",
+          "expected_exit": 0,
+          "expected_filtered_count": 0,
+          "expected_survivor_titles": ["Silksong Release Date Announced by Team Cherry"],
+          "expected_labels": { "Silksong Release Date Announced by Team Cherry": "NEW" }
+        },
+        {
+          "input": "input_event_run2.json",
+          "history": null,
+          "config_dir": "config",
+          "expected_exit": 0,
+          "expected_filtered_count": 0,
+          "expected_survivor_titles": ["Silksong Release Date Confirmed by Team Cherry"],
+          "expected_labels": { "Silksong Release Date Confirmed by Team Cherry": "UPDATED" }
+        }
+      ],
+      "expect_state_active_events": 1
+    },
+    {
+      "name": "similar_titles_separate_events",
+      "input": "input_similar_titles.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 0,
+      "expected_survivor_titles": [
+        "Example City Municipality Announces New Water Supply Schedule",
+        "Example City Municipality Announces New Road Repair Schedule"
+      ],
+      "expected_labels": {
+        "Example City Municipality Announces New Water Supply Schedule": "NEW",
+        "Example City Municipality Announces New Road Repair Schedule": "NEW"
+      },
+      "expect_state_active_events": 2
+    },
+    {
+      "name": "deadline_future_survives",
+      "input": "input_deadline_future.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 0,
+      "expected_survivor_titles": [
+        "TU Exam Form Registration Window Extended Through December"
+      ],
+      "expected_drops": []
+    },
+    {
+      "name": "deadline_expired_resolved",
+      "input": "input_deadline_expired.json",
+      "history": null,
+      "config_dir": "config",
+      "state_seed": "state_deadline_seed.json",
+      "expected_exit": 2,
+      "expected_filtered_count": 1,
+      "expected_survivor_titles": [],
+      "expected_drops": [
+        { "title": "TU Exam Form Deadline Nears for CSIT Students", "reason_contains": "deadline_expired" }
+      ],
+      "expect_state_status": { "evt-seeddead0001": "RESOLVED" }
+    },
+    {
+      "name": "relevance_sort_and_schema",
+      "input": "input_relevance_sort.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 1,
+      "expected_survivor_titles": [
+        "Zeta Water Supply Project Completed in Example City Wards",
+        "Midmark Road Segment Reopened After Repairs",
+        "Alpha Library Hours Extended for Exam Season"
+      ],
+      "expected_drops": [
+        { "title": "Broken Relevance Score Story", "reason_contains": "schema:" }
+      ]
+    },
+    {
+      "name": "foreign_promo_demotion",
+      "input": "input_foreign_promo.json",
+      "history": null,
+      "config_dir": "config",
+      "expected_exit": 0,
+      "expected_filtered_count": 3,
+      "expected_survivor_titles": [
+        "TU Extends BSc CSIT Exam Form Submission Deadline",
+        "Interstate Conflict Escalates as Border Fighting Intensifies",
+        "One Piece Episode 1141 Now Streaming on Legal Platforms",
+        "Anime Theme Concert Scheduled in Kathmandu This Winter",
+        "Bandai Namco Stock Hits Record High After Strong Fiscal Quarter",
+        "Naruto Throws Ceremonial First Pitch at Los Angeles MLB Game",
+        "One Piece x Timberland Collab Boot Collection Unveiled in Tokyo"
+      ],
+      "expected_priorities": {
+        "Naruto Throws Ceremonial First Pitch at Los Angeles MLB Game": 4,
+        "One Piece x Timberland Collab Boot Collection Unveiled in Tokyo": 4,
+        "Bandai Namco Stock Hits Record High After Strong Fiscal Quarter": 4,
+        "Interstate Conflict Escalates as Border Fighting Intensifies": 9,
+        "One Piece Episode 1141 Now Streaming on Legal Platforms": 8,
+        "TU Extends BSc CSIT Exam Form Submission Deadline": 9,
+        "Anime Theme Concert Scheduled in Kathmandu This Winter": 5
+      },
+      "expected_log_entries": [
+        { "title": "Naruto Throws Ceremonial First Pitch at Los Angeles MLB Game", "reason_contains": "foreign_promo_demoted" },
+        { "title": "One Piece x Timberland Collab Boot Collection Unveiled in Tokyo", "reason_contains": "foreign_promo_demoted" },
+        { "title": "Bandai Namco Stock Hits Record High After Strong Fiscal Quarter", "reason_contains": "foreign_promo_demoted" }
+      ],
+      "expected_drops": []
+    },
+    {
+      "name": "duplicate_of_active_event_sameday",
+      "runs": [
+        {
+          "input": "input_event_run1.json",
+          "history": null,
+          "config_dir": "config",
+          "expected_exit": 0,
+          "expected_filtered_count": 0,
+          "expected_labels": { "Silksong Release Date Announced by Team Cherry": "NEW" }
+        },
+        { "op": "update_history", "digest_time": "morning" },
+        {
+          "input": "input_event_run2.json",
+          "history": "carry",
+          "config_dir": "config",
+          "expected_exit": 2,
+          "expected_filtered_count": 1,
+          "expected_drops": [
+            { "title": "Silksong Release Date Confirmed by Team Cherry", "reason_contains": "duplicate_of_active_event" }
+          ]
+        }
+      ]
+    }
+  ],
+  "email_cases": [
+    {
+      "name": "escaping_canary_and_limited_banner",
+      "validated_from": "limited_passthrough",
+      "expected_exit": 0,
+      "html_must_contain": [
+        "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;",
+        "Limited digest"
+      ],
+      "html_must_not_contain": [
+        "<script>alert("
+      ]
+    },
+    {
+      "name": "zero_stories_minimal_email",
+      "validated_from": "empty_result",
+      "expected_exit": 0,
+      "html_must_contain": [
+        "No items cleared filtering today."
+      ]
+    },
+    {
+      "name": "section_order_and_content",
+      "validated_from": "full_matrix",
+      "expected_exit": 0,
+      "sections_in_relative_order": [
+        "ACTION / IMPORTANT",
+        "LOCAL & CITY",
+        "TU / BSC CSIT",
+        "Example College / COLLEGE",
+        "MY BANK",
+        "IMPORTANT NEPAL",
+        "GAMING",
+        "ANIME"
+      ],
+      "html_must_contain": [
+        "Why it matters:",
+        "&#8226; <a href="
+      ],
+      "html_must_not_contain": [
+        "{{DATE}}",
+        "{{DIGEST_TIME}}",
+        "{{RESEARCH_NOTICE}}",
+        "{{SECTIONS}}",
+        "{{STORY_COUNT}}",
+        "TECH / CAREER / OPPORTUNITIES",
+        "MANGA &middot; MANHWA &middot; MANHUA"
+      ]
+    },
+    {
+      "name": "data_cutoff_regex_and_chips",
+      "validated_from": "similar_titles_separate_events",
+      "expected_exit": 0,
+      "html_regex": "Information checked through: \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} NPT",
+      "text_regex": "^Information checked through: \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} NPT$",
+      "html_must_contain": [
+        "class=\"chip\"",
+        "[NEW]"
+      ],
+      "text_must_contain": [
+        "[NEW] "
+      ]
+    },
+    {
+      "name": "deadline_meta_line",
+      "validated_from": "deadline_future_survives",
+      "expected_exit": 0,
+      "html_must_contain": [
+        "&#128197; Deadline: 2027-12-31"
+      ],
+      "text_must_contain": [
+        "📅 Deadline: 2027-12-31"
+      ]
+    }
+  ],
+  "history_cases": [
+    {
+      "name": "fresh_add_then_idempotent",
+      "validated_from": "full_matrix",
+      "seed_history": null,
+      "expect_added_first_run": 15,
+      "expect_added_second_run": 0,
+      "expect_duplicates_skipped_second_run": 15,
+      "expect_total_after_second_run": 15
+    },
+    {
+      "name": "prune_legacy_seed",
+      "validated_from": "limited_passthrough",
+      "seed_history": "history_prune_seed.json",
+      "expect_pruned": 1,
+      "expect_added": 1,
+      "expect_total": 2
+    },
+    {
+      "name": "state_mark_reported",
+      "validated_from": "similar_titles_separate_events",
+      "seed_history": null,
+      "use_state": true,
+      "expect_added_first_run": 2,
+      "expect_added_second_run": 0,
+      "expect_duplicates_skipped_second_run": 2,
+      "expect_total_after_second_run": 2,
+      "expect_marked_events": 2
+    }
+  ]
+}

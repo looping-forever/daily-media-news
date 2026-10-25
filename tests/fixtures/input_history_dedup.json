@@ -1,0 +1,14 @@
+{
+  "stories": [
+    {
+      "title": "hollow knight major update released",
+      "url": "https://example.com/news/hollow-knight-update",
+      "date": "2026-08-28"
+    },
+    {
+      "title": "old story from july",
+      "url": "https://example.com/news/old-story",
+      "date": "2026-07-20"
+    }
+  ]
+}

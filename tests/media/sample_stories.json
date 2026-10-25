@@ -1,0 +1,53 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-31",
+  "research_status": "full",
+  "notes": "End-to-end dry-run test sample",
+  "generated_at_npt": "2026-08-31 06:00",
+  "data_cutoff_npt": "2026-08-31 06:00",
+  "stories": [
+    {
+      "title": "New Anime Season Kicks Off This Spring",
+      "summary": "Popular anime series returns with a brand-new season premiering April 2027.",
+      "why_it_matters": "Fans finally get continuation of the story after a year-long wait.",
+      "category": "anime",
+      "priority": 7,
+      "source_name": "Anime News Network",
+      "source_url": "https://example.com/anime-season-2027",
+      "supporting_sources": [],
+      "published_at": null,
+      "event_date": null,
+      "event_key": "anime-season-test",
+      "personal_relevance": 7,
+      "deadline": null,
+      "image": {
+        "url": "https://example.com/anime-cover.jpg",
+        "width": 640,
+        "height": 360,
+        "type": "image/jpeg",
+        "source": "media:content"
+      },
+      "label": "NEW"
+    },
+    {
+      "title": "University Exam Schedule Released",
+      "summary": "Tribhuvan University published the exam timetable for upcoming semester.",
+      "why_it_matters": "Students need to plan their study schedule around the published dates.",
+      "category": "education_tu",
+      "priority": 5,
+      "source_name": "TU Official",
+      "source_url": "https://example.com/tu-exam-schedule",
+      "supporting_sources": [],
+      "published_at": "2026-08-31",
+      "event_date": null,
+      "event_key": "tu-exam-test",
+      "personal_relevance": 6,
+      "deadline": "2026-09-15",
+      "image": null,
+      "video": null,
+      "label": "UPCOM"
+    }
+  ],
+  "filtered_count": 0,
+  "filter_log": []
+}

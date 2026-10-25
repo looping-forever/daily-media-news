@@ -1,0 +1,17 @@
+# Test-only config mirroring the structure of config/interests.yml so the
+# hand-rolled YAML parser is exercised against realistic content (top-level
+# block terminated by the next top-level key).
+excluded_keywords:
+  - LEGO
+  - Lego
+
+games:
+  enabled: true
+  interests:
+    - Hollow Knight
+    - Silksong
+
+anime:
+  enabled: true
+  interests:
+    - One Piece

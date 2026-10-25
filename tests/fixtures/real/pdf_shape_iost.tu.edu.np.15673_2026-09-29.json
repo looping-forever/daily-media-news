@@ -1,0 +1,12 @@
+{
+  "bytes": 10485961,
+  "captured_at": "2026-09-29T12:17:03+00:00",
+  "extractor": "pypdf (extract_pdf_text, ocr=False)",
+  "note": "METADATA ONLY, ON PURPOSE. A result sheet is a table of other students' names, roll numbers and marks. The bytes stay out of git; what is committed is how the sheet SHAPES, so sheet_text_is_readable is proven against a real sheet without mirroring a single student's record.",
+  "page_count": 11,
+  "readable_by_sheet_text_is_readable": true,
+  "roll_shaped_tokens_present": true,
+  "roll_split_across_columns": false,
+  "source_sha256": "930ccde30379fff5370f823272a47a0ce950e19e413da34c7e32744fe0d26bed",
+  "source_url": "https://portal.tu.edu.np/notice/15673/1790601157.pdf"
+}

@@ -1,0 +1,8 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "This file is intentionally INVALID JSON (truncated object) to prove fatal exit code 1.",
+  "stories": [
+    {
+      "title": "Truncated story on purpose"

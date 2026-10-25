@@ -1,0 +1,26 @@
+{
+  "digest_time": "morning",
+  "date": "2026-08-25",
+  "research_status": "full",
+  "notes": "Event-tracking run 2: same event_key, different URL and reworded copy (label must be UPDATED; single event in state).",
+  "stories": [
+    {
+      "title": "Silksong Release Date Confirmed by Team Cherry",
+      "summary": "The studio confirmed the launch window today: Silksong goes live globally on September 20 2026 and joins Game Pass on day one.",
+      "why_it_matters": "Confirms the previously announced launch date with an extra platform detail.",
+      "category": "gaming",
+      "priority": 8,
+      "source_name": "Games Wire",
+      "source_url": "https://games.example.net/silksong-release-confirmed",
+      "published_at": "2026-08-25",
+      "event_date": null,
+      "location": null,
+      "reliability": "tier2",
+      "spoiler_level": "none",
+      "spoiler_reason": "",
+      "relevance_reason": "Follow-up on major gaming release date.",
+      "language": "en",
+      "event_key": "silksong-release-date"
+    }
+  ]
+}

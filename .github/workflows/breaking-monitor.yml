@@ -1,0 +1,438 @@
+name: Breaking News Monitor
+
+# Triggers: manual dispatch (fallback/testing) + repository_dispatch from
+# Cloudflare Worker (primary detection) + a low-frequency schedule that keeps
+# detection alive even if the Worker path dies (see the `on:` block for why that
+# one is back). The Worker's sweep interval is DEFINED IN deploy/wrangler.toml
+# (`[triggers] crons`), applied by `wrangler deploy`, and enforced against that
+# file by Check 16 in tests/workflows/test_workflow_lint.py
+# — deliberately NOT restated as a number here. This header used to hardcode a
+# sweep interval that the Worker had not actually run for months, and nothing
+# failed, because the only check that looked at it PRINTED the contradiction
+# instead of asserting it.
+#
+# NOTE the wording above is deliberate: the sweep interval is named by its
+# SOURCE, never by a number, because Check 8 fails this file if a number
+# appears here.
+#
+# Executes scripts/breaking_monitor.py, which stays silent (one heartbeat row
+# appended to state/breaking_log.json, exit 0) unless a candidate clears the
+# deterministic pre-gate, AI classification, verification and dedup — only a
+# verified level-3 event triggers a breaking send.
+#
+# A verified level-3 alert is delivered to ntfy FIRST. Email and Telegram are
+# fallbacks: they fire only when the ntfy POST did not return a 2xx (or timed
+# out / could not connect), and are skipped with a recorded reason when it did.
+# The run's reason in state/breaking_log.json always states the ntfy outcome,
+# so a fallback's success never erases the primary failure.
+#
+# The Cloudflare Worker tripwire (deploy/cloudflare-worker.js) does cheap
+# deterministic detection on its declared cron and hands off here via
+# repository_dispatch (type: breaking-alert) for the full AI
+# classification/verification/alert pipeline instead of duplicating that
+# safety logic.
+on:
+  # Belt and braces, restored 2026-10-08. The Worker dispatch below is the
+  # PRIMARY trigger and stays primary.
+  #
+  # WHY IT IS BACK, stated so the next reader does not delete it again as
+  # redundant: for six weeks the ONLY triggers here were repository_dispatch and
+  # workflow_dispatch, and the Worker's gate matched 13 literal phrases against
+  # Python's 378-row vocabulary, so the dispatch chain was unreachable in
+  # practice — this workflow's last run was 2026-08-29. The gate is widened now
+  # (see tests/breaking/test_breaking_chain.py, which runs both gates over the
+  # 616-row frozen corpus and fails if the two drift apart again) and this schedule is the SECOND path: if the Worker is deleted,
+  # its cron is removed, its token expires or the gate regresses to something too
+  # narrow again, detection still runs from here on its own.
+  #
+  # WHY 1x/DAY AND NOT THE RETIRED HOURLY TICK (it was '20 * * * *', removed in
+  # 2bd8eda) OR THE 4x/DAY THAT REPLACED IT: the Worker sweeps far more often
+  # than this, so this run is a net, not the sensor. Hourly bought nothing the 6h
+  # KV dedup window does not already bound, and 4x/day spent Actions minutes on
+  # an account that had already been refused at runner-assignment. What the cut
+  # costs is stated plainly: a dead Worker is now noticed within ~24 hours rather
+  # than within 6. 01:20 UTC is 07:05 Nepal time, so an overnight outage is still
+  # seen before the morning digest goes out.
+  #
+  # WHY IT CANNOT DOUBLE-ALERT: this run runs the identical pre-gate, classifier
+  # and dedup path as a dispatched run, and Stage 6 of scripts/breaking_monitor.py
+  # matches the event against state/active_stories.json — a story already alerted
+  # with no escalation signal returns `duplicate_no_escalation` and sends
+  # nothing. The Worker's own KV dedup is unchanged and still marks exactly the
+  # one item it dispatched.
+  schedule:
+    - cron: '20 1 * * *'
+  repository_dispatch:
+    types: [breaking-alert]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (write state/email-preview.html instead of SMTP send)'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: breaking-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # bot state commit-back
+
+jobs:
+  breaking-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # fetch-depth: 0 (full history), same rationale as daily-news.yml:
+          # the final commit step pushes state back to master from this
+          # checkout and a full clone keeps that bot push reliable.
+          fetch-depth: 0
+          # DEFECT 2 (2026-09-30): keep GITHUB_TOKEN out of .git/config for the
+          # whole job. The commit step below injects it explicitly for its own
+          # pull/push only.
+          persist-credentials: false
+
+      - name: Record start time and NPT date
+        run: |
+          set -eo pipefail
+          echo "RUN_START=$(date +%s)" >> "$GITHUB_ENV"
+          echo "TODAY_NPT=$(TZ=Asia/Kathmandu date +%F)" >> "$GITHUB_ENV"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install OpenCode CLI
+        # Pin comes from config/opencode.json (single source of truth — never
+        # hardcode a version here, never use `latest`). The 1.x/lildax note
+        # applies only to the anomalyco fork, not the official opencode-ai
+        # package. Provider gate requires >= min_version from the same config
+        # (run 35171159132 failed on the old 0.0.0-beta-17823 pin). To bump:
+        # verify the target version exists (npm view opencode-ai@<version>
+        # version), update config/opencode.json, then confirm the
+        # "Verify OpenCode installation" step passes.
+        run: npm install -g "$(jq -r .pin config/opencode.json)"
+
+      - name: Verify OpenCode installation
+        # Fail-fast gate BEFORE the monitor step: version floor plus a
+        # flag-drift canary. v1 `run` must accept --auto/--model and must NOT
+        # know --standalone (v2/opencode2-only).
+        run: |
+          set -eo pipefail
+          opencode --version
+          ver="$(opencode --version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          req="$(jq -r .min_version config/opencode.json)"
+          [ "$(printf '%s\n%s\n' "$req" "$ver" | sort -V | head -n1)" = "$req" ] || { echo "FATAL: opencode $ver < required $req (config/opencode.json)"; exit 1; }
+          help_out="$(opencode run --help 2>&1)"
+          printf '%s' "$help_out" | grep -q -- --auto || { echo "FATAL: opencode run lacks --auto (config/opencode.json flags)"; exit 1; }
+          printf '%s' "$help_out" | grep -q -- --model || { echo "FATAL: opencode run lacks --model (config/opencode.json flags)"; exit 1; }
+          if printf '%s' "$help_out" | grep -q -- --standalone; then echo "FATAL: opencode run exposes --standalone (v2-only flag drift)"; exit 1; fi
+          echo "OpenCode verify OK: $ver (min $req), flags --auto/--model present, --standalone absent"
+
+      - name: Run breaking news monitor
+        # Python3 (stdlib only) for the monitor itself; the OpenCode CLI
+        # installed above provides AI classification (invoked via opencode).
+        # Model ladder is NOT hardcoded here: scripts/breaking_monitor.py
+        # reads it from config/opencode.json (single source of truth).
+        # The dry_run
+        # input reaches the shell ONLY via the DRY_RUN env var (never
+        # interpolated into the command string); the guard below maps it to
+        # the --dry-run flag. DRY_RUN is resolved here for BOTH event types:
+        # workflow_dispatch honors the dry_run input (default true), while
+        # schedule and repository_dispatch runs resolve to literal false, so
+        # the monitor runs live.
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          # Headline that tripped the Cloudflare Worker tripwire
+          # (repository_dispatch only; empty string otherwise). Surfaced in
+          # the step summary below — never interpolated into a shell command.
+          PAYLOAD_TITLE: ${{ github.event.client_payload.title || '' }}
+          # detection_source of the top tripped item ("rss" for direct
+          # publisher feeds, "google-news" otherwise). Env-context only;
+          # prefers the dedicated detection_source key and falls back to the
+          # generic source key for older dispatch payloads.
+          PAYLOAD_SOURCE: ${{ github.event.client_payload.detection_source || github.event.client_payload.source || '' }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_RECEIVER: ${{ secrets.GMAIL_RECEIVER }}
+          # ntfy is the PRIMARY breaking channel; email and Telegram are
+          # fallbacks that fire only when ntfy did not deliver. Reuses the
+          # existing NTFY secrets (daily-news.yml, digest-watchdog.yml,
+          # academic-result.yml) -- no new secret. Either may be absent, which
+          # the monitor records as ntfy_not_configured rather than silently
+          # treating as "ntfy is down". NTFY_TOPIC is a publish/subscribe
+          # capability: it is referenced by NAME here and never printed.
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          # Optional Telegram fan-out for Level-3 alerts (fallback to the
+          # fallback). Either secret may not exist yet — it resolves to an
+          # empty string and the monitor skips Telegram silently.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -eo pipefail
+          ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="--dry-run"
+          fi
+          echo "Breaking monitor: dry_run=${DRY_RUN:-false} day=${TODAY_NPT} (NPT)"
+          # $ARGS is intentionally unquoted: it is only ever empty or the
+          # literal "--dry-run" built above, never external input.
+          python3 scripts/breaking_monitor.py \
+            --state-dir state \
+            --config-dir config \
+            $ARGS
+
+      - name: Upload alert preview artifact
+        # Written only when an alert actually reached the render stage under
+        # --dry-run, so on silent hours this uploads nothing
+        # (if-no-files-found: ignore). ntfy-preview.txt is the PRIMARY
+        # channel's body and is what to read first when checking the text.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: breaking-alert-${{ github.run_id }}
+          path: |
+            state/ntfy-preview.txt
+            state/email-preview.html
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Commit breaking state
+        # Bot identity + scoped staging mirror daily-news.yml's commit step.
+        # Only the durable monitor-owned state files are staged, and only
+        # if they exist; breaking_log.json (ephemeral telemetry, stays
+        # local-only), history.json, breaking_pending.json and
+        # email-preview.html are deliberately never committed here.
+        #
+        # state/breaking_delivery.json IS staged, and it is the only reason this
+        # step needs the list above it: it is the delivery receipt the watchdog's
+        # breaking arm reads to answer "was an alert actually delivered?". Until
+        # it was committed the watchdog had no delivery record to read and was
+        # judging delivery off the Cloudflare Worker's trigger leg instead.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # DEFECT 2: the checkout persists no credentials, so the token is
+          # injected here, for the network commands only, via `git -c`.
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json; do
+            if [ -f "$f" ]; then
+              git add "$f"
+            fi
+          done
+          if git diff --staged --quiet; then
+            echo "No breaking-state changes to commit"
+          else
+            git commit -m "chore: update breaking monitor state [skip ci]"
+            # Attempt fast-forward pull; if it fails, try rebase; if that also fails, warn and continue
+            if ! git "${auth[@]}" pull --ff-only; then
+              echo "Fast-forward pull failed, attempting rebase..."
+              if ! git "${auth[@]}" pull --rebase; then
+                echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
+              fi
+            fi
+            git "${auth[@]}" push
+          fi
+
+      - name: Summarize run outcome
+        # Reads the last row the script appended to state/breaking_log.json:
+        # silent heartbeat vs tripped level/confidence vs alert sent.
+        if: always()
+        # A summary step must never be able to fail a job whose real work
+        # already succeeded. That is exactly how Bug B (2026-09-27) killed the
+        # monitor: an `if: always()` step with a heredoc, no continue-on-error,
+        # failing AFTER the monitor had done its job. This step is reporting
+        # only, so it can never be load-bearing.
+        continue-on-error: true
+        env:
+          PAYLOAD_TITLE: ${{ github.event.client_payload.title || '' }}
+          # Reused for the honesty-gate failure notice below. Same topic, same
+          # secrets as the alert itself; NTFY_TOPIC is never printed.
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -eo pipefail
+          if [ -f state/breaking_log.json ]; then
+            echo "Last breaking_log rows (raw tail):"
+            tail -n 14 state/breaking_log.json || true
+          fi
+          python3 - <<'PY'
+          import datetime as _dt
+          import json, os
+          import urllib.request
+
+          # A breaking alert is event-driven: the step summary reports the REAL
+          # NPT fire time, never a morning/evening slot (those label the 2x/day
+          # scheduled digest only). Asia/Kathmandu is UTC+05:45, no DST.
+          _fired_npt = ((_dt.datetime.now(_dt.timezone.utc)
+                        + _dt.timedelta(hours=5, minutes=45))
+                        .strftime("%Y-%m-%d %H:%M NPT"))
+
+          last = None
+          err = ""
+          try:
+              with open("state/breaking_log.json", encoding="utf-8") as fh:
+                  rows = json.load(fh)
+              if isinstance(rows, list) and rows and isinstance(rows[-1], dict):
+                  last = rows[-1]
+          except Exception as exc:
+              err = str(exc)
+
+          payload_title = os.environ.get("PAYLOAD_TITLE", "").strip()
+
+          # THE HONESTY GATE FAILED, OR NOTHING ELSE HAPPENED. A silent
+          # fail-safe is indistinguishable from a quiet news day: the AI ladder
+          # IS the thing that decides whether something is genuinely breaking,
+          # and when it errors the script writes one row to
+          # state/breaking_log.json and exits 0. That file is gitignored and is
+          # never committed or surfaced, so a broken ladder looked exactly like a
+          # calm day -- which is the one thing it must never be allowed to do.
+          #
+          # This step is the surfacing point, and it is DETERMINISTIC: it reads
+          # the row the script wrote and reports the reason string verbatim. The
+          # model is not consulted and cannot influence it, so it can neither
+          # invent a send that did not happen nor silence a real one. It only
+          # ever turns the script's own recorded outcome into a visible signal.
+          reason = (last or {}).get("reason") or ""
+          ai_failed = reason.startswith("ai_fail_safe")
+
+          # THE UN-JUDGED HEADLINES, read from the log row the script wrote.
+          # `github.event.client_payload.title` (PAYLOAD_TITLE) alone is not
+          # enough: a scheduled run carries no dispatch payload at all, so on
+          # that path the notice names a broken classifier and no event, which
+          # is exactly what the owner received on 2026-10-13. The headline is
+          # the thing they need in order to act by hand, so it rides in the log
+          # row on every trigger type.
+          unjudged = [str(t).strip() for t in
+                      ((last or {}).get("unjudged_titles") or []) if str(t).strip()]
+          if not unjudged and payload_title:
+              unjudged = [payload_title]
+          unjudged_block = ("\n".join("  * %s" % t for t in unjudged[:5])
+                            if unjudged else
+                            "  (the run recorded no headline; open the run log)")
+
+          header = "## Breaking News Monitor"
+          today = os.environ.get("TODAY_NPT", "")
+          if today:
+              header += " — %s NPT" % today
+          lines = [header]
+          if payload_title:
+              lines.append("- Triggered by Cloudflare Worker tripwire: %s" % payload_title)
+
+          if last is None:
+              detail = "no log row available"
+              if err:
+                  detail += " (%s)" % err
+              lines.append("- Outcome: %s" % detail)
+          else:
+              # `ai_failed` IS CHECKED FIRST, BEFORE `sent`. A failed classifier
+              # must be surfaced whether or not something else happened to send:
+              # a broken classifier must never be able to hide behind a
+              # successful send. (2026-10-13 had nothing else sending, so the
+              # order was invisible then; it is the order that is safe in
+              # general.)
+              if ai_failed:
+                  # Named as its own case rather than folded into the generic
+                  # "tripped but NO send" line, because those two mean opposite
+                  # things: below_alert_level is the AI ladder WORKING and
+                  # declining to send, while ai_fail_safe is the ladder itself
+                  # being broken. Printing both with the same words is how a
+                  # broken honesty gate hides inside a healthy-looking log.
+                  outcome = ("HONESTY GATE FAILED — no verdict was produced "
+                             "(%s); nothing was judged" % reason[:160])
+                  if last.get("sent") is True:
+                      outcome += " (something else did send this run)"
+              elif last.get("tripped") is False:
+                  outcome = "silent hour — pre-gate found nothing (heartbeat logged)"
+              elif last.get("sent") is True:
+                  # The reason rides along even on a successful send: with
+                  # ntfy-first, "sent" can mean the fallback carried it while
+                  # ntfy was down, and hiding that here is exactly how a dead
+                  # primary channel would go unnoticed.
+                  outcome = ("🚨 ALERT SENT level=%s confidence=%s event=%s"
+                             " — fired %s") % (
+                      last.get("level", ""), last.get("confidence", ""),
+                      last.get("event_id", ""), _fired_npt)
+                  if last.get("reason") and last.get("reason") != "sent":
+                      outcome += " — %s" % last.get("reason")
+              else:
+                  outcome = "tripped but NO send (level=%s confidence=%s reason=%s)" % (
+                      last.get("level", ""), last.get("confidence", ""),
+                      last.get("reason", "") or "n/a")
+              lines.append("- Outcome: %s" % outcome)
+              lines.append("- Candidates checked: %s" % last.get("checked"))
+              if ai_failed:
+                  lines.append("- Un-judged headline(s): %s"
+                               % ("; ".join(unjudged) if unjudged
+                                  else "not recorded (older run)"))
+
+          # One ntfy notice, on the EXISTING topic and the EXISTING secrets. No
+          # new channel: a broken honesty gate is reported on the same surface
+          # as the alerts it exists to filter.
+          #
+          # NTFY_TOPIC is a publish/subscribe capability. It is referenced BY
+          # NAME and never printed, logged or echoed — only whether a push was
+          # attempted and how the server answered. Same rule as every other ntfy
+          # caller in this repository.
+          if ai_failed:
+              title = ("Breaking honesty gate FAILED — breaking news was not "
+                       "judged this run")
+              lead = ("The AI ladder that decides whether something is genuinely "
+                      "breaking returned no verdict, so this run decided NOTHING. "
+                      "If something is breaking right now it is being missed: "
+                      "detection tripped the gate, the classifier failed, and no "
+                      "verdict was reached. That is a fault, not a quiet news day.")
+              body = "%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). The ladder " \
+                     "is tried across its model list; every attempt failed or " \
+                     "timed out. The classifier output is in this run's log." % (
+                         lead, unjudged_block, reason[:200], last.get("level", ""),
+                         last.get("confidence", ""), last.get("sent"))
+              print("::error::%s %s" % (title, reason[:200]))
+              topic = (os.environ.get("NTFY_TOPIC") or "").strip()
+              server = (os.environ.get("NTFY_SERVER") or "").strip()
+              if not (topic and server.startswith(("http://", "https://"))):
+                  ntfy_note = "ntfy_not_configured"
+                  print("::warning::ntfy secrets unset — the honesty-gate "
+                        "failure is annotation-only; the ::error:: above stands")
+              else:
+                  try:
+                      payload = json.dumps({
+                          "topic": topic, "title": title, "message": body,
+                          "priority": 4, "tags": ["warning"]})
+                      req = urllib.request.Request(
+                          server.rstrip("/") + "/",
+                          data=payload.encode("utf-8"),
+                          headers={"Content-Type": "application/json",
+                                   "Accept": "application/json"})
+                      with urllib.request.urlopen(req, timeout=15) as resp:
+                          resp.read()
+                      ntfy_note = "ntfy:delivered"
+                      print("honesty-gate ntfy notice delivered")
+                  except Exception as exc:
+                      ntfy_note = "ntfy_failed"
+                      print("::warning::honesty-gate ntfy push failed: %s" % exc)
+              lines.append("- Honesty-gate notice: %s" % ntfy_note)
+
+          report = "\n".join(lines)
+          print(report)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY", "")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write(report + "\n")
+          PY

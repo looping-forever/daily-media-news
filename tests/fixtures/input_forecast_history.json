@@ -1,0 +1,11 @@
+{
+  "stories": [
+    {
+      "url_normalized": "api.open-meteo.com/v1/forecast",
+      "title_hash": "2ba2d3c0c67b2d2540d9c748e3ef01d201b4697e",
+      "title": "Weather Forecast Example City (3-day forecast)",
+      "category": "local_city",
+      "date_sent": "2026-08-28"
+    }
+  ]
+}

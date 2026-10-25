@@ -1,0 +1,1435 @@
+name: Digest Prebuild
+
+# PHASE U6 -- build the digest AHEAD of its slot, then hand it over.
+#
+# WHAT THIS FILE IS. Two jobs and one `gh api` call. The Cloudflare Worker
+# dispatches it at 06:40 / 18:40 NPT with `phase: prebuild`; this file
+# dispatches daily-news.yml with that phase, waits for that run, and seals what
+# it produced into the Worker's KV. At 07:20 / 19:20 NPT the Worker's delivery
+# arm finds the artifact already built and pushes it, so the owner's
+# notification is a KV lookup instead of a 20-minute AI pipeline.
+#
+# WHY IT IS DELIBERATELY THIN. The feed sweep, the pre-spend gate, the AI
+# ladder, the personalisation, the render, the Pages deploy and the ntfy
+# payload all already exist, in daily-news.yml. Re-implementing any of them
+# here would create a SECOND copy of a pipeline that must not have two, and
+# drift between two copies is the defect class this repository has been bitten
+# by repeatedly (breaking-monitor's stale "every 5 min" header, the
+# heartbeat-cron row that existed only in wrangler.toml, the 378-row gate
+# vocabulary). Everything this file does is therefore: name the slot, ask
+# daily-news.yml to build it, wait, and seal the result.
+#
+# THE SLOT COMES FROM THE FIRING THAT ASKED FOR IT, NEVER FROM THE WALL CLOCK.
+# GitHub delayed the `0 4,16 * * *` watchdog firing by 3h19m (runs 37146741145
+# and 37227803911). A wall-clock slot turned that into a digest 19 hours early
+# and paged the owner about a slot nobody owed him. Delay moves the JOB; it
+# does not change which firing the job belongs to.
+
+on:
+  # NO `schedule:` HERE, AND THAT IS THE POINT.
+  #
+  # This workflow used to carry four GitHub crons of its own -- `5 1`, `20 1`,
+  # `5 13`, `20 13` UTC, i.e. 06:50/07:05 and 18:50/19:05 NPT. They were
+  # removed because they could not be relied on to fire ON TIME: GitHub-hosted
+  # SCHEDULED runs measured 4.5-7h late across 96 daily-news firings
+  # (2026-08-29..2026-10-12, mean 306.8 min, max 708.3 min), against ~2s for a
+  # workflow_dispatch over 90 runs. See actions/runner#4468.
+  #
+  # The trigger is now the Cloudflare Worker's own minute clock, which
+  # dispatches this workflow at 06:40 / 18:40 NPT (40 min before each slot) --
+  # recorded in deploy/schedule.json under
+  # `dispatcher_crons.digest_prebuild`, and derived by the Worker as
+  # `slot - PREBUILD_LEAD_MINUTES` rather than restated here.
+  #
+  # LEAVING THE FOUR CRONS IN PLACE ADDED A THIRD FIRING PER SLOT INSTEAD OF
+  # REPLACING THE BROKEN ONE, so each slot produced three full digest builds
+  # and three Pages deploys. Worse on a late day: a `5 13` firing delayed ~12h
+  # lands at ~00:53 UTC the next day, `firing_npt_date()` correctly dates it to
+  # the prior day, and it OVERWRITES `digest:artifact:<D>:evening` with a digest
+  # built twelve hours after that slot was already delivered. Nothing catches
+  # that -- the date matches, and the 26h freshness window has not expired.
+  # `concurrency: digest-prebuild` below serialises the runs; it does not
+  # remove them.
+  #
+  # So the schedule and the dispatch are MUTUALLY EXCLUSIVE by construction, and
+  # `tests/workflows/test_digest_prebuild.py` asserts exactly that: one prebuild
+  # firing per slot, counted from the code, with no second source able to add
+  # one. Re-add a cron here and that test goes red.
+  workflow_dispatch:
+    inputs:
+      run_id:
+        # A. THE RUN ID IS THE HAND-OFF, and it arrives as an argument because
+        # `workflow_dispatch` cannot return one to its caller: the API answers
+        # 204 with no body. daily-news.yml's prebuild therefore dispatches this
+        # workflow with its own `github.run_id` as its last step, which is what
+        # removes the watching dispatcher job entirely -- the id used to be
+        # discovered by listing runs before and after a dispatch, from a job
+        # that then had to stay alive (up to 45 minutes) to read the result.
+        description: 'Run id of the daily-news.yml prebuild this seal must read'
+        required: true
+        type: string
+      digest_time:
+        description: 'Which slot to prebuild (the Worker states the slot explicitly)'
+        required: true
+        type: choice
+        options:
+          - morning
+          - evening
+      slot_date:
+        # THE SAME DEFECT CLASS AS daily-news.yml's `slot_date`, FIXED HERE TOO.
+        #
+        # This workflow's slot step used to date a dispatch from the build's own
+        # Nepal date. That is provably wrong half the time HERE, because the
+        # prebuild fires 40 minutes BEFORE the slot it serves: any dispatch that
+        # lands on the other side of Nepal midnight names the wrong day, and the
+        # prebuild then seals a digest under the wrong date.
+        #
+        # Empty is the normal case for a scheduled-origin dispatch, and it is NOT
+        # a fallback to the clock: the derivation below dates an empty input from
+        # the NAMED SLOT'S OWN FIRING (`morning` 07:50 NPT, `evening` 19:20 NPT).
+        description: 'Nepal date YYYY-MM-DD of the slot. Empty derives it from the named slot own firing.'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  # A FIXED group, so two prebuilds for one slot queue instead of running
+  # beside each other. Two concurrent builds for one slot would race on the
+  # same Pages deploy and the same artifact key, and the loser's push would be
+  # whichever finished last.
+  #
+  # This SERIALISES a race; it does not remove one. It was the reason the four
+  # GitHub crons were not harmless alongside the Worker's dispatch -- queued,
+  # they still ran three full digest builds and three Pages deploys per slot,
+  # and on a late day the last one overwrote an already-delivered artifact.
+  # The queue is a second line of defence, not the fix; the fix is the single
+  # firing, asserted by tests/workflows/test_digest_prebuild.py.
+  group: digest-prebuild
+  cancel-in-progress: false
+
+permissions:
+  actions: write   # gh api .../dispatches, and gh run watch
+  contents: read
+
+jobs:
+  seal:
+    # A. THERE IS NO `needs:` HERE ANY MORE, AND THE GATE MOVED INTO THE JOB.
+    # The job that used to dispatch the build is gone: daily-news.yml's prebuild
+    # now hands this workflow its own run id, so nothing upstream can be depended
+    # on to have already failed. The ordering guarantee `needs: dispatch` gave --
+    # a failed build never reaches the seal -- is re-established by the FIRST
+    # STEP below, which reads that run's conclusion and refuses anything that is
+    # not `success`. It is the same check, in the only place left that can make
+    # it, and it cannot be skipped by a job dependency.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # U8 WIDENED THIS TO `write`, AND THAT IS A REAL CHANGE.
+      #
+      # Before U8 this job held `read` on purpose -- "the seal job commits
+      # nothing" -- and tests/workflows/test_digest_prebuild.py pinned that with
+      # a named reason. U8 gives this job the delivery-ledger mirror to commit,
+      # which cannot be done on `read`.
+      #
+      # THE BLAST RADIUS IS ONE FILE, AND IT IS DELIBERATELY THAT NARROW. The
+      # only commit this job makes stages `state/digest_slot_ledger.json` and
+      # nothing else, so a bug in the mirror step can put a record of what the
+      # Worker already did on master. It cannot publish a digest page, cannot
+      # move a state marker, cannot edit a workflow and cannot widen a
+      # permission. It also holds `actions: write` (U7), which is the strictly
+      # larger capability in reach: it can already dispatch any workflow in this
+      # repository.
+      #
+      # WHAT IS STILL NOT GRANTED: anything that could decide a delivery. `write`
+      # on `contents` is the ability to PUSH A FILE, not the ability to invent a
+      # ledger entry, and the mirror step reads its delivery half from KV and
+      # copies it -- so the authority over the punctuality record is unchanged.
+      contents: write
+      # `actions: read` for the cross-run artifact read the fetch step makes:
+      # listing a run's artifacts, downloading one by name, and reading that
+      # run's own job/step list to tell a legitimate no-op from a missing
+      # artifact. All three are Actions API reads, and with only
+      # `contents: read` they 403 and the seal job fails after the conclusion
+      # gate has already passed.
+      #
+      # U7 WIDENED THIS TO `actions: write`, AND THAT IS A REAL CHANGE.
+      # Before U7 this job held `read` on purpose: "a bug in it must not be able
+      # to dispatch anything". Dispatching the supersede — daily-news.yml at
+      # `phase=full`, for a slot whose ledger entry says the push was degraded —
+      # is exactly that capability, so the grant had to widen or the supersede
+      # has no dispatcher. `contents: read` is unchanged and `write` still does
+      # not extend to it.
+      #
+      # The blast radius is therefore one extra API: POST .../dispatches on this
+      # repository, from a job that already holds a token. What it can NOT do is
+      # publish anything by itself — the dispatched run is daily-news.yml, whose
+      # own gates are unchanged, and `trigger_source=supersede` only ever makes
+      # that run LESS likely to stand itself down, never more. A bug here can at
+      # worst push the owner's own digest to the owner early; it cannot publish
+      # to anywhere else and it cannot touch `contents`.
+      #
+      # WHAT IS STILL NOT GRANTED, DELIBERATELY: nothing that could rewrite the
+      # punctuality record. The `?deliver_now=1` probe still cannot write the
+      # ledger, and tests/digest/digest_delivery.test.js pins that structurally
+      # and at run time.
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Confirm the prebuild run succeeded before touching anything
+        # A. THE CONCLUSION IS READ HERE, NOT INHERITED. This step used to take
+        # `needs.dispatch.outputs.conclusion`; with the dispatcher job gone it is
+        # the only conclusion gate in the file, so the artifact step and the
+        # record builder now read ITS outputs instead.
+        #
+        # IT WAITS, BOUNDED, FOR THE HANDING-OFF RUN TO FINISH. daily-news.yml
+        # dispatches this workflow as its own LAST step, so for a few seconds the
+        # run it names is still `in_progress` and has no conclusion at all. An
+        # empty conclusion is never read as success: the poll is bounded, and
+        # exhausting it is a failure, not a pass.
+        #
+        # `built_at` COMES FROM THE SAME CALL and keeps exactly the meaning it
+        # had in the deleted launch step -- the dispatched run's own COMPLETION
+        # instant (`updated_at`), never this job's clock.
+        id: confirm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.inputs.run_id }}
+          REPO: ${{ github.repository }}
+          API: ${{ github.api_url }}
+        run: |
+          set -eo pipefail
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::no run id reached the seal job, so there is nothing to seal. Writing an artifact from an unbuilt digest would hand the Worker's delivery arm a page that does not exist."
+            exit 1
+          fi
+          CONCLUSION=""
+          BUILT_AT=""
+          # NARROWED FROM 20x15s TO 5x6s ON 2026-10-20 (the prebuild blocking
+          # wait). THE FIVE-MINUTE POLL WAS BUYING NOTHING: daily-news.yml
+          # dispatches this workflow only from its hand-off step, which is gated
+          # `if: success() && env.PHASE == 'prebuild'` AND is that job's LAST
+          # step -- so the run named in RUN_ID has ALREADY concluded
+          # successfully before this job is even dialled. The long poll existed
+          # because a dispatcher job used to fire this workflow BEFORE the build
+          # finished; nothing does that any more. What remains is GitHub's own
+          # read eventual-consistency, which is seconds, not minutes. The poll
+          # stays BOUNDED and exhausting it is still a FAILURE, never a pass: a
+          # read that never resolves must not be mistaken for a successful build.
+          for attempt in $(seq 1 5); do
+            META="$(gh api "$API/repos/$REPO/actions/runs/$RUN_ID" \
+              --jq '[.conclusion // "", .updated_at] | @tsv')" || {
+                echo "::warning::attempt $attempt of 5 could not read run $RUN_ID; retrying in 6s."
+                sleep 6
+                continue
+              }
+            CONCLUSION="$(printf '%s' "$META" | cut -f1)"
+            BUILT_AT="$(printf '%s' "$META" | cut -f2)"
+            if [ -n "$CONCLUSION" ]; then break; fi
+            echo "run $RUN_ID has not concluded yet (attempt $attempt of 5); waiting 6s."
+            sleep 6
+          done
+          echo "prebuild run $RUN_ID conclusion: '$CONCLUSION'"
+          if [ -z "$CONCLUSION" ]; then
+            echo "::error::run $RUN_ID was still in progress after 5 reads over about thirty seconds, so this job cannot tell a successful build from a failed one. Nothing is sealed, and the Worker's delivery arm builds the digest at its own cron instead."
+            exit 1
+          fi
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::prebuild run $RUN_ID did not succeed (conclusion '$CONCLUSION'). The seal job refuses to seal an artifact from a failed build -- a half-built digest pushed to the owner is worse than a late one."
+            exit 1
+          fi
+          echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
+          echo "built_at=$BUILT_AT" >> "$GITHUB_OUTPUT"
+
+      - name: Download the prebuild output
+        # A SUCCESSFUL RUN WITH NO ARTIFACT IS A DEFINED SKIP, NOT A FAILURE.
+        #
+        # Observed live, and it is why this step is not
+        # `actions/download-artifact@v4` any more:
+        #
+        #     Artifact not found for name: daily-digest-evening-39129324776
+        #
+        # The seal resolved the dispatched run, the run legitimately no-opped --
+        # nothing to build, so daily-news.yml's `Upload digest artifacts` step
+        # (gated on `always() && env.FALLBACK_NOOP != 'true'`) was SKIPPED and no
+        # artifact was uploaded -- and the action then turned "no artifact" into a
+        # dead job. Correct upstream behaviour made this job red, which is
+        # indistinguishable from a real break and therefore worthless as a signal.
+        #
+        # THE TWO CASES ARE SEPARATED BY A FACT FROM THE API, NOT BY A GUESS. The
+        # dispatched run's own step list is read, and the conclusion of the step
+        # that uploads the artifact decides:
+        #   * `skipped`  -> the no-op path. Nothing was built, so there is nothing
+        #     to seal. A DEFINED SKIP: reported in the log and the job summary, and
+        #     it does NOT fail the job.
+        #   * anything else (`success`, `failure`, or the step is absent from the
+        #     list) -> the upload step claims it ran, so an artifact that is not
+        #     there is a genuine break. FATAL, deliberately. This error class is
+        #     NOT silenced: only the case the API proves to be a no-op is a skip.
+        #
+        # `id: fetch` is the gate the four artifact-consuming steps below use. The
+        # supersede step near the end of this job deliberately does NOT gate on it
+        # -- a skip must still reach the supersede and let it read the ledger --
+        # and tests/workflows/test_digest_prebuild.py pins that difference.
+        id: fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.inputs.run_id }}
+          SLOT: ${{ github.event.inputs.digest_time }}
+          CONCLUSION: ${{ steps.confirm.outputs.conclusion }}
+          REPO: ${{ github.repository }}
+          API: ${{ github.api_url }}
+        run: |
+          set -eo pipefail
+          # The SAME name daily-news.yml uploaded under: `daily-digest-<slot>-<run_id>`,
+          # built from the same two values, so it cannot drift from the uploader.
+          NAME="daily-digest-$SLOT-$RUN_ID"
+          if ! ARTIFACTS="$(gh api "$API/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+              --paginate --jq '.artifacts[].name')"; then
+            echo "::error::could not list the artifacts of daily-news run $RUN_ID. The seal cannot tell a no-op (nothing to build) from a break (something built and lost), and it will not guess between them."
+            exit 1
+          fi
+          if printf '%s\n' "$ARTIFACTS" | grep -qxF "$NAME"; then
+            gh run download "$RUN_ID" --name "$NAME" --dir prebuild
+            echo "skip=0" >> "$GITHUB_OUTPUT"
+            echo "downloaded artifact $NAME from run $RUN_ID"
+            exit 0
+          fi
+
+          # NO ARTIFACT. Only the run's own record can say why, so it is asked.
+          UPLOAD="$(gh api "$API/repos/$REPO/actions/runs/$RUN_ID/jobs" \
+            --jq '[.jobs[].steps[] | select(.name == "Upload digest artifacts") | (.conclusion // "unknown")] | join(",")')"
+          echo "run $RUN_ID uploaded no artifact $NAME; 'Upload digest artifacts' concluded: '$UPLOAD'"
+          if [ "$UPLOAD" = "skipped" ]; then
+            echo "::notice::defined skip: daily-news run $RUN_ID concluded '$CONCLUSION' with no artifact because its 'Upload digest artifacts' step was SKIPPED -- the no-op path, where there was nothing to build. Nothing is sealed for the $SLOT slot, the job stays green, and the supersede step still runs."
+            {
+              echo "### Prebuild sealed nothing: defined skip"
+              echo ""
+              echo "| field | value |"
+              echo "| --- | --- |"
+              echo "| dispatched run | \`$RUN_ID\` |"
+              echo "| run conclusion | \`$CONCLUSION\` |"
+              echo "| \`Upload digest artifacts\` | \`skipped\` |"
+              echo "| artifact \`$NAME\` | not uploaded |"
+              echo ""
+              echo "The dispatched run no-opped, so there was nothing to build and"
+              echo "nothing to seal. This is correct upstream behaviour, not a break."
+              echo "The supersede step still runs, so the slot is not left unreplaced."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::daily-news run $RUN_ID concluded '$CONCLUSION' but has no artifact '$NAME', and its 'Upload digest artifacts' step concluded '$UPLOAD' rather than 'skipped'. A run whose upload step did not skip is supposed to have uploaded one, so the artifact is missing rather than never created -- a real break, and deliberately fatal."
+          exit 1
+
+      - name: Assert the rendered page and build the artifact record
+        # GATED ON THE FETCH, AND ON SUCCESS(). `success()` is repeated rather
+        # than left implicit: writing any `if:` replaces the default
+        # `success()` condition, so omitting it would let this step run after a
+        # genuine failure and read a half-written prebuild/.
+        if: success() && steps.fetch.outputs.skip != '1'
+        # THE MARKUP ASSERTIONS ARE THE ARCHIVE SCRAPERS' MARKUP. The three
+        # literals below are exactly what scripts/render_digest.py's
+        # parse_digest_categories() and first_thumbnail() split on, and
+        # tests/workflows/test_digest_prebuild.py proves that by importing those
+        # two functions and running them against a rendered fixture. They are
+        # asserted here so that renaming one is a RED prebuild at 06:40 instead
+        # of an archive index that silently reports zero categories tomorrow.
+        #
+        # They are PREFIXES, not the full elements, and deliberately: the
+        # renderer emits `<h2 class="section-header" style="--dot:...">` and
+        # `<img class="card-thumb" src=...>`, so an assertion on the bare
+        # `<h2 class="section-header">` would fail on every correctly-rendered
+        # digest -- a false page, which is the worse of the two mistakes.
+        env:
+          SLOT: ${{ github.event.inputs.digest_time }}
+          TODAY: ${{ github.event.inputs.slot_date }}
+          BUILT_AT: ${{ steps.confirm.outputs.built_at }}
+        run: |
+          set -eo pipefail
+          SLOT="$SLOT" TODAY="$TODAY" BUILT_AT="$BUILT_AT" python3 - <<'PY'
+          import datetime, hashlib, json, os, re, sys
+
+          # THE THREE PATHS ARE DERIVED BELOW, once SLOT and TODAY are in hand.
+          # The rendered page's NAME carries both, so its unpack location cannot
+          # be written down here without lying about it.
+
+          # The archive scrapers' markup, verbatim.
+          #
+          # PREFIXES, not whole elements, and deliberately: the renderer emits
+          # `<h2 class="section-header" style="--dot:...">` and
+          # `<img class="card-thumb" src=...>`, so an assertion on the bare
+          # `<h2 class="section-header">` would fail on every
+          # correctly-rendered digest -- a false page, twice a day.
+          SECTION_HEADER = '<h2 class="section-header"'
+          CARD = '<article class="card">'
+          CARD_THUMB = '<img class="card-thumb"'
+          # The two that every rendered digest carries, because every section
+          # that is not hidden emits a header and every story emits a card.
+          REQUIRED_MARKUP = (SECTION_HEADER, CARD)
+          # THE THUMBNAIL IS CONDITIONAL, AND MAKING IT UNCONDITIONAL IS A REAL
+          # DEFECT THAT WAS FOUND HERE BY RUNNING THE FIXTURE. The archive index
+          # reserves its 64px square whether or not an image exists, and
+          # render_digest.py's own comment records that "18 of the 75 shipped
+          # digests carry no <img class='card-thumb'> at all". Asserting it
+          # unconditionally would therefore turn roughly a quarter of all real
+          # prebuilds red for a page the archive index renders perfectly well
+          # without an image. It is asserted exactly when the payload could have
+          # produced one: render_media() emits the img only for a story with a
+          # non-empty image.url.
+          CONDITIONAL_MARKUP = (CARD_THUMB,)
+
+          def die(message):
+              print('::error::%s' % message)
+              sys.exit(1)
+
+          def read_json(path):
+              try:
+                  with open(path, encoding='utf-8') as fh:
+                      return json.load(fh)
+              except (OSError, ValueError) as exc:
+                  die('%s could not be read (%s). The prebuild produced no usable '
+                      'output, so there is nothing to seal.' % (path, exc))
+
+          slot = os.environ['SLOT']
+          today = os.environ['TODAY']
+          built_at = os.environ.get('BUILT_AT', '').strip()
+
+          # WHERE EACH FILE ACTUALLY IS, AND WHY.
+          #
+          # actions/upload-artifact@v4 stores every uploaded file RELATIVE TO
+          # THE LEAST COMMON ANCESTOR of the whole `path:` list. That list now
+          # spans `state/` and `docs/digests/`, so the LCA is the WORKSPACE
+          # ROOT and every file keeps its own directory: the `state/` prefixes
+          # below are therefore CORRECT now, and were wrong before the page was
+          # added to that list -- which is why check 20 in
+          # tests/workflows/test_workflow_lint.py derives both the root and
+          # these consumer paths from the uploader's own list rather than
+          # trusting a literal written here.
+          #
+          # NO CONCRETE UNPACK PATH IS SPELLED OUT IN THIS COMMENT BLOCK, and
+          # that is deliberate rather than stylistic: check 20 finds consumer
+          # paths by scanning this step's TEXT, so a path written only to
+          # illustrate it is indistinguishable from one the code reads, and
+          # naming the pre-fix shape here made the guard report a defect that
+          # does not exist.
+          #
+          # THE PAGE IS THE WEB PAGE, NOT THE EMAIL. `page_url` addresses
+          # `/digests/<date>-<slot>.html` -- the page the owner opens -- so the
+          # file whose markup is asserted, and whose bytes are hashed into
+          # html_sha256, MUST be that same file. `email.html` is the EMAIL
+          # renderer and carries none of the archive scrapers' markup; asserting
+          # against it failed this step on 12 runs out of 12 and no
+          # `digest:artifact:*` key was ever written.
+          PAGE = os.path.join('prebuild', 'docs', 'digests',
+                              '%s-%s.html' % (today, slot))
+          PAYLOAD = 'prebuild/state/ntfy_payload.json'
+          VALIDATED = 'prebuild/state/stories.validated.json'
+
+          html = ''
+          try:
+              with open(PAGE, encoding='utf-8') as fh:
+                  html = fh.read()
+          except OSError as exc:
+              die('%s could not be read (%s); the prebuild uploaded no page. '
+                  'The page the owner will be sent to is the same file this '
+                  'step asserts and hashes, so it is not optional.'
+                  % (PAGE, exc))
+          if not html.strip():
+              die('%s is empty; sealing an empty page would send the owner a page '
+                  'with nothing on it.' % PAGE)
+
+          found = [m for m in REQUIRED_MARKUP if m in html]
+          missing = [m for m in REQUIRED_MARKUP if m not in html]
+          if missing:
+              # WHAT WAS FOUND, NOT WHAT WAS ASKED FOR. This message used to
+              # print REQUIRED_MARKUP under the label "Present", so run
+              # 38244506858 read
+              #   missing: ['<h2 class="section-header"', '<article class="card">']
+              #   Present:  ['<h2 class="section-header"', '<article class="card">']
+              # -- identical lists under contradictory labels, which reads as a
+              # null result rather than "this file has none of them" and sent
+              # the next reader looking for a parser bug. `found` is the
+              # complement of `missing`, so an empty page reports [] honestly.
+              die('the rendered digest is missing the markup the archive index '
+                  'scrapes: %s. Found in %s: %s (%d bytes read). Renaming any '
+                  'of these in scripts/render_digest.py silently empties the '
+                  'archive index, so the prebuild refuses to seal a page that '
+                  'would do it. An empty "Found" list means the file is not a '
+                  'rendered digest page at all.'
+                  % (missing, PAGE, found, len(html)))
+
+          payload = read_json(PAYLOAD)
+          if not isinstance(payload, dict):
+              die('%s is not a JSON object; the ntfy payload is unusable.' % PAYLOAD)
+          title = str(payload.get('title') or '')
+          body = str(payload.get('message') or '')
+          page_url = str(payload.get('click') or '')
+          if not title:
+              die('the ntfy payload carries no title, so the push would have '
+                  'nothing to name the digest by.')
+          if not body.strip():
+              die('the ntfy payload carries an empty message body.')
+          if not page_url.startswith('https://'):
+              die('the ntfy payload click target %r is not an https URL.' % page_url)
+
+          validated = read_json(VALIDATED)
+          if not isinstance(validated, dict):
+              die('%s is not a JSON object.' % VALIDATED)
+          stories = validated.get('stories')
+          count = len(stories) if isinstance(stories, list) else 0
+          if str(validated.get('stories_outcome') or '') == 'empty' or count == 0:
+              die('the prebuild produced %d stories (stories_outcome=%r). An empty '
+                  'digest is the empty-digest retry ladder\'s case, not something '
+                  'to seal and push.' % (count, validated.get('stories_outcome')))
+
+          # The conditional markup, checked against the SAME condition the
+          # renderer uses: render_media() emits the img only for a story with a
+          # non-empty image.url. A payload that could have produced a thumbnail
+          # and did not is a render that silently stopped emitting one, which is
+          # the breakage this assertion exists to catch -- and a payload that
+          # could not has produced a correct page that the archive index renders
+          # with its reserved placeholder.
+          could_render_thumb = any(
+              isinstance(s, dict) and isinstance(s.get('image'), dict)
+              and str((s.get('image') or {}).get('url') or '').strip()
+              for s in (stories or []))
+          if could_render_thumb:
+              absent_conditional = [m for m in CONDITIONAL_MARKUP if m not in html]
+              if absent_conditional:
+                  die('the payload carries %d story image(s) but the rendered '
+                      'digest has none of %s. The archive index reads its '
+                      'thumbnail from exactly that markup, so this is the '
+                      'silent breakage the assertion exists to prevent.'
+                      % (sum(1 for s in (stories or []) if isinstance(s, dict)
+                             and isinstance(s.get('image'), dict)
+                             and str((s.get('image') or {}).get('url') or '').strip()),
+                         absent_conditional))
+          else:
+              print('no story carries an image url, so %s is correctly absent '
+                    'and the conditional markup check does not apply' % (CONDITIONAL_MARKUP,))
+
+          # THE BUILD IS FROM THIS SLOT AND THIS DAY. `phase` and the slot are
+          # derived from the scheduled firing, and these two fields come from the
+          # validator that ran inside the dispatched build, so a mismatch means
+          # the artifact on hand belongs to a different build than the one this
+          # job is about to vouch for.
+          if str(validated.get('digest_time') or '') != slot:
+              die('the prebuild artifact is for digest_time=%r but this run is the '
+                  '%s slot.' % (validated.get('digest_time'), slot))
+          if str(validated.get('date') or '') != today:
+              die('the prebuild artifact is dated %r (NPT) but this run is %r. '
+                  'Sealing it would file yesterday\'s digest under today\'s key.'
+                  % (validated.get('date'), today))
+          generated = str(validated.get('generated_at_npt') or '')
+          if not generated.startswith(today):
+              die('the prebuild artifact was generated at %r, which is not %r. This '
+                  'HTML was inherited from an earlier build, not produced by the '
+                  'run being sealed.' % (generated, today))
+
+          # The page URL must address the file that is actually on hand.
+          expected_tail = '/digests/%s-%s.html' % (today, slot)
+          if not page_url.endswith(expected_tail):
+              die('page_url %r does not end in %r, so the push would send the '
+                  'owner to a page that is not this digest.'
+                  % (page_url, expected_tail))
+
+          # AND THE TWO MUST BE THE SAME NAME, NOT JUST COMPATIBLE ONES. The
+          # markup above was asserted on PAGE and html_sha256 below is the hash
+          # of PAGE, so this step vouches for those bytes. The click target has
+          # to BE those bytes, and the only thing that makes that true rather
+          # than merely plausible is that the two names are one name. Checking
+          # the shared `/digests/<date>-<slot>.html` tail alone would still let
+          # a page filed under a different directory through, and the owner
+          # would be sent to a URL the sealed hash does not describe.
+          if page_url.rsplit('/', 1)[-1] != os.path.basename(PAGE):
+              die('page_url names %r but the page this step asserted and hashed '
+                  'is %r. The sealed hash would describe a file the owner is '
+                  'never sent to, so the artifact would vouch for one digest '
+                  'while the push links another.'
+                  % (page_url.rsplit('/', 1)[-1], os.path.basename(PAGE)))
+
+          # is_partial is a MEASURED fact, not an opinion: a digest built from
+          # anything other than a fully reachable source set carries the
+          # honesty banner, and the Worker's delivery arm labels a partial push
+          # so the reader knows it is one.
+          health = validated.get('source_health')
+          state = str(health.get('state') or '').strip().lower() if isinstance(health, dict) else 'unknown'
+          is_partial = state != 'ok'
+
+          if not built_at:
+              die('built_at was not carried through from the dispatched run, so the '
+                  'artifact would have no usable freshness stamp and the Worker '
+                  'would refuse it as stale_build.')
+          stamp = built_at.strip()
+          try:
+              datetime.datetime.strptime(stamp, '%Y-%m-%dT%H:%M:%SZ')
+          except ValueError:
+              stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+          artifact = {
+              'schema_version': 1,
+              'key': 'digest:artifact:%s:%s' % (today, slot),
+              'date': today,
+              'slot': slot,
+              'built_at': stamp + 'Z' if not stamp.endswith('Z') else stamp,
+              'page_url': page_url,
+              'is_partial': bool(is_partial),
+              'source_health_state': state,
+              'stories': count,
+              'html_sha256': hashlib.sha256(html.encode('utf-8')).hexdigest(),
+              'ntfy': {'title': title, 'body': body},
+          }
+          out = os.path.join('prebuild', 'artifact.json')
+          with open(out, 'w', encoding='utf-8') as fh:
+              json.dump(artifact, fh, ensure_ascii=False)
+          print('artifact: %d stories, source_health=%s, is_partial=%s, built_at=%s'
+                % (count, state, is_partial, artifact['built_at']))
+          print('markup asserted: %s' % (', '.join(REQUIRED_MARKUP),))
+          print('html_sha256: %s' % artifact['html_sha256'])
+          PY
+
+      - name: Verify the digest page is live before sealing
+        # Needs the artifact's own page_url, so it cannot run on a defined skip.
+        if: success() && steps.fetch.outputs.skip != '1'
+        # PROVING THE PAGE IS SERVED, WITH THE STRONG CHECK WHEN IT IS
+        # AVAILABLE AND AN HONEST WEAKER ONE WHEN IT IS NOT.
+        #
+        # `DIGEST_PASSWORD` is the Basic-auth password functions/_middleware.js
+        # protects the archive with. With it, the page is fetched WITH auth and
+        # the assertion is the only one that answers the real question: is this
+        # exact page what the owner's browser will load? A real failure there is
+        # a real defect and goes red.
+        #
+        # The secret almost certainly does not exist yet, and a workflow that
+        # bricks itself waiting on a secret the owner has not added is a
+        # workflow that ships nothing. So when it is absent the check degrades
+        # to three indirect checks, emits `::warning::` naming exactly what was
+        # skipped, and continues.
+        env:
+          DIGEST_PASSWORD: ${{ secrets.DIGEST_PASSWORD }}
+          SLOT: ${{ github.event.inputs.digest_time }}
+          TODAY: ${{ github.event.inputs.slot_date }}
+          CF_PAGES_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          set -eo pipefail
+          PAGE_URL="$(python3 -c "import json;print(json.load(open('prebuild/artifact.json'))['page_url'])")"
+          echo "page under test: $PAGE_URL"
+          BODY_FILE="$RUNNER_TEMP/prebuild_page.html"
+
+          if [ -n "${DIGEST_PASSWORD:-}" ]; then
+            CODE="$(curl -sS -m 20 -u "digest:${DIGEST_PASSWORD}" -o "$BODY_FILE" -w '%{http_code}' "$PAGE_URL")"
+            echo "authenticated GET -> HTTP $CODE"
+            if [ "$CODE" != "200" ]; then
+              echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an AUTHENTICATED request. The archive is not serving the page this artifact points at, so sealing would send the owner to a dead link."
+              exit 1
+            fi
+            if ! grep -q '<h2 class="section-header"' "$BODY_FILE"; then
+              echo "::error::the digest page answered 200 but carries no <h2 class=\"section-header\">. Production is serving something other than the digest that was just built, so the artifact's click target is wrong."
+              exit 1
+            fi
+            echo "page liveness: STRONG check passed (authenticated 200 + archive markup present)"
+            exit 0
+          fi
+
+          echo "::warning::DIGEST_PASSWORD is not set as an Actions secret, so the STRONG page-liveness check (authenticated GET asserting HTTP 200 and the section-header markup) was SKIPPED. Falling back to three indirect checks. To enable the strong check, add DIGEST_PASSWORD to this repository's Actions secrets."
+          problems=""
+          skipped=0
+
+          # (a) PATH AGREEMENT: the artifact's page_url must address the file
+          #     this job actually holds, and that file must be non-empty. It is
+          #     the unpacked WEB PAGE, at the same location the seal step read
+          #     it from. An email here would satisfy this check while describing
+          #     a different page from the one the owner is sent to, which is
+          #     the mismatch that made the sealed hash meaningless.
+          PAGE_FILE="prebuild/docs/digests/$TODAY-$SLOT.html"
+          if [ ! -s "$PAGE_FILE" ]; then
+            problems="$problems; $PAGE_FILE is missing or empty"
+          else
+            echo "(a) path agreement: page_url addresses /digests/$TODAY-$SLOT.html and the staged page is $(wc -c < "$PAGE_FILE") bytes"
+          fi
+
+          # (b) NOT INHERITED: the validated payload inside this artifact was
+          #     generated for TODAY's $SLOT slot (already asserted in the build
+          #     step). Re-read it here so this fallback check stands on its own
+          #     and not only on a step the operator may not have read.
+          CUTOFF="$(python3 -c "import json;print(json.load(open('prebuild/state/stories.validated.json')).get('generated_at_npt',''))")"
+          case "$CUTOFF" in
+            "$TODAY"*) echo "(b) not inherited: the digest in this artifact was generated at '$CUTOFF' (NPT), today" ;;
+            *) problems="$problems; the artifact's digest was generated at '$CUTOFF', not on $TODAY" ;;
+          esac
+
+          # (c) PRODUCTION IDENTITY: the newest production deployment of the
+          #     Pages project, read from the Cloudflare API. This answers "is a
+          #     production deployment actually current and healthy", which is the
+          #     question the authenticated GET was standing in for.
+          if [ -z "${CF_PAGES_API_TOKEN:-}" ] || [ -z "${CF_ACCOUNT_ID:-}" ]; then
+            # A WARNING, not a failure, and the count below is what decides.
+            # CF_PAGES_API_TOKEN and CF_ACCOUNT_ID already exist for the deploy
+            # in daily-news.yml, but a seal job that refuses to run because a
+            # credential is missing ships nothing, and the two checks that DID
+            # run are real evidence. So this is recorded as skipped, and the
+            # "at least two of three" rule below turns a wholesale loss of
+            # evidence into a failure.
+            skipped=$((skipped + 1))
+            echo "::warning::(c) production deployment identity: SKIPPED (CF_PAGES_API_TOKEN / CF_ACCOUNT_ID unset)"
+          else
+            DEPLOY_FILE="$RUNNER_TEMP/prebuild_deploy.json"
+            DCODE="$(curl -sS -m 20 -o "$DEPLOY_FILE" -w '%{http_code}' \
+              -H "Authorization: Bearer $CF_PAGES_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/daily-digest/deployments?env=production&per_page=1")"
+            if [ "$DCODE" != "200" ]; then
+              skipped=$((skipped + 1))
+              problems="$problems; the Cloudflare Pages deployment list answered HTTP $DCODE"
+            else
+              # The path goes in through the ENVIRONMENT, never interpolated into
+              # the Python source. A path containing a backslash becomes a `\U`
+              # escape inside a string literal and the read dies with a
+              # UnicodeDecodeError that reads like a corrupt file rather than a
+              # quoting mistake -- and $RUNNER_TEMP is a Windows path on a
+              # self-hosted runner.
+              DEPLOY_ID="$(DEPLOY_FILE="$DEPLOY_FILE" python3 -c "import json,os;d=json.load(open(os.environ['DEPLOY_FILE'])).get('result') or [{}];print(d[0].get('id',''))")"
+              DEPLOY_WHEN="$(DEPLOY_FILE="$DEPLOY_FILE" python3 -c "import json,os;d=json.load(open(os.environ['DEPLOY_FILE'])).get('result') or [{}];print(d[0].get('created_on',''))")"
+              if [ -z "$DEPLOY_ID" ]; then
+                problems="$problems; the Pages project reports no production deployment at all"
+              else
+                echo "(c) production deployment identity: newest production deployment $DEPLOY_ID created $DEPLOY_WHEN"
+              fi
+            fi
+          fi
+
+          # AT LEAST TWO OF THE THREE MUST ACTUALLY HAVE RUN. This is what keeps
+          # a blank from reading like good news: a fallback in which almost
+          # every check was skipped has measured nothing, and reporting that as
+          # "the page is live" is exactly the failure this whole step exists to
+          # prevent. One skipped check is tolerated and named; two is not.
+          if [ "$skipped" -ge 2 ]; then
+            problems="$problems; only $((3 - skipped)) of the 3 indirect checks could run, so the page was not meaningfully measured at all"
+          fi
+
+          if [ -n "$problems" ]; then
+            echo "::error::the digest page could not be proven live, and the strong check that would prove it was unavailable.$problems"
+            exit 1
+          fi
+          echo "page liveness: FALLBACK check passed ($((3 - skipped))/3 indirect checks ran). Weaker than an authenticated GET -- see the ::warning:: above."
+
+      - name: Seal the artifact into the Worker
+        # Seals prebuild/artifact.json. On a defined skip there is no record to
+        # seal, and sealing nothing must not look like sealing something.
+        if: success() && steps.fetch.outputs.skip != '1'
+        # ONE POST, to ONE host. The Worker origin is derived from
+        # deploy/schedule.json's health_url -- the same committed string the
+        # watchdog arm polls -- so there is exactly one place to correct a
+        # subdomain. The secret is passed by NAME in the header contract and by
+        # value from the environment; its value is never printed, never written
+        # to a file, and never reaches the log.
+        #
+        # A non-2xx is fatal. An unsealed artifact is the honest state for a
+        # prebuild that could not hand over, and the Worker's delivery arm then
+        # falls back to building the digest at its own cron -- which is what
+        # "partial-then-full" means.
+        env:
+          DIGEST_INGEST_TOKEN: ${{ secrets.DIGEST_INGEST_TOKEN }}
+        run: |
+          set -eo pipefail
+          HEALTH_URL="$(jq -r '.health_url // empty' deploy/schedule.json)"
+          if [ -z "$HEALTH_URL" ]; then
+            echo "::error::deploy/schedule.json carries no health_url, so the Worker origin cannot be derived and the artifact cannot be sealed. Refusing to guess a hostname."
+            exit 1
+          fi
+          INGEST_URL="$(python3 -c "
+          import sys
+          from urllib.parse import urlsplit, urlunsplit
+          parts = urlsplit(sys.argv[1])
+          print(urlunsplit((parts.scheme, parts.netloc, '/', 'ingest=1', '')))
+          " "$HEALTH_URL")"
+          echo "sealing to $INGEST_URL"
+
+          if [ -z "${DIGEST_INGEST_TOKEN:-}" ]; then
+            echo "::error::DIGEST_INGEST_TOKEN is not set, so the ingest would be refused by the Worker anyway. Nothing has been sealed. Create the Worker secret with: wrangler secret put DIGEST_INGEST_TOKEN -c deploy/wrangler.toml"
+            exit 1
+          fi
+
+          CODE="$(curl -sS -m 30 -o "$RUNNER_TEMP/seal_response.json" -w '%{http_code}' \
+            -X POST \
+            -H "X-Ingest-Token: $DIGEST_INGEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @prebuild/artifact.json \
+            "$INGEST_URL")"
+          echo "ingest -> HTTP $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::the Worker refused the artifact (HTTP $CODE). The response body below is the Worker's own reason."
+            cat "$RUNNER_TEMP/seal_response.json" || true
+            echo ""
+            echo "::error::nothing was sealed for this slot, so the delivery arm will build the digest at its own cron instead. This is the partial-then-full path working, not a silent success."
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/seal_response.json"
+          echo ""
+          echo "artifact sealed: the slot's push is now a lookup, not a build"
+
+      - name: Mirror the delivery ledger into git
+        # Reads the build half (built_at, story_count, source_health_state) out
+        # of prebuild/artifact.json and fails on an unreadable record, so it is
+        # gated on the fetch too. The delivery half still reaches the mirror on
+        # the next seal; the mirror is explicitly a lagging record.
+        if: success() && steps.fetch.outputs.skip != '1'
+        # U8. THE GIT MIRROR OF `digest:ledger`, AND THE DIRECTION OF TRUTH.
+        #
+        # WHY THIS EXISTS. `state/last_digest_sent.json` is ONE slot and is
+        # overwritten by the next digest run, so by the evening the morning slot
+        # is gone from it whether or not it was ever delivered. That is the
+        # whole reason `digest-watchdog.yml` could only ever PRINT that a
+        # displaced firing was unjudged. This file keeps the last 7 NPT days x
+        # 2 slots in committed state, so a slot stays answerable after the next
+        # run has overwritten the marker.
+        #
+        # DIRECTION OF TRUTH. STATED HERE BECAUSE A READER WHO FINDS THIS FILE
+        # LATER WILL NOT SEE THE COMMENT ANYWHERE ELSE:
+        #   * KV IS AUTHORITATIVE FOR DELIVERY. Whether a push happened is a
+        #     fact about the Worker, and only the Worker witnessed it. Git
+        #     never decides it. Every delivery field below is COPIED from the
+        #     KV ledger this step just read, and a key that exists in both is
+        #     taken from KV -- a collision is resolved in KV's favour, never
+        #     this step's.
+        #   * GIT IS AUTHORITATIVE FOR BUILD. `built_at`, `story_count` and
+        #     `source_health_state` describe the run that BUILT the digest, and
+        #     this job dispatched that run and holds its artifact record. No
+        #     other party can state them truthfully.
+        # THE TWO HALVES NEVER OVERWRITE EACH OTHER, and that is enforced by
+        # the merge below rather than by convention.
+        #
+        # NEVER HAND-MERGED. The delivery half is `days` lifted verbatim out of
+        # the KV payload; nothing here reconstructs, repairs or re-derives a
+        # delivery fact. If KV cannot be read the step writes NOTHING, because
+        # the only alternative to copying KV is inventing it.
+        #
+        # LAG, AND IT IS NOT SMALL. This runs at 06:40/18:40 NPT, BEFORE the
+        # 07:20/19:20 delivery, so the mirror it commits cannot contain the
+        # push that is still minutes away -- and the previous seal is up to ~12h
+        # old. Any rendered line that reads this file is therefore describing
+        # the ledger as of the PREVIOUS seal. That is why such a line must never
+        # claim to describe today.
+        #
+        # AN UNREADABLE KV IS A WARNING, NOT A FAILURE. This job has already
+        # done its real work -- the artifact is sealed by the previous step --
+        # and the watchdog treats an absent or stale mirror as "cannot judge",
+        # never as "did not happen". Refusing to fail here would turn a Cloudflare
+        # bad minute into a red seal job and a red prebuild for a file that only
+        # records what already happened.
+        id: mirror
+        env:
+          CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          SLOT: ${{ github.event.inputs.digest_time }}
+          TODAY: ${{ github.event.inputs.slot_date }}
+          ARTIFACT_PATH: prebuild/artifact.json
+        run: |
+          set -eo pipefail
+          SLOT="$SLOT" TODAY="$TODAY" ARTIFACT_PATH="$ARTIFACT_PATH" \
+          CF_LEDGER_TOKEN="$CF_LEDGER_TOKEN" CF_ACCOUNT_ID="$CF_ACCOUNT_ID" \
+          python3 - <<'PY'
+          import datetime, json, os, re, urllib.request
+
+          # The Worker's own DIGEST_LEDGER_KEY, and its DELIVERY_RETENTION_DAYS.
+          LEDGER_KEY = 'digest:ledger'
+          KV_API = 'https://api.cloudflare.com/client/v4'
+          WRANGLER = 'deploy/wrangler.toml'
+          RETENTION_DAYS = 7
+          MIRROR = 'state/digest_slot_ledger.json'
+
+          slot = os.environ['SLOT']
+          today = os.environ['TODAY']
+          token = os.environ.get('CF_LEDGER_TOKEN', '').strip()
+          account = os.environ.get('CF_ACCOUNT_ID', '').strip()
+
+          def note(text):
+              print(text)
+              summary = os.environ.get('GITHUB_STEP_SUMMARY', '')
+              if summary:
+                  with open(summary, 'a', encoding='utf-8') as fh:
+                      fh.write('- %s\n' % text)
+
+          # -- 1. THE BUILD HALF. Git is the only witness to this. ---------
+          # Read BEFORE the KV read on purpose: a mirror with no build half is
+          # still a faithful copy of KV, whereas a mirror with an invented
+          # build half is a lie in a file whose entire purpose is not to be
+          # one. If the artifact record is unreadable, this step fails.
+          try:
+              with open(os.environ['ARTIFACT_PATH'], encoding='utf-8') as fh:
+                  artifact = json.load(fh)
+          except (OSError, ValueError) as exc:
+              print('::error::the sealed artifact record could not be read (%s), so '
+                    'the BUILD half of the mirror cannot be written. built_at, '
+                    'story_count and source_health_state are facts about the run '
+                    'that built this digest, and this job is the only party that '
+                    'witnessed it -- inventing them here is the single thing this '
+                    'mirror must never do.' % exc)
+              raise SystemExit(1)
+          if not isinstance(artifact, dict):
+              print('::error::the sealed artifact record is not a JSON object, so the '
+                    'mirror cannot carry this build truthfully.')
+              raise SystemExit(1)
+          built_at = str(artifact.get('built_at') or '').strip()
+          if not built_at:
+              print('::error::the sealed artifact record carries no built_at, so the '
+                    'mirror would record a build it cannot time. The build step '
+                    'already refuses to seal without one.')
+              raise SystemExit(1)
+          try:
+              story_count = int(artifact.get('stories'))
+          except (TypeError, ValueError):
+              print('::error::the sealed artifact record carries a non-numeric '
+                    'stories count (%r), so the mirror cannot record what was built.'
+                    % artifact.get('stories'))
+              raise SystemExit(1)
+          build_half = {
+              'built_at': built_at,
+              'story_count': story_count,
+              'source_health_state': str(artifact.get('source_health_state') or 'unknown'),
+          }
+
+          # -- 2. THE DELIVERY HALF. Copied, never reconstructed. ----------
+          def kv_namespace():
+              try:
+                  with open(WRANGLER, encoding='utf-8-sig') as fh:
+                      text = fh.read()
+              except OSError:
+                  return ''
+              match = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
+                                text, re.S)
+              return match.group(1) if match else ''
+
+          kv_raw = ''
+          if not (token and account):
+              print('::warning::CF_PAGES_API_TOKEN / CF_ACCOUNT_ID unset, so the KV '
+                    'delivery ledger was not read and NO mirror is written. Git is '
+                    'never allowed to stand in for a delivery fact it did not witness.')
+          elif not kv_namespace():
+              print('::warning::no KV namespace id in %s, so the KV delivery ledger '
+                    'was not read and NO mirror is written.' % WRANGLER)
+          else:
+              url = ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
+                     % (KV_API, account, kv_namespace(), LEDGER_KEY))
+              request = urllib.request.Request(
+                  url, headers={'Authorization': 'Bearer ' + token,
+                                'Accept': 'text/plain'})
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      kv_raw = response.read().decode('utf-8', errors='replace')
+              except Exception as exc:
+                  print('::warning::the KV delivery ledger could not be read '
+                        '(%s: %s), so NO mirror is written. The watchdog will report '
+                        'the displaced slot as UNJUDGED rather than as missed, which '
+                        'is the honest answer and the safe one.'
+                        % (exc.__class__.__name__, exc))
+
+          ledger = {}
+          kv_read = False
+          if kv_raw.strip():
+              try:
+                  parsed = json.loads(kv_raw)
+              except ValueError as exc:
+                  print('::warning::the KV delivery ledger is not JSON (%s), so NO '
+                        'mirror is written rather than a guessed one.' % exc)
+              else:
+                  if isinstance(parsed, dict):
+                      ledger = parsed
+                      kv_read = True
+                  else:
+                      print('::warning::the KV delivery ledger is a %s, not an '
+                            'object, so NO mirror is written.'
+                            % type(parsed).__name__)
+
+          # THE GATE IS HERE, BEFORE ANY WRITE, AND IT IS THE WHOLE POINT.
+          # Everything above only ever failed by NOT KNOWING something. What
+          # this step must never do is turn that ignorance into a record: an
+          # entry written from an unreadable KV would carry a build half and no
+          # delivery half, and an entry with no `ntfy_sent_at` reads as MISSED
+          # to every consumer -- including the watchdog, which would then judge
+          # a slot on evidence that does not exist. So the file is not created
+          # at all unless KV was actually read AND parsed.
+          #
+          # `kv_read` rather than `kv_raw.strip()`, and that distinction is the
+          # whole reason this is not one line: a 200 response carrying
+          # "{not json" IS non-empty and IS unreadable, and a mirror written
+          # from it would be empty-but-plausible -- the most dangerous shape
+          # this file could take. (tests/digest/test_slot_ledger_mirror.py
+          # covers both the empty-body and the malformed-body case.)
+          if not kv_read:
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  fh.write('written=false\n')
+              note('delivery ledger mirror NOT written: KV was unreadable, and git '
+                   'does not get to decide whether a push happened')
+              raise SystemExit(0)
+          days = ledger.get('days')
+          if not isinstance(days, dict):
+              days = {}
+
+          # -- 3. THE MERGE, AND WHERE KV WINS. ---------------------------
+          # Only the BUILD keys are added, and only where they do not already
+          # exist: `days[today][slot]` is KV's entry, so a key KV already set
+          # is left exactly as KV wrote it. That is the "KV wins" rule made
+          # mechanical -- there is no branch in which this step overwrites a
+          # delivery fact, because it never writes one.
+          day = days.setdefault(today, {})
+          if not isinstance(day, dict):
+              day = {}
+              days[today] = day
+          entry = day.get(slot)
+          entry = dict(entry) if isinstance(entry, dict) else {}
+          for key, value in build_half.items():
+              if key not in entry:
+                  entry[key] = value
+          day[slot] = entry
+
+          # -- 4. THE SAME PRUNE THE WORKER APPLIES. -----------------------
+          # A mirror that kept more days than KV would resurrect history the
+          # Worker has deliberately dropped, and the two files would then
+          # disagree about the window itself rather than about a delivery.
+          cutoff = (datetime.date.fromisoformat(today)
+                    - datetime.timedelta(days=RETENTION_DAYS - 1)).isoformat()
+          for key in [k for k in days if str(k) < cutoff]:
+              del days[key]
+
+          # `as_of` is WHEN THIS MIRROR REFLECTS THE LEDGER -- the instant it
+          # was read, not the instant KV last happened to be written. It is the
+          # freshness signal the watchdog uses to tell "this slot was not
+          # delivered" apart from "this mirror predates that slot".
+          as_of = (datetime.datetime.now(datetime.timezone.utc)
+                   .replace(microsecond=0).isoformat().replace('+00:00', 'Z'))
+          mirror_doc = {
+              'schema_version': 1,
+              'as_of': as_of,
+              'days': days,
+          }
+          with open(os.environ.get('MIRROR_OUT') or MIRROR, 'w', encoding='utf-8') as fh:
+              json.dump(mirror_doc, fh, indent=2, ensure_ascii=False, sort_keys=True)
+              fh.write('\n')
+
+          def emit(**kw):
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  for k, v in kw.items():
+                      fh.write('%s=%s\n' % (k, v))
+
+          written = True
+          emit(written='true', as_of=as_of,
+               slots=str(sum(len(v) for v in days.values() if isinstance(v, dict))))
+          note('delivery ledger mirror written: %d day(s), as_of=%s, build=%s'
+               % (len(days), as_of, json.dumps(build_half)))
+          print('mirror: KV delivery half copied verbatim for %d day(s); build half '
+                'added for %s %s' % (len(days), today, slot))
+          PY
+
+      - name: Commit the delivery ledger mirror
+        # Scoped to the ONE file. This job holds `contents: write` for exactly
+        # this, and the narrowest commit that satisfies it is the whole safety
+        # argument: a bug in the mirror step can put one record file on master
+        # and cannot stage a digest page, a workflow, or a state marker.
+        if: steps.mirror.outputs.written == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # DEFECT 2, same as every other committing step here: the checkout
+          # persists no credentials, so the token is injected for the network
+          # commands only, via `git -c`.
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          git add state/digest_slot_ledger.json
+          if git diff --staged --quiet; then
+            echo "the delivery ledger mirror is unchanged -- nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: mirror the digest delivery ledger [skip ci]"
+          if ! git "${auth[@]}" pull --ff-only origin master; then
+            git "${auth[@]}" pull --rebase -X theirs origin master || \
+              echo "Fast-forward and rebase both failed - proceeding without pulling"
+          fi
+          git "${auth[@]}" push
+
+      - name: Supersede a degraded push with the full digest
+        # REPAIRING A PUSH THAT REACHED THE OWNER BUT WAS NOT A DIGEST.
+        #
+        # A slot whose ledger entry reads `partial`, `fallback_last_good` or
+        # `unavailable` has had something pushed — a banner over half the
+        # stories, yesterday's news labelled as today's, or a "digest
+        # unavailable" notice. All three carry `ntfy_sent_at`, which is exactly
+        # why every duplicate guard in the delivery path treats them as
+        # delivered and why nothing has repaired them: the owner keeps whatever
+        # they got, for the rest of the day.
+        #
+        # NO ORDINARY TRIGGER, AND THAT IS A REAL CHANGE, NOT AN OVERSIGHT.
+        #
+        # This used to describe the 07:05 RETRY prebuild as the only ordinary
+        # moment this step fires: the 06:50 primary built from a degraded source
+        # set and sealed a `partial`, the 07:20 delivery pushed it, and the
+        # retry queued behind the primary, finished its own build after the
+        # delivery, and found a partial push beside a complete artifact. That
+        # path is GONE -- `20 1` / `20 13` UTC were two of the four GitHub
+        # crons STEP 2 deleted, and the prebuild is now dispatched exactly once
+        # per slot by the Worker at 06:40 / 18:40 NPT.
+        #
+        # SO THE REMAINING WAYS IN ARE EXPLICIT AND WORTH NAMING, because a step
+        # nobody can reach is a step nobody believes is load-bearing:
+        #   * a MANUAL `workflow_dispatch` naming its slot, dispatched late
+        #     enough that its build lands after the slot was delivered degraded;
+        #   * the superseded prebuild's own re-run, if the owner dispatches it
+        #     again to repair a push.
+        #
+        # The consequence is stated rather than hidden: with one prebuild per
+        # slot, a slot whose ONLY prebuild sealed a degraded artifact is now
+        # repaired by the digest cron's own fallback ladder and by this step
+        # when it is dispatched, and not automatically by a second prebuild.
+        # One firing per slot was worth more than the retry -- see the
+        # one-firing-per-slot argument in the `on:` block -- but the trade is
+        # real and a later reader must not have to rediscover it.
+        #
+        # IT DISPATCHES, IT DOES NOT PUSH. daily-news.yml at `phase=full` runs
+        # its own unmodified ntfy step; nothing here builds a payload, and
+        # `trigger_source=supersede` is what tells `Fallback no-op check` that
+        # this run must not be stood down by the very record it exists to
+        # replace (proved in tests/digest/test_ladder_trigger.py).
+        #
+        # WHY THE LEDGER IS WRITTEN FROM HERE AND NOWHERE ELSE.
+        # `digest:ledger` has one writer today: the Worker's cron arm, which
+        # injects the writer as a parameter so no fetch path can reach it. The
+        # build-side ingest endpoint is deliberately ledger-free — giving it
+        # ledger access "would put the punctuality record one crafted request
+        # away from being rewritten" — and the JS suite pins that structurally,
+        # so widening it is not available. This job is the only party that knows
+        # "I dispatched the supersede", so it records that, and nothing else:
+        # both fields written are facts about this step.
+        #
+        # TWO WRITES, IN THIS ORDER, AND THE ORDER IS THE POINT.
+        #   1. `full_artifact_available_at` — written BEFORE the dispatch, and
+        #      it is TRUE before it: the artifact was sealed by the previous
+        #      step and the slot's push is already degraded. It is the loop latch,
+        #      and it is worded exactly as the fact it is.
+        #   2. `ntfy_full_sent_at` — written only AFTER the dispatch has been
+        #      accepted, because it claims a push left this job and that has to
+        #      have happened.
+        # Writing `ntfy_full_sent_at` first would put a claim of delivery into
+        # the punctuality ledger before anything was dispatched, which is the
+        # one thing this ledger is not allowed to do.
+        #
+        # THE WRITE IS A READ-MODIFY-WRITE AND IT RACES THE WORKER'S OWN WRITES.
+        # Stated rather than hidden: the worst it can cost is a lost update on
+        # the recovery path, which the delivery guarantee already permits
+        # (AT-LEAST-ONCE, possible duplicate). It cannot fabricate a send.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          SLOT: ${{ github.event.inputs.digest_time }}
+          TODAY: ${{ github.event.inputs.slot_date }}
+          ARTIFACT_PATH: prebuild/artifact.json
+          SUPERSEDE_DECISION_FILE: ${{ runner.temp }}/supersede_decision
+          SUPERSEDE_PATCH_FILE: ${{ runner.temp }}/supersede_patch.json
+          REPO: ${{ github.repository }}
+          API: ${{ github.api_url }}
+        run: |
+          set -eo pipefail
+          SLOT="$SLOT" TODAY="$TODAY" ARTIFACT_PATH="$ARTIFACT_PATH" \
+          SUPERSEDE_DECISION_FILE="$SUPERSEDE_DECISION_FILE" \
+          SUPERSEDE_PATCH_FILE="$SUPERSEDE_PATCH_FILE" \
+          CF_LEDGER_TOKEN="$CF_LEDGER_TOKEN" CF_ACCOUNT_ID="$CF_ACCOUNT_ID" \
+          python3 - <<'PY'
+          import datetime, json, os, re, sys, urllib.request
+
+          # The Worker's own DIGEST_LEDGER_KEY.
+          # tests/digest/test_supersede_push.py pins this literal against that
+          # constant, because a second copy is a second place to correct and a
+          # wrong one reads an absent key and never fires.
+          LEDGER_KEY = 'digest:ledger'
+          KV_API = 'https://api.cloudflare.com/client/v4'
+          WRANGLER = 'deploy/wrangler.toml'
+          # Mirrors DELIVERY_RETENTION_DAYS in deploy/cloudflare-worker.js. The
+          # write below re-reads the whole ledger, so it must apply the same
+          # prune the Worker applies or a rewrite here would resurrect days the
+          # Worker has already dropped.
+          RETENTION_DAYS = 7
+          # The three pushes that reached the owner and were not a digest.
+          # `delivered` and `duplicate_suppressed` are deliberately absent: the
+          # first is what a healthy slot looks like and the second is a second
+          # attempt at one, and superseding either is a duplicate push.
+          SUPERSEDED_KINDS = ('partial', 'fallback_last_good', 'unavailable')
+
+          slot = os.environ['SLOT']
+          today = os.environ['TODAY']
+          token = os.environ.get('CF_LEDGER_TOKEN', '').strip()
+          account = os.environ.get('CF_ACCOUNT_ID', '').strip()
+          decision_file = os.environ['SUPERSEDE_DECISION_FILE']
+
+          def full_sequence_id(date, slot_name):
+              """The supersede's own id — the primary id plus `-full`.
+
+              Every duplicate guard in the delivery path is keyed on
+              `sequence_id`, so a re-used id is exactly what they suppress. This
+              mirrors `digestFullSequenceId` in deploy/cloudflare-worker.js, and
+              the two are pinned against each other by the test suite rather
+              than left agreeing by luck.
+              """
+              return 'dmn-%s-%s-full' % (date, slot_name)
+
+          def decide(decision, reason):
+              with open(decision_file, 'w', encoding='utf-8') as fh:
+                  fh.write(decision)
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                  fh.write('supersede=%s\n' % decision)
+                  fh.write('supersede_reason=%s\n' % reason)
+              print('supersede decision for %s %s: %s (%s)'
+                    % (slot, today, decision, reason))
+
+          def skip(reason):
+              """Every way of NOT superseding. Green, and it stops here.
+
+              A `skip` is not a warning. The artifact is already sealed by the
+              time this runs; a step that fails because there was nothing to
+              repair would report a digest that was not lost.
+              """
+              decide('skip', reason)
+              raise SystemExit(0)
+
+          def die(message):
+              print('::error::%s' % message)
+              raise SystemExit(1)
+
+          def kv_namespace():
+              """The KV namespace id, from the config `wrangler deploy` binds."""
+              try:
+                  with open(WRANGLER, encoding='utf-8-sig') as fh:
+                      text = fh.read()
+              except OSError as exc:
+                  print('cannot read %s (%s) — no supersede this slot'
+                        % (WRANGLER, exc))
+                  return ''
+              match = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
+                                text, re.S)
+              return match.group(1) if match else ''
+
+          def kv_url(namespace):
+              return ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
+                      % (KV_API, account, namespace, LEDGER_KEY))
+
+          def read_ledger(namespace):
+              request = urllib.request.Request(
+                  kv_url(namespace),
+                  headers={'Authorization': 'Bearer ' + token,
+                           'Accept': 'text/plain'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return response.read().decode('utf-8', errors='replace')
+
+          def merge_and_write(ledger, patch, namespace):
+              """Merge into the slot entry and PUT the whole ledger back.
+
+              MERGE, NEVER REPLACE: the punctuality fields this step has no
+              opinion about (`ntfy_sent_at`, `first_ntfy_sent_at`, `last_good`)
+              survive the write, and the same retention prune the Worker applies
+              is applied here so a rewrite cannot resurrect dropped days.
+              """
+              import datetime as _dt
+              day = ledger.setdefault('days', {}).setdefault(today, {})
+              day[slot] = dict(day.get(slot) or {}, **patch)
+              cutoff = (_dt.date.fromisoformat(today)
+                        - _dt.timedelta(days=RETENTION_DAYS - 1)).isoformat()
+              for key in list(ledger.get('days') or {}):
+                  if str(key) < cutoff:
+                      del ledger['days'][key]
+              ledger['schema_version'] = 1
+              ledger['as_of'] = patch.get('ntfy_full_sent_at') or patch.get(
+                  'full_artifact_available_at')
+              ledger['pruned_before'] = cutoff
+              request = urllib.request.Request(
+                  kv_url(namespace),
+                  data=json.dumps(ledger, ensure_ascii=False).encode('utf-8'),
+                  headers={'Authorization': 'Bearer ' + token,
+                           'Content-Type': 'application/json',
+                           'Accept': 'text/plain'},
+                  method='PUT')
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return response.status
+
+          now = (datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+                 .isoformat().replace('+00:00', 'Z'))
+
+          # ---- 1. IS THERE A COMPLETE ARTIFACT TO SEND? -------------------
+          try:
+              with open(os.environ['ARTIFACT_PATH'], encoding='utf-8') as fh:
+                  artifact = json.load(fh)
+          except (OSError, ValueError) as exc:
+              skip('the sealed artifact is unreadable (%s)' % exc)
+          if not isinstance(artifact, dict):
+              skip('the sealed artifact is not a JSON object')
+          # The artifact on hand IS what the dispatched run would send. If it is
+          # partial too there is no complete digest to replace the partial push
+          # with, and dispatching would re-run the whole pipeline to deliver the
+          # same degraded news a second time.
+          if artifact.get('is_partial') is True:
+              skip('the sealed artifact is itself partial — nothing complete to '
+                   'supersede with')
+          if (str(artifact.get('date') or '') != today
+                  or str(artifact.get('slot') or '') != slot):
+              skip('the sealed artifact is filed under a different date/slot than '
+                   'this run')
+
+          # ---- 2. THE LEDGER ------------------------------------------------
+          if not token or not account:
+              skip('CF_PAGES_API_TOKEN / CF_ACCOUNT_ID unset — the ledger was not read')
+          namespace = kv_namespace()
+          if not namespace:
+              skip('no KV namespace id in deploy/wrangler.toml — the ledger was not read')
+          try:
+              raw = read_ledger(namespace)
+          except Exception as exc:
+              skip('the delivery ledger could not be read (%s: %s)'
+                   % (exc.__class__.__name__, exc))
+          try:
+              ledger = json.loads(raw) if raw else {}
+          except ValueError as exc:
+              skip('the delivery ledger is not JSON (%s)' % exc)
+          if not isinstance(ledger, dict):
+              skip('the delivery ledger is not a JSON object')
+          days = ledger.get('days')
+          day = days.get(today) if isinstance(days, dict) else None
+          entry = day.get(slot) if isinstance(day, dict) else None
+          if not isinstance(entry, dict):
+              skip('the ledger records no delivery for this slot, so there is no '
+                   'degraded push to supersede')
+
+          # ---- 3. THE THREE GUARDS, IN ORDER -------------------------------
+          # THE LOOP LATCH FIRST. The seal job runs twice a day per slot (a
+          # primary prebuild and a retry) and both can observe the same degraded
+          # entry, so without a latch the owner gets the full digest twice.
+          if entry.get('full_artifact_available_at'):
+              skip('full_artifact_available_at is already set for this slot (%s) — '
+                   'the supersede has already been dispatched'
+                   % entry.get('full_artifact_available_at'))
+          # THE `kind` TERM. Only the three pushes the owner cannot read are
+          # eligible; anything else here would be a duplicate.
+          if str(entry.get('kind') or '') not in SUPERSEDED_KINDS:
+              skip('the slot was pushed as %r, which is not a degraded push'
+                   % entry.get('kind'))
+          # `ntfy_full_sent_at`, AND NOT `ntfy_sent_at`. Every degraded kind sets
+          # `ntfy_sent_at` — a push happened — so guarding on it would make the
+          # supersede unreachable on exactly the slots it was written for. This
+          # field answers the different question: has the FULL digest already
+          # been dispatched for this slot?
+          if entry.get('ntfy_full_sent_at'):
+              skip('ntfy_full_sent_at is already set for this slot (%s) — the full '
+                   'digest has already been dispatched'
+                   % entry.get('ntfy_full_sent_at'))
+
+          # ---- 4. THE LATCH, BEFORE THE DISPATCH ---------------------------
+          # Three fields, all of them facts: a complete artifact now exists for
+          # this slot, the id the supersede will be recorded under, and who
+          # decided. Nothing here claims a push happened — `ntfy_full_sent_at`
+          # is written by the second half of this step, after the dispatch.
+          patch = {
+              'full_artifact_available_at': now,
+              'supersede_sequence_id': full_sequence_id(today, slot),
+              'supersede_triggered_by': 'digest-prebuild seal job',
+          }
+          try:
+              status = merge_and_write(ledger, patch, namespace)
+          except Exception as exc:
+              # NO DISPATCH WITHOUT A LATCH. The latch is the only thing that
+              # makes this once-only, and a dispatch nothing can stop repeating
+              # is not a repair, it is a second bug.
+              die('the slot %s %s is pushed as %r and a complete artifact is sealed, '
+                  'but the ledger write FAILED (%s: %s), so the supersede was NOT '
+                  'dispatched and the loop latch could not be set. The owner keeps '
+                  'the digest they already have and the 07:50 ladder still stands '
+                  'down. Fix the KV write scope on CF_PAGES_API_TOKEN.'
+                  % (slot, today, entry.get('kind'), exc.__class__.__name__, exc))
+          print('latched: %s (KV HTTP %s)' % (json.dumps(patch), status))
+          with open(os.environ['SUPERSEDE_PATCH_FILE'], 'w', encoding='utf-8') as fh:
+              json.dump({'ledger': ledger, 'patch': patch, 'namespace': namespace,
+                         'dispatched_at': None}, fh, ensure_ascii=False)
+          decide('fire', 'the slot was pushed as %r and a complete artifact is now '
+                         'sealed' % entry.get('kind'))
+          PY
+
+          if [ "$(cat "$SUPERSEDE_DECISION_FILE")" = "fire" ]; then
+            echo "dispatching daily-news.yml at phase=full to supersede the degraded push"
+            # `slot_date` is $TODAY -- the slot's own date, which this job has
+            # held all along -- and not the receiving run's clock. This job can
+            # run past midnight NPT, and a supersede that named the wrong day
+            # would repair the wrong slot's push.
+            gh api -X POST \
+              -H "Accept: application/vnd.github+json" \
+              "$API/repos/$REPO/actions/workflows/daily-news.yml/dispatches" \
+              -f ref=master \
+              -f "inputs[digest_time]=$SLOT" \
+              -f "inputs[phase]=full" \
+              -f "inputs[slot_date]=$TODAY" \
+              -f "inputs[trigger_source]=supersede"
+            echo "supersede dispatch accepted for $SLOT $TODAY"
+
+            # ---- 5. AND ONLY NOW, THE RECORD THAT A PUSH LEFT THIS JOB -----
+            SLOT="$SLOT" TODAY="$TODAY" CF_LEDGER_TOKEN="$CF_LEDGER_TOKEN" \
+            CF_ACCOUNT_ID="$CF_ACCOUNT_ID" SUPERSEDE_PATCH_FILE="$SUPERSEDE_PATCH_FILE" \
+            python3 - <<'PY'
+          import datetime, json, os, urllib.request
+
+          KV_API = 'https://api.cloudflare.com/client/v4'
+          LEDGER_KEY = 'digest:ledger'
+          RETENTION_DAYS = 7
+
+          slot = os.environ['SLOT']
+          today = os.environ['TODAY']
+          with open(os.environ['SUPERSEDE_PATCH_FILE'], encoding='utf-8') as fh:
+              carried = json.load(fh)
+          ledger = carried['ledger']
+          namespace = carried['namespace']
+          # The instant the dispatch was ACCEPTED is the honest value here. Not
+          # the time the full digest actually reaches the phone — this job never
+          # learns that, and guessing would put an invented instant into the
+          # punctuality ledger.
+          dispatched_at = (datetime.datetime.now(datetime.timezone.utc)
+                          .replace(microsecond=0).isoformat().replace('+00:00', 'Z'))
+          patch = {'ntfy_full_sent_at': dispatched_at}
+          day = ledger.setdefault('days', {}).setdefault(today, {})
+          day[slot] = dict(day.get(slot) or {}, **patch)
+          cutoff = (datetime.date.fromisoformat(today)
+                    - datetime.timedelta(days=RETENTION_DAYS - 1)).isoformat()
+          for key in list(ledger.get('days') or {}):
+              if str(key) < cutoff:
+                  del ledger['days'][key]
+          ledger['as_of'] = dispatched_at
+          ledger['pruned_before'] = cutoff
+          url = ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
+                 % (KV_API, os.environ['CF_ACCOUNT_ID'], namespace, LEDGER_KEY))
+          request = urllib.request.Request(
+              url, data=json.dumps(ledger, ensure_ascii=False).encode('utf-8'),
+              headers={'Authorization': 'Bearer ' + os.environ['CF_LEDGER_TOKEN'],
+                       'Content-Type': 'application/json',
+                       'Accept': 'text/plain'},
+              method='PUT')
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  status = response.status
+          except Exception as exc:
+              print('::error::the supersede for %s %s was DISPATCHED but recording it '
+                    'FAILED (%s: %s). Nothing about the digest the owner already has has '
+                    'changed, and the loop latch from the first write IS on disk, so this '
+                    'slot cannot be superseded twice — but `ntfy_full_sent_at` is missing, '
+                    'so a human reading the ledger will not see that the full digest went '
+                    'out. Fix the KV write scope on CF_PAGES_API_TOKEN.'
+                    % (slot, today, exc.__class__.__name__, exc))
+              raise SystemExit(1)
+          print('supersede recorded: ntfy_full_sent_at=%s (KV HTTP %s)'
+                % (dispatched_at, status))
+          PY
+          fi
