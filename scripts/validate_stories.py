@@ -258,6 +258,28 @@ def load_source_results(candidates_path):
     return results, None
 
 
+def load_candidate_pool(candidates_path):
+    """Return (candidates, warning).
+
+    The collector's own candidate list from candidates.json, or None when the
+    file is missing/corrupt or carries no `candidates` list. None means
+    UNMEASURED: an unmeasured pool is never evidence that a quiet day
+    happened, so it can never turn a broken run into a quiet one.
+    """
+    try:
+        with open(candidates_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as exc:
+        return None, ("candidates.json unreadable (%s) - candidate pool unknown"
+                      % exc)
+    if not isinstance(data, dict):
+        return None, None
+    cands = data.get("candidates")
+    if not isinstance(cands, list):
+        return None, None
+    return cands, None
+
+
 def load_critical_hosts(config_dir):
     """Return (critical_hosts, warning) from config/collection.json.
 
@@ -1171,8 +1193,18 @@ def crime_violation(text):
 #
 # The classification below is a function of MEASURED SOURCE PRODUCTION and
 # never of the research agent's opinion. `raw` is what the collector handed
-# over, `final` is what survived this validator, and `source_health` is
-# scripts/source_health.py's pure derivation of what the hosts actually did.
+# over, `final` is what survived this validator, `source_health` is
+# scripts/source_health.py's pure derivation of what the hosts actually did,
+# and the CANDIDATE POOL is the collector's own list from candidates.json.
+#
+# WHY THE POOL IS AN INPUT: `source_health.state` is `degraded` on every run
+# while a critical host stays dark (tu.edu.np has been timing out for days),
+# so a health-only rule files EVERY empty digest as `broken` -- including a
+# same-day second run where 139 candidates were fetched and every published
+# one had already been sent. `degraded` answers "is a critical host dark?",
+# NOT "did collection work?". A non-empty candidate pool answers the second
+# question directly, and that is the question that separates a quiet day from
+# an outage.
 
 #: `source_health.state` values that mean "we could not confirm that any source
 #: produced something usable". `degraded` = a critical host is dark; `empty` =
@@ -1196,7 +1228,110 @@ def _count(value):
         return 0
 
 
-def derive_empty_outcome(raw, final, source_health):
+#: Title-token overlap at or above this means "the same story". Shared by the
+#: Stage 6 dedup and the empty-outcome measurement so the two cannot drift.
+DEDUP_OVERLAP_THRESHOLD = 0.7
+
+
+def _usable_candidates(candidates):
+    """The candidate dicts carrying a title or a URL to match on."""
+    usable = []
+    if not isinstance(candidates, (list, tuple)):
+        return usable
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+        title = cand.get("title")
+        url = cand.get("url")
+        if (isinstance(title, str) and title.strip()) or \
+                (isinstance(url, str) and url.strip()):
+            usable.append(cand)
+    return usable
+
+
+def history_coverage(candidates, fresh_history):
+    """How many collected candidates the fresh history already covers.
+
+    A candidate counts as covered when any dedup rule hits: normalized URL,
+    exact title hash, or title-token overlap >= DEDUP_OVERLAP_THRESHOLD (the
+    same rule Stage 6 applies). Forecast URLs are excluded from the URL rule
+    because they recur by design and Stage 6 re-sends them on a new day.
+
+    This is a MEASUREMENT of how much of the pool was old news. It is not the
+    decision: the empty rule only needs to know that the pool was not empty.
+    """
+    urls, hashes, known_tokens = set(), set(), []
+    for entry in fresh_history or []:
+        if not isinstance(entry, dict):
+            continue
+        url = entry.get("url_normalized")
+        if isinstance(url, str) and url:
+            urls.add(url)
+        thash = entry.get("title_hash")
+        if isinstance(thash, str) and thash:
+            hashes.add(thash)
+        tokens = title_tokens(entry.get("title") or "")
+        if tokens:
+            known_tokens.append(tokens)
+
+    pool = _usable_candidates(candidates)
+    matched = by_url = by_title = by_overlap = 0
+    for cand in pool:
+        url_norm = normalize_url(cand.get("url") or "")
+        title = cand.get("title") if isinstance(cand.get("title"), str) else ""
+        if url_norm and url_norm in urls and not is_forecast_url(url_norm):
+            by_url += 1
+        elif title.strip() and title_hash(title) in hashes:
+            by_title += 1
+        else:
+            tokens = title_tokens(title)
+            if tokens and any(jaccard(tokens, known) >= DEDUP_OVERLAP_THRESHOLD
+                              for known in known_tokens):
+                by_overlap += 1
+            else:
+                continue
+        matched += 1
+    return {"total": len(pool), "matched": matched, "by_url": by_url,
+            "by_title": by_title, "by_overlap": by_overlap}
+
+
+def collection_path_evidence(candidates, fresh_history, source_health):
+    """Measure whether the COLLECTION path delivered candidates this run.
+
+    ``ok`` is True only when candidates.json was readable AND carried at least
+    one usable candidate. That measures the collector, not the writer: a
+    non-empty pool proves fetching and parsing worked even when
+    ``source_health.state`` is ``degraded``, because one dark critical host can
+    coexist with candidates from every other source.
+    """
+    measured = isinstance(candidates, (list, tuple))
+    pool = _usable_candidates(candidates)
+    coverage = history_coverage(pool, fresh_history)
+    health = source_health if isinstance(source_health, dict) else {}
+    all_block = health.get("all")
+    all_block = all_block if isinstance(all_block, dict) else {}
+    critical = health.get("critical")
+    critical = critical if isinstance(critical, dict) else {}
+
+    if not measured:
+        summary = "candidates.json unmeasured, pool unknown"
+    elif not pool:
+        summary = "0 usable candidates"
+    else:
+        summary = ("%d usable candidates (%d items found across %d sources, "
+                   "%d critical ok); %d of %d already sent within the TTL "
+                   "(url=%d, title=%d, near-title=%d)"
+                   % (len(pool), _count(all_block.get("items_found")),
+                      _count(all_block.get("total")),
+                      _count(critical.get("ok")), coverage["matched"],
+                      coverage["total"], coverage["by_url"],
+                      coverage["by_title"], coverage["by_overlap"]))
+    return {"measured": measured, "usable": len(pool),
+            "ok": measured and bool(pool), "summary": summary}
+
+
+def derive_empty_outcome(raw, final, source_health, candidates=None,
+                         fresh_history=None):
     """Return ``(stories_outcome, empty_kind, empty_evidence)``.
 
     ``stories_outcome`` is ``"produced"`` or ``"empty"``. ``empty_kind`` is
@@ -1205,14 +1340,25 @@ def derive_empty_outcome(raw, final, source_health):
     the decision was made from, so the retry ladder's alert can state WHICH
     fact triggered it rather than repeating the conclusion.
 
-    The four frozen rows, in order:
+    The rows, in order:
       final > 0                                    -> produced, None
       final == 0 and raw > 0                       -> quiet_day (the VALIDATOR
                                                       dropped them: not a
                                                       source outage)
+      final == 0 and raw == 0 and the collection
+        path delivered >= 1 usable candidate
+        and no critical feed is empty              -> quiet_day (the pool was
+                                                      real, so fetching and
+                                                      parsing worked; the only
+                                                      claim left is dedup or
+                                                      nothing new. A failed
+                                                      critical host does NOT
+                                                      override this -- see the
+                                                      comment above)
       final == 0 and raw == 0 and (critical
         empty_hosts non-empty or state in
-        {degraded, empty, unknown})                -> broken
+        {degraded, empty, unknown})                -> broken (collection failed
+                                                      or could not be measured)
       final == 0 and raw == 0 and state in
         {ok, partial}                              -> quiet_day (sources were up
                                                       and the agent returned
@@ -1233,15 +1379,31 @@ def derive_empty_outcome(raw, final, source_health):
                 % (raw_n, final_n, state, _count(critical.get("ok")),
                    _count(critical.get("total")), _count(critical.get("failed")),
                    len(empty_hosts)))
+    collection = collection_path_evidence(candidates, fresh_history, health)
 
     if final_n > 0:
         return "produced", None, evidence
     if raw_n > 0:
         return "empty", "quiet_day", (evidence + " - the validator dropped "
                                       "every collected candidate")
+    if collection["ok"] and not empty_hosts:
+        # Collection WORKED. `degraded` says a critical host is dark, not that
+        # nothing was fetched, and the pool in hand proves otherwise. Filing
+        # this as `broken` paged the owner for a quiet day (2026-10-26
+        # evening: 139 candidates, 0 published), so the pool decides and the
+        # degraded counters are reported instead of obeyed.
+        #
+        # `empty_hosts` is deliberately NOT overridden: a critical feed that
+        # answered and produced nothing is a specific, actionable gap, and it
+        # stays `broken` so it still pages.
+        return "empty", "quiet_day", (evidence + " - collection path: "
+                                      + collection["summary"]
+                                      + " -> dedup/newness, not an outage")
     if empty_hosts or state in BROKEN_HEALTH_STATES:
         return "empty", "broken", (evidence + " - critical empty_hosts: "
-                                   + (", ".join(empty_hosts) or "none"))
+                                   + (", ".join(empty_hosts) or "none")
+                                   + " - collection path: "
+                                   + collection["summary"])
     return "empty", "quiet_day", (evidence + " - sources were up; the agent "
                                     "returned nothing")
 
@@ -1509,7 +1671,7 @@ def main(argv=None):
             continue
         dup_title = False
         for prev_tokens, prev_title in seen_token_sets:
-            if jaccard(tokens, prev_tokens) >= 0.7:
+            if jaccard(tokens, prev_tokens) >= DEDUP_OVERLAP_THRESHOLD:
                 drop(story, "duplicate_in_run: title overlap >=0.7 with %r" % prev_title[:80])
                 dup_title = True
                 break
@@ -1581,8 +1743,18 @@ def main(argv=None):
     research_status = ("full" if source_health_block.get("state") == "ok"
                        else "limited")
 
+    # Only an empty digest needs the candidate pool, so it is read lazily: a
+    # normal run does not pay for another parse of a 135 KB file.
+    candidates_pool, candidates_warn = None, None
+    if not final_stories:
+        candidates_pool, candidates_warn = load_candidate_pool(
+            args.candidates_path)
+        if candidates_warn:
+            print("WARNING: %s" % candidates_warn)
+
     stories_outcome, empty_kind, empty_evidence = derive_empty_outcome(
-        raw_stories, final_stories, source_health_block)
+        raw_stories, final_stories, source_health_block,
+        candidates=candidates_pool, fresh_history=fresh_history)
 
     payload = {
         "digest_time": digest_time,
@@ -1654,6 +1826,11 @@ def main(argv=None):
     print("  outcome:     %s%s" % (stories_outcome,
                                   "" if empty_kind is None
                                   else " (%s: %s)" % (empty_kind, empty_evidence)))
+    if empty_kind is not None:
+        print("  empty-kind:  %s | collection path: %s"
+              % (empty_kind,
+                 collection_path_evidence(candidates_pool, fresh_history,
+                                          source_health_block)["summary"]))
     print("  generated_at_npt: %s | data_cutoff_npt: %s" % (generated_at_npt, data_cutoff_npt))
     if filter_log:
         print("  filter log:")
