@@ -308,6 +308,41 @@ class FallbackLedgerTests(unittest.TestCase):
                         "minutes after the push that already succeeded.\n%s"
                         % out)
 
+    def test_the_record_the_stand_down_writes_stands_the_ladder_down(self):
+        """THE 2026-10-26 CASE, through the real decision step, both halves.
+
+        The slot was delivered to the topic by a run whose KV write failed, so
+        the stored entry read `pending` with the earlier attempt's 429 and
+        `ntfy_failed=true` -- and this step armed, because `ntfy_failed`
+        outranks every other fact here. The stand-down now writes the same
+        record a real push writes: state=sent, kind=delivered, an instant from
+        the read-back, and no failure markers. The verdict must flip.
+        """
+        pending = entry(state="pending", kind="fallback_last_good",
+                        ntfy_sent_at=None, first_ntfy_sent_at=None,
+                        ntfy_failed=True, http_status=429)
+        code, out = self._run(kv_body=ledger_raw(pending),
+                              marker_obj=marker(delivered=False))
+        self.assertEqual(0, code, out)
+        self.assertFalse(
+            self._armed(),
+            "state=pending with ntfy_failed=true must still stand the ladder "
+            "UP -- that is the state the stand-down repairs, and if it stopped "
+            "arming the repair would be invisible:\n%s" % out)
+
+        self._forget()
+        delivered = entry(state="sent", kind="delivered",
+                          ntfy_sent_at="2026-10-26T13:52:07Z",
+                          first_ntfy_sent_at="2026-10-26T13:52:07Z")
+        code, out = self._run(kv_body=ledger_raw(delivered),
+                              marker_obj=marker(delivered=False))
+        self.assertEqual(0, code, out)
+        self.assertTrue(
+            self._armed(),
+            "the record the stand-down writes did not stand the ladder down, so "
+            "the owner still gets a digest the topic already carries, by email "
+            "and Telegram:\n%s" % out)
+
     def test_the_ledger_is_read_from_the_committed_namespace_and_account(self):
         code, out = self._run(kv_body=ledger_raw(entry()),
                               marker_obj=marker(delivered=False))

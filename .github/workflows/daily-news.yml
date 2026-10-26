@@ -2047,7 +2047,7 @@ jobs:
                   entry.pop('first_ntfy_sent_at', None)
                   entry['honesty_downgraded_at'] = now
 
-          def kv_record_delivery(date, slot, patch):
+          def kv_record_delivery(date, slot, patch, clear=()):
               """Read-modify-write the slot's delivery record. NEVER raises.
 
               This runs AFTER the push succeeded. A failure here costs the
@@ -2057,6 +2057,14 @@ jobs:
               reads state/.ntfy_ok on the next line, so a non-zero exit would
               discard a delivered digest's own result and fire the Gmail backup
               against a push that already landed.
+
+              `clear` names fields the patch REMOVES rather than overwrites, and
+              it is not cosmetic: this is a merge onto whatever is already
+              stored, so an earlier attempt's `ntfy_failed`/`http_status` would
+              survive a later success. `enforce_ledger_honesty` then sees
+              ntfy_failed=true beside state=sent and DOWNGRADES the record it
+              was just told is delivered, deleting ntfy_sent_at again -- the
+              success erases its own proof.
               """
               try:
                   ledger = kv_read_ledger()
@@ -2071,6 +2079,8 @@ jobs:
                   day = ledger['days'].setdefault(date, {})
                   entry = dict(day.get(slot) or {})
                   entry.update(patch)
+                  for key in clear:
+                      entry.pop(key, None)
                   entry.setdefault('first_ntfy_sent_at', patch.get('ntfy_sent_at', now))
                   enforce_ledger_honesty(entry, date, slot, now)
                   day[slot] = entry
@@ -2113,6 +2123,75 @@ jobs:
                         'namespace id in the CF_KV_NAMESPACE_ID repository variable.'
                         % (detail, date, slot))
                   return False
+
+          def iso_utc(moment):
+              """An aware datetime in the ledger's instant format."""
+              return (moment.astimezone(datetime.timezone.utc)
+                      .replace(microsecond=0).isoformat().replace('+00:00', 'Z'))
+
+          def message_epoch(message):
+              """A read-back message's own `time` as epoch seconds, or -1."""
+              try:
+                  return int(message.get('time'))
+              except (AttributeError, TypeError, ValueError):
+                  return -1
+
+          def message_sent_at(message):
+              """The read-back message's OWN `time` as a ledger instant, or None.
+
+              ntfy publishes `time` as epoch seconds. This is the only evidence
+              of WHEN the delivery that is already on the topic happened:
+              `ntfy_sent_at` is compared against the slot's due instant, so
+              "now" -- the moment this run noticed the message -- would date a
+              19:20 push at 19:55 and is not the delivery's instant.
+              """
+              try:
+                  return iso_utc(datetime.datetime.fromtimestamp(
+                      int(message.get('time')), datetime.timezone.utc))
+              except (AttributeError, TypeError, ValueError, OSError, OverflowError):
+                  return None
+
+          def record_delivery(date, slot, sequence_id, sent_at, supersede):
+              """THE ONE RECORD A CONFIRMED DELIVERY WRITES. Both arms call it.
+
+              The two arms are the publish that just returned, and the
+              stand-down that found this slot's message already on the topic.
+              They write the SAME shape on purpose: nothing downstream can tell
+              which arm produced an entry, and a stand-down that recorded
+              nothing (2026-10-26 evening) left a delivered slot reading
+              `pending` for the rest of the day.
+
+              `sent_at` is the delivery's own instant, never "now" on the
+              stand-down arm -- see message_sent_at().
+              """
+              if not kv_configured():
+                  print('WARNING: CF_PAGES_API_TOKEN / CF_ACCOUNT_ID or the '
+                        'KV namespace id is unavailable, so this delivery '
+                        'was NOT recorded in the KV ledger and the '
+                        'Worker\'s duplicate guard cannot see it. The '
+                        'sequence_id read-back above is the only thing '
+                        'standing between this slot and a double push.')
+                  return False
+              if supersede:
+                  # `ntfy_sent_at` is deliberately NOT set here. The Worker's
+                  # ledger guard suppresses on it, and the degraded push this
+                  # replaces already set it.
+                  return kv_record_delivery(date, slot, {
+                      'ntfy_full_sent_at': sent_at,
+                      'full_sequence_id': sequence_id,
+                  })
+              patch = {
+                  'sequence_id': sequence_id,
+                  'state': 'sent',
+                  'kind': 'delivered',
+              }
+              if sent_at:
+                  patch['ntfy_sent_at'] = sent_at
+              # The failure markers of every earlier attempt at this slot go:
+              # with ntfy_failed still true, enforce_ledger_honesty downgrades
+              # this record and deletes the ntfy_sent_at it just wrote.
+              return kv_record_delivery(
+                  date, slot, patch, clear=('ntfy_failed', 'http_status'))
 
           def main():
               topic = (os.environ.get('NTFY_TOPIC') or '').strip()
@@ -3394,9 +3473,30 @@ jobs:
                   seen = [m for m in readback
                           if isinstance(m, dict) and m.get('sequence_id') == push_seq]
                   if seen:
+                      # ---- A MESSAGE ON THE TOPIC IS A DELIVERY, AND IT IS
+                      # ---- RECORDED HERE, FROM THE MESSAGE'S OWN CLOCK.
+                      #
+                      # Standing this slot down used to write state/.ntfy_ok and
+                      # return, recording NOTHING -- so on 2026-10-26 evening the
+                      # push whose KV write hit the 10013 bug existed on the
+                      # topic and the ledger still read `pending`, and every
+                      # later reader (the ladder, the watchdog, ?health=1) judged
+                      # the slot undelivered. This is the same record
+                      # record_delivery() writes after a real push.
+                      #
+                      # `since=all` returns the whole history and a slot can hold
+                      # several messages under one sequence id, so take the
+                      # newest: that is the one the owner's client shows.
+                      message = max(seen, key=message_epoch)
+                      sent_at = message_sent_at(message)
                       print('ntfy slot %s is already on the topic (read-back found '
-                            '%d message(s)) - NOT publishing a second copy'
-                            % (push_seq, len(seen)))
+                            '%d message(s), newest at %s) - NOT publishing a second copy'
+                            % (push_seq, len(seen), sent_at or 'an unreadable instant'))
+                      if not sent_at:
+                          print('WARNING: the read-back message carries no readable '
+                                '`time`, so this delivery is recorded without an '
+                                'instant and the ladder will still see it as unproven')
+                      record_delivery(today, kind, message.get('sequence_id') or push_seq, sent_at, is_supersede)
                       write_flag(True)
                       return
               try:
@@ -3426,36 +3526,13 @@ jobs:
                       # miss. An at-least-once guarantee with a possible
                       # duplicate is the honest shape here; exactly-once is not
                       # available across "ntfy has it" and "KV has it".
-                      if kv_configured():
-                          sent_at = (datetime.datetime.now(datetime.timezone.utc)
-                                       .replace(microsecond=0).isoformat()
-                                       .replace('+00:00', 'Z'))
-                          if is_supersede:
-                              # `ntfy_sent_at` is deliberately NOT set here. The
-                              # Worker's ledger guard suppresses on it, and the
-                              # degraded push this replaces already set it -- so
-                              # writing it again would make every later re-fire
-                              # for this slot believe a second delivery exists
-                              # and, worse, would make the watchdog judge the slot
-                              # on a field that answers the wrong question.
-                              kv_record_delivery(today, kind, {
-                                  'ntfy_full_sent_at': sent_at,
-                                  'full_sequence_id': push_seq,
-                              })
-                          else:
-                              kv_record_delivery(today, kind, {
-                                  'ntfy_sent_at': sent_at,
-                                  'sequence_id': push_seq,
-                                  'state': 'sent',
-                                  'kind': 'delivered',
-                              })
-                      else:
-                          print('WARNING: CF_PAGES_API_TOKEN / CF_ACCOUNT_ID or the '
-                                'KV namespace id is unavailable, so this delivery '
-                                'was NOT recorded in the KV ledger and the '
-                                'Worker\'s duplicate guard cannot see it. The '
-                                'sequence_id read-back above is the only thing '
-                                'standing between this slot and a double push.')
+                      #
+                      # The SAME call the stand-down arm above makes, with the
+                      # clock this push really happened at.
+                      record_delivery(today, kind, push_seq,
+                                      iso_utc(datetime.datetime.now(
+                                          datetime.timezone.utc)),
+                                      is_supersede)
                       write_flag(True)
                   else:
                       desc = str(result.get('description') or result) if isinstance(result, dict) else str(result)

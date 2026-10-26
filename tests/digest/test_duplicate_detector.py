@@ -246,10 +246,15 @@ class ActionsHarness(unittest.TestCase):
 
     # -- the fake network -------------------------------------------------
     def _urlopen(self, history_body=None, history_status=200,
-                 kv_get_error=None, kv_put_error=None, ntfy_error=None):
+                 kv_get_error=None, kv_put_error=None, ntfy_error=None,
+                 seed_ledger=None):
         posts, kv_gets, kv_puts, bodies = self.posts, self.kv_gets, \
             self.kv_puts, self.readback_bodies
-        state = {"kv": None}
+        # The LIVE KV value, so a test can seed what a slot already records and
+        # read back what the step left behind -- a later reader's GET, not the
+        # PUT body this process happened to send.
+        state = {"kv": None if seed_ledger is None else json.dumps(seed_ledger)}
+        self.kv_state = state
 
         def fake(request, *args, **kwargs):
             url = str(getattr(request, "full_url", request))
@@ -309,7 +314,8 @@ class ActionsHarness(unittest.TestCase):
     }
 
     def run_step(self, env_overrides=None, history_body=None, history_status=200,
-                 kv_get_error=None, kv_put_error=None, ntfy_error=None):
+                 kv_get_error=None, kv_put_error=None, ntfy_error=None,
+                 seed_ledger=None):
         """The convenience form of the inline harness, same save/restore pair.
 
         `exec_step()` directly above is the reference for what this must do:
@@ -323,7 +329,8 @@ class ActionsHarness(unittest.TestCase):
         env.update(env_overrides or {})
         real = urllib.request.urlopen
         urllib.request.urlopen = self._urlopen(
-            history_body, history_status, kv_get_error, kv_put_error, ntfy_error)
+            history_body, history_status, kv_get_error, kv_put_error, ntfy_error,
+            seed_ledger)
         buf = io.StringIO()
         saved = dict(os.environ)
         prev = os.getcwd()
@@ -360,8 +367,19 @@ class ActionsHarness(unittest.TestCase):
             return None
         return json.loads(self.kv_puts[-1]["body"])
 
+    def kv_stored(self):
+        """What KV holds NOW — the value a later run would GET."""
+        return json.loads(self.kv_state["kv"]) if self.kv_state.get("kv") else None
+
     def slot_entry(self):
         ledger = self.kv_ledger()
+        if not ledger:
+            return None
+        day = (ledger.get("days") or {}).get(TODAY) or {}
+        return day.get(SLOT)
+
+    def stored_slot_entry(self):
+        ledger = self.kv_stored()
         if not ledger:
             return None
         day = (ledger.get("days") or {}).get(TODAY) or {}
@@ -786,6 +804,138 @@ class LedgerHandoffTests(ActionsHarness):
         self.assertNotIn(
             TOKEN, json.dumps([p for p in self.kv_puts]),
             "the KV token reached the ledger body")
+
+
+# ==========================================================================
+# 2b. THE STAND-DOWN RECORDS THE DELIVERY IT JUST VERIFIED
+# ==========================================================================
+
+
+class StandDownRecordsTests(ActionsHarness):
+    """2026-10-26 EVENING: the slot was on the topic and the ledger said pending.
+
+    That push was delivered by a run whose KV write hit the 10013 bug, so the
+    message existed on the topic and nothing recorded it. The read-back branch
+    then wrote `state/.ntfy_ok` and returned -- so every later reader (the
+    fallback ladder, the watchdog, `?health=1`) judged a delivered slot
+    undelivered for the rest of the day.
+
+    The two log lines from that run:
+
+        ntfy slot dmn-2026-10-26-evening is already on the topic (read-back
+          found 1 message(s)) - NOT publishing a second copy
+        ledger: state=pending http_status=429 ntfy_failed=true ntfy_sent_at=null
+
+    These tests assert the record the stand-down now writes, and that the
+    read-back message's OWN instant is what lands in it.
+    """
+
+    #: The message instants from the fixtures above, converted by ntfy's own
+    #: contract (`time` is epoch seconds). Hardcoded rather than re-derived in
+    #: the test, so a wrong conversion cannot agree with itself.
+    INSTANT_1925 = "2026-10-14T04:25:05Z"
+    INSTANT_1940 = "2026-10-14T04:40:38Z"
+
+    #: The evening entry the live ledger actually held after the 2026-10-26 run.
+    PENDING = {
+        "state": "pending",
+        "kind": "fallback_last_good",
+        "sequence_id": SEQUENCE_ID,
+        "http_status": 429,
+        "ntfy_failed": True,
+        "ntfy_sent_at": None,
+    }
+
+    def _seed(self, entry):
+        return {"schema_version": 1, "as_of": "2026-10-13T14:00:00Z",
+                "days": {TODAY: {SLOT: dict(entry)}}}
+
+    def test_a_stand_down_records_the_delivery_it_read_back(self):
+        out = self.run_step(history_body=ndjson(PUSH_1940, PUSH_1925))
+        self.assertEqual(
+            0, len(self.posts),
+            "the read-back guard did not fire, so the record asserted below "
+            "would describe a push this run actually made:\n%s" % out)
+        entry = self.slot_entry()
+        self.assertIsNotNone(
+            entry,
+            "the stand-down recorded NOTHING for %s %s. The slot is on the "
+            "topic and the ledger still says it is not, which is exactly the "
+            "2026-10-26 evening defect: %r" % (TODAY, SLOT, self.kv_ledger()))
+        self.assertEqual("delivered", entry.get("kind"),
+                         "the stand-down recorded kind=%r; a push that is on the "
+                         "topic delivered the digest: %r"
+                         % (entry.get("kind"), entry))
+        self.assertEqual("sent", entry.get("state"),
+                         "the stand-down recorded state=%r for a delivered "
+                         "slot: %r" % (entry.get("state"), entry))
+        self.assertEqual(SEQUENCE_ID, entry.get("sequence_id"),
+                         "the recorded sequence_id is not the one the message "
+                         "carries, so a later read-back looks for a message that "
+                         "was never sent: %r" % entry)
+        self.assertEqual(
+            self.INSTANT_1940, entry.get("ntfy_sent_at"),
+            "ntfy_sent_at is not the read-back message's own `time`. The "
+            "newest message for this slot was published at %s UTC; the run "
+            "noticed it later, and 'later' is not the delivery's instant: %r"
+            % (self.INSTANT_1940, entry))
+
+    def test_the_instant_is_the_read_back_clock_not_this_runs(self):
+        """The single-message case, and the one that catches a `now()` fallback.
+
+        A `datetime.now()` here would be indistinguishable from the real
+        delivery in a test that only checks the field is present, so the
+        expected value is the message's own epoch and the assertion is exact.
+        """
+        out = self.run_step(history_body=ndjson(PUSH_1925))
+        self.assertEqual(0, len(self.posts), out)
+        entry = self.slot_entry()
+        self.assertIsNotNone(entry, out)
+        self.assertEqual(
+            self.INSTANT_1925, entry.get("ntfy_sent_at"),
+            "the stand-down did not take ntfy_sent_at from the message's own "
+            "`time` (epoch %s = %s UTC): %r"
+            % (PUSH_1925["time"], self.INSTANT_1925, entry))
+
+    def test_a_slot_that_read_pending_does_not_still_read_pending(self):
+        """THE POST-RUN READ: what a later GET of `digest:ledger` sees.
+
+        The ledger is a read-modify-write onto what KV already holds, and the
+        stored entry here is the real 2026-10-26 evening one: pending, with a
+        429 and `ntfy_failed=true` from the failed attempt. If those two
+        markers survive the merge, `enforce_ledger_honesty` downgrades the
+        record back to `failed` and deletes the instant it just wrote.
+        """
+        out = self.run_step(history_body=ndjson(PUSH_1940),
+                            seed_ledger=self._seed(self.PENDING))
+        self.assertEqual(0, len(self.posts), out)
+        stored = self.stored_slot_entry()
+        self.assertIsNotNone(
+            stored, "the stand-down wrote nothing over the pending entry, so a "
+            "later read of the ledger still says this slot is undelivered: %r"
+            % (self.kv_stored(),))
+        self.assertNotEqual(
+            "pending", stored.get("state"),
+            "the slot still reads state=pending after the stand-down: %r" % stored)
+        self.assertEqual("sent", stored.get("state"), stored)
+        self.assertEqual("delivered", stored.get("kind"), stored)
+        self.assertEqual(self.INSTANT_1940, stored.get("ntfy_sent_at"),
+                         "the recorded instant was not kept: %r" % stored)
+        self.assertNotIn(
+            "ntfy_failed", stored,
+            "the earlier attempt's ntfy_failed survived the delivered record. "
+            "It outranks ntfy_sent_at in the ladder's verdict, so the fallback "
+            "step would still email and Telegram a digest the owner has: %r"
+            % stored)
+        self.assertNotIn(
+            "http_status", stored,
+            "the earlier attempt's http_status=429 survived a successful "
+            "delivery and describes a push that is no longer the last word: %r"
+            % stored)
+        self.assertNotEqual(
+            "failed", stored.get("state"),
+            "the honesty arm downgraded the record this run had just confirmed "
+            "delivered, which is what a surviving ntfy_failed does: %r" % stored)
 
 
 # ==========================================================================
@@ -1404,8 +1554,8 @@ class MutationProofTests(unittest.TestCase):
 
     def test_reverting_the_kv_write_makes_the_handoff_fail(self):
         tmp = self._revert_in_copy(
-            "kv_record_delivery(today, kind, {\n                                  'ntfy_sent_at': sent_at,",
-            "_unused_suppress = (today, kind, {\n                                  'ntfy_sent_at': sent_at,",
+            "record_delivery(today, kind, push_seq,",
+            "_unused_suppress = (push_seq,",
             ".github/workflows/daily-news.yml")
         proc = subprocess.run(
             [sys.executable, "-m", "unittest",
@@ -1431,6 +1581,32 @@ class MutationProofTests(unittest.TestCase):
             "NOTHING was written to the KV delivery ledger", blob,
             "the KV write test failed for a reason other than the missing "
             "write:\n%s" % blob[-4000:])
+
+    def test_reverting_the_standdown_record_leaves_the_slot_unrecorded(self):
+        """THE 2026-10-26 GAP: the branch verified a delivery and recorded none."""
+        tmp = self._revert_in_copy(
+            "record_delivery(today, kind, message.get('sequence_id') or "
+            "push_seq, sent_at, is_supersede)",
+            "_unused_standdown = (kind, message, sent_at, is_supersede)",
+            ".github/workflows/daily-news.yml")
+        proc = subprocess.run(
+            [sys.executable, "-m", "unittest",
+             "tests.digest.test_duplicate_detector.StandDownRecordsTests"],
+            cwd=str(tmp), capture_output=True, text=True, errors="replace",
+            timeout=900)
+        self.assertNotEqual(
+            0, proc.returncode,
+            "removing the stand-down's ledger write left the suite GREEN, so "
+            "nothing is holding the record of a delivery the read-back proved.")
+        blob = proc.stdout + proc.stderr
+        self.assertIn(
+            "test_a_stand_down_records_the_delivery_it_read_back", blob,
+            "the revert did not fail for the reason it was written:\n%s"
+            % blob[-4000:])
+        self.assertIn(
+            "the stand-down recorded NOTHING", blob,
+            "the stand-down test failed for a reason other than the missing "
+            "record:\n%s" % blob[-4000:])
 
     def test_reverting_the_full_sequence_id_makes_the_supersede_fail(self):
         tmp = self._revert_in_copy(
