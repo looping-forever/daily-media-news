@@ -1,4 +1,4 @@
-#>
+<#
 deploy-worker.ps1 -- deploy the breaking-monitor Worker with the real KV
 namespace id, without that id living in the committed config.
 
