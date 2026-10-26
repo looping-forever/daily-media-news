@@ -963,7 +963,7 @@ jobs:
             --cache state/model_cache.json --info-out state/digest_model_select.json \
             --all "${NO_WORK_ARGS[@]}")
           [ "${#models[@]}" -gt 0 ] || { echo "FATAL: empty model ladder - nothing was discovered and config/opencode.json has no seed"; exit 1; }
-          python3 -c "import json;d=json.load(open('state/digest_model_select.json'));print('model ladder: source=%s provider=%s selected=%s cooled_down=%s dropped_seed=%s error=%s' % (d.get('source'),d.get('provider'),d.get('selected'),d.get('cooled_down'),d.get('dropped_seed'),d.get('error')))" || true
+          python3 -c "import json;d=json.load(open('state/digest_model_select.json'));print('model ladder: source=%s provider=%s selected=%s cooled_down=%s dropped_seed=%s dropped_seed_evidence=%s error=%s' % (d.get('source'),d.get('provider'),d.get('selected'),d.get('cooled_down'),d.get('dropped_seed'),d.get('dropped_seed_evidence'),d.get('error')))" || true
           # The budget is stated ONCE, by the selector, and read back here. The
           # `// N` defaults plus the `case` guards keep this working when the
           # info file is missing or unwritable (--info-out is best-effort).

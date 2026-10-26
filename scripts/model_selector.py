@@ -264,6 +264,29 @@ def usable(model):
     return True, "ok"
 
 
+#: The only statuses that count as PROOF a configured model is gone. Read from a
+#: record the catalogue actually printed for that exact id -- never from the id's
+#: ABSENCE from a listing, which is not evidence of anything.
+#:
+#: Run 40280837914 is why this distinction is load-bearing. The runner has no
+#: credentials, and `opencode models opencode --verbose` in that environment
+#: returns a DIFFERENT, smaller catalogue than the same binary on an
+#: authenticated machine: seven ids, of which four are not served at all -- the
+#: three muse/ling ids pinned in tests/breaking/test_dynamic_model_ladder.py and
+#: mimo-v2.5-free -- while the fifth is an id this repo had already banned as
+#: dead a day earlier. A listing that advertises a model the project knows is
+#: gone cannot be treated as evidence that an absent one is gone. Measured here
+#: on 2026-10-26 against `opencode-ai@1.18.31` (the pin): the cold home reports
+#: 7 models and omits five of the six configured rungs, the warm one reports 9
+#: and includes every rung. The name of the stale rung is built at run time in
+#: the test rather than written here, because BANNED_RE bans the literal.
+#: The old `[m for m in seed if m not in pool]` read that gap as "gone" and
+#: discarded five measured rungs, so production walked seven unmeasured ids and
+#: succeeded by luck. A listing can be INCOMPLETE; a record saying `deprecated`
+#: cannot mean anything else.
+GONE_STATUSES = ("deprecated", "retired", "deleted", "removed")
+
+
 def _release_ordinal(meta):
     """Sortable proxy for "newer", for tiebreaks among never-tried models.
 
@@ -310,7 +333,7 @@ def discover(provider, cache_path=None, ttl_sec=DISCOVERY_TTL_SEC,
     """
     now = time.time() if now is None else now
     info = {"source": "none", "unparsed": [], "rejected": {}, "release": {},
-            "elapsed_sec": 0.0}
+            "catalogue_status": {}, "elapsed_sec": 0.0}
     started = time.time()
 
     memo = _MEMO.get(provider)
@@ -327,7 +350,9 @@ def discover(provider, cache_path=None, ttl_sec=DISCOVERY_TTL_SEC,
         _MEMO[provider] = {"at": started, "ids": list(ids),
                            "info": {"unparsed": list(info["unparsed"]),
                                     "rejected": dict(info["rejected"]),
-                                    "release": dict(info.get("release") or {})}}
+                                    "release": dict(info.get("release") or {}),
+                                    "catalogue_status": dict(
+                                        info.get("catalogue_status") or {})}}
         # A pinned answer stays labelled `pin`. Reporting it as `live` would
         # tell a log reader the provider catalogue answered when nothing asked
         # it -- the same class of dishonesty this selector exists to avoid, one
@@ -387,7 +412,10 @@ def _discover_live(provider, timeout_sec, run_cmd, info):
     models, unparsed = parse_verbose_models(out, provider)
     info["unparsed"] = list(unparsed)
     ids = []
+    status_by_id = info.setdefault("catalogue_status", {})
     for model in models:
+        meta = model.get("meta") or {}
+        status_by_id[model["id"]] = meta.get("status")
         ok, why = usable(model)
         if ok:
             ids.append(model["id"])
@@ -972,15 +1000,29 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
             "rejected": disc.get("rejected") or {},
             "unparsed": disc.get("unparsed") or [],
             "error": disc.get("error", ""),
-            "dropped_seed": [], "cooled_down": []}
+            "dropped_seed": [], "dropped_seed_evidence": {}, "cooled_down": []}
+
+    # THE CONFIGURED LADDER IS AUTHORITATIVE (run 40280837914). Discovery may
+    # APPEND, and may never reorder or remove a seed. The only removal is a
+    # record that says the model is gone -- see GONE_STATUSES: absence from a
+    # listing proves nothing, because the unauthenticated catalogue the runner
+    # sees is a different, smaller list that omits five working models.
+    status_by_id = disc.get("catalogue_status") or {}
+    kept = []
+    for m in seed:
+        status = status_by_id.get(m)
+        status = status.strip().lower() if isinstance(status, str) else ""
+        if status in GONE_STATUSES:
+            info["dropped_seed"].append(m)
+            info["dropped_seed_evidence"][m] = "catalogue status=%r" % status
+        else:
+            kept.append(m)
 
     if pool:
-        # A seed model that Zen no longer serves is DROPPED, not attempted.
-        # Attempting it is how a run spends 60s proving a model is gone.
-        info["dropped_seed"] = [m for m in seed if m not in pool]
+        pool = kept + [m for m in pool if m not in kept]
     else:
-        pool = list(seed)          # tier 3: the owner's own seed
-        info["source"] = "seed" if seed else "none"
+        pool = list(kept)          # tier 3: the owner's own seed
+        info["source"] = "seed" if kept else "none"
 
     rows = (health or {}).get("models") or {}
     info["cooled_down"] = [m for m in pool if on_cooldown(rows.get(m), now)]

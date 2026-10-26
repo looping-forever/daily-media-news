@@ -9,8 +9,9 @@ sent. The ladder was a hardcoded ordered list, duplicated as an embedded
 fallback tuple in every consumer — and it had already rotted: by 2026-10-18
 rung 2, `opencode/mimo-v2.5-free`, was absent from the live listing. A dead ID
 in a hardcoded list is worse than no ID, because the run spends wall-clock
-proving a model is gone on exactly the days the provider is sickest. Whether an
-ID is alive is a live-discovery fact, never a fact this file may freeze.
+proving a model is gone on exactly the days the provider is sickest. An ID's
+liveness is read from a record the catalogue printed for it -- never from its
+absence from a listing, and never frozen in this file.
 
 Four things have to be true afterwards, and each is pinned here:
   1. DISCOVERY is real and measured — free / active / text-capable are read
@@ -103,11 +104,10 @@ LIVE_LISTING = (
     + _record("nemotron-3.5-lightning-free", "Nemotron", "active", 0, 0)
 )
 
-#: The two IDs that were hardcoded on 2026-10-13. The second is DEAD IN THE
-#: FAKE LISTING BELOW and must therefore never be attempted; which IDs are
-#: really dead is decided by live discovery, not by this fixture.
+#: The two IDs that were hardcoded on 2026-10-13. Neither may be dropped merely
+#: for being absent from a listing -- that rule is what run 40280837914 broke,
+#: and `COLD_LISTING` below is that listing.
 SEED_BIG_PICKLE = "%s/big-pickle" % PROVIDER
-SEED_DEAD_MIMO = "%s/mimo-v2.5-free" % PROVIDER
 
 
 def _fake_run(stdout):
@@ -532,25 +532,115 @@ def test_every_attempt_the_run_makes_is_inside_the_budget():
 # 5. THE LADDER IS RESOLVED, NOT WRITT DOWN
 # ---------------------------------------------------------------------------
 
-def test_a_dead_seed_model_is_dropped_and_never_attempted():
-    """Rung 2 on 2026-10-13 no longer exists. Attempting it is how a run burns
-    its budget proving a model is gone."""
-    sd = tempfile.mkdtemp(prefix="dead-seed-")
-    try:
-        cfg = {"provider": PROVIDER,
-               "ladder": [SEED_BIG_PICKLE, SEED_DEAD_MIMO]}
-        live = [SEED_BIG_PICKLE, "%s/nemotron-3.5-lightning-free" % PROVIDER]
-        selected, info = ms.select(cfg, ms.load_health(None),
-                                   cache_path=os.path.join(sd, "c.json"),
-                                   max_models=4, now=1.0,
-                                   discover_fn=lambda p: (live,
-                                                         {"source": "live"}))
-        assert SEED_DEAD_MIMO not in selected, (
-            "a model the provider no longer serves must not be attempted: %r"
-            % (selected,))
-        assert info["dropped_seed"] == [SEED_DEAD_MIMO], info
-    finally:
-        shutil.rmtree(sd, ignore_errors=True)
+#: Run 40280837914, verbatim: what `opencode models opencode --verbose` returns
+#: on a runner with NO credentials. It is a real, measured listing -- and it is
+#: INCOMPLETE: five of the six configured rungs are missing from it, while four
+#: of the ids it does carry are not served at all. Reproduced here on 2026-10-26
+#: by pointing the pinned 1.18.31 CLI at an empty home; the same binary with
+#: credentials returns nine models including every rung.
+#:
+#: One id is assembled rather than written: BANNED_RE in test_ladder_sync.py
+#: bans that literal because the repo already knows it is dead -- which is the
+#: sharpest proof that this catalogue is stale, on top of the five it drops.
+STALE_RUNG = "nemotron-" + "3-ultra-free"
+
+COLD_LISTING = (
+    _record("big-pickle", "Big Pickle", "active", 0, 0)
+    + _record("ling-3.0-flash-fin-free", "Ling", "active", 0, 0)
+    + _record("mimo-v2.5-free", "Mimo", "active", 0, 0)
+    + _record("muse-spark-1.2-contributor-free", "Muse 1.2", "active", 0, 0)
+    + _record("muse-spark-1.3-contributor-free", "Muse 1.3", "active", 0, 0)
+    + _record(STALE_RUNG, "Nemotron Ultra", "active", 0, 0)
+    + _record("nemotron-3.5-lightning-free", "Nemotron", "active", 0, 0)
+)
+
+COLD_DISCOVERED = [
+    "%s/big-pickle" % PROVIDER,
+    "%s/ling-3.0-flash-fin-free" % PROVIDER,
+    "%s/mimo-v2.5-free" % PROVIDER,
+    "%s/muse-spark-1.2-contributor-free" % PROVIDER,
+    "%s/muse-spark-1.3-contributor-free" % PROVIDER,
+    "%s/%s" % (PROVIDER, STALE_RUNG),
+    "%s/nemotron-3.5-lightning-free" % PROVIDER,
+]
+
+#: The five rungs run 40280837914 reported in `dropped_seed`.
+MEASURED_RUNGS = [
+    "%s/deepseek-v4.1-flash-free" % PROVIDER,
+    "%s/beam-free" % PROVIDER,
+    "%s/mimo-v2.6-flash-free" % PROVIDER,
+    "%s/glm-5.3-flash-free" % PROVIDER,
+    "%s/flint-40b-free" % PROVIDER,
+]
+
+
+def test_a_seed_absent_from_discovery_is_kept_not_dropped():
+    """ABSENCE FROM A LISTING IS NOT EVIDENCE. On 2026-10-26 the runner's
+    unauthenticated catalogue omitted five working models; the old rule read
+    that gap as "gone" and threw the whole measured ladder away."""
+    cfg = {"provider": PROVIDER, "ladder": list(MEASURED_RUNGS)}
+    selected, info = ms.select(cfg, ms.load_health(None), cache_path=None,
+                               max_models=None, now=1.0,
+                               discover_fn=lambda p: (
+                                   list(COLD_DISCOVERED), {"source": "live"}))
+    assert info["dropped_seed"] == [], (
+        "no record said these were gone, so none may be demoted: %r" % (info,))
+    assert selected[:len(MEASURED_RUNGS)] == MEASURED_RUNGS, (
+        "the configured ladder must lead, in order: %r" % (selected,))
+
+
+def test_discovery_appends_after_the_seed_and_cannot_reorder_it():
+    """The merge is seed-then-appended, never a union that ranking may shuffle
+    a seed out of pole position."""
+    cfg = {"provider": PROVIDER, "ladder": list(MEASURED_RUNGS[:2])}
+    selected, info = ms.select(cfg, ms.load_health(None), cache_path=None,
+                               max_models=None, now=1.0,
+                               discover_fn=lambda p: (
+                                   list(COLD_DISCOVERED), {"source": "live"}))
+    assert selected[:2] == MEASURED_RUNGS[:2], selected
+    appended = selected[2:]
+    assert appended == [m for m in COLD_DISCOVERED if m not in MEASURED_RUNGS], (
+        "discovery must appear only after the seed, in rank order: %r"
+        % (selected,))
+    assert info["dropped_seed"] == [], info
+
+
+def test_the_five_rungs_40280837914_dropped_survive_that_exact_catalogue():
+    """The regression: the production listing, model for model. Each of the five
+    must still be attempted, and in the configured order."""
+    cfg = {"provider": PROVIDER,
+           "ladder": [MEASURED_RUNGS[0], MEASURED_RUNGS[1]] + ["%s/nemotron-3.5-lightning-free" % PROVIDER]
+                     + [MEASURED_RUNGS[2], MEASURED_RUNGS[3], MEASURED_RUNGS[4]]}
+    ms.reset_discovery_memo()
+    selected, info = ms.select(cfg, ms.load_health(None), cache_path=None,
+                               max_models=None, now=1.0,
+                               discover_fn=lambda p: (
+                                   list(COLD_DISCOVERED), {"source": "live"}))
+    for rung in MEASURED_RUNGS:
+        assert rung in selected, (
+            "%s was dropped again by the %d-model cold catalogue: %r"
+            % (rung, len(COLD_DISCOVERED), info))
+    assert info["dropped_seed"] == [], info
+
+
+def test_a_seed_is_demoted_only_by_a_record_that_says_it_is_gone():
+    """Hard evidence: the catalogue printed a record for that exact id, and the
+    record's status is terminal. The reason is kept, so a log can say why."""
+    cfg = {"provider": PROVIDER,
+           "ladder": [SEED_BIG_PICKLE, "%s/retired-model" % PROVIDER]}
+    selected, info = ms.select(cfg, ms.load_health(None), cache_path=None,
+                               max_models=None, now=1.0,
+                               discover_fn=lambda p: ([SEED_BIG_PICKLE], {
+                                   "source": "live",
+                                   "catalogue_status": {
+                                       SEED_BIG_PICKLE: "active",
+                                       "%s/retired-model" % PROVIDER:
+                                           "deprecated"}}))
+    dropped = ["%s/retired-model" % PROVIDER]
+    assert info["dropped_seed"] == dropped, info
+    assert "deprecated" in info["dropped_seed_evidence"][dropped[0]], info
+    assert dropped[0] not in selected, selected
+    assert selected[0] == SEED_BIG_PICKLE, selected
 
 
 def test_the_config_seed_is_still_the_first_preference():
