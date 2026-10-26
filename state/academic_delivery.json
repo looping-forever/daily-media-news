@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "at_npt": "2026-10-26T15:55:51+0545",
+  "emitted": 0,
+  "deliveries_owed": 1,
+  "ntfy_delivered": 1,
+  "page_ok": true,
+  "dry_run": false,
+  "ok": true,
+  "reason": "degraded_delivered",
+  "degraded": true,
+  "monitor_exit_code": "3",
+  "degraded_payload_count": 1,
+  "payload_titles": [
+    "⚠️ Academic monitor DEGRADED (exit 3)"
+  ]
+}
