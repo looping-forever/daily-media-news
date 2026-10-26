@@ -111,6 +111,27 @@
       "title": "Nepal Oil Corporation requires VAT invoices for cooking gas sales",
       "category": "nepal",
       "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "in.ign.com/one-piece/275312/crunchyroll-finally-has-every-one-piece-episode-after-a-massive-catalog-update",
+      "title_hash": "94acf7193f5ed962d823f32f03c791cf807f68f7",
+      "title": "Crunchyroll adds complete One Piece catalog",
+      "category": "anime",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "in.ign.com/bleach-mirrors-high/275356/bleach-mirrors-high-confirms-launch-roster-13-returning-characters-and-5-kubo-originals",
+      "title_hash": "0ab1aa1a921ac6db94f5e52aa5a515b8c8f54178",
+      "title": "BLEACH Mirrors High confirms launch roster of 13 returning characters",
+      "category": "gaming",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cq398p1wd1evo",
+      "title_hash": "0554998e716a044d5b4fa9a09abd3e16d6c2edbc",
+      "title": "Anthropic files S-1 for planned stock market listing",
+      "category": "tech_career",
+      "date_sent": "2026-10-26"
     }
   ]
 }
