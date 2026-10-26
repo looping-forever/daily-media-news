@@ -54,7 +54,16 @@ REAL_UNKNOWN_NO_MARKER = "UnknownError: Unexpected server error\n"
 REAL_QUOTA = "429 Too Many Requests\nRetry-After: 30\n"
 REAL_AUTH = "401 Unauthorized: invalid api key\n"
 REAL_OUTAGE = "502 Bad Gateway\n"
-REAL_WATCHDOG = "%s no output for 90s; attempt abandoned\n" % ms.WATCHDOG_MARKER
+REAL_WATCHDOG = "%s no output for 60s; attempt abandoned\n" % ms.WATCHDOG_MARKER
+#: Captured 2026-10-26 from flint-40b-free, which printed this FIVE times from
+#: 12.6s, produced zero tokens, and still burned its whole allowance.
+REAL_ENDPOINT_GONE = ("AI_APICallError: Upstream request failed: "
+                      "Endpoint is unavailable.")
+
+
+def _stamp(line):
+    """The CLI prefixes its log lines with a clock."""
+    return "12:34:56.789 " + line
 
 
 class ClassifierTests(unittest.TestCase):
@@ -148,6 +157,24 @@ class ClassifierTests(unittest.TestCase):
                          ms.DECISIVE_CLASSES)
         for kind in ("provider_outage", "slow_or_stalled", "other"):
             self.assertNotIn(kind, ms.DECISIVE_CLASSES)
+
+    def test_the_measured_endpoint_failure_is_an_outage(self):
+        """THE LINE THAT COST FLINT ITS WHOLE ALLOWANCE. Captured 2026-10-26:
+
+            AI_APICallError: Upstream request failed: Endpoint is unavailable.
+
+        It matched no marker, so it classified `other` -- and an `other` is not
+        skipped, it is waited on. It is an OUTAGE, and an outage is deliberately
+        NOT decisive (a single 5xx may recover), so the kill comes from the
+        repeat breaker instead. Both halves are asserted here.
+        """
+        self.assertEqual("provider_outage",
+                         ms.classify_failure(REAL_ENDPOINT_GONE, 1))
+        self.assertEqual("provider_outage",
+                         ms.classify_failure(_stamp(REAL_ENDPOINT_GONE), 1))
+        self.assertIsNone(ms.classify_stream_line(REAL_ENDPOINT_GONE),
+                          "an outage must not be decisive: one 5xx is not death")
+        self.assertEqual(3, ms.REPEAT_OUTAGE_LIMIT)
 
 
 class DiscoveryGateTests(unittest.TestCase):
@@ -246,12 +273,29 @@ class WatchdogTests(unittest.TestCase):
         self.assertEqual(0, rc, sink.getvalue())
         self.assertNotIn(ms.WATCHDOG_MARKER, sink.getvalue())
 
-    def test_the_window_is_over_four_times_the_measured_first_token(self):
-        """90s vs the measured 12-20s to first token, and the 20.9s control run.
-        A number without its measurement is a guess, and this one would kill
-        working models."""
-        self.assertEqual(90, ms.NO_OUTPUT_WATCHDOG_SEC)
-        self.assertGreater(ms.NO_OUTPUT_WATCHDOG_SEC, 4.3 * 20.9)
+    def test_the_window_follows_the_measurement_per_model(self):
+        """ONE GLOBAL NUMBER CANNOT SERVE TWO MODELS 9x APART.
+
+        Measured on the real ~65k-token prompt (2026-10-26): deepseek's first
+        token at 14.59s, beam's at 137.63s. A single 60s window would kill beam
+        every time and make the only other working model unreachable; a single
+        window generous enough for beam would waste 180s on each dead model.
+        """
+        self.assertEqual(60, ms.no_output_sec_for(
+            "opencode/deepseek-v4.1-flash-free"))
+        self.assertEqual(240, ms.no_output_sec_for("opencode/beam-free"))
+        self.assertGreaterEqual(ms.no_output_sec_for(
+            "opencode/deepseek-v4.1-flash-free"), 4 * 14.59)
+        self.assertGreater(ms.no_output_sec_for("opencode/beam-free"), 137.63)
+        self.assertEqual(60, ms.no_output_sec_for("opencode/never-measured"))
+
+    def test_the_watchdog_resolves_the_window_from_the_model_id(self):
+        """The table is useless unless the SUPERVISOR actually consults it."""
+        self.assertEqual(240, mw.resolve_window(model="opencode/beam-free"))
+        self.assertEqual(60, mw.resolve_window(
+            model="opencode/deepseek-v4.1-flash-free"))
+        self.assertEqual(60, mw.resolve_window(model="opencode/unknown-free"))
+        self.assertEqual(5, mw.resolve_window(explicit=5))
 
     def test_a_rejected_attempt_is_killed_at_the_error_line(self):
         """THE 480s BURN, KILLED AT +1s. The child prints the measured rejection
@@ -298,19 +342,102 @@ class WatchdogTests(unittest.TestCase):
         self.assertEqual(0, rc, sink.getvalue())
         self.assertNotIn(mw.FATAL_MARKER, sink.getvalue())
 
+    def test_a_repeating_outage_is_abandoned_without_waiting_the_window(self):
+        """THE FLINT DEATH. Its endpoint answered with the same fatal line five
+        times and then hung, producing zero tokens, for the whole allowance.
+
+        The line is NOT decisive on its own (one 5xx may recover), so the kill
+        has to come from the repeat: identical fatal lines with no assistant
+        text. The window here is 30s and the kill must land in ~1s, which is
+        what proves the mechanism is the counter and not the silence clock.
+        """
+        sink = io.StringIO()
+        child = ("import time\n"
+                 "for _ in range(5):\n"
+                 "    print('12:34:56.789 ' + %r, flush=True)\n"
+                 "    time.sleep(0.3)\n"
+                 "time.sleep(60)\n") % REAL_ENDPOINT_GONE
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=30, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertEqual(mw.FAST_FAIL_RC, rc, sink.getvalue())
+        self.assertLess(elapsed, 15,
+                        "the attempt waited for the silence window instead of "
+                        "the repeating outage: %.1fs" % elapsed)
+        log = sink.getvalue()
+        self.assertIn(mw.FATAL_MARKER, log)
+        self.assertIn("kind=provider_outage", log)
+        self.assertIn("repeats=3", log)
+        self.assertNotIn(ms.WATCHDOG_MARKER, log,
+                         "this is a repeating outage, not silence")
+
+    def test_the_repeat_threshold_is_three_so_one_bad_second_keeps_its_chance(self):
+        """THE ASSERTION THAT KEEPS THE BREAKER FROM BEING A MARKER BLUDGEON.
+
+        One fatal line must never kill an attempt, and neither must two. Only
+        the third identical line -- with zero assistant text produced -- means
+        the endpoint is gone rather than flaky.
+        """
+        for count, expected_rc in ((1, 0), (2, 0), (3, mw.FAST_FAIL_RC)):
+            with self.subTest(lines=count):
+                sink = io.StringIO()
+                child = ("import time\n"
+                         "for _ in range(%d):\n"
+                         "    print('12:34:56.789 ' + %r, flush=True)\n"
+                         "for _ in range(3):\n"
+                         "    print('assistant text', flush=True)\n"
+                         "    time.sleep(0.2)\n") % (count, REAL_ENDPOINT_GONE)
+                rc = mw.supervise([sys.executable, "-c", child],
+                                  no_output_sec=30, sink=sink)
+                self.assertEqual(expected_rc, rc, sink.getvalue())
+
+    def test_a_repeating_line_after_assistant_text_is_not_an_outage_kill(self):
+        """A model that has ALREADY produced text is partially working; killing
+        it would throw the work away. The rule is 'zero assistant tokens'."""
+        sink = io.StringIO()
+        child = ("import time\n"
+                 "print('Here is the digest:', flush=True)\n"
+                 "for _ in range(5):\n"
+                 "    print('12:34:56.789 ' + %r, flush=True)\n"
+                 "    time.sleep(0.2)\n") % REAL_ENDPOINT_GONE
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=30, sink=sink)
+        self.assertEqual(0, rc, sink.getvalue())
+        self.assertNotIn(mw.FATAL_MARKER, sink.getvalue())
+
 
 class AllFailBoundTests(unittest.TestCase):
     def test_the_arithmetic_of_a_silent_all_fail_walk(self):
-        """6 models x 90s watchdog + 30s overhead = 570s = 9.5 min.
+        """THE 540s BOUND, COMPUTED FROM THE TABLE.
 
-        The 90s is the silence window; the per-attempt cap (360s) is never the
-        cost of a dead model any more, which is why the walk can no longer spend
-        6 x 360 = 2,160s.
+            deepseek 60 + beam 240 + mimo 60 + nemotron 60 + glm 60 + flint 60
+                = 540s = 9 min
+
+        Before the per-model table every rung cost one global window; before
+        the watchdog a dead rung cost its full 360s cap (6 x 360 = 2,160s).
+        The point of computing it FROM the table is that adding, removing or
+        re-measuring a model moves this number without anyone editing a test.
         """
-        self.assertEqual(570, ms.worst_case_all_fail_sec(6))
-        self.assertEqual(660, ms.worst_case_all_fail_sec(7))
-        self.assertLess(ms.worst_case_all_fail_sec(7), 19 * 60)
-        self.assertLess(ms.worst_case_all_fail_sec(7), 7 * ms.WALK_PER_ATTEMPT_SEC)
+        ladder = ms.ladder_model_ids()
+        self.assertEqual(6, len(ladder), ladder)
+        self.assertEqual(540, ms.worst_case_all_fail_sec(ladder))
+        self.assertEqual(540, ms.worst_case_all_fail_sec(),
+                         "the default must be the configured ladder")
+        self.assertEqual(570, ms.worst_case_all_fail_sec(ladder,
+                                                        overhead_sec=30))
+        # A seventh, unmeasured rung costs only the default window.
+        self.assertEqual(600, ms.worst_case_all_fail_sec(
+            ladder + ["opencode/some-new-free"]))
+        self.assertLessEqual(540, 9 * 60)
+        self.assertLess(540, 6 * ms.WALK_PER_ATTEMPT_SEC)
+
+    def test_a_ladder_without_beam_is_cheaper_which_proves_the_table_is_read(self):
+        """If the table were ignored, dropping beam would change nothing."""
+        ladder = [m for m in ms.ladder_model_ids()
+                  if m != "opencode/beam-free"]
+        self.assertEqual(300, ms.worst_case_all_fail_sec(ladder))
+        self.assertLess(ms.worst_case_all_fail_sec(ladder), 540)
 
     def test_the_arithmetic_of_a_rejected_all_fail_walk(self):
         """THE OBSERVED 2026-10-25 MODE: every model rejected at ~1s.
@@ -323,9 +450,9 @@ class AllFailBoundTests(unittest.TestCase):
         self.assertEqual(42, ms.fast_fail_all_fail_sec(6))
         self.assertLess(ms.fast_fail_all_fail_sec(6), 60)
         self.assertLess(ms.fast_fail_all_fail_sec(6),
-                        ms.worst_case_all_fail_sec(6),
+                        ms.worst_case_all_fail_sec(ms.ladder_model_ids()),
                         "a rejection must be cheaper than silence")
-        self.assertLess(ms.FAST_FAIL_SEC, ms.NO_OUTPUT_WATCHDOG_SEC)
+        self.assertLess(ms.FAST_FAIL_SEC, ms.NO_OUTPUT_DEFAULT_SEC)
 
 
 # ==========================================================================
@@ -424,11 +551,11 @@ class LadderPurityTests(unittest.TestCase):
 
     EXPECTED = [
         "opencode/deepseek-v4.1-flash-free",
-        "opencode/mimo-v2.6-flash-free",
-        "opencode/flint-40b-free",
-        "opencode/nemotron-3.5-lightning-free",
         "opencode/beam-free",
+        "opencode/mimo-v2.6-flash-free",
+        "opencode/nemotron-3.5-lightning-free",
         "opencode/glm-5.3-flash-free",
+        "opencode/flint-40b-free",
     ]
 
     def test_the_config_ladder_is_the_six_live_models(self):
@@ -436,6 +563,18 @@ class LadderPurityTests(unittest.TestCase):
         self.assertEqual(self.EXPECTED, cfg.get("ladder"))
         self.assertEqual(len(set(self.EXPECTED)), len(self.EXPECTED),
                          "a repeated rung is a wasted attempt")
+
+    def test_the_order_is_the_measurement(self):
+        """The two models that produced a digest are rungs 1 and 2; the known
+        hard failure is the LAST rung and is not deleted."""
+        cfg = ms.load_config(str(REPO_ROOT / "config" / "opencode.json"))
+        ladder = cfg.get("ladder") or []
+        self.assertEqual(["opencode/deepseek-v4.1-flash-free",
+                          "opencode/beam-free"], ladder[:2])
+        self.assertEqual("opencode/flint-40b-free", ladder[-1])
+        self.assertEqual(1, ladder.count("opencode/flint-40b-free"))
+        self.assertEqual(ladder, ms.ladder_model_ids(),
+                         "worst_case_all_fail_sec must read this same ladder")
 
     def test_no_dead_id_is_configured(self):
         dead = {"opencode/muse-spark-1.3-contributor-free",

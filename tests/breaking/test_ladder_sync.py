@@ -52,13 +52,21 @@ EXPECTED_PROVIDER = "opencode"
 # cap can no longer silently make a configured rung unreachable. Keep the two in
 # step -- test_breaking_fast_path asserts selected >= len(AI_MODELS) and
 # <= AI_MAX_MODELS, which is the invariant that catches a drift either way.
+# REORDERED 2026-10-26 FROM MEASUREMENT, not taste. The full ~65k-token prompt,
+# serial, one model at a time: deepseek WORKED (first token 14.59s, complete
+# 127.53s, 4 stories); beam WORKED but slow (first token 137.63s, 138.56s, 6
+# stories); mimo / nemotron / glm produced no assistant text by 150s; flint was
+# a HARD FAILURE. So the two models that have ever produced a digest are rungs
+# 1 and 2 -- the order a walk actually hits them in a bad week. flint is LAST,
+# deliberately NOT removed: it is a known hard failure, but it costs one silence
+# window when it fails, and dropping it would lose a rung if it recovers.
 EXPECTED_LADDER = [
     "opencode/deepseek-v4.1-flash-free",
-    "opencode/mimo-v2.6-flash-free",
-    "opencode/flint-40b-free",
-    "opencode/nemotron-3.5-lightning-free",
     "opencode/beam-free",
+    "opencode/mimo-v2.6-flash-free",
+    "opencode/nemotron-3.5-lightning-free",
     "opencode/glm-5.3-flash-free",
+    "opencode/flint-40b-free",
 ]
 
 #: The four IDs CI tried on 2026-10-25 that the catalogue did not serve. This is
@@ -271,8 +279,18 @@ def test_no_hardcoded_models_in_workflows():
     # silence watchdog and its failure is CLASSIFIED before the next model is
     # tried. Without these the breaker could be deleted and this guard would
     # still pass.
-    assert "model_watchdog.py" in step and "--no-output-sec" in step, \
+    # CHANGED 2026-10-26: the silence window is PER MODEL, so the watchdog is
+    # handed the model id and resolves its own measured window (deepseek 60s,
+    # beam 240s). A single global number is the defect: 60s would make beam --
+    # the only other model that has produced a digest -- unreachable forever.
+    assert "model_watchdog.py" in step, \
         "each attempt must run under the no-progress watchdog"
+    assert '--model "$model"' in step, \
+        ("the watchdog must be told WHICH model it supervises, so the "
+         "per-model window table can be resolved")
+    assert '--no-output-sec "$NOOUT"' not in step, \
+        ("the walk must not pass one global silence window to every attempt; "
+         "the window is measured per model")
     assert "--classify" in step and "model_not_found" in step \
         and "auth" in step, \
         "the walk must classify each failure and act on model_not_found/auth"
@@ -362,6 +380,30 @@ def test_no_model_id_is_hardcoded_in_the_ladder_consumers():
     print("  PASS: test_no_model_id_is_hardcoded_in_the_ladder_consumers")
 
 
+def test_the_measured_working_models_lead_and_the_known_failure_is_last():
+    """THE ORDER IS THE MEASUREMENT (2026-10-26, full ~65k-token prompt).
+
+    deepseek worked (14.59s to first token, 127.53s complete) and beam worked
+    but slow (137.63s to first token), so those two must be rungs 1 and 2: a
+    bad week must spend its time on the models that answer. flint is a KNOWN
+    HARD FAILURE and is kept as the LAST rung rather than deleted -- it costs
+    one silence window when it fails, and removing it would lose a rung if it
+    recovers. This test fails if someone tidies flint away or promotes it.
+    """
+    ladder = _load_config().get("ladder") or []
+    assert ladder[:2] == ["opencode/deepseek-v4.1-flash-free",
+                          "opencode/beam-free"], (
+        "the two models that have produced a digest must be tried first, in "
+        "measured order: %r" % (ladder[:2],))
+    assert ladder[-1] == "opencode/flint-40b-free", (
+        "the known hard failure must be the LAST rung, not removed and not "
+        "promoted: %r" % (ladder[-1] if ladder else None,))
+    assert ladder.count("opencode/flint-40b-free") == 1, \
+        "flint may appear exactly once: %r" % (ladder,)
+    print("  PASS: test_the_measured_working_models_lead_and_the_known_failure"
+          "_is_last")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -375,6 +417,7 @@ ALL_TESTS = [
     test_classifier_ladder_matches_config,
     test_run_flags_present,
     test_no_model_id_is_hardcoded_in_the_ladder_consumers,
+    test_the_measured_working_models_lead_and_the_known_failure_is_last,
 ]
 
 if __name__ == "__main__":

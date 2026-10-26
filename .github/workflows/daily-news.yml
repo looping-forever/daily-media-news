@@ -970,14 +970,14 @@ jobs:
           BUDGET=$(jq -r '.total_budget_sec // 1800' state/digest_model_select.json 2>/dev/null || echo 1800)
           PER=$(jq -r '.per_attempt_sec // 360' state/digest_model_select.json 2>/dev/null || echo 360)
           MIN=$(jq -r '.min_attempt_sec // 90' state/digest_model_select.json 2>/dev/null || echo 90)
-          # The no-progress window is stated by the selector too. 90s is over 4x
-          # the measured 12-20s first token, so a slow model is never killed and
-          # a stuck one costs 90s instead of the 360s per-attempt cap.
-          NOOUT=$(jq -r '.no_output_sec // 90' state/digest_model_select.json 2>/dev/null || echo 90)
+          # The no-progress window is PER MODEL and lives in the selector: the
+          # watchdog is handed the model id and looks up its own measured
+          # window (deepseek 60s, beam 240s, everything else 60s). A single
+          # global number cannot serve both -- 60s for beam, measured at
+          # 137.63s to first token, would make it unreachable forever.
           case "$BUDGET" in ''|*[!0-9]*) BUDGET=1800;; esac
           case "$PER" in ''|*[!0-9]*) PER=360;; esac
           case "$MIN" in ''|*[!0-9]*) MIN=90;; esac
-          case "$NOOUT" in ''|*[!0-9]*) NOOUT=90;; esac
           deadline=$(( $(date +%s) + BUDGET ))
           tried=0
           last_err="unknown"
@@ -994,12 +994,12 @@ jobs:
             echo "=== Attempt $tried with $model (allow ${allow}s) ==="
             run_rc=0
             # The watchdog sits INSIDE `timeout`: timeout still owns the total
-            # allowance, and the watchdog owns BOTH the decisive error line (it
-            # kills at ~1-2s when the provider rejects the call, which is what
-            # used to burn the full 480s producing nothing) and silence (90s,
-            # over four times the 20.9s control-run latency).
+            # allowance, and the watchdog owns all three measured deaths -- the
+            # decisive error line (~1-2s), the repeating outage (flint printed
+            # the same fatal line 5x from 12.6s and burned the lot), and
+            # silence, at the window the selector measured for THIS model.
             if cat prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
-              --no-output-sec "$NOOUT" -- \
+              --model "$model" -- \
               opencode run \
               --auto \
               --model "$model" \

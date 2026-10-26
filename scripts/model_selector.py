@@ -638,14 +638,41 @@ WALK_MIN_ATTEMPT_SEC = 90
 WALK_NO_WORK_TOTAL_BUDGET_SEC = 300
 
 
-#: The no-progress watchdog, and the measurement behind the number.
+#: The no-progress watchdog: a window PER MODEL, because one number cannot serve
+#: two models whose measured behaviour differs by a factor of nine.
 #:
-#: Measured on 2026-10-25: every live free model in the ladder answered with its
-#: first token in 12-20s. 90s is more than FOUR TIMES the slowest measured
-#: first token, so a model that is merely slow is never killed, while a model
-#: that will never answer is abandoned long before the 360s per-attempt cap --
-#: which is the whole point, because 360s is what a dead model used to cost.
-NO_OUTPUT_WATCHDOG_SEC = 90
+#: Measured on 2026-10-26 against the REAL prompt (26.8KB prompt + 231KB /
+#: 616-row candidates, ~65k tokens), serial, one model at a time:
+#:
+#:   deepseek-v4.1-flash-free   first token  14.59s, done 127.53s, 4 stories
+#:   beam-free                  first token 137.63s, done 138.56s, 6 stories
+#:   mimo-v2.6 / nemotron-3.5 / glm-5.3   no assistant text by 150s
+#:   flint-40b                  hard failure from 12.6s (see REPEAT_OUTAGE_LIMIT)
+#:
+#: 60s is ~4x deepseek's measured first token, which is the same margin the
+#: old global 90s had over the old measurement. But 60s for beam would make the
+#: ONLY other model that has ever produced a digest permanently unreachable, so
+#: beam gets 240s -- ~1.7x its measured 137.63s. A global window would be a
+#: taste decision with a measured casualty; this is the measurement instead.
+#:
+#: AND THE OTHER HALF, so nobody reads a quiet attempt as a dead one: stdout
+#: carries assistant TEXT only. The probe showed nemotron and glm alive and
+#: streaming TOOL CALLS with no text at all, so "no output" here means "no
+#: assistant text yet" -- these windows are the ONLY silence signal, and the
+#: repeat breaker below is a different signal entirely.
+NO_OUTPUT_BY_MODEL = {
+    "opencode/deepseek-v4.1-flash-free": 60,   # 14.59s measured -> ~4x margin
+    "opencode/beam-free": 240,                 # 137.63s measured -> ~1.7x margin
+}
+#: Every model the probe did not measure gets this. 60s is safe for them by
+#: construction: each produced NO text at 150s, so nothing is being cut short.
+NO_OUTPUT_DEFAULT_SEC = 60
+
+
+def no_output_sec_for(model_id):
+    """The silence window for `model_id`, or the default for an unmeasured one."""
+    return NO_OUTPUT_BY_MODEL.get(model_id, NO_OUTPUT_DEFAULT_SEC)
+
 
 #: Marker the watchdog prints when it abandons a silent attempt. It is in the
 #: attempt log, so a later classification does not have to guess why the
@@ -679,6 +706,7 @@ _AUTH_MARKERS = ("unauthorized", "invalid api key", "invalid_api_key",
 _OUTAGE_MARKERS = ("unknownerror", "unexpected server error",
                    "internal server error", "bad gateway",
                    "service unavailable", "gateway timeout",
+                   "endpoint is unavailable", "upstream request failed",
                    "econnreset", "econnrefused")
 
 #: HTTP status codes, matched with boundaries so a timestamp or a model id
@@ -721,20 +749,31 @@ def classify_failure(text, returncode=0):
     return "other"
 
 
-def worst_case_all_fail_sec(models=6, overhead_sec=30):
-    """Worst-case seconds for a walk in which EVERY attempt fails SILENTLY.
+def worst_case_all_fail_sec(models=None, overhead_sec=0):
+    """Worst-case seconds for a walk in which EVERY attempt goes SILENT.
 
-    Per attempt the CLI spends either ~3s (the measured not-found latency) or,
-    if it hangs, the watchdog window -- never the 360s per-attempt cap, because
-    a silent attempt is abandoned at NO_OUTPUT_WATCHDOG_SEC. So:
+    Computed FROM THE PER-MODEL TABLE, never from one guessed window. With the
+    configured six-rung ladder and the 2026-10-26 measurements:
 
-        models x 90 + overhead = 6 x 90 + 30 = 570s = 9.5 min
+        deepseek 60 + beam 240 + mimo 60 + nemotron 60 + glm 60 + flint 60
+            = 540s = 9 min
 
-    `overhead_sec` covers CLI cold start plus process setup per attempt. This is
-    the SILENCE bound; a quota/not-found rejection is far cheaper -- see
-    fast_fail_all_fail_sec().
+    (plus ~30s of CLI cold start for the whole walk, which `overhead_sec`
+    states separately so the 540 stays legible). This is the SILENCE bound.
+    A rejected or hard-failing attempt is far cheaper -- see
+    fast_fail_all_fail_sec(), and REPEAT_OUTAGE_LIMIT for the one that is not
+    silent but is still fatal.
     """
-    return int(models) * NO_OUTPUT_WATCHDOG_SEC + int(overhead_sec)
+    ids = ladder_model_ids() if models is None else models
+    return sum(no_output_sec_for(m) for m in ids) + int(overhead_sec)
+
+
+def ladder_model_ids():
+    """The configured seed ladder, in order, from config/opencode.json."""
+    return list((load_config(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "config", "opencode.json")) or {}).get("ladder") or [])
+
 
 
 #: Measured 2026-10-25: the provider answered `Free usage limit reached` 1.0s
@@ -745,8 +784,25 @@ FAST_FAIL_SEC = 2
 
 #: Classes that end the attempt the moment they appear on the stream. A
 #: provider_outage is NOT here: the CLI may recover from a 5xx by itself, so it
-#: keeps the 90s silence window instead of being cut at once.
+#: keeps the silence window instead of being cut at once.
 DECISIVE_CLASSES = ("model_not_found", "quota_or_rate_limited", "auth")
+
+#: THE REPEAT BREAKER -- the compensating rule for the line above, and NOT a
+#: marker bludgeon.
+#:
+#: Measured 2026-10-26: flint-40b-free emitted the identical fatal line
+#:
+#:     AI_APICallError: Upstream request failed: Endpoint is unavailable.
+#:
+#: FIVE times from 12.6s and still burned the whole allowance, producing zero
+#: tokens, because "Endpoint is unavailable" was classified `other` and a
+#: provider_outage is deliberately non-decisive. Making the marker decisive
+#: would kill a model that is merely having one bad second, so the rule is the
+#: REPEAT: the same fatal line REPEAT_OUTAGE_LIMIT times, with ZERO assistant
+#: text produced, means this endpoint is gone, not flaky. One 5xx still gets
+#: its chance -- which is the whole reason this is a counter and not a marker.
+REPEAT_OUTAGE_LIMIT = 3
+
 
 #: Error-shaped lines, required before a decisive line may kill a live attempt.
 #:
@@ -773,6 +829,17 @@ def _error_shaped(low):
         return True
     return bool(_STATUS_LINE.match(low)) and any(p in low
                                                  for p in _REASON_PHRASES)
+
+
+def is_error_shaped(line):
+    """True when `line` is a real error/log line rather than assistant prose.
+
+    Exposed because the watchdog needs the SAME test to tell "no assistant text
+    yet" (a live stream of tool calls) from "the CLI is printing failures". Two
+    implementations of that question would drift apart.
+    """
+    return _error_shaped((line or "").lower())
+
 
 
 def classify_stream_line(line):
@@ -1072,7 +1139,11 @@ def _main(argv=None):
         # single attempt could outlast its own walk, which is incoherent even
         # though the caller clamped it with min(remaining, PER).
         info["per_attempt_sec"] = min(args.per_attempt, total_budget)
-        info["no_output_sec"] = NO_OUTPUT_WATCHDOG_SEC
+        # Per model, because the window follows the measurement: the workflow
+        # hands the model id to the watchdog and the watchdog looks it up here.
+        info["no_output_sec_by_model"] = {m: no_output_sec_for(m)
+                                          for m in models}
+        info["no_output_sec_default"] = NO_OUTPUT_DEFAULT_SEC
         info["total_budget_sec"] = total_budget
         info["min_attempt_sec"] = WALK_MIN_ATTEMPT_SEC
         if args.no_work:

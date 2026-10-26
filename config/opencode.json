@@ -4,11 +4,11 @@
   "provider": "opencode",
   "ladder": [
     "opencode/deepseek-v4.1-flash-free",
-    "opencode/mimo-v2.6-flash-free",
-    "opencode/flint-40b-free",
-    "opencode/nemotron-3.5-lightning-free",
     "opencode/beam-free",
-    "opencode/glm-5.3-flash-free"
+    "opencode/mimo-v2.6-flash-free",
+    "opencode/nemotron-3.5-lightning-free",
+    "opencode/glm-5.3-flash-free",
+    "opencode/flint-40b-free"
   ],
   "flags": [
     "--auto",
