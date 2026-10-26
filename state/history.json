@@ -1,0 +1,32 @@
+{
+  "stories": [
+    {
+      "url_normalized": "pashplus.jp/anime/500145",
+      "title_hash": "610a77401f8771b8572a64f374df062fbb1367ee",
+      "title": "Bleach: Thousand-Year Blood War releases 50th episode",
+      "category": "anime",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/10/2043880/nepals-government-websites-begin-to-open",
+      "title_hash": "c63167560a86ad3574a71d82ebc95c11170b98f6",
+      "title": "Nepal government websites start returning after PHP flaw outage",
+      "category": "nepal",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "polygon.com/phantom-blade-zero-review",
+      "title_hash": "555de30b5b222d2e74420d2a19dbde8201190d83",
+      "title": "Phantom Blade Zero reviews praise fast wuxia combat",
+      "category": "gaming",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/business/sebon-tightens-anti-money-laundering-rules-for-stock-market",
+      "title_hash": "0d4700a2c266e36b32e50f79d70741cbca7a734c",
+      "title": "SEBON tightens stock-market anti-money-laundering rules",
+      "category": "nepal",
+      "date_sent": "2026-10-26"
+    }
+  ]
+}
