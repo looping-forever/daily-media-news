@@ -2978,6 +2978,21 @@ def render_index(out_dir, index_path, current_date, current_time):
     return True
 
 
+# The card markup one story emits. Counted in an existing page to answer "has
+# this slot already published stories?", which is the only question the guard
+# below needs answered.
+STORY_CARD_TAG = '<article class="card">'
+
+
+def count_story_cards(path):
+    """Story cards in an existing page, or None when the file is unreadable."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+            return handle.read().count(STORY_CARD_TAG)
+    except OSError:
+        return None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Render daily digest as a styled HTML page for GitHub Pages.")
     ap.add_argument("--digest-time", dest="digest_time", required=True,
@@ -3055,6 +3070,18 @@ def main(argv=None):
     # Write output file.
     out_name = "%s-%s.html" % (args.date, args.digest_time)
     out_path = os.path.join(args.out_dir, out_name)
+
+    # An empty build must never replace a page that already has stories. On
+    # 2026-10-26 the 20:43 run had zero stories and overwrote that evening's
+    # 13:35 page (3 stories) at the stable slot URL: an empty render is still a
+    # successful render, and the deploy gate on EMPTY_DIGEST does not protect
+    # the committed file. Exit non-zero so the caller's swap step is skipped.
+    published = count_story_cards(out_path) if os.path.isfile(out_path) else 0
+    if not stories and published:
+        print("render_digest: REFUSED to overwrite %s with a 0-story build; "
+              "the published page has %d story(ies)" % (out_path, published))
+        return 1
+
     if args.out_dir and not os.path.isdir(args.out_dir):
         os.makedirs(args.out_dir, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
