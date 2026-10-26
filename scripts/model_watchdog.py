@@ -21,16 +21,29 @@ Three different deaths were measured, and they need three triggers:
    (see model_selector.classify_stream_line), because a digest article can
    legitimately contain "rate limit" or "quota".
 
-2. SILENCE -- but per model, because one window cannot serve two models whose
-   measured time-to-first-token differs by a factor of nine:
+2. SILENCE -- in TWO windows, because time-to-first-token and the gap between
+   tokens are different questions and one number cannot answer both:
 
-       deepseek-v4.1-flash-free   14.59s  -> 60s window
-       beam-free                 137.63s  -> 240s window
-       everything else                      60s window
+       FIRST OUTPUT (nothing emitted yet), per model, from the measurement:
 
-   60s for beam would make the only other model that has ever produced a digest
-   permanently unreachable, which is why the table lives in model_selector.py
-   (NO_OUTPUT_BY_MODEL) and is read by name here.
+           deepseek-v4.1-flash-free   14.59s  -> 60s window
+           beam-free                 137.63s  -> 240s window
+           everything else                      60s window
+
+       60s for beam would make the only other model that has ever produced a
+       digest permanently unreachable, which is why that table lives in
+       model_selector.py (NO_OUTPUT_BY_MODEL) and is read by name here.
+
+       INTER TOKEN (text has begun), one generous number:
+
+           INTER_TOKEN_SEC = 240s
+
+   Run 40286310047 is why the second window exists. deepseek emitted early,
+   went quiet mid-generation, and the 60s window killed it at 112.9s of a
+   generation measured finishing at 127.53s -- 14.7s short -- so beam had to
+   finish the digest. Emission restarts the clock against the inter-token
+   window instead, and the per-attempt cap (360s) stays the real bound on a
+   slow attempt.
 
    AND THE TRAP, so a quiet attempt is never read as a dead one: stdout carries
    assistant TEXT only. The probe watched nemotron and glm stream TOOL CALLS
@@ -70,6 +83,8 @@ FAST_FAIL_RC = 125
 #: named. Matches NO_OUTPUT_DEFAULT_SEC, and duplicated only so this file still
 #: supervises something if that import fails.
 DEFAULT_NO_OUTPUT_SEC = 60
+#: Last-resort inter-token window, for the same reason. Matches INTER_TOKEN_SEC.
+DEFAULT_INTER_TOKEN_SEC = 240
 POLL_SEC = 0.1
 
 #: The classifier and the window table are SINGLE-SOURCED in model_selector, so
@@ -79,6 +94,7 @@ POLL_SEC = 0.1
 try:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from model_selector import (  # noqa: E402
+        INTER_TOKEN_SEC,
         REPEAT_OUTAGE_LIMIT,
         classify_failure,
         classify_stream_line,
@@ -88,6 +104,7 @@ try:
 except Exception:                                          # pragma: no cover
     classify_stream_line = classify_failure = is_error_shaped = None
     no_output_sec_for = None
+    INTER_TOKEN_SEC = DEFAULT_INTER_TOKEN_SEC
     REPEAT_OUTAGE_LIMIT = 3
 
 #: The CLI prefixes log lines with a clock. Two reports of the same dead
@@ -96,12 +113,19 @@ _TS_RE = re.compile(r"^\s*\d{1,2}:\d{2}:\d{2}(?:[.,]\d+)?\s*")
 
 
 def resolve_window(model=None, explicit=None):
-    """The silence window to enforce: an explicit number wins, else the table."""
+    """The FIRST-OUTPUT window: an explicit number wins, else the table."""
     if explicit is not None:
         return int(explicit)
     if model and no_output_sec_for is not None:
         return int(no_output_sec_for(model))
     return DEFAULT_NO_OUTPUT_SEC
+
+
+def resolve_inter_token_window(explicit=None):
+    """The window used once assistant text has begun. 240s unless overridden."""
+    if explicit is not None:
+        return int(explicit)
+    return int(INTER_TOKEN_SEC or DEFAULT_INTER_TOKEN_SEC)
 
 
 def _normal_key(line):
@@ -171,13 +195,16 @@ def _kill(proc):
             pass
 
 
-def supervise(cmd, no_output_sec=None, sink=None, model=None):
+def supervise(cmd, no_output_sec=None, sink=None, model=None,
+              inter_token_sec=None):
     """Run `cmd`; 124 if it went silent, 125 if it was rejected or repeating."""
     out = sink or sys.stdout
-    window = resolve_window(model=model, explicit=no_output_sec)
+    first = resolve_window(model=model, explicit=no_output_sec)
+    inter = resolve_inter_token_window(explicit=inter_token_sec)
     if classify_stream_line is None:
         print("model_watchdog: classifier unavailable; supervision is "
-              "silence-only (%ss)" % window, file=sys.stderr)
+              "silence-only (first_output=%ss inter_token=%ss)"
+              % (first, inter), file=sys.stderr)
     proc = subprocess.Popen(
         list(cmd), stdin=sys.stdin, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT, text=True, errors="replace",
@@ -205,6 +232,10 @@ def supervise(cmd, no_output_sec=None, sink=None, model=None):
                 out.flush()
                 reader.join(timeout=5)
                 return FAST_FAIL_RC
+            # TWO windows, one clock. Before any assistant text the attempt is
+            # judged on time-to-first-token; afterwards a gap is a long
+            # generation, not a dead one, so the generous window applies.
+            window = inter if state["text"] else first
             if time.monotonic() - state["last"] > float(window):
                 _kill(proc)
                 out.write("%s no output for %ss; attempt abandoned\n"
@@ -225,7 +256,7 @@ def supervise(cmd, no_output_sec=None, sink=None, model=None):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    explicit, model, cmd = None, None, []
+    explicit, inter_explicit, model, cmd = None, None, None, []
     i = 0
     while i < len(argv):
         arg = argv[i]
@@ -237,6 +268,14 @@ def main(argv=None):
                       file=sys.stderr)
                 return 2
             i += 2
+        elif arg == "--inter-token-sec" and i + 1 < len(argv):
+            try:
+                inter_explicit = int(argv[i + 1])
+            except ValueError:
+                print("model_watchdog: --inter-token-sec must be an integer",
+                      file=sys.stderr)
+                return 2
+            i += 2
         elif arg == "--model" and i + 1 < len(argv):
             model = argv[i + 1]
             i += 2
@@ -245,18 +284,20 @@ def main(argv=None):
             break
         else:
             print("model_watchdog: unknown argument %r (expected "
-                  "--model ID | --no-output-sec N -- CMD...)" % arg,
-                  file=sys.stderr)
+                  "--model ID | --no-output-sec N | --inter-token-sec N "
+                  "-- CMD...)" % arg, file=sys.stderr)
             return 2
     if not cmd:
         print("model_watchdog: no command after --", file=sys.stderr)
         return 2
-    window = resolve_window(model=model, explicit=explicit)
-    # Stated once, in the attempt log, so the window that was enforced is
+    first = resolve_window(model=model, explicit=explicit)
+    inter = resolve_inter_token_window(explicit=inter_explicit)
+    # Stated once, in the attempt log, so the windows that were enforced are
     # auditable afterwards instead of being inferred from the file's constants.
-    print("model_watchdog: window=%ss model=%s" % (window, model or "?"),
-          file=sys.stderr)
-    return supervise(cmd, no_output_sec=window)
+    print("model_watchdog: first_output=%ss inter_token=%ss model=%s"
+          % (first, inter, model or "?"), file=sys.stderr)
+    return supervise(cmd, no_output_sec=first, model=model,
+                     inter_token_sec=inter)
 
 
 if __name__ == "__main__":

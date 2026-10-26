@@ -666,8 +666,10 @@ WALK_MIN_ATTEMPT_SEC = 90
 WALK_NO_WORK_TOTAL_BUDGET_SEC = 300
 
 
-#: The no-progress watchdog: a window PER MODEL, because one number cannot serve
-#: two models whose measured behaviour differs by a factor of nine.
+#: The no-progress watchdog, window ONE: silence BEFORE the first assistant
+#: token. It is per model because one number cannot serve two models whose
+#: measured time-to-first-token differs by a factor of nine. Once text has
+#: begun, INTER_TOKEN_SEC (below) governs instead.
 #:
 #: Measured on 2026-10-26 against the REAL prompt (26.8KB prompt + 231KB /
 #: 616-row candidates, ~65k tokens), serial, one model at a time:
@@ -698,8 +700,43 @@ NO_OUTPUT_DEFAULT_SEC = 60
 
 
 def no_output_sec_for(model_id):
-    """The silence window for `model_id`, or the default for an unmeasured one."""
+    """The FIRST-OUTPUT window for `model_id`, or the default for an unmeasured one."""
     return NO_OUTPUT_BY_MODEL.get(model_id, NO_OUTPUT_DEFAULT_SEC)
+
+
+#: THE SECOND WINDOW, and the defect that forced it. Run 40286310047, 2026-10-26:
+#:
+#:     07:32:35 === Attempt 1 with opencode/deepseek-v4.1-flash-free (allow 360s)
+#:     07:34:28 __WATCHDOG_NO_OUTPUT__ no output for 60s; attempt abandoned
+#:     07:35:52 Agent wrote valid state/stories.json on attempt 2 (beam-free)
+#:
+#: deepseek had emitted early -- it was not silent -- then went quiet
+#: mid-generation, and the 60s window killed it at 112.9s of a generation that
+#: was measured finishing at 127.53s. 14.7s short, and the same model completes
+#: reliably outside CI. One window was serving two different questions.
+#:
+#: Time-to-FIRST-token is a property of the queue: 14.59s for deepseek, 137.63s
+#: for beam. A gap BETWEEN tokens is a long generation thinking. So the
+#: first-output windows stay exactly as measured (60s / 240s / 60s), and this
+#: one governs only AFTER text has begun.
+#:
+#: 240s cannot fire on either measured success: deepseek's widest observed gap
+#: is under 113s (first token 14.59s, done 127.53s) and beam's is ~1s (137.63s
+#: -> 138.56s). It is deliberately generous because it is NOT the bound on a
+#: slow attempt -- WALK_PER_ATTEMPT_SEC = 360s is -- so this window only has to
+#: catch a stream that is genuinely WEDGED, which is a multi-minute thing.
+INTER_TOKEN_SEC = 240
+
+
+def inter_token_sec_for(model_id=None):
+    """The gap allowed BETWEEN tokens, once assistant text has begun.
+
+    One number on purpose: unlike time-to-first-token, no two models here have
+    measured inter-token behaviour 9x apart, so a per-model table would be a
+    preference rather than a measurement. `model_id` is accepted so the
+    watchdog and the arithmetic below read the same shape as the TTFT table.
+    """
+    return INTER_TOKEN_SEC
 
 
 #: Marker the watchdog prints when it abandons a silent attempt. It is in the
@@ -778,22 +815,52 @@ def classify_failure(text, returncode=0):
 
 
 def worst_case_all_fail_sec(models=None, overhead_sec=0):
-    """Worst-case seconds for a walk in which EVERY attempt goes SILENT.
+    """Worst-case seconds for a walk in which EVERY attempt never EMITS at all.
 
-    Computed FROM THE PER-MODEL TABLE, never from one guessed window. With the
-    configured six-rung ladder and the 2026-10-26 measurements:
+    Computed FROM THE PER-MODEL FIRST-OUTPUT TABLE, never from one guessed
+    window. With the configured six-rung ladder and the 2026-10-26
+    measurements:
 
         deepseek 60 + beam 240 + mimo 60 + nemotron 60 + glm 60 + flint 60
             = 540s = 9 min
 
     (plus ~30s of CLI cold start for the whole walk, which `overhead_sec`
-    states separately so the 540 stays legible). This is the SILENCE bound.
-    A rejected or hard-failing attempt is far cheaper -- see
-    fast_fail_all_fail_sec(), and REPEAT_OUTAGE_LIMIT for the one that is not
-    silent but is still fatal.
+    states separately so the 540 stays legible). This is the SILENCE bound, and
+    it is unchanged by the split into two windows -- an attempt that never emits
+    never reaches the second one. The OTHER shape is
+    worst_case_emit_then_stall_sec(). A rejected or hard-failing attempt is far
+    cheaper -- see fast_fail_all_fail_sec(), and REPEAT_OUTAGE_LIMIT for the one
+    that is not silent but is still fatal.
     """
     ids = ladder_model_ids() if models is None else models
     return sum(no_output_sec_for(m) for m in ids) + int(overhead_sec)
+
+
+def worst_case_emit_then_stall_sec(models=None, per_attempt_cap=None,
+                                   overhead_sec=0):
+    """Worst-case seconds for a walk in which EVERY attempt emits, then WEDGES.
+
+    The second shape, and a different number. An attempt that emits and stalls
+    is measured against INTER_TOKEN_SEC from its LAST line, so its ceiling is
+    its first-output window plus that gap -- truncated by the per-attempt cap,
+    which is what actually protects a single attempt:
+
+        deepseek   min( 60 + 240, 360) = 300s
+        beam       min(240 + 240, 360) = 360s   <- the cap is binding
+        the other four                 = 300s each
+
+        = 300 + 360 + 4 * 300 = 1860s
+
+    1860s exceeds the 1800s walk budget, and that is worth stating plainly: in
+    this mode the budget and the per-attempt cap bound the run, not the silence
+    windows. The windows exist to make the COMMON case cheap; they are not the
+    ceiling on the pathological one.
+    """
+    ids = ladder_model_ids() if models is None else models
+    cap = WALK_PER_ATTEMPT_SEC if per_attempt_cap is None else int(per_attempt_cap)
+    total = sum(min(no_output_sec_for(m) + inter_token_sec_for(m), cap)
+                for m in ids)
+    return total + int(overhead_sec)
 
 
 def ladder_model_ids():

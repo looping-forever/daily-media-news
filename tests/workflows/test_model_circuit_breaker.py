@@ -297,6 +297,77 @@ class WatchdogTests(unittest.TestCase):
         self.assertEqual(60, mw.resolve_window(model="opencode/unknown-free"))
         self.assertEqual(5, mw.resolve_window(explicit=5))
 
+    def test_the_first_output_window_is_the_one_that_fires_before_any_text(self):
+        """NOTHING EMITTED -> the FIRST-OUTPUT window, not the generous one.
+
+        If a silent attempt were judged on the inter-token window it would cost
+        240s instead of 60s, and the all-fail walk would be four times longer.
+        """
+        sink = io.StringIO()
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c", "import time; time.sleep(30)"],
+                          no_output_sec=1, inter_token_sec=240, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertEqual(124, rc, sink.getvalue())
+        self.assertLess(elapsed, 15, "the first-output window did not fire")
+        self.assertIn("no output for 1s", sink.getvalue())
+
+    def test_the_inter_token_window_does_not_fire_at_the_first_output_window(self):
+        """THE REGRESSION, run 40286310047 -- and the whole reason for the split.
+
+        deepseek emitted at ~0.2s, went quiet mid-generation, and the 60s
+        first-output window killed it at 112.9s of a 127.53s generation. Once
+        text has begun the gap is a long generation, not a dead stream, so the
+        attempt must survive a gap far longer than the first-output window.
+        COLLAPSE THE TWO WINDOWS INTO ONE AND THIS TEST GOES RED AT 1s.
+        """
+        sink = io.StringIO()
+        child = ("import time\n"
+                 "print('Here is the digest:', flush=True)\n"
+                 "time.sleep(4)\n"
+                 "print('...and the rest of it, finished late.', flush=True)\n")
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=1, inter_token_sec=240, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertEqual(0, rc, sink.getvalue())
+        self.assertNotIn(ms.WATCHDOG_MARKER, sink.getvalue(),
+                         "a mid-generation gap was read as a dead stream")
+        self.assertGreaterEqual(elapsed, 4,
+                                "the gap must really have exceeded the first "
+                                "output window: %.1fs" % elapsed)
+
+    def test_the_inter_token_window_fires_at_its_own_limit(self):
+        """A genuinely WEDGED stream is still caught -- one window is not a
+        licence to hang. Text at 0.2s, then silence past the inter-token
+        window: 124, and the marker names the window that fired."""
+        sink = io.StringIO()
+        child = ("import time\n"
+                 "print('Here is the digest:', flush=True)\n"
+                 "time.sleep(30)\n")
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=1, inter_token_sec=2, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertEqual(124, rc, sink.getvalue())
+        self.assertLess(elapsed, 20, "the inter-token window never fired")
+        self.assertGreaterEqual(elapsed, 2)
+        self.assertIn("no output for 2s", sink.getvalue())
+
+    def test_the_inter_token_window_covers_both_measured_completions(self):
+        """240s cannot fire on a measured success: the widest gap either model
+        has ever shown is deepseek's 112.94s (14.59 -> 127.53) against beam's
+        ~0.93s. The per-attempt cap stays the real bound on a slow attempt."""
+        self.assertEqual(240, ms.INTER_TOKEN_SEC)
+        self.assertGreater(ms.INTER_TOKEN_SEC, 127.53 - 14.59)
+        self.assertGreater(ms.INTER_TOKEN_SEC, 138.56 - 137.63)
+        self.assertGreater(ms.INTER_TOKEN_SEC, ms.no_output_sec_for(
+            "opencode/deepseek-v4.1-flash-free"),
+            "the inter-token window must be the more generous of the two")
+        self.assertLess(ms.INTER_TOKEN_SEC, ms.WALK_PER_ATTEMPT_SEC)
+        self.assertEqual(240, mw.resolve_inter_token_window())
+        self.assertEqual(7, mw.resolve_inter_token_window(explicit=7))
+
     def test_a_rejected_attempt_is_killed_at_the_error_line(self):
         """THE 480s BURN, KILLED AT +1s. The child prints the measured rejection
         line and then hangs exactly as the CLI did. The watchdog must abandon it
@@ -438,6 +509,40 @@ class AllFailBoundTests(unittest.TestCase):
                   if m != "opencode/beam-free"]
         self.assertEqual(300, ms.worst_case_all_fail_sec(ladder))
         self.assertLess(ms.worst_case_all_fail_sec(ladder), 540)
+
+    def test_the_arithmetic_of_an_emit_then_stall_walk(self):
+        """THE OTHER WORST CASE, and a different number from the 540s bound.
+
+        An attempt that never emits costs its FIRST-OUTPUT window (540s over the
+        six rungs). An attempt that emits and then wedges is measured from its
+        last line, so it costs first-output + INTER_TOKEN, truncated by the
+        per-attempt cap:
+
+            deepseek   min( 60 + 240, 360) = 300
+            beam       min(240 + 240, 360) = 360   <- the cap is binding
+            other four                     = 300 each
+            = 1860s
+
+        1860s is longer than the 1800s walk budget, which is the honest reading:
+        in this mode the budget and the cap bound the run, not the windows.
+        """
+        ladder = ms.ladder_model_ids()
+        self.assertEqual(6, len(ladder), ladder)
+        self.assertEqual(1860, ms.worst_case_emit_then_stall_sec(ladder))
+        self.assertEqual(1860, ms.worst_case_emit_then_stall_sec(),
+                         "the default must be the configured ladder")
+        self.assertEqual(1890, ms.worst_case_emit_then_stall_sec(
+            ladder, overhead_sec=30))
+        self.assertEqual(
+            360,
+            min(ms.no_output_sec_for("opencode/beam-free") + ms.INTER_TOKEN_SEC,
+                ms.WALK_PER_ATTEMPT_SEC),
+            "beam's ceiling must be the cap, not the sum of the windows")
+        self.assertGreater(ms.worst_case_emit_then_stall_sec(ladder),
+                           ms.worst_case_all_fail_sec(ladder),
+                           "emitting then stalling must cost MORE than silence")
+        self.assertLessEqual(ms.worst_case_emit_then_stall_sec(ladder),
+                             6 * ms.WALK_PER_ATTEMPT_SEC)
 
     def test_the_arithmetic_of_a_rejected_all_fail_walk(self):
         """THE OBSERVED 2026-10-25 MODE: every model rejected at ~1s.
