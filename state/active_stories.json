@@ -420,6 +420,34 @@
       "deadline": null,
       "effective_date": "2026-10-19",
       "updated_at": "2026-10-26T18:19:03+05:45"
+    },
+    {
+      "event_id": "evt-5de9c68f3e4b",
+      "event_key": "nepal-oil-corp-vat-invoices-cooking-gas",
+      "canonical_title": "Nepal Oil Corporation requires VAT invoices for cooking gas sales",
+      "category": "nepal",
+      "first_seen": "2026-10-26",
+      "last_seen": "2026-10-26",
+      "first_reported": "2026-10-26",
+      "last_reported": "2026-10-26",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.nepalnews.com/s/business/nepal-oil-corporation-mandates-vat-invoices-for-cooking-gas-sales"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Nepal Oil Corporation has directed cooking-gas sellers to issue mandatory VAT invoices on liquefied petroleum gas sales after complaints that some retailers were not providing bills to customers. The directive is reported by Onlinekhabar and Nepalnews; the official notice itself was not available.",
+      "latest_development": "Reported: Nepal Oil Corporation has directed cooking-gas sellers to issue mandatory VAT invoices on liquefied petroleum gas sales after complaints that some retailers were not providing bills to customers. The directive is reported by Onlinekhabar and Nepalnews; the official notice itself was not available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-10-26",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-26T18:43:49+05:45"
     }
   ],
   "archived": []
