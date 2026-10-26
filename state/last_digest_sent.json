@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-25",
+  "date": "2026-10-26",
   "time": "evening",
   "stories": 1,
   "empty_digest": false,
@@ -12,5 +12,5 @@
   },
   "delivered": false,
   "dry_run": false,
-  "phase": "full"
+  "phase": "prebuild"
 }
