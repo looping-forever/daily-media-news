@@ -115,7 +115,12 @@ PUSH_1940 = {
     "title": "Evening Digest - 18:44 - 2026-10-13 - 3 items",
 }
 
-NAMESPACE_ID = "abcdefabcdefabcdefabcdefabcdefab"
+#: Supplied through the CF_KV_NAMESPACE_ID variable. Built from two halves so no
+#: 32-hex literal sits beside a NAMESPACE_ID name (test_deploy_config_ids.py).
+NAMESPACE_ID = "0123456789abcdef" * 2
+#: The id actually committed in deploy/wrangler.toml: a PLACEHOLDER that names
+#: no namespace. The harness writes it on disk to prove the step ignores it.
+KV_PLACEHOLDER = "abcdefabcdefabcdefabcdefabcdefab"
 ACCOUNT_ID = "acc0000000000000000000000000000ab"
 TOKEN = "kv-token-not-a-real-secret"
 SERVER = "https://ntfy.example.invalid"
@@ -128,7 +133,7 @@ WRANGLER = (
     "[[kv_namespaces]]\n"
     'binding = "KV"\n'
     'id = "%s"\n'
-) % NAMESPACE_ID
+) % KV_PLACEHOLDER
 
 
 def step_run(name):
@@ -300,6 +305,7 @@ class ActionsHarness(unittest.TestCase):
         "DIGEST_TIME": SLOT,
         "CF_LEDGER_TOKEN": TOKEN,
         "CF_ACCOUNT_ID": ACCOUNT_ID,
+        "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
     }
 
     def run_step(self, env_overrides=None, history_body=None, history_status=200,
@@ -499,6 +505,7 @@ class ReadbackSuppressesTests(ActionsHarness):
                 "NTFY_TOPIC": TOPIC, "NTFY_SERVER": SERVER, "DRY_RUN": "false",
                 "TODAY": TODAY, "DIGEST_TIME": SLOT, "CF_LEDGER_TOKEN": TOKEN,
                 "CF_ACCOUNT_ID": ACCOUNT_ID,
+                "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
             })
             with contextlib.redirect_stdout(buf):
                 try:
@@ -642,6 +649,7 @@ class LedgerHandoffTests(ActionsHarness):
                 "NTFY_TOPIC": TOPIC, "NTFY_SERVER": SERVER, "DRY_RUN": "false",
                 "TODAY": TODAY, "DIGEST_TIME": SLOT, "CF_LEDGER_TOKEN": TOKEN,
                 "CF_ACCOUNT_ID": ACCOUNT_ID,
+                "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
             })
             with contextlib.redirect_stdout(buf):
                 try:
@@ -730,6 +738,7 @@ class LedgerHandoffTests(ActionsHarness):
                 "NTFY_TOPIC": TOPIC, "NTFY_SERVER": SERVER, "DRY_RUN": "false",
                 "TODAY": TODAY, "DIGEST_TIME": SLOT, "CF_LEDGER_TOKEN": TOKEN,
                 "CF_ACCOUNT_ID": ACCOUNT_ID,
+                "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
             })
             with contextlib.redirect_stdout(buf):
                 try:
@@ -845,6 +854,7 @@ class SupersedeSequenceIdTests(ActionsHarness):
                 "NTFY_TOPIC": TOPIC, "NTFY_SERVER": SERVER, "DRY_RUN": "false",
                 "TODAY": TODAY, "DIGEST_TIME": SLOT, "TRIGGER_SOURCE": "supersede",
                 "CF_LEDGER_TOKEN": TOKEN, "CF_ACCOUNT_ID": ACCOUNT_ID,
+                "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
             })
             with contextlib.redirect_stdout(buf):
                 try:

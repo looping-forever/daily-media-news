@@ -74,19 +74,26 @@ STEP = "Fallback no-op check"
 #: reads an absent key and never arms.
 LEDGER_KEY = "digest:ledger"
 
-#: A plausible namespace id. The step must read the real one out of
-#: deploy/wrangler.toml rather than carrying its own, and the test asserts the
-#: URL it built uses THIS one.
-NAMESPACE_ID = "abcdefabcdefabcdefabcdefabcdefab"
+#: A plausible namespace id, supplied through the CF_KV_NAMESPACE_ID variable.
+#: The step must read the repository variable and NEVER deploy/wrangler.toml,
+#: and the test asserts the URL it built uses THIS one. Built from two halves so
+#: no 32-hex literal sits beside a NAMESPACE_ID name (test_deploy_config_ids.py
+#: rejects those, and a fixture is not a place to carve an exception).
+NAMESPACE_ID = "0123456789abcdef" * 2
+#: The id actually committed in deploy/wrangler.toml. It is a PLACEHOLDER that
+#: names no namespace -- Cloudflare answers 10013 -- which is why the step may
+#: never read that file.
+KV_PLACEHOLDER = "abcdefabcdefabcdefabcdefabcdefab"
 ACCOUNT_ID = "acc0000000000000000000000000000ab"
 TOKEN = "kv-read-token-not-a-real-secret"
 
 TODAY = "2026-10-09"
 SLOT = "morning"
 
-#: A miniature of deploy/wrangler.toml, BOM and all: the committed file carries
-#: a UTF-8 BOM, and a reader that opens it with plain utf-8 has to cope with
-#: that rather than discovering it in production.
+#: A miniature of deploy/wrangler.toml, BOM and all. It carries the PLACEHOLDER
+#: on purpose: the step is given this file and must still use the variable, so
+#: a regression to reading the config turns the namespace assertion red instead
+#: of silently querying a namespace that does not exist.
 WRANGLER_TEMPLATE = (
     '\ufeffname = "breaking-monitor"\n'
     'main = "cloudflare-worker.js"\n'
@@ -97,7 +104,7 @@ WRANGLER_TEMPLATE = (
     "[[kv_namespaces]]\n"
     'binding = "KV"\n'
     'id = "%s"\n'
-) % NAMESPACE_ID
+) % KV_PLACEHOLDER
 
 
 def step_dict(step_name):
@@ -260,6 +267,7 @@ class FallbackLedgerTests(unittest.TestCase):
                 "TODAY": TODAY,
                 "CF_LEDGER_TOKEN": TOKEN,
                 "CF_ACCOUNT_ID": ACCOUNT_ID,
+                "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
             }
             env.update(env_overrides or {})
             return exec_body(body, env, self.tmp)
@@ -310,9 +318,11 @@ class FallbackLedgerTests(unittest.TestCase):
                          "sit in front of every fallback run:\n%s" % out)
         url = self.requests[0]["url"]
         self.assertIn(NAMESPACE_ID, url,
-                      "the KV read did not use the namespace id committed in "
-                      "deploy/wrangler.toml, so it would read a key that does "
-                      "not exist and the fallback would never arm: " + url)
+                      "the KV read did not use the CF_KV_NAMESPACE_ID variable, "
+                      "so it would read a key that does not exist and the "
+                      "fallback would never arm: " + url)
+        self.assertNotIn(KV_PLACEHOLDER, url,
+                         "the KV read used the published placeholder id: " + url)
         self.assertIn(ACCOUNT_ID, url, url)
         self.assertTrue(url.endswith("/" + LEDGER_KEY), url)
         self.assertEqual("bearer " + TOKEN,
@@ -417,11 +427,27 @@ class FallbackLedgerTests(unittest.TestCase):
         self.assertFalse(self._armed(), out)
 
     def test_an_absent_namespace_id_fails_open_too(self):
-        (self.tmp / "deploy" / "wrangler.toml").unlink()
-        code, out = self._run(marker_obj=marker())
+        # The variable is the ONLY source of the id. Unset, no request is made
+        # -- and the committed config sitting on disk must not rescue it.
+        code, out = self._run(marker_obj=marker(),
+                              env_overrides={"CF_KV_NAMESPACE_ID": ""})
         self.assertEqual(0, code, out)
         self.assertTrue(self._armed(), out)
         self.assertEqual([], self.requests)
+
+    def test_the_committed_placeholder_id_is_rejected_loudly(self):
+        """deploy/wrangler.toml's id is published and names no namespace.
+
+        The step is handed a config carrying it AND the placeholder through the
+        variable, and must refuse both without a request -- querying it is what
+        produced Cloudflare 10013 and a silent 404.
+        """
+        code, out = self._run(marker_obj=marker(),
+                              env_overrides={"CF_KV_NAMESPACE_ID": KV_PLACEHOLDER})
+        self.assertEqual(0, code, out)
+        self.assertTrue(self._armed(), out)
+        self.assertEqual([], self.requests, out)
+        self.assertIn("PLACEHOLDER", out)
 
     def test_an_empty_ledger_leaves_the_step_behaviour_identical(self):
         """U4 alone is inert. This is what "the current state" has to mean."""

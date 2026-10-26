@@ -449,6 +449,9 @@ jobs:
           # Both already exist for the Pages deploy below; neither is new.
           CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          # The namespace id, from a repository variable. Not a secret: an id
+          # grants nothing without the token above.
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
         run: |
           set -eo pipefail
           python3 - <<'PY'
@@ -459,7 +462,13 @@ jobs:
           # trusting it, because a second copy is a second place to correct.
           LEDGER_KEY = 'digest:ledger'
           KV_API = 'https://api.cloudflare.com/client/v4'
-          WRANGLER = 'deploy/wrangler.toml'
+          # THE ONLY SOURCE OF THE NAMESPACE ID: a repository VARIABLE, not a
+          # secret (an id grants nothing without a token). deploy/wrangler.toml
+          # carries a PLACEHOLDER and is deliberately never read -- reading it
+          # is what made every run query a namespace that does not exist
+          # (Cloudflare 10013, HTTP 404).
+          KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
+          KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           KIND_UNAVAILABLE = 'unavailable'
           # The same literal digest-prebuild.yml's seal lists in its
           # SUPERSEDED_KINDS -- the three kinds a complete digest may replace --
@@ -519,23 +528,48 @@ jobs:
                           and not marked.get('dry_run', False) and stories > 0)
 
           def kv_namespace():
-              """The KV namespace id, read from deploy/wrangler.toml at run time.
+              """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
 
-              The committed config is what `wrangler deploy` binds, so it is the
-              only place this id is written down. The file carries a UTF-8 BOM,
-              hence utf-8-sig rather than utf-8.
+              NEVER deploy/wrangler.toml: its id is a published placeholder that
+              names no namespace. There is deliberately no fallback — an absent,
+              malformed or placeholder value returns '' and says which it was, so
+              this step stands down loudly instead of querying a namespace that
+              cannot answer.
               """
-              try:
-                  with open(WRANGLER, encoding='utf-8-sig') as fh:
-                      text = fh.read()
-              except OSError as exc:
-                  print(f'cannot read {WRANGLER} ({exc}) — the file rule alone decides')
+              raw = (os.environ.get(KV_NAMESPACE_ENV) or '').strip()
+              if not raw:
+                  print(f'{KV_NAMESPACE_ENV} is unset — there is no fallback to '
+                        f'deploy/wrangler.toml, whose id is a placeholder')
                   return ''
-              match = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
-                                text, re.S)
-              if not match:
-                  print(f'{WRANGLER} declares no KV namespace id — the file rule alone decides')
-              return match.group(1) if match else ''
+              if not re.fullmatch(r'[0-9a-fA-F]{32}', raw):
+                  print(f'{KV_NAMESPACE_ENV} is not a 32-hex namespace id (value not shown)')
+                  return ''
+              if raw.lower() == KV_PLACEHOLDER:
+                  print(f'{KV_NAMESPACE_ENV} is the PLACEHOLDER id committed in '
+                        f'deploy/wrangler.toml — it names no namespace; set the '
+                        f'repository variable to the real id')
+                  return ''
+              return raw
+
+          def kv_error_detail(exc):
+              """(HTTP status, Cloudflare errors[0].code, printable label).
+
+              The body is read ONCE, here. The label never quotes the request
+              URL, because that URL carries the account and namespace ids.
+              10013 is "namespace not found"; 10009 is "key not found", i.e. an
+              empty ledger rather than a broken namespace.
+              """
+              status = getattr(exc, 'code', None)
+              code = None
+              if status is not None:
+                  try:
+                      payload = json.loads((exc.read() or b'').decode('utf-8', 'replace'))
+                      code = (payload.get('errors') or [{}])[0].get('code')
+                  except Exception:
+                      code = None
+              printable = (f'HTTP {status}, Cloudflare code {code or "none"}'
+                           if status is not None else exc.__class__.__name__)
+              return status, code, printable
 
           def ledger_verdict():
               """'arm' | 'no_arm' | 'unknown' for this slot, from the ledger.
@@ -561,7 +595,7 @@ jobs:
                   return UNKNOWN
               namespace = kv_namespace()
               if not namespace:
-                  LEDGER_REASON = 'no KV namespace id in deploy/wrangler.toml'
+                  LEDGER_REASON = 'no KV namespace id in CF_KV_NAMESPACE_ID'
                   return UNKNOWN
               url = (f'{KV_API}/accounts/{account}/storage/kv/namespaces/{namespace}'
                      f'/values/{LEDGER_KEY}')
@@ -575,10 +609,17 @@ jobs:
                   # A 403 HERE IS THE MIS-SCOPED-TOKEN CASE, and it is the one
                   # this log line exists for. Nothing below tries to tell it
                   # apart from a 5xx or a timeout — a wrong guess would hide
-                  # the other cause — but printing the exception's own words
-                  # makes it readable from the run without any guessing.
-                  LEDGER_REASON = f'read failed ({exc.__class__.__name__}: {exc})'
-                  print(f'WARNING: the delivery ledger could not be read ({exc}) — '
+                  # the other cause — but printing the status and Cloudflare's
+                  # OWN error code makes it readable from the run without any
+                  # guessing, and 10013 names a namespace that does not exist.
+                  status, code, detail = kv_error_detail(exc)
+                  if status == 404 and code == 10009:
+                      LEDGER_REASON = 'ledger key absent (HTTP 404 / Cloudflare 10009)'
+                      print('the KV ledger key is absent (HTTP 404, Cloudflare 10009) '
+                            '— an empty ledger; the file rule alone decides')
+                      return UNKNOWN
+                  LEDGER_REASON = f'read failed ({detail})'
+                  print(f'WARNING: the delivery ledger could not be read ({detail}) — '
                         f'falling back to the file rule; a KV outage must never '
                         f'stand the fallback ladder down')
                   return UNKNOWN
@@ -1504,6 +1545,12 @@ jobs:
           # this arm already delivered.
           CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          # The namespace id, from a repository variable -- never a secret, and
+          # never the placeholder in deploy/wrangler.toml.
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
+          # The Pages origin for the push's click link. Not committed: the public
+          # repository must not carry the real host.
+          CF_ARCHIVE_ORIGIN: ${{ vars.CF_ARCHIVE_ORIGIN }}
         run: |
           set -eo pipefail
           # Rich, self-contained notification: full digest markdown, image,
@@ -1689,27 +1736,49 @@ jobs:
           # use; this step adds no new credential.
           LEDGER_KEY = 'digest:ledger'
           KV_API = 'https://api.cloudflare.com/client/v4'
-          WRANGLER = 'deploy/wrangler.toml'
+          # Same resolver as 'Fallback no-op check': the id comes from a
+          # repository VARIABLE and never from deploy/wrangler.toml, whose
+          # committed id is a placeholder that names no namespace.
+          KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
+          KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           LEDGER_RETENTION_DAYS = 7
           SCHEMA_VERSION = 1
 
           def kv_namespace():
-              """The KV namespace id, read from deploy/wrangler.toml at run time.
+              """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
 
-              The committed config is what `wrangler deploy` binds, so it is the
-              only place this id is written down. The file carries a UTF-8 BOM,
-              hence utf-8-sig rather than utf-8.
+              An absent, malformed or placeholder value returns '' — there is no
+              fallback, because the only other place the id is written down is a
+              published placeholder.
               """
-              try:
-                  with open(WRANGLER, encoding='utf-8-sig') as fh:
-                      text = fh.read()
-              except OSError:
+              raw = (os.environ.get(KV_NAMESPACE_ENV) or '').strip()
+              if not raw or not re.fullmatch(r'[0-9a-fA-F]{32}', raw):
                   return ''
-              match = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
-                                text, re.S)
-              return match.group(1) if match else ''
+              if raw.lower() == KV_PLACEHOLDER:
+                  return ''
+              return raw
+
+          def kv_error_detail(exc):
+              """(HTTP status, Cloudflare errors[0].code, printable label).
+
+              The body is read ONCE. The label never quotes the request URL,
+              which carries the account and namespace ids.
+              """
+              status = getattr(exc, 'code', None)
+              code = None
+              if status is not None:
+                  try:
+                      payload = json.loads((exc.read() or b'').decode('utf-8', 'replace'))
+                      code = (payload.get('errors') or [{}])[0].get('code')
+                  except Exception:
+                      code = None
+              printable = (f'HTTP {status}, Cloudflare code {code or "none"}'
+                           if status is not None else exc.__class__.__name__)
+              return status, code, printable
 
           def kv_configured():
+              # kv_namespace() is the placeholder gate: a placeholder id makes
+              # this False, so no request is attempted with it.
               return bool((os.environ.get('CF_LEDGER_TOKEN') or '').strip()
                           and (os.environ.get('CF_ACCOUNT_ID') or '').strip()
                           and kv_namespace())
@@ -1733,9 +1802,17 @@ jobs:
                   with urllib.request.urlopen(request, timeout=30) as response:
                       raw = response.read().decode('utf-8', errors='replace')
               except Exception as exc:
-                  # CLASS NAME ONLY, NEVER THE MESSAGE -- see the read-back above.
+                  # STATUS AND CLOUDFLARE'S OWN CODE, NEVER THE URL: 10013 is a
+                  # namespace that does not exist, 10009 is a key that does not
+                  # exist -- and the second one means an EMPTY ledger, not a
+                  # broken one, so it is answered as empty rather than unknown.
+                  status, code, detail = kv_error_detail(exc)
+                  if status == 404 and code == 10009:
+                      print('the KV ledger key is absent (HTTP 404, Cloudflare 10009) '
+                            '— treating the ledger as empty')
+                      return {'schema_version': SCHEMA_VERSION, 'days': {}}
                   print('WARNING: the KV delivery ledger could not be read (%s)'
-                        % exc.__class__.__name__)
+                        % detail)
                   return None
               if not raw.strip():
                   return {'schema_version': SCHEMA_VERSION, 'days': {}}
@@ -2027,13 +2104,14 @@ jobs:
                   # that has been mis-scoped for months is otherwise invisible:
                   # the digest still goes out, so nothing else in this run ever
                   # says so. This line is the only place it is ever said.
+                  _, _, detail = kv_error_detail(exc)
                   print('::error::KV write FAILED (%s). This push was DELIVERED '
                         'but the Worker\'s duplicate guard cannot see it, so the '
                         'next run for %s %s may publish a second copy. The push '
                         'itself is not in doubt. Grant CF_PAGES_API_TOKEN the '
                         'Account > KV Storage > Write permission and confirm the '
-                        'namespace id in %s.'
-                        % (exc.__class__.__name__, date, slot, WRANGLER))
+                        'namespace id in the CF_KV_NAMESPACE_ID repository variable.'
+                        % (detail, date, slot))
                   return False
 
           def main():
@@ -2489,7 +2567,19 @@ jobs:
               # deleted 2026-10-03. Do NOT reintroduce a proxy in front of the
               # origin: it cannot add protection the origin does not already
               # have, and it can only add a second identity prompt.
-              pages_url = 'https://daily-digest.example.pages.dev/digests/%s-%s.html' % (today, kind)
+              # THE ORIGIN IS NOT COMMITTED. scripts/check_public_sanitisation.py
+              # forbids the real Pages host in this repository, so it comes from
+              # the CF_ARCHIVE_ORIGIN repository variable. The fallback below is
+              # the committed placeholder and is NOT reachable -- it is kept only
+              # so a missing variable degrades to today's behaviour instead of a
+              # crash, and it says so in the log.
+              archive_origin = (os.environ.get('CF_ARCHIVE_ORIGIN') or '').strip().rstrip('/')
+              if not archive_origin:
+                  archive_origin = 'https://daily-digest.example.pages.dev'
+                  print('WARNING: CF_ARCHIVE_ORIGIN is unset, so this push links to the '
+                        'placeholder host, which is not reachable. Set the repository '
+                        'variable to the real Pages origin.')
+              pages_url = '%s/digests/%s-%s.html' % (archive_origin, today, kind)
 
               # --- Build full digest markdown (HARD LIMIT 4096 bytes) ---
               MAX_BYTES = 4096

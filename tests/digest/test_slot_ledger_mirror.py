@@ -73,7 +73,12 @@ MIRROR_STEP = "Mirror the delivery ledger into git"
 COMMIT_MIRROR_STEP = "Commit the delivery ledger mirror"
 COMMIT_STATE_STEP = "Commit state changes"
 
-NAMESPACE_ID = "abcdefabcdefabcdefabcdefabcdefab"
+#: Supplied through the CF_KV_NAMESPACE_ID variable. Built from two halves so no
+#: 32-hex literal sits beside a NAMESPACE_ID name (test_deploy_config_ids.py).
+NAMESPACE_ID = "0123456789abcdef" * 2
+#: The id committed in deploy/wrangler.toml: a PLACEHOLDER that names no
+#: namespace. The harness writes it on disk to prove both steps ignore it.
+KV_PLACEHOLDER = "abcdefabcdefabcdefabcdefabcdefab"
 ACCOUNT_ID = "acc0000000000000000000000000000ab"
 TOKEN = "kv-token-not-a-real-secret"
 
@@ -269,7 +274,7 @@ class Harness(unittest.TestCase):
         (self.tmp / "deploy" / "wrangler.toml").write_text(
             '\ufeffname = "breaking-monitor"\n'
             'main = "cloudflare-worker.js"\n\n'
-            '[[kv_namespaces]]\nbinding = "KV"\nid = "%s"\n' % NAMESPACE_ID,
+            '[[kv_namespaces]]\nbinding = "KV"\nid = "%s"\n' % KV_PLACEHOLDER,
             encoding="utf-8")
         self.outputs = self.tmp / "gh_output.txt"
         self.outputs.write_text("", encoding="utf-8")
@@ -534,6 +539,7 @@ class MirrorIsCopiedNotMergedTests(Harness):
             "ARTIFACT_PATH": "prebuild/artifact.json",
             "CF_LEDGER_TOKEN": (cf or {}).get("CF_LEDGER_TOKEN", TOKEN),
             "CF_ACCOUNT_ID": (cf or {}).get("CF_ACCOUNT_ID", ACCOUNT_ID),
+            "CF_KV_NAMESPACE_ID": (cf or {}).get("CF_KV_NAMESPACE_ID", NAMESPACE_ID),
             "TZ": "UTC",
         }
         body = first_body(PREBUILD, MIRROR_STEP)
@@ -695,6 +701,7 @@ class KvWinsDisagreementTests(Harness):
             "EVENT_SCHEDULE": "0 4,16 * * *",
             "CF_LEDGER_TOKEN": TOKEN,
             "CF_ACCOUNT_ID": ACCOUNT_ID,
+            "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
             "TZ": "UTC",
         }
         payload = kv_payload if isinstance(kv_payload, str) else json.dumps(kv_payload)

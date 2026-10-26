@@ -4700,7 +4700,9 @@ class DeletedDigestAuthWorkerTests(unittest.TestCase):
     """
 
     DEAD_HOST = "digest-auth.example.workers.dev"
-    LIVE_HOST = "breaking-monitor.example.workers.dev"
+    # The real Worker host. deploy/schedule.json names it, so every health poll
+    # reaches the deployment that exists instead of a placeholder subdomain.
+    LIVE_HOST = "breaking-monitor.alishmainalee4.workers.dev"
     SCANNED = ("scripts", "templates", "prompts", "config", "deploy",
                ".github/workflows")
 
@@ -4737,7 +4739,7 @@ class DeletedDigestAuthWorkerTests(unittest.TestCase):
             blob = self._read(path) or ""
             found.update(re.findall(r"https?://([a-z0-9.-]*workers\.dev)", blob))
         self.assertEqual(
-            {"breaking-monitor.example.workers.dev"}, found,
+            {"breaking-monitor.alishmainalee4.workers.dev"}, found,
             "unexpected workers.dev host(s) in the repo: %s" % sorted(found))
 
     def test_the_worker_source_files_are_gone(self):

@@ -787,10 +787,9 @@ class ThinOrchestratorTests(unittest.TestCase):
         self.assertIn(
             "workflows/daily-news.yml/dispatches", supersede_raw,
             "the seal job dispatches something other than daily-news.yml")
-        # COMMAND position, not the bare substring: this step legitimately
-        # READS deploy/wrangler.toml for the KV namespace id, and reading a
-        # committed config file is the opposite of invoking wrangler. An `echo`
-        # telling the reader to run something is likewise not an invocation.
+        # COMMAND position, not the bare substring: the step reads the KV
+        # namespace id from the CF_KV_NAMESPACE_ID repository variable, and an
+        # `echo` telling the reader to run something is not an invocation.
         for forbidden in (r"(?:^|[|;&(]\s*|npx\s+)wrangler\b",
                           r"pages/deploy", r"\bgit\s+push\b"):
             self.assertIsNone(

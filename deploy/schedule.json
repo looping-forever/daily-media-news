@@ -239,7 +239,7 @@
       "on_failure": "a due retry is not dialled until the next ladder tick (at most 15 min later); the 04/16 watchdog pair still runs the job and the Worker never touches state/digest_retry.json, so the ladder is late, never lost"
     }
   },
-  "health_url": "https://breaking-monitor.example.workers.dev/?health=1",
+  "health_url": "https://breaking-monitor.alishmainalee4.workers.dev/?health=1",
   "worker": "deploy/cloudflare-worker.js",
   "wrangler_config": "deploy/wrangler.toml",
   "health_check_cron": "17 * * * *",

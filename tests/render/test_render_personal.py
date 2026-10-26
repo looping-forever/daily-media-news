@@ -1890,9 +1890,16 @@ class DigestLinkHostTests(unittest.TestCase):
             self._assert_clean("rendered %s" % name, surfaces[name])
 
     def test_the_workflow_literal_is_the_origin(self):
-        """The constant itself, so a bad edit fails here and not in production."""
-        self.assertIn("pages_url = '%s/digests/%%s-%%s.html'" % self.ORIGIN,
+        """The origin, so a bad edit fails here and not in production.
+
+        The real host is NOT committed (scripts/check_public_sanitisation.py
+        forbids it): the step reads CF_ARCHIVE_ORIGIN and falls back to this
+        placeholder with a warning, so the fallback is what is pinned here.
+        """
+        self.assertIn("archive_origin = 'https://daily-digest.example.pages.dev'",
                       ntfy_source())
+        self.assertIn("os.environ.get('CF_ARCHIVE_ORIGIN')", ntfy_source())
+        self.assertIn("/digests/%s-%s.html", ntfy_source())
         # Only the HOST is forbidden in source: the heredoc documents in a
         # comment why the Worker was removed, and that history should survive.
         self._assert_no_dead_host("ntfy heredoc source", ntfy_source())

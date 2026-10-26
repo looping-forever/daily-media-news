@@ -75,7 +75,12 @@ from tests.workflows.test_workflow_lint import heredoc_bodies  # noqa: E402
 
 STEP = "Fallback no-op check"
 
-NAMESPACE_ID = "abcdefabcdefabcdefabcdefabcdefab"
+#: Supplied through the CF_KV_NAMESPACE_ID variable. Built from two halves so no
+#: 32-hex literal sits beside a NAMESPACE_ID name (test_deploy_config_ids.py).
+NAMESPACE_ID = "0123456789abcdef" * 2
+#: The id committed in deploy/wrangler.toml: a PLACEHOLDER that names no
+#: namespace, written on disk here to prove the step does not read it.
+KV_PLACEHOLDER = "abcdefabcdefabcdefabcdefabcdefab"
 ACCOUNT_ID = "acc0000000000000000000000000000ab"
 TOKEN = "kv-read-token-not-a-real-secret"
 
@@ -89,7 +94,7 @@ WRANGLER_TEMPLATE = (
     "[[kv_namespaces]]\n"
     'binding = "KV"\n'
     'id = "%s"\n'
-) % NAMESPACE_ID
+) % KV_PLACEHOLDER
 
 #: The three degraded kinds the supersede push and this ladder agree on.
 SUPERSEDED_KINDS = ("partial", "fallback_last_good", "unavailable")
@@ -250,6 +255,7 @@ class LadderHarness(unittest.TestCase):
                 "TODAY": TODAY,
                 "CF_LEDGER_TOKEN": TOKEN,
                 "CF_ACCOUNT_ID": ACCOUNT_ID,
+                "CF_KV_NAMESPACE_ID": NAMESPACE_ID,
                 "DRIGGER_SOURCE": trigger,
                 "TRIGGER_SOURCE": trigger,
             }

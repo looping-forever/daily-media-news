@@ -459,6 +459,9 @@ jobs:
           # marker it replaces.
           CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          # The namespace id, from a repository variable -- never a secret, and
+          # never the placeholder in deploy/wrangler.toml.
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
         run: |
           set -eo pipefail
           python3 - <<'PY'
@@ -885,18 +888,48 @@ jobs:
               'digest_slot_ledger.json')
           KV_LEDGER_KEY = 'digest:ledger'
           KV_API = 'https://api.cloudflare.com/client/v4'
+          # The id comes from a repository VARIABLE, never from
+          # deploy/wrangler.toml, whose committed id is a placeholder.
+          KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
+          KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
 
           def kv_namespace(workspace):
-              """The KV namespace id from the config `wrangler deploy` binds."""
-              path = os.path.join(workspace, 'deploy', 'wrangler.toml')
-              try:
-                  with open(path, encoding='utf-8-sig') as fh:
-                      text = fh.read()
-              except OSError:
+              """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
+
+              NEVER deploy/wrangler.toml, even though this job checks the repo
+              out: its id is a published placeholder that names no namespace
+              (Cloudflare 10013, HTTP 404). No fallback -- an absent, malformed
+              or placeholder value returns '' and the mirror is used instead.
+              """
+              raw = (os.environ.get(KV_NAMESPACE_ENV) or '').strip()
+              if not raw or not re.fullmatch(r'[0-9a-fA-F]{32}', raw):
+                  print('%s unset or not a 32-hex id (value not shown) - the live '
+                        'ledger is not consulted' % KV_NAMESPACE_ENV)
                   return ''
-              found = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
-                                text, re.S)
-              return found.group(1) if found else ''
+              if raw.lower() == KV_PLACEHOLDER:
+                  print('%s is the PLACEHOLDER id committed in deploy/wrangler.toml '
+                        '- it names no namespace, so the live ledger is not consulted'
+                        % KV_NAMESPACE_ENV)
+                  return ''
+              return raw
+
+          def kv_error_detail(exc):
+              """(HTTP status, Cloudflare errors[0].code, printable label).
+
+              The body is read ONCE. The label never quotes the request URL,
+              which carries the account and namespace ids.
+              """
+              status = getattr(exc, 'code', None)
+              code = None
+              if status is not None:
+                  try:
+                      payload = json.loads((exc.read() or b'').decode('utf-8', 'replace'))
+                      code = (payload.get('errors') or [{}])[0].get('code')
+                  except Exception:
+                      code = None
+              printable = (f'HTTP {status}, Cloudflare code {code or "none"}'
+                           if status is not None else exc.__class__.__name__)
+              return status, code, printable
 
           mirror = {}
           try:
@@ -954,9 +987,20 @@ jobs:
                   with urllib.request.urlopen(request, timeout=30) as response:
                       raw = response.read().decode('utf-8', errors='replace')
               except Exception as exc:
-                  print('live KV ledger unreadable (%s: %s) - falling back to the '
+                  # 10009 IS AN EMPTY LEDGER, NOT AN UNREACHABLE ONE. The key
+                  # has never been written, so KV HAS answered: nothing is
+                  # delivered. Falling back to the mirror here would let a stale
+                  # mirror outrank a live "no entry" and report a miss as a
+                  # delivery, which is the one direction this arm must not err.
+                  status, code, detail = kv_error_detail(exc)
+                  if status == 404 and code == 10009:
+                      print('live KV ledger has no key yet (HTTP 404, Cloudflare '
+                            '10009) - an empty ledger, which is an ANSWER, not a '
+                            'failure')
+                      return {}
+                  print('live KV ledger unreadable (%s) - falling back to the '
                         'git mirror, which lags by up to one seal but is still '
-                        "KV's own content" % (exc.__class__.__name__, exc))
+                        "KV's own content" % detail)
                   return None
               try:
                   parsed = json.loads(raw) if raw.strip() else {}

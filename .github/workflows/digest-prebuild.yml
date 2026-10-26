@@ -824,6 +824,9 @@ jobs:
         # records what already happened.
         id: mirror
         env:
+          # The namespace id, from a repository variable -- never a secret, and
+          # never the placeholder in deploy/wrangler.toml.
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
           CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           SLOT: ${{ github.event.inputs.digest_time }}
@@ -839,7 +842,11 @@ jobs:
           # The Worker's own DIGEST_LEDGER_KEY, and its DELIVERY_RETENTION_DAYS.
           LEDGER_KEY = 'digest:ledger'
           KV_API = 'https://api.cloudflare.com/client/v4'
-          WRANGLER = 'deploy/wrangler.toml'
+          # The id comes from a repository VARIABLE, never from
+          # deploy/wrangler.toml, whose committed id is a placeholder that names
+          # no namespace (Cloudflare 10013, HTTP 404).
+          KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
+          KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           RETENTION_DAYS = 7
           MIRROR = 'state/digest_slot_ledger.json'
 
@@ -896,14 +903,35 @@ jobs:
 
           # -- 2. THE DELIVERY HALF. Copied, never reconstructed. ----------
           def kv_namespace():
-              try:
-                  with open(WRANGLER, encoding='utf-8-sig') as fh:
-                      text = fh.read()
-              except OSError:
+              """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
+
+              No fallback: the only other place the id is written down is a
+              published placeholder, and querying it is what failed silently.
+              """
+              raw = (os.environ.get(KV_NAMESPACE_ENV) or '').strip()
+              if not raw or not re.fullmatch(r'[0-9a-fA-F]{32}', raw):
                   return ''
-              match = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
-                                text, re.S)
-              return match.group(1) if match else ''
+              if raw.lower() == KV_PLACEHOLDER:
+                  return ''
+              return raw
+
+          def kv_error_detail(exc):
+              """(HTTP status, Cloudflare errors[0].code, printable label).
+
+              The body is read ONCE. The label never quotes the request URL,
+              which carries the account and namespace ids.
+              """
+              status = getattr(exc, 'code', None)
+              code = None
+              if status is not None:
+                  try:
+                      payload = json.loads((exc.read() or b'').decode('utf-8', 'replace'))
+                      code = (payload.get('errors') or [{}])[0].get('code')
+                  except Exception:
+                      code = None
+              printable = (f'HTTP {status}, Cloudflare code {code or "none"}'
+                           if status is not None else exc.__class__.__name__)
+              return status, code, printable
 
           kv_raw = ''
           if not (token and account):
@@ -911,8 +939,9 @@ jobs:
                     'delivery ledger was not read and NO mirror is written. Git is '
                     'never allowed to stand in for a delivery fact it did not witness.')
           elif not kv_namespace():
-              print('::warning::no KV namespace id in %s, so the KV delivery ledger '
-                    'was not read and NO mirror is written.' % WRANGLER)
+              print('::warning::no usable KV namespace id in CF_KV_NAMESPACE_ID (unset, '
+                    'malformed, or the deploy/wrangler.toml placeholder), so the KV '
+                    'delivery ledger was not read and NO mirror is written.')
           else:
               url = ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
                      % (KV_API, account, kv_namespace(), LEDGER_KEY))
@@ -923,11 +952,21 @@ jobs:
                   with urllib.request.urlopen(request, timeout=30) as response:
                       kv_raw = response.read().decode('utf-8', errors='replace')
               except Exception as exc:
-                  print('::warning::the KV delivery ledger could not be read '
-                        '(%s: %s), so NO mirror is written. The watchdog will report '
-                        'the displaced slot as UNJUDGED rather than as missed, which '
-                        'is the honest answer and the safe one.'
-                        % (exc.__class__.__name__, exc))
+                  # 10009 IS AN EMPTY LEDGER, NOT A BROKEN ONE: the key has
+                  # simply never been written, so the honest mirror carries no
+                  # delivery facts yet. 10013 (namespace not found) stays a
+                  # warning -- there is nothing truthful to copy.
+                  status, code, detail = kv_error_detail(exc)
+                  if status == 404 and code == 10009:
+                      print('::notice::the KV ledger key is absent (HTTP 404, Cloudflare '
+                            '10009) -- an empty ledger; the mirror carries the build '
+                            'half only.')
+                      kv_raw = '{}'
+                  else:
+                      print('::warning::the KV delivery ledger could not be read '
+                            '(%s), so NO mirror is written. The watchdog will report '
+                            'the displaced slot as UNJUDGED rather than as missed, which '
+                            'is the honest answer and the safe one.' % detail)
 
           ledger = {}
           kv_read = False
@@ -1132,6 +1171,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          # The namespace id, from a repository variable -- never a secret, and
+          # never the placeholder in deploy/wrangler.toml.
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
           SLOT: ${{ github.event.inputs.digest_time }}
           TODAY: ${{ github.event.inputs.slot_date }}
           ARTIFACT_PATH: prebuild/artifact.json
@@ -1154,7 +1196,11 @@ jobs:
           # wrong one reads an absent key and never fires.
           LEDGER_KEY = 'digest:ledger'
           KV_API = 'https://api.cloudflare.com/client/v4'
-          WRANGLER = 'deploy/wrangler.toml'
+          # The id comes from a repository VARIABLE, never from
+          # deploy/wrangler.toml, whose committed id is a placeholder that names
+          # no namespace (Cloudflare 10013, HTTP 404).
+          KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
+          KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           # Mirrors DELIVERY_RETENTION_DAYS in deploy/cloudflare-worker.js. The
           # write below re-reads the whole ledger, so it must apply the same
           # prune the Worker applies or a rewrite here would resurrect days the
@@ -1207,17 +1253,35 @@ jobs:
               raise SystemExit(1)
 
           def kv_namespace():
-              """The KV namespace id, from the config `wrangler deploy` binds."""
-              try:
-                  with open(WRANGLER, encoding='utf-8-sig') as fh:
-                      text = fh.read()
-              except OSError as exc:
-                  print('cannot read %s (%s) — no supersede this slot'
-                        % (WRANGLER, exc))
+              """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
+
+              No fallback: the only other place the id is written down is a
+              published placeholder, and querying it is what failed silently.
+              """
+              raw = (os.environ.get(KV_NAMESPACE_ENV) or '').strip()
+              if not raw or not re.fullmatch(r'[0-9a-fA-F]{32}', raw):
                   return ''
-              match = re.search(r'\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([0-9a-fA-F]{32})"',
-                                text, re.S)
-              return match.group(1) if match else ''
+              if raw.lower() == KV_PLACEHOLDER:
+                  return ''
+              return raw
+
+          def kv_error_detail(exc):
+              """(HTTP status, Cloudflare errors[0].code, printable label).
+
+              The body is read ONCE. The label never quotes the request URL,
+              which carries the account and namespace ids.
+              """
+              status = getattr(exc, 'code', None)
+              code = None
+              if status is not None:
+                  try:
+                      payload = json.loads((exc.read() or b'').decode('utf-8', 'replace'))
+                      code = (payload.get('errors') or [{}])[0].get('code')
+                  except Exception:
+                      code = None
+              printable = (f'HTTP {status}, Cloudflare code {code or "none"}'
+                           if status is not None else exc.__class__.__name__)
+              return status, code, printable
 
           def kv_url(namespace):
               return ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
@@ -1289,12 +1353,18 @@ jobs:
               skip('CF_PAGES_API_TOKEN / CF_ACCOUNT_ID unset — the ledger was not read')
           namespace = kv_namespace()
           if not namespace:
-              skip('no KV namespace id in deploy/wrangler.toml — the ledger was not read')
+              skip('no usable KV namespace id in CF_KV_NAMESPACE_ID — the ledger was not read')
           try:
               raw = read_ledger(namespace)
           except Exception as exc:
-              skip('the delivery ledger could not be read (%s: %s)'
-                   % (exc.__class__.__name__, exc))
+              # 10009 IS AN EMPTY LEDGER, NOT A BROKEN ONE: the key has never
+              # been written, so this slot records no delivery and there is
+              # nothing to supersede. 10013 stays a skip with its real reason.
+              status, code, detail = kv_error_detail(exc)
+              if status == 404 and code == 10009:
+                  raw = ''
+              else:
+                  skip('the delivery ledger could not be read (%s)' % detail)
           try:
               ledger = json.loads(raw) if raw else {}
           except ValueError as exc:
