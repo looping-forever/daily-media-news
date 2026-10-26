@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal News Informer — Evening Digest · due 19:20 — 2026-10-25</title>
+  <style>
+    /* ===================================================================
+       THE APPROVED MOBILE DESIGN. Reproduced, not interpreted.
+
+       There is no desktop layout here on purpose. The owner has no desktop use
+       case: the previous page was max-width 1100px with 260px images, built
+       for a screen he does not use and read on a 390px phone. So the content
+       column is capped at 480px and centred, and there is no min-width media
+       query that reintroduces a wide multi-column grid. On a wider screen the
+       page is a centred 480px column, which is what the design specifies.
+       =================================================================== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #0E1014;
+      color: #ECEEF2;
+      line-height: 1.6;
+      -webkit-text-size-adjust: 100%;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px 18px 32px 18px;
+    }
+    a { color: #FF7A59; }
+
+    /* -- top bar --------------------------------------------------------- */
+    .topbar { border-bottom: 1px solid #272B34; }
+    .topbar-inner {
+      position: relative;
+      padding: 20px 18px 14px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+    }
+    .topbar-title {
+      font-size: 21px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: #ECEEF2;
+      padding-right: 86px;
+    }
+    .topbar-sub {
+      font-size: 12px;
+      font-weight: 500;
+      color: #6C727C;
+    }
+    .topbar-count {
+      position: absolute;
+      top: 20px;
+      right: 18px;
+      background: #1F232C;
+      color: #9BA1AC;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 9px;
+      white-space: nowrap;
+    }
+    .topbar-nav { padding: 9px 18px 11px 18px; }
+    .back-link {
+      color: #6C727C;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* -- your day -------------------------------------------------------- */
+    .your-day {
+      background: #171A21;
+      border-radius: 14px;
+      padding: 15px;
+      margin: 16px 0 0 0;
+    }
+    .your-day-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .your-day-label {
+      color: #FF7A59;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+    }
+    .your-day-spacer { flex: 1 1 auto; }
+    .your-day-weather {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #6BA8F5;
+    }
+    .weather-icon { display: block; flex: 0 0 auto; }
+    .your-day-temp {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6BA8F5;
+    }
+    /* Main line, then supporting lines. Both sizes are fixed; only weight and
+       colour differ, so a one-line block and a three-line block read the same
+       way. */
+    .your-day ul { margin: 10px 0 0 0; padding: 0; list-style: none; }
+    .your-day li {
+      color: #ECEEF2;
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1.45;
+    }
+    .your-day li + li {
+      margin-top: 4px;
+      color: #9BA1AC;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.45;
+    }
+
+    /* -- weather block --------------------------------------------------- */
+    /* Not in the approved design: the design has no separate weather block,
+       because it moves the glyph into the `Your day` header. The advice TEXT
+       is still a tested feature on this surface (an empty engine list renders
+       nothing, a populated one renders its lines, capped at WEATHER_MAX), so
+       the block stays and is restyled onto the same surface card rather than
+       deleted. Reported as a deviation. */
+    .weather-block {
+      background: #171A21;
+      border-radius: 14px;
+      padding: 13px 15px;
+      margin: 10px 0 0 0;
+    }
+    .weather-label {
+      color: #FF7A59;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+    }
+    .weather-block ul {
+      margin: 8px 0 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .weather-block li {
+      color: #9BA1AC;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .weather-block li + li { margin-top: 4px; }
+
+    /* -- honesty + freshness --------------------------------------------- */
+    /* ALSO not in the approved design, and deliberately NOT restyled with it.
+       The health banner is a tested feature in its own right (degraded /
+       down / unverified-cutoff states, and a research note cut on a word
+       boundary), and its amber-on-translucent-red is carrying meaning: "this
+       digest may be missing items" must not read like ordinary content. It
+       keeps its own colours, scaled down to the new type scale. */
+    .health-banner {
+      background: rgba(220, 38, 38, 0.12);
+      border: 1px solid rgba(220, 38, 38, 0.55);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 10px 0 0 0;
+      text-align: left;
+    }
+    .health-line { color: #fbbf24; font-size: 12px; font-weight: 700; }
+    .health-down {
+      color: #fca5a5;
+      font-size: 11px;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+    .health-note {
+      color: #ddd;
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+    /* A folded research note. Only the summary shows until the reader taps it,
+       so the summary carries the weight the whole note used to; the detail
+       inside keeps the `health-note` styling. */
+    .health-details { margin-top: 4px; }
+    .health-details-label {
+      color: #ddd;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .hero-cutoff { color: #6C727C; font-size: 11px; margin-top: 12px; }
+    .hero-cutoff-unverified {
+      color: #fbbf24;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* -- sections -------------------------------------------------------- */
+    /* The coloured header bar is gone. What is left is a quiet label row: a
+       6px dot in the section's own accent colour, then the name. The accent
+       arrives as the `--dot` custom property set inline by render_sections,
+       so the eleven existing per-section colours are reused rather than
+       re-invented. */
+    .digest-section { margin-bottom: 28px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: 1px;
+      color: #6C727C;
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .section-header::before {
+      content: "";
+      display: block;
+      flex: 0 0 auto;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--dot, #FF7A59);
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      margin-top: 11px;
+    }
+
+    /* -- stories --------------------------------------------------------- */
+    /* NO card, NO border, NO per-card background. The cyan 1px card border
+       was the loudest thing on a 390px screen and is deleted outright. What
+       separates two stories in the same section is a single hairline. */
+    .card {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 16px 0;
+    }
+    .card + .card { border-top: 1px solid #272B34; }
+    .card-body {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 0;
+    }
+    .card-thumb-col {
+      flex: 0 0 64px;
+      width: 64px;
+      height: 64px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #1F232C;
+    }
+    .card-thumb-col img.card-thumb {
+      display: block;
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+    .card-text { flex: 1 1 auto; min-width: 0; }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: #ECEEF2;
+    }
+
+    /* A playable video is the one thing that is NOT a 64px square: a 16:9
+       embed cannot be, and the brief names the 56.25% wrapper as the case to
+       preserve. It spans the column above the text. */
+    .card-media {
+      margin: 0 0 10px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+    .media-video { position: relative; padding-top: 56.25%; background: #000; }
+    .media-video iframe.video-frame,
+    .media-video video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    .media-watch { padding: 0; }
+    .media-watch a { color: #FF7A59; font-weight: 600; text-decoration: none; }
+    .media-watch a:hover { text-decoration: underline; }
+
+    /* -- chips / meta / body --------------------------------------------- */
+    .card-badges {
+      margin: 6px 0 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .chip {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      vertical-align: middle;
+    }
+    .chip-label { background: #1F232C; color: #FF7A59; }
+    .chip-cat { background: #1F232C; color: #eef; }
+    .chip-deadline { background: #dc2626; color: #fff; }
+    .chip-via { background: #1F232C; color: #eef; }
+    .badge {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      background: #FF7A59;
+      color: #eef;
+    }
+    .badge-high { background: #FF7A59; color: #fff; }
+    .card-meta {
+      font-size: 11px;
+      font-weight: 500;
+      color: #6C727C;
+      margin-top: 5px;
+    }
+    .card-deadline {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6C727C;
+      margin-top: 5px;
+    }
+    /* 16px, not 13px: the story body is what the owner actually READS, and it
+       used to be the smallest text on the page after the chips. Reading text
+       and headline are now the same size and the step between them is carried
+       by weight and colour instead, so nothing that must be read is smaller
+       than the headline above it. */
+    .card-summary {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #9BA1AC;
+      margin-top: 8px;
+    }
+    .card-summary ul { margin: 4px 0 0 16px; }
+    .card-summary li { margin-bottom: 5px; }
+    .card-foryou {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #9BA1AC;
+      margin-top: 8px;
+    }
+    .card-foryou strong { color: #FF7A59; }
+    .card-links {
+      list-style: none;
+      margin: 8px 0 0 0;
+      padding: 0;
+    }
+    .card-links li { margin-bottom: 5px; }
+    .card-links a {
+      color: #FF7A59;
+      text-decoration: none;
+      font-size: 15px;
+      word-break: break-word;
+    }
+    .card-links a:hover { text-decoration: underline; }
+    .story-link { font-weight: 600; }
+
+    /* STATUS TONE (D2 + D3). TWO CLAIMS WERE DRESSED IDENTICALLY.
+       "I checked and there was no news" and "the source failed, so this may
+       be a lie by omission" both rendered as amber #FBBF24 on a translucent
+       red background with a red left bar - the reader could not tell a quiet
+       day from a broken one. Worse, 5 of 9 status lines on the live 3-story
+       page were false alarms about sections with no configured source at all,
+       which made a working digest read as broken.
+
+       So the base class is QUIET: --muted, no background, no bar, not bold.
+       The alarm colours are opt-in via one modifier class, so a tone that is
+       ever forgotten renders quiet rather than loud. Both tones are the same
+       size so COLOUR is the only thing that distinguishes them.
+
+       SIZE: METADATA DOES NOT OUTRANK THE STORIES IT ANNOTATES. This rule was
+       0.95rem = 15.2px, which is LARGER than the 15px story titles directly
+       beneath it, so on a 3-story page the 9 metadata lines were the second
+       loudest thing on the screen - the owner's "no clear priority" and "too
+       cluttered to scan" were this, still alive. A status line is a fact about
+       a SECTION, so it joins the section furniture at 11px rather than
+       competing with the content. Same letter-spacing as .section-header so
+       the label and its status read as one pair. See
+       test_no_metadata_text_outranks_the_story_titles, which asserts the
+       general invariant so this cannot be re-inflated.
+
+       COLOUR: --muted (#9BA1AC), measured 7.33:1 on the page background, which
+       is WCAG AA and AAA for normal text. --dim (#6C727C) was the first choice
+       because the approved palette reserves it for section labels, but it
+       measures 3.93:1 on #0E1014 and FAILS AA's 4.5:1 at this size, so it
+       would have bought the quietness by making the line hard to read. The
+       old #aaa measured 8.20:1, so this is also a genuine small step DOWN in
+       loudness rather than a rename.
+
+       The quiet/alarm distinction above is a correctness property and is
+       unaffected: the base rule still carries neither the amber nor the red,
+       and both tones still render at the same size. */
+    .section-status {
+      color: #9BA1AC;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      background: transparent;
+      border-left: 3px solid transparent;
+      border-radius: 4px;
+      padding: 0.4rem 0.7rem;
+      word-break: break-word;
+    }
+    .section-status-alarm {
+      color: #fbbf24;
+      font-weight: 600;
+      background: rgba(220, 38, 38, 0.10);
+      border-left-color: #dc2626;
+    }
+    .empty-state { text-align: center; padding: 3rem 0; color: #ddd; }
+    footer {
+      text-align: center;
+      padding: 20px 0 0 0;
+      color: #6C727C;
+      font-size: 11px;
+      border-top: 1px solid #272B34;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner"><h1 class="topbar-title">Evening Digest · due 19:20</h1><p class="topbar-sub">Sun 25 Oct · Example City</p><span class="topbar-count">3 stories</span></div><div class="topbar-nav"><a class="back-link" href="/index.html">← All digests</a></div></header>
+  <div class="container">
+    <section class="hero"><div class="health-banner"><p class="health-line">⚠️ Some sources were unreachable — this digest may be missing items.</p><p class="health-down">Down: iost.tu.edu.np, tu.edu.np</p><details class="health-details"><summary class="health-details-label">Research note</summary><p class="health-note">Official notice pages for TU, IOST, Example College and Example Bank failed (DNS/timeouts), so those domains rely on news feeds; NEA&#x27;s notice page returned empty. The local_city and bank feeds were dominated by foreign road and bank items…</p></details></div><div class="your-day"><div class="your-day-head"><p class="your-day-label">Your day</p><span class="your-day-spacer"></span><span class="your-day-weather"><svg class="weather-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></svg></span></div><ul><li>Carry your TU ID at the Kirtipur campus through 21 November 2026 while NPL matches run.</li></ul></div><div class="weather-block"><p class="weather-label">★ Weather</p><ul><li>Nothing to plan for - dry and mild today (24.3C)</li></ul></div><p class="hero-cutoff">Information checked through: 2026-10-26 12:21 NPT · some sources were unreachable</p></section>
+    <section class="digest-section">
+  <h2 class="section-header" style="--dot:#0d9488;">LOCAL &amp; CITY</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="http://english.onlinekhabar.com/wp-content/uploads/2026/10/KTM_RSS_8__MG_0364-1024x683.jpg" alt="Babarmahal footbridge to open this week" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Babarmahal footbridge to open this week</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-26T06:21:47+00:00</div>
+      <div class="card-summary"><p>Reported: The under-construction footbridge at Babarmahal in Kathmandu is set to come into operation this week to ease pedestrian crossing and reduce road accidents.</p></div>
+      <ul class="card-links"><li><a href="https://english.onlinekhabar.com/babarmahal-footbridge-to-come-into-operation-this-week.html" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#2563eb;">TU / BSC CSIT</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://npcdn.ratopati.com/media/news/npl-kirtipur-15_Y5tqARttUa.webp" alt="TU Kirtipur campus requires ID cards during Nepal Premier League" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">TU Kirtipur campus requires ID cards during Nepal Premier League</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-25T11:45:32+00:00</div>
+      <div class="card-summary"><p>Reported: Tribhuvan University&#x27;s University Campus in Kirtipur has asked students, professors and staff to carry identity cards while entering during the Nepal Premier League, which runs from Kartik 9 to Mangsir 5 (26 October to 21 November 2026).</p></div>
+      <p class="card-foryou"><strong>For you:</strong> Carry your TU ID at the Kirtipur campus through 21 November 2026 while NPL matches run.</p>
+      <ul class="card-links"><li><a href="https://english.ratopati.com/story/84501/identity-card-mandatory-to-enter-tu-campus-during-npl" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+  <p class="section-status section-status-alarm">⚠️ 2 of 9 sources for this section were unreachable.</p>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#7c3aed;">Example College / COLLEGE</h2>
+  <p class="section-status section-status-alarm">⚠️ Source unreachable — check https://college.example.edu/</p>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#16a34a;">MY BANK — EXAMPLE BANK</h2>
+  <p class="section-status section-status-alarm">⚠️ Source unreachable — check https://www.bank.example.com/</p>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#db2777;">ANIME</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.techpowerup.com/img/9GwY3iqunv0F5xjx.jpg" alt="Fortnite&#x27;s One Piece crossover mini-season starts 1 November" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Fortnite&#x27;s One Piece crossover mini-season starts 1 November</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-26T00:42:00+00:00</div>
+      <div class="card-summary"><p>Reported: Epic Games has confirmed a One Piece crossover mini-season in Fortnite starting 1 November 2026, according to TechPowerUp.</p></div>
+      <ul class="card-links"><li><a href="https://www.techpowerup.com/354125/epic-games-makes-fortnite-x-one-piece-official-mini-season-starts-november-1" class="story-link" target="_blank" rel="noopener">Read article →</a></li><li><a href="https://news.google.com/rss/articles/CBMitAFBVV95cUxQTGVoSm5LT0ZxVndMVUtEeTk4WlJvc2EzbDE4Sk9HZWVMeUwxUTBHZFl4eEc0ckVTSXUwNXBPUW12UHRsVWpseEVTSUZaRHZsbVRqRzR2OGJUYjljdHVYU0VhYndOM0JMQ1B2MWtsTHZCZ2FvM0MtZ3BaLVpXM19Yc3FTZEFMMFNQLVJmMHBacW0wU1FnLU9hSWI1Tnc2WHZ3cEktUjV0OG54djFoVURiV25EdDk?oc=5" target="_blank" rel="noopener">GosuGamers</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+    <footer>
+      Generated by Personal News Informer · 2026-10-26 12:27 NPT
+    </footer>
+  </div>
+</body>
+</html>
