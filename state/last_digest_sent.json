@@ -1,7 +1,7 @@
 {
-  "date": "2026-10-26",
-  "time": "morning",
-  "stories": 4,
+  "date": "2026-10-25",
+  "time": "evening",
+  "stories": 3,
   "empty_digest": false,
   "empty_kind": null,
   "channels": {
@@ -12,5 +12,5 @@
   },
   "delivered": false,
   "dry_run": false,
-  "phase": "prebuild"
+  "phase": "full"
 }
