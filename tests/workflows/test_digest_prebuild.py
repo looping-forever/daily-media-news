@@ -1494,15 +1494,13 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
         did not succeed, which is what makes "a refused date emitted nothing"
         assertable. stderr is captured because this step reports its FATAL there.
         """
-        # THE STEP'S OWN DISPATCH-BRANCH SUBSTITUTION. With no schedule, the step
-        # substitutes the NAMED SLOT's own firing before it calls the heredoc
-        # (`SLOT_CRON="5 2 * * *"` / `"5 14 * * *"`, daily-news.yml), so the
-        # heredoc never sees an empty cron. Executing the heredoc alone means
-        # doing that here -- and those two literals are pinned by an assertion in
-        # the date-less-dispatch test below, so a change to the step fails there
-        # instead of drifting silently here.
-        if event == "workflow_dispatch" and not schedule:
-            schedule = "5 2 * * *" if digest_time == "morning" else "5 14 * * *"
+        # NO SUBSTITUTION HERE ANY MORE (2026-10-26). This helper used to model
+        # the step's dispatch branch by filling in the named slot's own cron when
+        # no schedule was given -- which is exactly the walk-back that dated two
+        # undated dispatches to 2026-10-25 while they meant the 26th. The step no
+        # longer keeps those literals, so a dispatch that names no date reaches
+        # the heredoc with an empty EVENT_SCHEDULE and must be REFUSED. Modelling
+        # the guess here would hide that refusal from every test below.
         with W.frozen_datetime(now_iso):
             code, text = exec_heredoc(self.date_body(), {
                 "EVENT_NAME": event,
@@ -1587,8 +1585,8 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
                                  "day:\n%s" % (expr, slot, out))
 
     # ------------------------------------------------------------------
-    # THE DISPATCH BRANCH: A NAMED DATE IS OBEYED, AND WITHOUT ONE THE DATE
-    # COMES FROM THE NAMED SLOT'S OWN FIRING (2026-10-18).
+    # THE DISPATCH BRANCH: A NAMED DATE IS OBEYED, AND NOTHING ELSE IS
+    # INVENTED (2026-10-18, RETIRED 2026-10-26).
     #
     # This test used to be `test_a_manual_dispatch_still_uses_the_builds_own_
     # nepal_date` and it asserted the opposite: that a dispatch of the evening
@@ -1597,6 +1595,16 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
     # claim daily-news.yml's dispatch path made, and the comment it rested on
     # was wrong in the same way. Corrected here rather than deleted, so that a
     # later reader can see it was re-approved on purpose.
+    #
+    # The correction that replaced it -- "without a date, use the named slot's
+    # most recent firing" -- was ALSO wrong, and only became visible on
+    # 2026-10-26: a cron names the most recent instant it fired, so at 14:00
+    # NPT on the 26th the evening slot's most recent firing is the 25th's, and
+    # two undated dispatches for the 26th produced
+    # state/digest-archive/2026-10-25-evening-undated.html (header 2026-10-26)
+    # and ...-undated-2.html (header 2026-10-25). A dispatcher that cannot say
+    # which day it means is now REFUSED, and `SLOT_CRON` is gone from the step
+    # entirely -- see test_the_comment_that_argued_the_clock_was_right_is_gone.
     # ------------------------------------------------------------------
 
     def test_a_dispatch_naming_a_date_is_obeyed_verbatim(self):
@@ -1621,45 +1629,37 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
             "the build's own day is not a source this branch may use.\n%s"
             % (emitted.get("today"), out))
 
-    def test_a_date_less_dispatch_uses_the_named_slots_own_firing(self):
-        """THE DEFECT, AT THE INSTANT IT BITES -- and NPT-today is wrong here.
+    def test_a_date_less_dispatch_is_refused_not_walked_back(self):
+        """THE COST OF A GUESS, AT THE INSTANT IT BITES.
 
-        2026-10-11T02:10:00Z is 07:55 NPT on the 11th. NPT-today is therefore
-        the 11th -- and the 11th's EVENING slot is 11 hours away. The evening
-        slot that has actually been due is the 10th's 19:20 NPT, so a date-less
-        evening prebuild belongs to the 10th. That disagreement is structural,
-        not an edge: the prebuild runs BEFORE its slot, so NPT-today names the
-        wrong day for every dispatch on the far side of Nepal midnight.
+        2026-10-11T02:10:00Z is 07:55 NPT on the 11th. NPT-today says the 11th;
+        the named evening slot's most recent firing says the 10th; and a
+        dispatch at 14:00 NPT on the 26th makes the same two answers disagree
+        the other way. There is no reading of "now" that is right for both, so
+        the step does not read the clock and does not walk back -- it refuses,
+        and the dispatcher has to say which day it means.
         """
         body = step_named(HANDOFF_WORKFLOW, HANDOFF_JOB, DATE_STEP)["run"]
-        for literal in ('SLOT_CRON="5 2 * * *"', 'SLOT_CRON="5 14 * * *"'):
-            self.assertIn(literal, body,
-                          "the dispatch branch no longer substitutes the named "
-                          "slot's own firing, so a date-less dispatch would "
-                          "reach the heredoc with no cron at all -- which is "
-                          "exactly the substitution resolve() models.")
+        code_only = "\n".join(line for line in body.splitlines()
+                              if not line.lstrip().startswith("#"))
+        self.assertNotIn("SLOT_CRON", code_only,
+                         "the step is substituting a slot cron of its own again; "
+                         "the slot times live in deploy/schedule.json and a "
+                         "dispatch that names no date must be refused, not dated "
+                         "to a firing that has already happened.")
         code, out, emitted = self.resolve(
             "", "2026-10-11T02:10:00Z", event="workflow_dispatch",
             digest_time="evening")
-        self.assertEqual(0, code, out)
-        self.assertEqual(
-            "2026-10-10", emitted.get("today"),
-            "a date-less evening dispatch at 07:55 NPT on the 11th was filed "
-            "under %r. NPT-today would say 2026-10-11, but the 11th's evening "
-            "slot is 11 hours away -- the evening slot that has been due is the "
-            "10th's.\n%s" % (emitted.get("today"), out))
-
-        # The MORNING slot at the same instant IS the 11th: its own 07:50 NPT
-        # firing is 02:05 UTC, five minutes before this run started.
-        code, out, emitted = self.resolve(
-            "", "2026-10-11T02:10:00Z", event="workflow_dispatch",
-            digest_time="morning")
-        self.assertEqual(0, code, out)
-        self.assertEqual(
-            "2026-10-11", emitted.get("today"),
-            "the morning slot's 02:05 UTC firing had already happened five "
-            "minutes before this run, so the 11th is right for it -- and a rule "
-            "that only works for one of the two slots is not a rule.\n%s" % out)
+        self.assertNotEqual(0, code,
+                            "a date-less evening dispatch was accepted and filed "
+                            "under %r. Any day it could have picked is a guess: "
+                            "the 11th is NPT-today, the 10th is the named slot's "
+                            "last firing, and neither is what the dispatcher "
+                            "meant.\n%s" % (emitted.get("today"), out))
+        self.assertIn("no slot_date", out,
+                      "the run failed, but not for the reason this test is "
+                      "about -- it must say that no slot_date was named.\n%s"
+                      % out)
 
     def test_a_malformed_slot_date_is_fatal(self):
         """Not a date STOPS the run; it never falls back to anything.

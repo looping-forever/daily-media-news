@@ -53,7 +53,7 @@ Read first (if a file is absent, continue and still reference it by path):
 - `state/history.json` — previously reported stories (READ ONLY — never modify)
 
 Environment:
-- `TODAY` env var = current date (YYYY-MM-DD, Asia/Kathmandu); search ONLY the windows below, never stale years from training data.
+- `TODAY` env var = the EDITION DATE of this digest (YYYY-MM-DD): the day the slot belongs to, which is NOT necessarily the day you are running. Search ONLY the windows below, never stale years from training data, and use this value verbatim for the `date` field.
 - `DIGEST_TIME` env var = `morning` or `evening`.
 
 ## HARD RULES (read twice)
@@ -402,7 +402,7 @@ Its entire content = valid JSON matching this exact shape:
 
 {
   "digest_time": "morning|evening",
-  "date": "YYYY-MM-DD",
+  "date": "YYYY-MM-DD — must equal the TODAY env var verbatim (the edition date, not the day you are running)",
   "research_status": "full|limited",
   "notes": "which domains failed / caveats; empty string if none",
   "stories": [

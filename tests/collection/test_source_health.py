@@ -804,8 +804,9 @@ class Harness(object):
     def __init__(self, tmp, stories, candidates=None, critical_hosts=None,
                  collected_at="2026-09-27T00:00:00+00:00",
                  research_status="full", corrupt_candidates=False,
-                 legacy_candidates=False):
+                 legacy_candidates=False, today="2026-09-27"):
         self.tmp = tmp
+        self.today = today
         self.candidates_path = os.path.join(tmp, "candidates.json")
         if corrupt_candidates:
             with open(self.candidates_path, "w", encoding="utf-8") as f:
@@ -840,20 +841,25 @@ class Harness(object):
 
         self.in_path = os.path.join(tmp, "stories.json")
         with open(self.in_path, "w", encoding="utf-8") as f:
-            json.dump({"digest_time": "morning", "date": "2026-09-27",
+            json.dump({"digest_time": "morning", "date": self.today,
                        "research_status": research_status,
                        "stories": stories}, f)
         self.out_path = os.path.join(tmp, "validated.json")
 
-    def run(self):
+    def run(self, omit_today=False):
         buf = io.StringIO()
+        args = [
+            "--in", self.in_path, "--out", self.out_path,
+            "--history", os.path.join(self.tmp, "history.json"),
+            "--state", os.path.join(self.tmp, "active.json"),
+            "--config-dir", os.path.join(self.tmp, "config"),
+            "--candidates", self.candidates_path]
+        # --today is REQUIRED since 2026-10-26: the edition date comes from the
+        # slot, and a run that cannot name one is refused rather than guessing.
+        if not omit_today:
+            args += ["--today", self.today]
         with contextlib.redirect_stdout(buf):
-            rc = vs.main([
-                "--in", self.in_path, "--out", self.out_path,
-                "--history", os.path.join(self.tmp, "history.json"),
-                "--state", os.path.join(self.tmp, "active.json"),
-                "--config-dir", os.path.join(self.tmp, "config"),
-                "--candidates", self.candidates_path])
+            rc = vs.main(args)
         payload = None
         if os.path.isfile(self.out_path):
             with open(self.out_path, "r", encoding="utf-8") as f:
@@ -864,6 +870,22 @@ class Harness(object):
 class TestValidateStoriesWiring(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="src-health-e2e-")
+
+    def test_a_run_without_a_slot_date_is_refused(self):
+        """NO --today MEANS NO EDITION DATE, AND THAT IS FATAL (2026-10-26).
+
+        The agent's own `date` is a hint, not a source: two runs from one input
+        printed two different days. The clock is worse -- it filed the 10th's
+        evening slot under the 11th. So a run that cannot name its slot date
+        produces NO payload at all rather than a day nobody asked for.
+        """
+        rc, out, payload = Harness(self.tmp, [valid_story()]).run(omit_today=True)
+        self.assertNotEqual(0, rc, out)
+        self.assertIn("FATAL", out)
+        self.assertIn("--today", out)
+        self.assertIsNone(payload,
+                          "a run with no slot date still wrote a payload, so "
+                          "some fallback date reached the file anyway.")
 
     def test_source_health_reaches_the_payload(self):
         results = [entry(name="notice:tu.edu.np", kind="notice",

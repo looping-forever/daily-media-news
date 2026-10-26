@@ -1251,6 +1251,11 @@ def main(argv=None):
     ap.add_argument("--in", dest="in_path", default="state/stories.json")
     ap.add_argument("--out", dest="out_path", default="state/stories.validated.json")
     ap.add_argument("--history", dest="history_path", default="state/history.json")
+    # The edition date, derived ONCE by the workflow's slot-date step from the
+    # slot's own firing. REQUIRED: the agent cannot know which slot it was asked
+    # for, so without this there is no honest source for the day and the run
+    # stops rather than publishing the agent's own `date`.
+    ap.add_argument("--today", dest="today", default="")
     ap.add_argument("--config-dir", dest="config_dir", default="config")
     ap.add_argument("--state", dest="state_path", default="state/active_stories.json")
     ap.add_argument("--candidates", dest="candidates_path", default="state/candidates.json")
@@ -1261,6 +1266,20 @@ def main(argv=None):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+    # FAIL LOUDLY WITHOUT A SLOT DATE. Falling back to the agent's `date` here
+    # is how two runs from one input printed two different days; falling back
+    # to the clock is how the 10th evening slot was filed under the 11th.
+    today_override = (args.today or "").strip()
+    if not today_override:
+        print("FATAL: --today is required. The edition date belongs to the SLOT "
+              "and is derived by the workflow's slot-date step; there is no "
+              "safe default, because the agent's own `date` is a hint and the "
+              "clock is the defect.")
+        return 1
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", today_override):
+        print("FATAL: --today must be YYYY-MM-DD, got %r" % args.today)
+        return 1
 
     # -- Stage 1: load -----------------------------------------------------
     if not os.path.isfile(args.in_path):
@@ -1283,6 +1302,19 @@ def main(argv=None):
     if digest_time not in VALID_DIGEST_TIMES:
         digest_time = ""
     date_val = data.get("date") if isinstance(data.get("date"), str) else ""
+
+    # The agent's `date` is a HINT, never the edition date. The slot-date step
+    # owns the day, and its value is the one the marker, the archive name and
+    # this header all print. A disagreement is RECORDED (`agent_date`) and
+    # reported, never silently rewritten: a model that dated the run a day out
+    # is evidence it may have searched the wrong day, and overwriting it hid
+    # exactly that signal on 2026-10-26.
+    agent_date = date_val
+    if date_val != today_override:
+        print("WARNING: the agent dated this edition %r but the slot is %r; the "
+              "slot date wins and the agent's value is kept in `agent_date`"
+              % (date_val, today_override))
+    date_val = today_override
     research_status = data.get("research_status")
     if research_status not in VALID_RESEARCH_STATUS:
         research_status = ""
@@ -1555,6 +1587,7 @@ def main(argv=None):
     payload = {
         "digest_time": digest_time,
         "date": date_val,
+        "agent_date": agent_date,
         "research_status": research_status,
         "agent_research_status": agent_research_status,
         "notes": notes,
@@ -1602,6 +1635,8 @@ def main(argv=None):
              ", ".join(_sh_crit["reasons"]) or "none"))
     print("  research_status: %s (agent said %r)"
           % (research_status, agent_research_status or "-"))
+    print("  edition_date: %s (agent said %r)"
+          % (date_val, agent_date or "-"))
     print("  spoilers:    %d dropped" % (len(after_keywords) - len(after_spoiler)))
     print("  crime:       %d dropped" % (len(after_spoiler) - len(after_crime)))
     print("  dedup:       %d dropped (%d fresh history entries)" %

@@ -92,23 +92,31 @@ def dispatch_inputs():
     return (on.get("workflow_dispatch") or {}).get("inputs") or {}
 
 
-def exec_body(body, env, cwd):
+def exec_body(body, env, cwd, capture_stderr=False):
     saved = dict(os.environ)
     os.environ.update({k: str(v) for k, v in env.items()})
     buf = io.StringIO()
+    err = io.StringIO()
     code = 0
     cwd_before = os.getcwd()
     try:
         os.chdir(str(cwd))
         with contextlib.redirect_stdout(buf):
-            try:
-                exec(compile(body, "<step>", "exec"), {"__name__": "step"})
-            except SystemExit as exc:
-                code = exc.code if isinstance(exc.code, int) else 1
+            # A refused step reports its FATAL on stderr, so a caller that wants
+            # to read the refusal has to ask for it; everyone else keeps the
+            # stream, because swallowing it would hide the very message a
+            # failing run needs to show.
+            with contextlib.redirect_stderr(buf if capture_stderr else err):
+                try:
+                    exec(compile(body, "<step>", "exec"), {"__name__": "step"})
+                except SystemExit as exc:
+                    code = exc.code if isinstance(exc.code, int) else 1
     finally:
         os.chdir(cwd_before)
         os.environ.clear()
         os.environ.update(saved)
+    if not capture_stderr:
+        sys.stderr.write(err.getvalue())
     return code, buf.getvalue()
 
 
@@ -568,7 +576,7 @@ class PhasePromotionTests(TempCase):
     STEP = "Determine date, digest time and trigger source"
 
     def _promote(self, phase, dry_run="", digest_time="morning",
-                 event="workflow_dispatch", schedule=""):
+                 event="workflow_dispatch", schedule="", slot_date="2026-10-09"):
         out = self.tmp / ("gh_%s_%s_%s.txt" % (phase, dry_run, digest_time))
         out.write_text("", encoding="utf-8")
         code, text = run_step_as_bash(
@@ -581,6 +589,9 @@ class PhasePromotionTests(TempCase):
                 # the step reads `github.event.schedule` from its `env:` block
                 # so the slot NAME and the slot DATE come from one string.
                 "EVENT_SCHEDULE": schedule,
+                # A DISPATCH MUST NAME ITS DATE (2026-10-26), so the dispatch
+                # arm needs one here; a scheduled run has no inputs at all.
+                "INPUT_SLOT_DATE": slot_date if event == "workflow_dispatch" else "",
                 "INPUT_DIGEST_TIME": digest_time,
                 "INPUT_TRIGGER_SOURCE": "prebuild",
                 "INPUT_DRY_RUN": dry_run,
@@ -866,25 +877,31 @@ class SlotDateTests(TempCase):
                     "caller would read a slot date that was never approved"
                     % (bad, got))
 
-    def test_the_dispatch_path_reuses_the_workflows_own_crons(self):
-        """The slot crons are copied from `on: schedule:`, not re-invented.
+    def test_the_dispatch_path_keeps_no_private_copy_of_the_slot_crons(self):
+        """THE SLOT TIMES LIVE IN ONE PLACE: deploy/schedule.json.
 
-        The dispatch path needs a firing rule to date from, and the only honest
-        place to take one from is this workflow's own schedule. A private copy
-        could drift from the real slot and date a dispatch from a firing that
-        never happens.
+        The dispatch path used to carry `SLOT_CRON="5 2 * * *"` /
+        `"5 14 * * *"` -- the WORKFLOW's dead-man's-switch crons, which fire 30
+        minutes AFTER the real slots -- and dated a date-less dispatch by walking
+        back to one of them. That is how a dispatch at 14:00 NPT on 2026-10-26
+        was filed under the 25th. The variable is gone, and the assertion that
+        demanded it was the defect stated as a test.
         """
         run = step_dict(self.STEP)["run"]
         crons = [str(spec.get("cron")) for spec in
                  ((workflow_doc().get("on") or {}).get("schedule") or [])]
         self.assertIn("5 2 * * *", crons)
         self.assertIn("5 14 * * *", crons)
-        for cron in crons:
-            self.assertIn(
-                'SLOT_CRON="%s"' % cron, run,
-                "the dispatch path does not reuse the workflow's own cron %r, so "
-                "a dispatch could be dated from a firing the schedule does not "
-                "have" % cron)
+        # Comment lines are excluded on purpose: the history above names the
+        # literals it retired, and a grep over the raw text cannot tell that
+        # explanation apart from the copy of the crons it is explaining.
+        code_only = "\n".join(line for line in run.splitlines()
+                              if not line.lstrip().startswith("#"))
+        self.assertNotIn(
+            "SLOT_CRON", code_only,
+            "the step has a private copy of the slot crons again, so a dispatch "
+            "with no date can be dated from a firing that has already happened "
+            "instead of being refused.")
 
     def _dispatch_through_shell(self, slot_date, digest_time="evening"):
         """Run the WHOLE step the way a dispatch would, and read back its env."""
@@ -935,20 +952,30 @@ class SlotDateTests(TempCase):
             "workflow would build a digest for a day nobody named"
             % env.get("TODAY"))
 
-    def test_a_date_less_dispatch_falls_back_to_the_slots_own_firing(self):
-        """END TO END: no date supplied still yields the slot's own date.
+    def test_a_date_less_dispatch_is_refused_end_to_end(self):
+        """END TO END: no date supplied is FATAL, not a guess.
 
         The clock cannot be pinned through bash, so the INSTANTS are pinned by
         the heredoc tests above and this asserts the WIRING: a startup that
-        cannot name a date is dated from the slot's firing, never from the build.
+        cannot name a date stops, and promotes no TODAY at all. The old shape of
+        this test asked for "the slot's own firing" -- and that fallback is
+        exactly what filed two undated dispatches under 2026-10-25.
         """
         code, text, env = self._dispatch_through_shell(None)
-        self.assertEqual(0, code, text)
-        self.assertRegex(
-            env.get("TODAY", ""), r"^\d{4}-\d{2}-\d{2}$",
-            "a date-less dispatch produced no usable slot date at all: "
-            "TODAY=%r\n%s" % (env.get("TODAY"), text))
-        self.assertEqual("evening", env.get("DIGEST_TIME"))
+        self.assertNotEqual(0, code,
+                            "a dispatch with no slot_date was accepted and "
+                            "produced TODAY=%r. Every day it could have picked "
+                            "is a guess about which slot the caller meant.\n%s"
+                            % (env.get("TODAY"), text))
+        self.assertIn("no slot_date", text,
+                      "the run failed, but not for the reason this test is "
+                      "about -- it must say that no slot_date was named.\n%s"
+                      % text)
+        self.assertNotIn(
+            "TODAY", env,
+            "a refused slot date still promoted TODAY=%r, so the rest of the "
+            "workflow would build a digest for a day nobody named"
+            % env.get("TODAY"))
 
     def test_the_schedule_comes_from_the_env_block_not_the_script_text(self):
         """The step must BIND `github.event.schedule` and read it from there.
@@ -1065,6 +1092,9 @@ class PayloadIsIdenticalAcrossPhasesTests(TempCase):
                 "Determine date, digest time and trigger source",
                 {"GITHUB_OUTPUT": str(out), "GITHUB_ENV": str(out),
                  "EVENT_NAME": "workflow_dispatch",
+                 # A dispatch must name its slot date since 2026-10-26; without
+                 # one the step is refused before anything can be compared.
+                 "INPUT_SLOT_DATE": "2026-10-09",
                  "INPUT_DIGEST_TIME": "morning",
                  "INPUT_TRIGGER_SOURCE": "prebuild",
                  "INPUT_DRY_RUN": "true",

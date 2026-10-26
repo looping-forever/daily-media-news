@@ -161,37 +161,43 @@ jobs:
           # digest-watchdog.yml's digest_due() already uses, and the same rule
           # digest-prebuild.yml's slot step uses for its own `today` output.
           #
-          # A MANUAL DISPATCH IS TOLD ITS DATE, AND IF IT IS NOT, ITS SLOT'S OWN
-          # FIRING STILL DECIDES -- NEVER THE CLOCK. This paragraph used to say
-          # that a manual dispatch "has no firing to belong to", that it is not
-          # late but on demand, so the build's own Nepal date was the honest
-          # answer. That was wrong in the one way that costs a delivery, because
-          # a dispatch accepted before midnight NPT can START after it: run
-          # 2026-10-17T18:16:53Z -- 00:01 NPT on the 18th -- was dispatched for
-          # `evening`, took the 18th from the wall clock, and pushed the 18th's
-          # evening digest 19 hours before its slot, superseding a slot that had
-          # not been due yet. So `slot_date` travels with the dispatch, and
-          # without one the fallback is the named slot's OWN firing -- the same
-          # derivation the scheduled path below has always used.
+          # A DISPATCH MUST NAME ITS DATE; THERE IS NO DERIVED FALLBACK FOR IT.
+          # A cron only names the most recent instant it fired, so a dispatch
+          # that carries no date can only ever be dated to a firing that has
+          # ALREADY happened. At 14:00 NPT on the 26th the evening slot's most
+          # recent firing is the 25th's, so the old fallback silently produced
+          # the 25th for a run that meant the 26th. Observed twice on
+          # 2026-10-26 from the same input:
+          #   state/digest-archive/2026-10-25-evening-undated.html
+          #     -> header 2026-10-26
+          #   state/digest-archive/2026-10-25-evening-undated-2.html
+          #     -> header 2026-10-25
+          # Run 2026-10-17T18:16:53Z is the same defect in the other direction:
+          # 00:01 NPT on the 18th, dispatched for `evening`, took the 18th from
+          # the wall clock and pushed it 19 hours before its slot. `slot_date`
+          # travels with the dispatch, the Worker sends it on both digest
+          # dispatches (deploy/cloudflare-worker.js dispatchDigest /
+          # dispatchPrebuild), and digest-watchdog.yml relays it on a retry. A
+          # caller that cannot say which day it means now FAILS rather than
+          # guessing a day in the past.
+          #
+          # THE SLOT TIMES LIVE IN ONE PLACE: deploy/schedule.json
+          # (`dispatcher_crons.digest_slots`). This step keeps no private copy
+          # of them. It used to carry `SLOT_CRON="5 2 * * *"` / `"5 14 * * *"`
+          # for the dispatch path -- the WORKFLOW's dead-man's-switch crons,
+          # which fire 30 minutes AFTER the real slots -- so even an on-time
+          # dispatch resolved its walk-back to the previous day. That variable
+          # is gone; the scheduled path derives its date from the firing that
+          # actually happened, which is the only arm that has one.
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             case "$INPUT_DIGEST_TIME" in
               morning|evening) time="$INPUT_DIGEST_TIME" ;;
               *) echo "FATAL: invalid digest_time input: $INPUT_DIGEST_TIME"; exit 1 ;;
             esac
             trigger="${INPUT_TRIGGER_SOURCE:-manual}"
-            # The named slot's OWN firing rule, copied from this workflow's
-            # `schedule:` so there is exactly one definition of when each slot
-            # fires. The date is then derived from the firing, never from the
-            # clock the runner started on.
-            if [ "$time" = "morning" ]; then
-              SLOT_CRON="5 2 * * *"
-            else
-              SLOT_CRON="5 14 * * *"
-            fi
           else
             # The SAME string the date is derived from, so the name and the date
             # cannot disagree about which firing this is.
-            SLOT_CRON="$EVENT_SCHEDULE"
             if [[ "$EVENT_SCHEDULE" == "5 2 * * *" ]]; then
               time=morning
             else
@@ -199,7 +205,7 @@ jobs:
             fi
             trigger="github-schedule-fallback"
           fi
-          today=$(EVENT_SCHEDULE="$SLOT_CRON" INPUT_SLOT_DATE="${INPUT_SLOT_DATE:-}" python3 - <<'PY'
+          today=$(INPUT_SLOT_DATE="${INPUT_SLOT_DATE:-}" python3 - <<'PY'
           import datetime, os, re, sys
 
           NPT_OFFSET_MINUTES = 345  # Nepal is UTC+05:45, no DST. Same 345 the
@@ -267,19 +273,27 @@ jobs:
 
           try:
               named = slot_date_from_input(os.environ.get('INPUT_SLOT_DATE'))
+              # The arm that ACTUALLY FIRED. A workflow_dispatch has no
+              # `github.event.schedule`, so this is empty for one -- and an
+              # empty one is refused below rather than turned into a guess.
+              schedule = (os.environ.get('EVENT_SCHEDULE') or '').strip()
               if named is not None:
                   print(named)
+              elif not schedule:
+                  raise ValueError('this run names no slot_date and has no '
+                                   'scheduled firing to be dated from; a '
+                                   'dispatch must say which day its slot '
+                                   'belongs to')
               else:
-                  print(firing_npt_date(os.environ['EVENT_SCHEDULE'],
-                                        datetime.datetime.now(UTC)))
+                  print(firing_npt_date(schedule, datetime.datetime.now(UTC)))
           except (KeyError, ValueError) as exc:
               print('FATAL: the slot date could not be established: %s. A named '
                     'slot_date must be a real YYYY-MM-DD date; without one the '
-                    'slot is dated from its own firing. Refusing to fall back to '
-                    'the build date, which is how run 38076000974 produced '
-                    '2026-10-11-evening for the 10th evening slot, and how run '
-                    '2026-10-17T18:16:53Z pushed the 18th evening digest 19 '
-                    'hours before its slot.' % exc,
+                    'slot is dated from its own scheduled firing. Refusing to '
+                    'walk back or to use the clock, which is how a dispatch at '
+                    '14:00 NPT on 2026-10-26 produced 2026-10-25, and how run '
+                    '38076000974 produced 2026-10-11-evening for the 10th '
+                    'evening slot.' % exc,
                     file=sys.stderr)
               raise SystemExit(1)
           PY
@@ -1084,6 +1098,7 @@ jobs:
             --in state/stories.json \
             --out state/stories.validated.json \
             --history state/history.json \
+            --today "$TODAY" \
             --config-dir config 2>&1 | tee /tmp/validate.log || rc=$?
           END=$(date +%s)
           STAGE_KEY=validate STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
