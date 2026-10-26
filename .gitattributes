@@ -12,3 +12,14 @@
 # verbatim, applying no eol normalization in either direction. This closes the
 # whole class rather than re-recording the two hashes that happened to trip it.
 tests/fixtures/real/** -text
+
+# JavaScript stays LF in the working tree, wherever it is checked out.
+#
+# Two guards slice deploy/cloudflare-worker.js on the literal "\n}\n" and take
+# everything before it as a function body: tests/academic/test_notification_classes.py:312
+# and tests/notifications/test_ntfy_wire_shape_guard.py:313. A CRLF checkout
+# turns those into "\r\n}\r\n", the delimiter is never found, and the extracted
+# body is empty -- so the guards pass on this machine (whose working tree is LF)
+# and fail on a fresh clone. `text eol=lf` makes the checkout agree with the
+# bytes the extractors were written against.
+*.js text eol=lf
