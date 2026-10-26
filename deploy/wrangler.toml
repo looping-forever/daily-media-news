@@ -21,14 +21,23 @@ preview_urls = false
 # schedule exactly; the dispatcher decides per tick, and a tick with nothing due
 # costs one clock comparison and no KV or network I/O at all.
 #
-# Deploy with the build stamp so a deployment from a stale checkout becomes
-# visible (?health=1 reports it, and drift-canary.yml compares it to master HEAD):
-#   wrangler deploy -c deploy/wrangler.toml --var WORKER_BUILD:<short sha>
+# Deploy with scripts/deploy-worker.ps1. It injects the REAL namespace id from
+# $env:DMNEWS_KV_NAMESPACE_ID, renders it into a gitignored local config, and
+# stamps the build so a deployment from a stale checkout becomes visible
+# (?health=1 reports it, and drift-canary.yml compares it to master HEAD):
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy-worker.ps1
+# Deploying THIS file directly binds the placeholder below and fails with
+# code 10041 (KV namespace not found).
 [triggers]
 crons = ["* * * * *"]
 
 [[kv_namespaces]]
 binding = "KV"
+# PLACEHOLDER ONLY, in both the private and the published tree. The real 32-hex
+# namespace id is supplied at deploy time through the environment variable named
+# above and never committed. No fallback exists on purpose: this value is valid
+# 32-hex, so a deploy that used it would be rejected by Cloudflare rather than
+# silently binding the wrong namespace.
 id = "abcdefabcdefabcdefabcdefabcdefab"
 
 [vars]

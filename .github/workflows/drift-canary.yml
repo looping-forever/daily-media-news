@@ -255,8 +255,9 @@ jobs:
                   'DRIFTED: the deployed build stamp is "unset", so this '
                   'deployment was published without --var WORKER_BUILD:<sha> '
                   'and its source commit is unknown. Redeploy with '
-                  '`wrangler deploy -c deploy/wrangler.toml --var WORKER_BUILD:'
-                  '$(git rev-parse --short HEAD)` from a clean checkout of master.')
+                  '`powershell -NoProfile -ExecutionPolicy Bypass -File '
+                  'scripts\\deploy-worker.ps1`, which stamps WORKER_BUILD from '
+                  '`git rev-parse --short HEAD` of a clean checkout of master.')
           elif not BUILD_STAMP_RE.match(build):
               # DEFECT 5. Refused BEFORE git is asked, because git would answer
               # and the answer would be about a REF, not about a deployed
@@ -274,9 +275,10 @@ jobs:
                   '`rev-parse --verify` resolves a ref name happily, and a ref '
                   'name is not proof of which commit was deployed, because a '
                   'branch can move since. Redeploy with '
-                  '`wrangler deploy -c deploy/wrangler.toml --var WORKER_BUILD:'
-                  '$(git rev-parse --short HEAD)` from a clean checkout of '
-                  'master.' % build)
+                  '`powershell -NoProfile -ExecutionPolicy Bypass -File '
+                  'scripts\\deploy-worker.ps1`, which stamps WORKER_BUILD from '
+                  '`git rev-parse --short HEAD` of a clean checkout of master.'
+                  % build)
           else:
               # DEFECT 3. THE REAL ANCESTRY TEST. `build` is a SHORT sha, so it
               # is resolved against the fetched history first (the checkout sets

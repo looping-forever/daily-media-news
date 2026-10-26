@@ -120,6 +120,12 @@ deploy/.wrangler/
 deploy/.dev.vars
 deploy/.dev.vars.*
 
+# The RENDERED deploy config, written by scripts/deploy-worker.ps1 from the
+# committed template plus the real KV namespace id out of the environment. It
+# holds that id, so it is regenerated on every deploy and never committed; the
+# committed template keeps a placeholder.
+deploy/wrangler.local.toml
+
 # Root-level wrangler cache. `deploy/.wrangler/` above covers the nested one,
 # but wrangler also writes `<repo-root>/.wrangler/` when a Pages/Workers command
 # is run from the repository root, and that copy is NOT covered by the nested

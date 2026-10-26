@@ -56,18 +56,49 @@ that goes red if a slot's artifact was never sealed.
 
 ## 3. Deploying the Worker
 
-Manual, by design. **Always from the repository root.**
+Manual, by design, through one script. **Always from the repository root.**
+
+**The committed `deploy/wrangler.toml` carries a placeholder KV namespace id, not
+the real one** — in this working copy and in the published copy alike. Deploying
+that file directly reaches the Cloudflare API and fails with
+`code: 10041 KV namespace not found`, because the placeholder is valid 32-hex and
+nothing skips it locally.
 
 ```powershell
-& wrangler.cmd deploy --config deploy/wrangler.toml --var WORKER_BUILD:<commit-sha>
+# 1. the real id, for this session only -- never written to a tracked file
+$env:DMNEWS_KV_NAMESPACE_ID = '<the 32-hex id from: wrangler.cmd kv namespace list>'
+
+# 2. deploy
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy-worker.ps1
+
+# optional: see the command without deploying anything
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy-worker.ps1 -DryRun
 ```
 
-- **`& wrangler.cmd`, never bare `wrangler`.** Bare `wrangler` resolves to the
-  PowerShell *alias* for `Invoke-WebRequest` on some machines, which produces a
-  baffling error that mentions nothing about Cloudflare.
-- **Always pass `--var WORKER_BUILD:<sha>`.** Without it the Worker reports
-  `build: "unset"` and the drift canary cannot tell a current deployment from a
-  stale one.
+- **Where the id comes from: `$env:DMNEWS_KV_NAMESPACE_ID`.** One value, one
+  session. `scripts/deploy-worker.ps1` substitutes it into a rendered copy at
+  `deploy/wrangler.local.toml`, which is **gitignored** and rewritten on every
+  deploy so it cannot go stale. The id is never printed — deploy output is
+  filtered before it reaches the screen.
+- **When it is missing, nothing deploys.** The script exits `2` and says so. It
+  also refuses a value that is not 32 hex, or that is still the placeholder.
+  There is deliberately no fallback: a silent fallback binds the wrong namespace.
+- **It always stamps `--var WORKER_BUILD:<short sha>`.** Without it the Worker
+  reports `build: "unset"` and the drift canary cannot tell a current deployment
+  from a stale one.
+- **`-BuildStamp` exists for one case.** The default is `git rev-parse --short
+  HEAD` of the checkout. `drift-canary.yml` resolves the stamp against
+  `looping-forever/daily-media-news`, so a commit that exists only in the private
+  working copy cannot be resolved there and the canary fails closed. If the
+  content was synced from the public repository, pass the public commit it was
+  synced from.
+- **The script verifies itself.** It reads `?health=1` from `deploy/schedule.json`
+  after deploying and exits `2` — "deployed but not verified" — if the Worker
+  does not report the build stamp it just set.
+- **`& wrangler.cmd`, never bare `wrangler`,** for anything run by hand. Bare
+  `wrangler` resolves to the PowerShell *alias* for `Invoke-WebRequest` on some
+  machines, which produces a baffling error that mentions nothing about
+  Cloudflare.
 - **`git fetch` needs a schannel override** on this machine:
   `git -c http.sslBackend=schannel fetch`. Without it git fails TLS
   negotiation against GitHub.
@@ -78,6 +109,9 @@ one you just shipped:
 ```powershell
 (Invoke-WebRequest 'https://<worker>.workers.dev/?health=1').Content | ConvertFrom-Json | Select-Object build, crons
 ```
+
+`tests/workflows/test_deploy_config_ids.py` fails if a real-looking id is ever
+committed again, in either tree, and if the rendered config stops being ignored.
 
 ## 4. Deploying the Pages site — read this twice
 
