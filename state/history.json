@@ -132,6 +132,34 @@
       "title": "Anthropic files S-1 for planned stock market listing",
       "category": "tech_career",
       "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "videogameschronicle.com/news/arkane-now-has-until-mid-december-to-find-a-buyer-as-microsoft-extends-its-deadline",
+      "title_hash": "b2f37d4a6c349a1f6c957bd101b2cc627fd63510",
+      "title": "UPDATE: Arkane gets until mid-December to find a buyer",
+      "category": "gaming",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "eurogamer.net/steam-personal-calendar-full-release",
+      "title_hash": "7cad2637f813102d0723d846cae8ac826a20f783",
+      "title": "Steam's Personal Calendar exits beta for all users",
+      "category": "gaming",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/10/2044435/gas-shortage-solution-motihari-sarlahi-pipeline-and-50000-tons-of-storage-being-built",
+      "title_hash": "32a24c54694958cbcc7d836d03fd5488b9865158",
+      "title": "NOC accelerates LPG storage and cross-border pipeline work",
+      "category": "nepal",
+      "date_sent": "2026-10-26"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/nation/flood-damaged-bridge-threatens-road-connectivity-in-myagdi",
+      "title_hash": "e8913df10666ce0741bd10d2c256886f9c8f6b7e",
+      "title": "Flood-damaged bridge threatens Myagdi highway link",
+      "category": "nepal",
+      "date_sent": "2026-10-26"
     }
   ]
 }
