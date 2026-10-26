@@ -1,9 +1,9 @@
 {
-  "date": "2026-10-26",
-  "time": "morning",
-  "stories": 0,
-  "empty_digest": true,
-  "empty_kind": "broken",
+  "date": "2026-10-25",
+  "time": "evening",
+  "stories": 1,
+  "empty_digest": false,
+  "empty_kind": null,
   "channels": {
     "website": false,
     "ntfy": false,

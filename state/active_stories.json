@@ -308,6 +308,34 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-26T13:20:52+05:45"
+    },
+    {
+      "event_id": "evt-ddabad3e6149",
+      "event_key": "cpp26-dis-ballot-failure",
+      "canonical_title": "C++26 fails its ISO draft ballot over contracts",
+      "category": "tech_career",
+      "first_seen": "2026-10-26",
+      "last_seen": "2026-10-26",
+      "first_reported": "2026-10-26",
+      "last_reported": "2026-10-26",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "train-it.eu/blog/cpp26-contracts-the-ballot-result"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: C++26 failed its Draft International Standard ballot, the first C++ draft to do so, according to a post summarising the official SC22 result. The draft got 12 of 20 P-member yes votes (60%, short of two-thirds) and 9 of 22 negative votes (41%, above the 25% cap); the ballot closed on 23 October 2026. It is not yet known how long the delay will be or whether contracts will be removed.",
+      "latest_development": "Reported: C++26 failed its Draft International Standard ballot, the first C++ draft to do so, according to a post summarising the official SC22 result. The draft got 12 of 20 P-member yes votes (60%, short of two-thirds) and 9 of 22 negative votes (41%, above the 25% cap); the ballot closed on 23 October 2026. It is not yet known how long the delay will be or whether contracts will be removed.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-10-26",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-26T14:00:44+05:45"
     }
   ],
   "archived": []
