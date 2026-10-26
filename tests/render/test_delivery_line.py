@@ -361,6 +361,27 @@ class TestStateFourLate(unittest.TestCase):
         line = delivery_ledger.delivery_line(ledger(AFTER_BOTH, entries))
         self.assertIn("(evening 2026-10-06)", line)
 
+    def test_a_pre_slot_send_is_early_and_never_on_time(self):
+        """A negative delta is a mislabel, not punctuality.
+
+        WHY THIS EXPECTATION IS CORRECT AND THE OLD ONE WAS NOT. A send that
+        precedes its own slot cannot belong to a slot that had not begun, and
+        the Worker already reports `on_time: false` for it. This module counted
+        `_delta_s <= ON_TIME_S` with no lower bound, so the same entry was
+        rendered as on time (and could never appear in `late`, which asked only
+        for `> ON_TIME_S`): the page said "14/14 on time" while ?health=1 said
+        false. The board is [0, ON_TIME_S]; outside it in either direction is
+        not on time, and the direction is named.
+        """
+        entries = every_slot(AFTER_BOTH, 41, skip=[("2026-10-06", "evening")])
+        entries.append(entry("2026-10-06", "evening",
+                             delivery_ledger.KIND_DELIVERED, -300))
+        line = delivery_ledger.delivery_line(ledger(AFTER_BOTH, entries))
+        self.assertIn("13/14 slots on time", line)
+        self.assertIn("worst 5m 00s early (evening 2026-10-06)", line)
+        self.assertNotIn("14/14", line)
+        self.assertNotIn("5m 00s late", line)
+
 
 class TestStateFiveMissing(unittest.TestCase):
     """State 5. A slot that was due produced no push at all."""

@@ -1828,6 +1828,41 @@ test("?health=1 reports the digest fields, the last delivery and the live arm", 
   assert.strictEqual(d.retention_days, w.DELIVERY_RETENTION_DAYS);
 });
 
+test("?health=1 reports a send BEFORE its slot as early, never on time", async () => {
+  // The 2026-10-17T18:16:53Z mislabel sent the 18th's evening digest 19 hours
+  // before its slot. A delta of -5m must not read as punctual: the renderer's
+  // on_time count and this boolean describe the same entry.
+  const w = loadWorker();
+  const clock = fakeClock(T0);
+  const sentEarly = new Date(Date.parse("2026-10-09T01:35:00Z") - 5 * MIN)
+    .toISOString();
+  const harness = makeHarness({
+    initial: {
+      [artifactKey()]: artifact(),
+      "digest:ledger": ledgerWith({
+        state: "sent",
+        kind: "delivered",
+        sequence_id: "dmn-" + TODAY + "-" + SLOT,
+        ntfy_sent_at: sentEarly,
+        first_ntfy_sent_at: sentEarly,
+        scheduled_instant: "2026-10-09T01:35:00Z",
+      }),
+    },
+  });
+  let res;
+  try {
+    res = await w.WORKER.fetch(
+      new Request("https://probe.invalid/?health=1"), ntfyEnv(harness.kv));
+  } finally {
+    clock.restore();
+  }
+  const d = JSON.parse(await res.text()).digest;
+  assert.strictEqual(d.last_delivery.delta_s, -5 * 60);
+  assert.strictEqual(d.last_delivery.on_time, false,
+    "a send before its own slot is early; counting it as on time made the page " +
+    "and ?health=1 contradict each other");
+});
+
 test("?health=1 reports a missing artifact as absent and never as age 0", async () => {
   const w = loadWorker();
   const harness = makeHarness({ initial: {} });

@@ -3449,7 +3449,11 @@ async function deliverDigestPlan(env, slot, writer, options) {
       http_status: outcome.http_status,
       ntfy_sent_at: outcome.ntfy_sent_at,
       delta_s: outcome.delta_s,
-      on_time: outcome.delta_s !== null && outcome.delta_s <= DELIVERY_ON_TIME_S,
+      // A send BEFORE its slot is early, not on time: a negative delta cannot
+      // belong to a slot that had not begun. The Python renderer applies the
+      // same [0, DELIVERY_ON_TIME_S] window.
+      on_time: outcome.delta_s !== null && outcome.delta_s >= 0 &&
+        outcome.delta_s <= DELIVERY_ON_TIME_S,
     })
   );
   return outcome;
@@ -4587,7 +4591,9 @@ function latestLedgerDelivery(ledger) {
     sequence_id: best.sequence_id || null,
     ntfy_sent_at: best.ntfy_sent_at || null,
     delta_s: delta,
-    on_time: delta !== null && delta <= DELIVERY_ON_TIME_S,
+    // Same window as the ledger writer above and `_delta_s` in
+    // scripts/delivery_ledger.py: negative is early, never on time.
+    on_time: delta !== null && delta >= 0 && delta <= DELIVERY_ON_TIME_S,
   };
 }
 

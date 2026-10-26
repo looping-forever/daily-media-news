@@ -24,6 +24,9 @@ Consequences that are deliberate, not accidents:
     never rounded away, softened, dropped below a threshold, or replaced with
     "recently". A health line that hides its own worst number is worse than no
     health line, because it is trusted.
+  * A send BEFORE its slot is rendered as early, and never as on time: a
+    negative delta is a mislabel, not punctuality, and the Worker already
+    reports `on_time: false` for it.
   * Nothing here infers, judges or softens. There is no language model, no
     heuristic and no "probably" anywhere in this file. Every value rendered is
     read out of the ledger or computed by arithmetic from two recorded
@@ -218,6 +221,18 @@ def humanise_seconds(seconds):
                                 total % 60)
 
 
+def _describe_delta(seconds):
+    """A delta as words: "41s late", or "1m 00s early" when it is negative.
+
+    `humanise_seconds` takes the absolute value, so printing "%s late" straight
+    from a negative delta called a pre-slot send "1m late" -- the opposite of
+    what happened. The direction is decided here, once.
+    """
+    if seconds < 0:
+        return "%s early" % humanise_seconds(seconds)
+    return "%s late" % humanise_seconds(seconds)
+
+
 # --------------------------------------------------------------------------
 # Ledger reading
 # --------------------------------------------------------------------------
@@ -349,8 +364,8 @@ def delivery_line(ledger):
       5  a slot that was due never produced a push
       6  a slot's ntfy send failed and the email fallback carried it
       2  this run's own slot has not gone out yet (the normal pre-push case)
-      4  a slot that DID go out went out late
-      3  every slot went out, and on time
+      4  a slot that DID go out was late, or went out before its own slot
+      3  every slot went out, and on time (every delta in [0, ON_TIME_S])
 
     State 7 is not in that order because it is not an alternative to any of
     them: a suppressed duplicate is appended to whichever line the ledger
@@ -424,10 +439,16 @@ def _delivery_line(ledger):
     suppressed = [e for e in entries
                   if e.get("kind") == KIND_DUPLICATE_SUPPRESSED]
 
+    # A send BEFORE its own slot is EARLY, not on time: it cannot belong to a
+    # slot that had not begun, and the Worker already reports on_time=false for
+    # it. Counting it here made the page say "14/14 on time" while `?health=1`
+    # said false for the same entry.
     on_time = [e for e in delivered
-               if _delta_s(e) is not None and _delta_s(e) <= ON_TIME_S]
+               if _delta_s(e) is not None and 0 <= _delta_s(e) <= ON_TIME_S]
     late = [e for e in delivered
             if _delta_s(e) is not None and _delta_s(e) > ON_TIME_S]
+    early = [e for e in delivered
+             if _delta_s(e) is not None and _delta_s(e) < 0]
 
     total = len(slots)
 
@@ -448,16 +469,20 @@ def _delivery_line(ledger):
         times = " and ".join(npt_clock_from_cron(c) for c in crons)
         latest = max(delivered, key=lambda e: str(e["scheduled_instant"]))
         line = ("Delivery: pushes at %s NPT · last %d days on time %d/%d "
-                "· latest %s late" % (times, RETENTION_DAYS, len(on_time),
-                                      total, humanise_seconds(_delta_s(latest))))
-    elif late:
-        worst = max(late, key=lambda e: _delta_s(e))
+                "· latest %s" % (times, RETENTION_DAYS, len(on_time),
+                                 total, _describe_delta(_delta_s(latest))))
+    elif late or early:
+        # Lateness outranks earliness when both exist: lateness is the harm
+        # this line exists to report. With only early sends, the largest
+        # pre-slot margin is the one named.
+        pool = late or early
+        worst = max(pool, key=lambda e: abs(_delta_s(e)))
         latest = max(delivered, key=lambda e: str(e["scheduled_instant"]))
-        line = ("Delivery: %d/%d slots on time · worst %s late (%s) "
-                "· latest %s late" % (len(on_time), total,
-                                      humanise_seconds(_delta_s(worst)),
-                                      _slot_label(worst),
-                                      humanise_seconds(_delta_s(latest))))
+        line = ("Delivery: %d/%d slots on time · worst %s (%s) "
+                "· latest %s" % (len(on_time), total,
+                                 _describe_delta(_delta_s(worst)),
+                                 _slot_label(worst),
+                                 _describe_delta(_delta_s(latest))))
     else:
         worst = max(delivered, key=lambda e: _delta_s(e))
         line = ("Delivery: on time for the last %d days (%d/%d slots, "
