@@ -918,7 +918,16 @@ class StandDownRecordsTests(ActionsHarness):
             "pending", stored.get("state"),
             "the slot still reads state=pending after the stand-down: %r" % stored)
         self.assertEqual("sent", stored.get("state"), stored)
-        self.assertEqual("delivered", stored.get("kind"), stored)
+        # THIS EXPECTATION WAS CHANGED DELIBERATELY on 2026-10-26, and it is the
+        # one assertion in this file that moved. It used to read `delivered`,
+        # which is the defect: the entry it merges onto already says what was
+        # built, and the stand-down did not build the message it found. A slot
+        # whose only push was a fallback must not read as a healthy digest.
+        self.assertEqual(
+            "fallback_last_good", stored.get("kind"),
+            "the stand-down relabelled a degraded build as %r. `kind` says what "
+            "was BUILT, and an entry that already carries one is evidence this "
+            "arm does not have: %r" % (stored.get("kind"), stored))
         self.assertEqual(self.INSTANT_1940, stored.get("ntfy_sent_at"),
                          "the recorded instant was not kept: %r" % stored)
         self.assertNotIn(
@@ -937,11 +946,73 @@ class StandDownRecordsTests(ActionsHarness):
             "the honesty arm downgraded the record this run had just confirmed "
             "delivered, which is what a surviving ntfy_failed does: %r" % stored)
 
+    def test_a_degraded_build_is_not_relabelled_by_the_stand_down(self):
+        """THE 2026-10-26 LAUNDER, IN THE LEDGER RATHER THAN IN A PREDICTION.
+
+        `?health=1` read back `kind: delivered, state: sent` for an evening slot
+        whose only push left the topic at 12:34:19Z, 61 minutes BEFORE the slot
+        was due, and whose stored entry had said `fallback_last_good` with a 429
+        on it. Nothing that run built replaced that push: it found it and stood
+        down. So the instant and the sequence id move forward, and the
+        classification must not.
+
+        The seed is the `failed` shape rather than `pending` so this cannot pass
+        by reading the PENDING fixture: the entry has already been written off.
+        """
+        degraded = {
+            "state": "failed",
+            "kind": "fallback_last_good",
+            "sequence_id": SEQUENCE_ID,
+            "http_status": 429,
+            "ntfy_failed": True,
+        }
+        out = self.run_step(history_body=ndjson(PUSH_1940),
+                            seed_ledger=self._seed(degraded))
+        self.assertEqual(
+            0, len(self.posts),
+            "the read-back guard did not fire, so the assertions below describe "
+            "a push this run built rather than one it found:\n%s" % out)
+        stored = self.stored_slot_entry()
+        self.assertIsNotNone(stored, out)
+        self.assertEqual(
+            "fallback_last_good", stored.get("kind"),
+            "a slot whose only push was a fallback now reads kind=%r. The "
+            "digest the owner holds is not the one this record claims: %r"
+            % (stored.get("kind"), stored))
+        self.assertEqual(
+            "sent", stored.get("state"),
+            "the delivery the read-back proved was not recorded as sent: %r"
+            % stored)
+        self.assertEqual(
+            self.INSTANT_1940, stored.get("ntfy_sent_at"),
+            "the instant is not the found message's own clock: %r" % stored)
+
+    def test_the_publish_arm_still_calls_the_digest_it_built_delivered(self):
+        """The other direction, and the reason the flag is not applied blindly.
+
+        An entry carrying a degraded kind does NOT stop this run recording its
+        own successful push as `delivered`: this arm built the message that went
+        out. Without this the fix would trade one lie for the opposite one --
+        a healthy digest filed as a fallback -- and no test would fail.
+        """
+        out = self.run_step(history_body="",
+                            seed_ledger=self._seed(self.PENDING))
+        self.assertEqual(
+            1, len(self.posts),
+            "the publish arm did not run, so nothing below was measured:\n%s"
+            % out)
+        stored = self.stored_slot_entry()
+        self.assertIsNotNone(stored, out)
+        self.assertEqual(
+            "delivered", stored.get("kind"),
+            "this run pushed its own digest over a stale failed attempt and "
+            "recorded kind=%r: %r" % (stored.get("kind"), stored))
+        self.assertEqual("sent", stored.get("state"), stored)
+
 
 # ==========================================================================
 # 3. THE SEQUENCE-ID CONTRACT — D-003 HONOURED, NOT PAPERED OVER
 # ==========================================================================
-
 
 class SupersedeSequenceIdTests(ActionsHarness):
     """A repair push must NOT reuse the id of the push it replaces.
@@ -1585,9 +1656,10 @@ class MutationProofTests(unittest.TestCase):
     def test_reverting_the_standdown_record_leaves_the_slot_unrecorded(self):
         """THE 2026-10-26 GAP: the branch verified a delivery and recorded none."""
         tmp = self._revert_in_copy(
-            "record_delivery(today, kind, message.get('sequence_id') or "
-            "push_seq, sent_at, is_supersede)",
-            "_unused_standdown = (kind, message, sent_at, is_supersede)",
+            (("record_delivery(today, kind, message.get('sequence_id') or ",
+              "_unused_standdown = (kind, message.get('sequence_id') or "),
+             ("is_supersede,\n" + " " * 38 + "inherit_stored_kind=True)",
+              "is_supersede)")),
             ".github/workflows/daily-news.yml")
         proc = subprocess.run(
             [sys.executable, "-m", "unittest",
@@ -1772,6 +1844,36 @@ class MutationProofTests(unittest.TestCase):
             proc.stdout + proc.stderr,
             "the revert did not fail through the suppression test it was "
             "written against.\n%s" % (proc.stdout + proc.stderr)[-4000:])
+
+
+    def test_reverting_the_inherited_kind_launders_the_degraded_build(self):
+        """THE 2026-10-26 PROOF: removing the guard must bring the launder back.
+
+        The revert keeps every other line, so the ONLY difference from the
+        committed workflow is that the stand-down stamps `kind: delivered` over
+        whatever the slot already recorded. That is the record `?health=1` served
+        for an evening slot whose only push landed 61 minutes early.
+        """
+        tmp = self._revert_in_copy(
+            "                  if inherit_stored_kind and entry.get('kind'):",
+            "                  if False and entry.get('kind'):",
+            ".github/workflows/daily-news.yml")
+        proc = self._run_child(
+            tmp, "tests.digest.test_duplicate_detector.StandDownRecordsTests")
+        self.assertNotEqual(
+            0, proc.returncode,
+            "removing the inherited-kind guard left the suite GREEN, so a "
+            "degraded build is still relabelled `delivered` by the stand-down "
+            "and nothing is watching it.")
+        blob = proc.stdout + proc.stderr
+        self.assertIn(
+            "test_a_degraded_build_is_not_relabelled_by_the_stand_down", blob,
+            "the revert did not fail for the reason it was written -- the test "
+            "that names the launder did not fail:\n%s" % blob[-4000:])
+        self.assertIn(
+            "digest the owner holds is not the one this record claims", blob,
+            "the launder test failed for a reason other than the relabelling:\n%s"
+            % blob[-4000:])
 
 
 # ==========================================================================

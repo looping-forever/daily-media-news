@@ -2047,7 +2047,8 @@ jobs:
                   entry.pop('first_ntfy_sent_at', None)
                   entry['honesty_downgraded_at'] = now
 
-          def kv_record_delivery(date, slot, patch, clear=()):
+          def kv_record_delivery(date, slot, patch, clear=(),
+                                 inherit_stored_kind=False):
               """Read-modify-write the slot's delivery record. NEVER raises.
 
               This runs AFTER the push succeeded. A failure here costs the
@@ -2078,6 +2079,14 @@ jobs:
                              .replace('+00:00', 'Z'))
                   day = ledger['days'].setdefault(date, {})
                   entry = dict(day.get(slot) or {})
+                  # A STAND-DOWN DID NOT BUILD THE MESSAGE IT FOUND, SO IT DOES
+                  # NOT GET TO CLASSIFY IT. `kind` says what was built, and an
+                  # entry that already carries one has that evidence; stamping
+                  # `delivered` over it claimed a healthy digest for a slot whose
+                  # only push was a fallback (2026-10-26 evening: kind
+                  # fallback_last_good, ntfy_sent_at 12:34:19Z, due 13:35Z).
+                  if inherit_stored_kind and entry.get('kind'):
+                      patch = {k: v for k, v in patch.items() if k != 'kind'}
                   entry.update(patch)
                   for key in clear:
                       entry.pop(key, None)
@@ -2151,7 +2160,8 @@ jobs:
               except (AttributeError, TypeError, ValueError, OSError, OverflowError):
                   return None
 
-          def record_delivery(date, slot, sequence_id, sent_at, supersede):
+          def record_delivery(date, slot, sequence_id, sent_at, supersede,
+                              inherit_stored_kind=False):
               """THE ONE RECORD A CONFIRMED DELIVERY WRITES. Both arms call it.
 
               The two arms are the publish that just returned, and the
@@ -2163,6 +2173,10 @@ jobs:
 
               `sent_at` is the delivery's own instant, never "now" on the
               stand-down arm -- see message_sent_at().
+
+              The ONE difference between the arms is `inherit_stored_kind`: the
+              stand-down found a message it did not build, so it keeps whatever
+              `kind` the slot already records instead of asserting `delivered`.
               """
               if not kv_configured():
                   print('WARNING: CF_PAGES_API_TOKEN / CF_ACCOUNT_ID or the '
@@ -2191,7 +2205,8 @@ jobs:
               # with ntfy_failed still true, enforce_ledger_honesty downgrades
               # this record and deletes the ntfy_sent_at it just wrote.
               return kv_record_delivery(
-                  date, slot, patch, clear=('ntfy_failed', 'http_status'))
+                  date, slot, patch, clear=('ntfy_failed', 'http_status'),
+                  inherit_stored_kind=inherit_stored_kind)
 
           def main():
               topic = (os.environ.get('NTFY_TOPIC') or '').strip()
@@ -3496,7 +3511,8 @@ jobs:
                           print('WARNING: the read-back message carries no readable '
                                 '`time`, so this delivery is recorded without an '
                                 'instant and the ladder will still see it as unproven')
-                      record_delivery(today, kind, message.get('sequence_id') or push_seq, sent_at, is_supersede)
+                      record_delivery(today, kind, message.get('sequence_id') or push_seq, sent_at, is_supersede,
+                                      inherit_stored_kind=True)
                       write_flag(True)
                       return
               try:
