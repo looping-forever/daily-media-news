@@ -100,6 +100,12 @@ notice pages. Your job is CLASSIFICATION, not collection: filter, rank,
 translate, spoiler-tag, and write up THOSE candidates into stories. Do NOT
 redo the broad searches the collector already ran.
 
+- `candidates.json` is a TRUNCATED set: the collector keeps at most the
+  freshest 4 candidates per `domain_category` (dedup and the 36h freshness
+  window run BEFORE that cap). So a domain showing only a few rows is capped,
+  not quiet — never claim coverage beyond what you were given, and never widen
+  the supplemental budget to compensate.
+
 - `weather_summary` IS the weather fetch (open-meteo, Example City). Report ONLY
   significant signals from it (heavy precipitation, temperature extremes,
   severe codes); always state it is a FORECAST; never invent amounts.
@@ -114,19 +120,13 @@ redo the broad searches the collector already ran.
 
 ## MEDIA FIELDS (PASSTHROUGH-ONLY — READ TWICE)
 
-Some candidates carry optional `image` / `video` objects (extracted by the
-collector from the RSS feed). Rules:
-
-- **Passthrough only.** Copy the `image`/`video` object from the candidate into
-  the story VERBATIM. NEVER invent, guess, construct, or alter a media URL.
-- When a candidate has an `image`/`video`, you MUST copy it into the story — it
-  is not optional when present.
-- If a candidate has no `image`/`video`, OMIT the field from the story — do not
-  add an empty object or a placeholder.
-- Never attach media from one candidate to a different story.
-- The downstream validator DROPS any media whose URL was not present in the
-  matching candidate (or that fails validation). Media is never a story-killer:
-  a story with invalid or absent media still flows through unchanged.
+Some candidates carry optional `image` / `video` objects, extracted by the
+collector from the RSS feed. Copy them VERBATIM when present — never invent,
+guess, construct or alter a URL, and never attach one candidate's media to a
+different story. When a candidate has no media, OMIT the field (no empty object,
+no placeholder). The validator DROPS any media whose URL was not in the matching
+candidate, and media is never a story-killer: a story with absent or invalid
+media still flows through unchanged.
 
 ## SUPPLEMENTAL CALLS — ALLOWED USES ONLY (max 5)
 

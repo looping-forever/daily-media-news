@@ -137,6 +137,15 @@ MAX_WORKERS = 8
 SOFT_BUDGET_SEC = 75.0
 FRESHNESS_HOURS = 36
 MAX_TOTAL = 140
+#: How many candidates ONE domain may contribute. This is the agent's INPUT
+#: size, not a display setting: measured 2026-10-27, the collector's 20-per-domain
+#: output was 140 rows / 139,207 bytes, and the model has to read all of it before
+#: it can classify anything. 4 per domain keeps every domain represented, keeps
+#: the freshest of each (the ordering below is freshest-first), and is still far
+#: more than the 5-15 stories the digest targets. The prompt states the cap, so
+#: an absent candidate is never read as a quiet day.
+MAX_PER_DOMAIN = 4
+
 TITLE_JACCARD_THRESHOLD = 0.7
 SNIPPET_MAX_CHARS = 300
 
@@ -2406,7 +2415,8 @@ def main(argv=None):
     ap.add_argument("--out", dest="out_path", default="state/candidates.json")
     ap.add_argument("--interests", dest="interests_path", default="config/interests.yml")
     ap.add_argument("--timings", dest="timings_path", default="state/timings.json")
-    ap.add_argument("--max-per-domain", dest="max_per_domain", type=int, default=20)
+    ap.add_argument("--max-per-domain", dest="max_per_domain", type=int,
+                    default=MAX_PER_DOMAIN)
     ap.add_argument("--max-interest-titles", dest="max_interest_titles",
                     type=int, default=None,
                     help="how many titles from EACH configured interest list "
