@@ -1,17 +1,15 @@
 {
   "schema_version": 1,
-  "at_npt": "2026-10-26T22:34:46+0545",
+  "at_npt": "2026-10-27T15:10:09+0545",
   "emitted": 0,
-  "deliveries_owed": 1,
-  "ntfy_delivered": 1,
-  "page_ok": true,
-  "dry_run": false,
+  "deliveries_owed": 0,
+  "ntfy_delivered": 0,
+  "page_ok": false,
+  "dry_run": true,
   "ok": true,
-  "reason": "degraded_delivered",
-  "degraded": true,
-  "monitor_exit_code": "3",
-  "degraded_payload_count": 1,
-  "payload_titles": [
-    "⚠️ Academic monitor DEGRADED (exit 3)"
-  ]
+  "reason": "nothing_emitted",
+  "degraded": false,
+  "monitor_exit_code": "0",
+  "degraded_payload_count": -1,
+  "payload_titles": []
 }
