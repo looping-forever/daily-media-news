@@ -1,18 +1,15 @@
 {
   "schema_version": 1,
-  "at_npt": "2026-10-27T18:00:57+0545",
-  "emitted": 2,
-  "deliveries_owed": 2,
-  "ntfy_delivered": 2,
-  "page_ok": true,
+  "at_npt": "2026-10-27T21:39:48+0545",
+  "emitted": 0,
+  "deliveries_owed": 0,
+  "ntfy_delivered": 0,
+  "page_ok": false,
   "dry_run": false,
   "ok": true,
-  "reason": "delivered",
+  "reason": "nothing_emitted",
   "degraded": false,
   "monitor_exit_code": "0",
   "degraded_payload_count": -1,
-  "payload_titles": [
-    "🎓 CSIT exam notice: Bachelor in Data Science IV Semester-2081 Exam Result",
-    "🎓 CSIT exam notice: B.Sc.CSIT and Bachelor in Infromation Technology (BIT) II Semester-2082 Exam Schedule"
-  ]
+  "payload_titles": []
 }
