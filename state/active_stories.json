@@ -644,6 +644,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-26T20:10:25+05:45"
+    },
+    {
+      "event_id": "evt-ebcd058c51e1",
+      "event_key": "cyclone-arnab-nepal-warning",
+      "canonical_title": "Cyclone Arnab warning: heavy rain and snowfall possible across Nepal",
+      "category": "nepal",
+      "first_seen": "2026-10-27",
+      "last_seen": "2026-10-27",
+      "first_reported": "2026-10-27",
+      "last_reported": "2026-10-27",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.onlinekhabar.com/cyclone-arnab-bring-rain-snow.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Nepal's Department of Hydrology and Meteorology issued a special weather bulletin warning that Cyclone Arnab over the Bay of Bengal is expected to intensify and bring rain and snowfall to several parts of Nepal, with heavy rain possible in Lumbini Province. The department urged people to take precautions.",
+      "latest_development": "Reported: Nepal's Department of Hydrology and Meteorology issued a special weather bulletin warning that Cyclone Arnab over the Bay of Bengal is expected to intensify and bring rain and snowfall to several parts of Nepal, with heavy rain possible in Lumbini Province. The department urged people to take precautions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-10-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-27T06:43:53+05:45"
+    },
+    {
+      "event_id": "evt-bef65da1230d",
+      "event_key": "openai-three-research-discoveries",
+      "canonical_title": "OpenAI announces three research discoveries in math, computer science and physics",
+      "category": "tech_career",
+      "first_seen": "2026-10-27",
+      "last_seen": "2026-10-27",
+      "first_reported": "2026-10-27",
+      "last_reported": "2026-10-27",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "openai.com/index/building-scientific-understanding-with-academic-communities"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: OpenAI announced three new discoveries in mathematics, computer science and physics. The feed headline gave no further details about the individual results.",
+      "latest_development": "Confirmed: OpenAI announced three new discoveries in mathematics, computer science and physics. The feed headline gave no further details about the individual results.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-10-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-27T06:43:53+05:45"
     }
   ],
   "archived": []
