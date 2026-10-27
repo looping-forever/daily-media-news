@@ -329,7 +329,11 @@ class AgentWalkHarness(unittest.TestCase):
         # the same reason it contains the real prompt: a workspace missing a
         # file the step uses tests a tree that is never shipped.
         (self.tmp / "scripts").mkdir(exist_ok=True)
-        for name in ("model_watchdog.py", "model_selector.py"):
+        # render_prompt.py resolves the prompt's {{TOKEN}} placeholders, and
+        # private_values.py is what it reads them from. Both are copied for the
+        # same reason as model_watchdog.py: the step really runs them.
+        for name in ("model_watchdog.py", "model_selector.py",
+                     "render_prompt.py", "private_values.py"):
             shutil.copy(str(REPO_ROOT / "scripts" / name),
                         str(self.tmp / "scripts" / name))
         self.bin_dir = self.tmp / "bin"

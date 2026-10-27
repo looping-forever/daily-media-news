@@ -18,6 +18,10 @@ def main(argv):
     if len(argv) != 2:
         sys.stderr.write("usage: render_prompt.py PROMPT_PATH\n")
         return 2
+    # The prompts carry arrows and em dashes. Piping on Windows defaults stdout
+    # to the console code page (cp1252), which cannot encode them and kills the
+    # step with UnicodeEncodeError instead of printing the prompt.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     with open(argv[1], "r", encoding="utf-8") as handle:
         text = handle.read()
     sys.stdout.write(private_values.substitute_tokens(text))
