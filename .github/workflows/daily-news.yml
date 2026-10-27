@@ -1027,8 +1027,19 @@ jobs:
             --config config/opencode.json --health state/model_health.json \
             --cache state/model_cache.json --info-out state/digest_model_select.json \
             --all "${NO_WORK_ARGS[@]}")
-          [ "${#models[@]}" -gt 0 ] || { echo "FATAL: empty model ladder - nothing was discovered and config/opencode.json has no seed"; exit 1; }
-          python3 -c "import json;d=json.load(open('state/digest_model_select.json'));print('model ladder: source=%s provider=%s selected=%s cooled_down=%s dropped_seed=%s dropped_seed_evidence=%s error=%s' % (d.get('source'),d.get('provider'),d.get('selected'),d.get('cooled_down'),d.get('dropped_seed'),d.get('dropped_seed_evidence'),d.get('error')))" || true
+          # AN EMPTY LIST HAS TWO VERY DIFFERENT CAUSES and the step must name
+          # the right one. "All cooled down" means the ladder is real and every
+          # rung is temporarily barred; reporting that as "nothing was
+          # discovered" would send the next reader to the wrong file entirely.
+          if [ "${#models[@]}" -eq 0 ]; then
+            if [ "$(jq -r '.all_cooled // false' state/digest_model_select.json 2>/dev/null || echo false)" = "true" ]; then
+              echo "FATAL: every model is on a hard cooldown ($(jq -rc '.hard_cooled_down // []' state/digest_model_select.json 2>/dev/null || echo '[]')) -- no attempt can be made until one expires. This is the cooldown, not an empty ladder."
+            else
+              echo "FATAL: empty model ladder - nothing was discovered and config/opencode.json has no seed"
+            fi
+            exit 1
+          fi
+          python3 -c "import json;d=json.load(open('state/digest_model_select.json'));print('model ladder: source=%s provider=%s selected=%s cooled_down=%s hard_cooled_down=%s all_cooled=%s dropped_seed=%s dropped_seed_evidence=%s error=%s' % (d.get('source'),d.get('provider'),d.get('selected'),d.get('cooled_down'),d.get('hard_cooled_down'),d.get('all_cooled'),d.get('dropped_seed'),d.get('dropped_seed_evidence'),d.get('error')))" || true
           # The budget is stated ONCE, by the selector, and read back here. The
           # `// N` defaults plus the `case` guards keep this working when the
           # info file is missing or unwritable (--info-out is best-effort).
@@ -1113,7 +1124,12 @@ jobs:
             if [ "$kind" = "model_not_found" ] || [ "$kind" = "quota_or_rate_limited" ]; then
               echo "Circuit breaker: $model -> $kind. Skipping to the next model without spending the allowance."
               last_err="$kind on $model"
-              python3 scripts/model_selector.py --record "$model" transport || true
+              # RECORD THE REAL CLASS, never a generic "transport". The selector
+              # decides what each class costs: a not-found earns a 24h hard
+              # cooldown (the id is simply wrong), and a quota is recorded but
+              # deliberately NOT cooled down, because the whole free pool shares
+              # that limit and skipping models over it would end the run early.
+              python3 scripts/model_selector.py --record "$model" "$kind" || true
               continue
             fi
             if [ "$kind" = "auth" ]; then
@@ -1134,6 +1150,13 @@ jobs:
               if [ "$run_rc" = "124" ]; then
                 last_err="timeout"
                 python3 scripts/model_selector.py --record "$model" timeout || true
+              elif [ "$kind" = "provider_outage" ]; then
+                # RECORDED AS ITSELF so the selector can count a REPEAT. A single
+                # 5xx is still recorded and still reorders the next run, but it
+                # only earns a short hard cooldown on the second hit -- one bad
+                # second must not remove a model from the walk.
+                last_err="command failed rc=$run_rc"
+                python3 scripts/model_selector.py --record "$model" provider_outage || true
               else
                 last_err="command failed rc=$run_rc"
                 python3 scripts/model_selector.py --record "$model" transport || true
@@ -4349,6 +4372,14 @@ jobs:
           fi
           if [ -f state/active_stories.json ]; then
             git add state/active_stories.json
+          fi
+          # THE HARD MODEL COOLDOWN IS THE POINT OF COMMITTING IT. The runner is
+          # ephemeral and state/model_health.json is gitignored, so a cooldown
+          # that lived only in the workspace would be re-learned from scratch on
+          # every run -- which is exactly the 4-of-12 attempts this fixes. Named
+          # by path like every other file here so nothing else can be swept in.
+          if [ -f state/model_cooldown.json ]; then
+            git add state/model_cooldown.json
           fi
           if git diff --staged --quiet; then
             echo "No state changes to commit"

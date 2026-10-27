@@ -76,20 +76,34 @@ which is already the loud, correct behaviour for a sick provider.
 
 SAFETY INVARIANT, and it is the one that matters
 -----------------------------------------------
-HEALTH MEMORY CAN ONLY REORDER. It can never veto. A cooldown demotes a
-model to the back of the attempt order; it never removes a model from it,
-and rank_models always returns at least one candidate whenever any
-candidate exists. If EVERY discovered model is cooling down, the
-least-recently-failed one is still returned and still tried. A system that
-decides what counts as breaking news must never be silenced by its own
-memory of a bad afternoon.
+HEALTH MEMORY CAN ONLY REORDER. It can never veto. A health cooldown demotes
+a model to the back of the attempt order; it never removes a model from it,
+and rank_models always returns at least one candidate whenever any candidate
+exists. If EVERY discovered model is health-cooling, the least-recently-failed
+one is still returned and still tried. A system that decides what counts as
+breaking news must never be silenced by its own memory of a bad afternoon.
 
-Cooldown decay, stated once: cooldown = COOLDOWN_UNIT_SEC x consecutive
+Cooldown decay, stated once: health cooldown = COOLDOWN_UNIT_SEC x consecutive
 failures, capped at COOLDOWN_MAX_SEC. COOLDOWN_UNIT_SEC is the breaking
 monitor's own 6-hour cron period, so "one failure" means exactly "skip it
 for the next scheduled run and try it again", which is a real retry rather
 than a blacklist. A single success resets the streak to zero and clears the
 cooldown immediately. A model that has never failed is never penalised.
+
+THE ONE VETO, AND WHY IT IS NOT A CONTRADICTION
+-----------------------------------------------
+A second, HARD cooldown lives in its own file and DOES remove a model from
+the attempt list. It exists because a `model_not_found` is not a bad
+afternoon: the id is simply wrong, and on 2026-10-27 four such ids cost 4 of
+12 digest attempts on every run before a workable model was reached. Health
+memory cannot express that, because health memory may not veto.
+
+Two things keep the veto honest, and both are load-bearing:
+  * it is applied ONLY when a caller asks for it (`select(cooldown_path=...)`),
+    so the breaking-news path keeps the reorder-only invariant above;
+  * if every candidate is hard-cooled the selection returns EMPTY and says
+    so (`info["all_cooled"]`), and the CLI exits non-zero naming the
+    cooldown. It never silently resolves to "nothing to do".
 """
 
 import json
@@ -99,6 +113,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Discovery
@@ -514,6 +529,19 @@ HEALTH_MAX_MODELS = 64
 
 FAILURE_KINDS = ("timeout", "transport", "garbage")
 
+#: The classifier's vocabulary is wider than health memory's, and this is the
+#: bridge. A missing model, a pool-wide quota and a 5xx are all "this attempt
+#: produced no verdict", which is exactly what `transport` already meant, so
+#: health memory keeps behaving as it did before those classes existed.
+HEALTH_KIND_OF = {
+    "model_not_found": "transport",
+    "provider_outage": "transport",
+    "quota_or_rate_limited": "transport",
+    "slow_or_stalled": "timeout",
+    "other": "transport",
+    "auth": "transport",
+}
+
 
 def _empty_health():
     return {"schema_version": HEALTH_SCHEMA_VERSION, "models": {}}
@@ -602,7 +630,7 @@ def record_failure(doc, model, kind="transport", at=None):
     never answers -- so it earns the same cooldown.
     """
     if kind not in FAILURE_KINDS:
-        kind = "transport"
+        kind = HEALTH_KIND_OF.get(kind, "transport")
     at = time.time() if at is None else float(at)
     row = _entry(doc, model)
     row[kind] = int(row.get(kind) or 0) + 1
@@ -628,6 +656,201 @@ def on_cooldown(row, now):
         return float(until) > float(now)
     except (TypeError, ValueError):
         return False
+
+
+# ---------------------------------------------------------------------------
+# The HARD cooldown -- the one veto, in its own file
+# ---------------------------------------------------------------------------
+# Measured 2026-10-27: four ids the provider's catalogue still advertised were
+# ranked into the digest walk and cost 4 of its 12 attempts -- three answered
+# `model_not_found` (the id does not exist) and one answered `Model is
+# unavailable` (the id exists and the endpoint withdrew it). Ranking them again
+# next run is not a health question, it is a fact: the id is not servable.
+#
+# WHY A SEPARATE FILE RATHER THAN MORE FIELDS IN model_health.json. The health
+# file is gitignored and rebuilt from nothing on a clean runner, and it is a
+# RANKING input whose invariant is "never veto". This is the opposite: a small,
+# committed, explicit list of ids that must not be tried, which has to survive
+# the ephemeral runner to be worth anything. Mixing it into a reorder-only file
+# would break that file's invariant and lose the veto at the same time.
+
+COOLDOWN_FILENAME = "model_cooldown.json"
+COOLDOWN_SCHEMA_VERSION = 1
+
+#: How long each cooled-down class stays cooled. Two very different numbers, on
+#: purpose:
+#:   model_not_found -- the id is wrong until somebody fixes the list, so a day.
+#:   provider_outage -- genuinely transient, so 15 minutes AND only after the
+#:                      second hit. One 5xx may recover; that is why this is a
+#:                      count and not a marker.
+#: `quota_or_rate_limited` is deliberately ABSENT. The whole free pool shares
+#: that limit, so cooling models down would remove the pool and end the run.
+COOLDOWN_SEC = {
+    "model_not_found": 24 * 3600,
+    "provider_outage": 15 * 60,
+}
+
+#: A provider_outage is evidence only when it repeats.
+OUTAGE_HITS_BEFORE_COOLDOWN = 2
+
+#: An outage hit older than this stops counting toward a pair, so two unrelated
+#: single 5xx a month apart can never add up to a cooldown.
+COOLDOWN_HIT_TTL_SEC = 24 * 3600
+
+#: Bounded growth, like HEALTH_MAX_MODELS: this file is state, not a log.
+COOLDOWN_MAX_MODELS = 64
+
+
+def cooldown_path_for(health_path):
+    """The cooldown file that belongs beside `health_path`, or None.
+
+    Both are per-model state for the same walk, so they live in one directory
+    and neither caller has to learn a second path.
+    """
+    if not health_path:
+        return None
+    return os.path.join(os.path.dirname(os.path.abspath(health_path)),
+                        COOLDOWN_FILENAME)
+
+
+def _iso(at):
+    """ISO-8601 UTC stamp for an epoch second. Absolute, never a duration."""
+    return datetime.fromtimestamp(float(at), timezone.utc).isoformat()
+
+
+def _epoch(stamp):
+    """Epoch seconds from an ISO-8601 stamp, or 0.0 when it cannot be read."""
+    if isinstance(stamp, (int, float)):
+        return float(stamp)
+    try:
+        moment = datetime.fromisoformat(str(stamp).strip().replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        return 0.0
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.timestamp()
+
+
+def _empty_cooldown():
+    return {"schema_version": COOLDOWN_SCHEMA_VERSION, "models": {}}
+
+
+def load_cooldown(path):
+    """Best-effort read. Missing or corrupt -> empty; never an exception.
+
+    A broken cooldown file must be able to lose a veto, never a run: the worst
+    case is that the next run pays one wasted attempt per dead id again.
+    """
+    if not path:
+        return _empty_cooldown()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return _empty_cooldown()
+    if not isinstance(doc, dict) or not isinstance(doc.get("models"), dict):
+        return _empty_cooldown()
+    doc.setdefault("schema_version", COOLDOWN_SCHEMA_VERSION)
+    return doc
+
+
+def save_cooldown(path, doc):
+    """Atomic, best-effort write. Returns True when the file was written."""
+    if not path:
+        return False
+    try:
+        parent = os.path.dirname(os.path.abspath(path))
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent, exist_ok=True)
+        doc["schema_version"] = COOLDOWN_SCHEMA_VERSION
+        doc["models"] = _trim_cooldown(doc.get("models") or {})
+        tmp = "%s.%d.tmp" % (path, os.getpid())
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(doc, fh, ensure_ascii=False, indent=2, sort_keys=True)
+            fh.write("\n")
+        os.replace(tmp, path)
+        return True
+    except OSError:
+        return False
+
+
+def _trim_cooldown(models):
+    if len(models) <= COOLDOWN_MAX_MODELS:
+        return models
+    ordered = sorted(models.items(),
+                     key=lambda kv: str(kv[1].get("last_hit")
+                                        if isinstance(kv[1], dict) else ""))
+    return dict(ordered[-COOLDOWN_MAX_MODELS:])
+
+
+def prune_cooldown(doc, now=None):
+    """Drop entries that can no longer affect selection; return the dropped ids.
+
+    Two kinds of dead entry. One whose `until` has passed is expired. One with
+    NO `until` is a single outage hit waiting for its pair, and it stops
+    counting once it is older than COOLDOWN_HIT_TTL_SEC.
+    """
+    now = time.time() if now is None else float(now)
+    models = doc.get("models")
+    if not isinstance(models, dict):
+        doc["models"] = {}
+        return []
+    dropped = []
+    for model, row in list(models.items()):
+        if not isinstance(row, dict):
+            dropped.append(model)
+            del models[model]
+            continue
+        if row.get("until"):
+            alive = _epoch(row["until"]) > now
+        else:
+            alive = (now - _epoch(row.get("last_hit"))) <= COOLDOWN_HIT_TTL_SEC
+        if not alive:
+            dropped.append(model)
+            del models[model]
+    return dropped
+
+
+def on_hard_cooldown(doc, model, now=None):
+    """True while this model must not be attempted at all."""
+    row = ((doc or {}).get("models") or {}).get(model)
+    if not isinstance(row, dict) or not row.get("until"):
+        return False
+    return _epoch(row["until"]) > (time.time() if now is None else float(now))
+
+
+def record_cooldown(doc, model, kind, at=None):
+    """Cool `model` down after a `kind` failure. Returns the row, or None.
+
+    Only COOLDOWN_SEC's two kinds are cooled. `provider_outage` records the hit
+    but does not start a cooldown until OUTAGE_HITS_BEFORE_COOLDOWN, so a single
+    5xx gets its chance. Everything else -- quota above all -- is ignored.
+    """
+    seconds = COOLDOWN_SEC.get(kind)
+    if not seconds:
+        return None
+    at = time.time() if at is None else float(at)
+    models = doc.setdefault("models", {})
+    row = models.get(model)
+    if not isinstance(row, dict):
+        row = {}
+        models[model] = row
+    row["hits"] = int(row.get("hits") or 0) + 1
+    row["last_hit"] = _iso(at)
+    row["reason"] = kind
+    if kind == "provider_outage" and row["hits"] < OUTAGE_HITS_BEFORE_COOLDOWN:
+        return row
+    row["until"] = _iso(at + seconds)
+    return row
+
+
+def clear_cooldown(doc, model):
+    """Drop a model's entry. One success is proof the id works today."""
+    models = doc.get("models")
+    if isinstance(models, dict) and model in models:
+        del models[model]
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -785,6 +1008,12 @@ _OUTAGE_MARKERS = ("unknownerror", "unexpected server error",
                    "internal server error", "bad gateway",
                    "service unavailable", "gateway timeout",
                    "endpoint is unavailable", "upstream request failed",
+                   # Measured 2026-10-27: a model the catalogue listed as ACTIVE
+                   # answered `Model is unavailable`. That is the endpoint
+                   # withdrawing a model it still lists, not a missing id, so it
+                   # belongs with the outages and earns the 15-minute cooldown
+                   # only after it repeats.
+                   "model is unavailable",
                    "econnreset", "econnrefused")
 
 #: HTTP status codes, matched with boundaries so a timestamp or a model id
@@ -1053,7 +1282,7 @@ def rank_models(candidates, seed=(), health=None, now=0, release=None):
 
 
 def select(config, health, cache_path=None, state_note=None, max_models=4,
-           now=None, discover_fn=None):
+           now=None, discover_fn=None, cooldown=None, cooldown_path=None):
     """The whole decision, in one call. Returns (models, info).
 
     `models` is the ordered attempt list: capped to `max_models`, or the FULL
@@ -1062,6 +1291,13 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
     `info` is what a log row must carry to be honest about how the list was
     built: the discovery source, what discovery rejected and why, and which
     models health memory demoted.
+
+    `cooldown` / `cooldown_path` OPT IN to the hard cooldown, and a caller that
+    passes neither keeps the reorder-only behaviour above. When one is given,
+    a model whose hard cooldown is live is REMOVED from the list and the walk
+    falls through to the next ranked model; if that leaves nothing,
+    `info["all_cooled"]` is True and the list is empty, so the caller can fail
+    loudly instead of reporting an empty ladder it does not have.
     """
     import time as _time
 
@@ -1080,7 +1316,8 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
             "rejected": disc.get("rejected") or {},
             "unparsed": disc.get("unparsed") or [],
             "error": disc.get("error", ""),
-            "dropped_seed": [], "dropped_seed_evidence": {}, "cooled_down": []}
+            "dropped_seed": [], "dropped_seed_evidence": {}, "cooled_down": [],
+            "hard_cooled_down": [], "all_cooled": False}
 
     # THE CONFIGURED LADDER IS AUTHORITATIVE (run 40280837914). Discovery may
     # APPEND, and may never reorder or remove a seed. The only removal is a
@@ -1109,19 +1346,36 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
 
     ordered = rank_models(pool, seed=seed, health=health, now=now,
                           release=disc.get("release"))
+
+    # THE HARD COOLDOWN, applied AFTER ranking so the fall-through is simply
+    # "the next ranked model that is not cooling". Prune first, then read:
+    # an expired entry must not be able to veto anything.
+    cool = cooldown
+    if cool is None and cooldown_path:
+        cool = load_cooldown(cooldown_path)
+    if cool is not None:
+        prune_cooldown(cool, now)
+        info["hard_cooled_down"] = [m for m in ordered
+                                    if on_hard_cooldown(cool, m, now)]
+    cooled = set(info["hard_cooled_down"])
+    attemptable = [m for m in ordered if m not in cooled]
+    info["all_cooled"] = bool(ordered) and not attemptable
+
     if max_models is None:
         # The WHOLE ranked pool. The caller bounds the WALK, not the list: it
         # walks in rank order under its own wall-clock budget and stops when one
         # more attempt is no longer affordable. The cap was the defect -- on run
         # 39117668287 all three capped models died (two at the 600s cap) and the
         # slot ended with a known-good pool of ten, none of them tried.
-        info["selected"] = list(ordered)
+        info["selected"] = list(attemptable)
     else:
-        info["selected"] = ordered[:max(1, max_models)]
-        # SAFETY: a non-empty pool must yield a non-empty attempt list, however
-        # bad the health memory looks. Reordering is allowed; silence is not.
-        if pool and not info["selected"]:
-            info["selected"] = ordered[:1]
+        info["selected"] = attemptable[:max(1, max_models)]
+        # SAFETY: health memory is a reorder and must never yield silence from a
+        # non-empty pool, however bad it looks. A HARD cooldown may, and that
+        # case is reported as all_cooled rather than papered over with a model
+        # the provider has already proved it cannot serve.
+        if attemptable and not info["selected"]:
+            info["selected"] = attemptable[:1]
     fetched_at, age_sec = _cache_stamp(cache_path, provider, now)
     info["cache_fetched_at"] = fetched_at
     info["cache_age_sec"] = age_sec
@@ -1180,7 +1434,9 @@ def _main(argv=None):
     parser.add_argument("--select", action="store_true",
                         help="print the ordered attempt list, one model per line")
     parser.add_argument("--record", nargs=2, metavar=("MODEL", "OUTCOME"),
-                        help="record an outcome: ok, timeout, transport or garbage")
+                        help="record an outcome: ok, timeout, transport, garbage, "
+                             "or a classifier class (model_not_found, "
+                             "provider_outage, quota_or_rate_limited, ...)")
     parser.add_argument("--health", default="state/model_health.json",
                         help="health-memory file (default: state/model_health.json)")
     parser.add_argument("--cache", default="state/model_cache.json",
@@ -1222,11 +1478,20 @@ def _main(argv=None):
     if args.record:
         model, outcome = args.record
         doc = load_health(args.health)
+        cool_path = cooldown_path_for(args.health)
+        cool = load_cooldown(cool_path)
+        prune_cooldown(cool)
         if outcome == "ok":
             record_success(doc, model)
+            clear_cooldown(cool, model)
         else:
             record_failure(doc, model, outcome)
+            record_cooldown(cool, model, outcome)
         save_health(args.health, doc)
+        # Written only when there is something to say, so a walk with nothing
+        # cooling leaves no file behind for the state commit to pick up.
+        if cool.get("models") or os.path.isfile(cool_path or ""):
+            save_cooldown(cool_path, cool)
         return 0
 
     if args.classify:
@@ -1247,8 +1512,13 @@ def _main(argv=None):
     if args.select:
         config = load_config(args.config)
         health = load_health(args.health)
+        cool_path = cooldown_path_for(args.health)
+        cool = load_cooldown(cool_path)
         models, info = select(config, health, cache_path=args.cache,
-                              max_models=None if args.all else args.max)
+                              max_models=None if args.all else args.max,
+                              cooldown=cool)
+        if cool.get("models") or os.path.isfile(cool_path or ""):
+            save_cooldown(cool_path, cool)
         # The caller states the CASE, never the number: `--no-work` means "there
         # is nothing to write" and this file owns what that costs, exactly as it
         # owns the full walk. min() so an explicit smaller --budget still wins:
@@ -1283,16 +1553,26 @@ def _main(argv=None):
         # "model" whose name is a sentence, and the walk would spend a whole
         # per-attempt timeout asking the CLI to run it.
         print("model_selector: pool source=%s size=%d returned=%d budget=%ds "
-              "per_attempt=%ds min_attempt=%ds%s"
+              "per_attempt=%ds min_attempt=%ds hard_cooled=%d%s"
               % (info.get("source"), len(info.get("discovered") or []),
                  len(models), total_budget, args.per_attempt,
-                 WALK_MIN_ATTEMPT_SEC,
+                 WALK_MIN_ATTEMPT_SEC, len(info.get("hard_cooled_down") or []),
                  " no_work=yes" if args.no_work else ""), file=sys.stderr)
         print("model_selector: ranked ids=%s" % (", ".join(models) or "none"),
               file=sys.stderr)
         for model in models:
             print(model)
         if not models:
+            if info.get("all_cooled"):
+                # THE ONE CASE THAT MAY NOT BE SILENT. Every model is cooling,
+                # so nothing will be attempted -- and that must be named, not
+                # reported as an empty ladder that does not exist.
+                print("model_selector: FATAL: every candidate model is on a "
+                      "hard cooldown (%s), so no attempt can be made until one "
+                      "expires. This is the cooldown, not an empty ladder."
+                      % (", ".join(info.get("hard_cooled_down") or [])
+                         or "list not recorded"), file=sys.stderr)
+                return 1
             print("model_selector: empty model ladder -- discovery returned "
                   "nothing and %s has no seed" % args.config, file=sys.stderr)
             return 1
