@@ -380,13 +380,24 @@ test("DEFECT 1: the FALLBACK ladder push (last_good rung) sends acceptable types
     assert.strictEqual(r.thrown, null, "the delivery threw: " + r.thrown);
 
     const bodies = ntfyBodies(h.net);
-    assert.strictEqual(bodies.length, 1,
-      "expected one ntfy POST on the fallback_last_good rung, got " +
-      bodies.length);
-    assert.strictEqual(bodies[0].priority, 5,
-      "this test must be exercising the priority-5 rung; it saw priority=" +
-      JSON.stringify(bodies[0].priority));
-    assertNtfyAcceptableTypes(bodies[0], "the fallback_last_good push", 5,
+    // TWO messages since the stale-edition alert (digest_delivery.test.js §5d)
+    // was added: the fallback push, then the notice that says the edition is
+    // old. The count is pinned and the rung is selected by its own priority, so
+    // a third message cannot slip in unnoticed and this test still judges the
+    // priority-5 push it was written for.
+    assert.strictEqual(bodies.length, 2,
+      "expected the fallback push plus its one stale-edition notice, got " +
+      bodies.length + ": " + JSON.stringify(bodies.map((b) => b.priority)));
+    const rung = bodies.filter((b) => b.priority === 5);
+    assert.strictEqual(rung.length, 1,
+      "expected exactly one priority-5 push on the fallback_last_good rung, got " +
+      JSON.stringify(bodies.map((b) => b.priority)));
+    const staleNotices = bodies.filter((b) => b.priority === 4);
+    assert.strictEqual(staleNotices.length, 1);
+    assert.match(staleNotices[0].title, /STALE/,
+      "the second message on this rung must be the stale-edition notice, not " +
+      "another digest push: " + staleNotices[0].title);
+    assertNtfyAcceptableTypes(rung[0], "the fallback_last_good push", 5,
       ["warning", "rotting_light"]);
   });
 

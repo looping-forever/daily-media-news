@@ -378,6 +378,20 @@ class VerifiedFailureFiresTheLadderTests(LadderHarness):
         What repairs those two is the SUPERSEDE push (see test_supersede_push.py),
         which replaces the push instead of adding a third notification to it.
         The ladder is for a slot that reached nobody at all.
+
+        THE CONTRACT IS ABOUT THE LADDER, AND ONLY THE LADDER. It is not a
+        claim that the owner received today's edition, and it must never be read
+        as one: `fallback_last_good` reaches him with yesterday's (or, on
+        2026-10-27, nine-days-old) news. Saying so is the Worker's job, not this
+        ladder's — `?health=1` now reports the derived `edition` of the last
+        delivery (`fresh` / `fallback` / `partial` / `failed`) plus
+        `fresh_edition`, `fallback_shown`, `last_good_shown` and `reason`, and a
+        slot that served a fallback gets ONE recovery notice naming the edition
+        actually shown. Those live in deploy/cloudflare-worker.js and are pinned
+        in tests/digest/digest_delivery.test.js §5d, because a shell ladder
+        runs once per slot and the alert has to be once per slot too. So the
+        assertion below stays exactly as it is: arming this ladder on a readable
+        push would be a regression, not a fix for the reporting gap.
         """
         for kind in ("partial", "fallback_last_good"):
             with self.subTest(kind=kind):

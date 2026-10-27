@@ -660,12 +660,21 @@ test("DEFECT 2 (VACUITY): the SAME harness with NO delivered run DOES push last-
     const r = await fire(w, h, { env: { GH_TOKEN: GH } });
     assert.strictEqual(r.thrown, null);
     const b = bodies(h.net);
-    assert.strictEqual(b.length, 1,
-      "with no delivered run the ladder MUST push last-good — that push is the " +
-      "no-burn invariant. A guard that suppresses it has stopped delivery " +
-      "outright.");
-    assert.ok(/2026-10-12/.test(b[0].message),
-      "the push must be the last-good one it always was. message=" + b[0].message);
+    // The fallback plus its one stale-edition notice (digest_delivery.test.js
+    // §5d). Selected by TITLE rather than position, because BOTH messages name
+    // 2026-10-12 and a positional or date-based match would let the notice stand
+    // in for the fallback it warns about.
+    assert.strictEqual(b.length, 2,
+      "with no delivered run the ladder MUST push last-good and its one stale " +
+      "notice — that push is the no-burn invariant. A guard that suppresses it " +
+      "has stopped delivery outright.");
+    const fallback = b.filter((x) => /digest delayed/.test(String(x.title)));
+    assert.strictEqual(fallback.length, 1,
+      "exactly one of the two messages must be the last-good push, got " +
+      JSON.stringify(b.map((x) => x.title)));
+    assert.ok(/2026-10-12/.test(fallback[0].message),
+      "the push must be the last-good one it always was. message=" +
+      fallback[0].message);
     assert.strictEqual(r.outcome.delivery_evidence,
       w.DELIVERY_EVIDENCE_NOT_DELIVERED);
   });
@@ -750,8 +759,14 @@ test("DEFECT 2: no dispatch marker means no check, no call, and the ladder runs"
     assert.strictEqual(runsGets(h.net).length, 0,
       "the Actions API was called for a slot this Worker never escalated — a " +
       "GitHub API call added to a routine re-fire for no possible information");
-    assert.strictEqual(ntfyPosts(h.net).length, 1,
-      "with no marker the ladder must push exactly as it always did");
+    // TWO posts since the stale-edition notice (digest_delivery.test.js §5d)
+    // was added beside the fallback: the fallback itself, then the one-per-slot
+    // warning that says the edition is old. The point of this test is the GitHub
+    // API call, and that is asserted above; the push count is still pinned
+    // exactly so a third message cannot appear here unnoticed.
+    assert.strictEqual(ntfyPosts(h.net).length, 2,
+      "with no marker the ladder must push the fallback and its one stale " +
+      "notice, and nothing else");
   });
 
 test("DEFECT 2: classifyDeliveryEvidence is a total, fail-closed table",

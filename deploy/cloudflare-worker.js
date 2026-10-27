@@ -2299,6 +2299,30 @@ const STATE_PENDING = "pending";
 const STATE_SENT = "sent";
 const STATE_FAILED = "failed";
 
+// WHAT THE OWNER ACTUALLY RECEIVED, IN ONE WORD. `kind` classifies what was
+// BUILT and `state` says whether a push landed; neither of them answers the
+// question ?health=1 and the ledger are read to answer, which is "did he get
+// TODAY's edition?". `kind: fallback_last_good` + `state: sent` is a slot that
+// served 2026-10-18's news while reading, to anyone who stops at `sent`, exactly
+// like a delivery — and nine days of that went unnoticed.
+//
+// `edition` is derived, never written by a caller who could disagree with it, so
+// there is one place that decides what each combination means. It is also
+// written into every ledger patch, so a reader of the raw KV record does not
+// have to reproduce this table in their head.
+function deliveryEdition(entry) {
+  const e = entry || {};
+  if (e.ntfy_failed === true || e.state === STATE_FAILED) return "failed";
+  if (e.state === STATE_PENDING) return "pending";
+  if (e.kind === KIND_DELIVERED) return "fresh";
+  if (e.kind === KIND_PARTIAL) return "partial";
+  if (e.kind === KIND_FALLBACK_LAST_GOOD) return "fallback";
+  if (e.kind === KIND_UNAVAILABLE) return "notice";
+  if (e.kind === KIND_DUPLICATE_SUPPRESSED) return "duplicate";
+  if (e.kind === DELIVERY_KIND_STOOD_DOWN) return "stood_down";
+  return e.state === STATE_SENT ? "other" : "unknown";
+}
+
 // THE VERIFIED-FAILURE FLAG (U7). `ntfy_failed: true` means exactly one thing:
 // `publishToNtfy` exhausted DELIVERY_ATTEMPTS and every attempt came back an
 // error. It is deterministic arithmetic over HTTP statuses, never a verdict, and
@@ -2739,6 +2763,10 @@ function enforceLedgerHonesty(entry, update) {
     );
     out.state = STATE_FAILED;
     out.ntfy_failed = true;
+    // The derived verdict has to follow the correction, or the record would read
+    // `state: failed` beside `edition: fresh` and a reader would be back to
+    // guessing which field to believe.
+    out.edition = "failed";
     // `kind` is DELIBERATELY LEFT ALONE. It classifies what was BUILT — the
     // digest really did build, and really was a full one — so rewriting it to
     // `unavailable` would mean "we tried and there was nothing", which is a NEW
@@ -3341,6 +3369,7 @@ async function deliverDigestPlan(env, slot, writer, options) {
       patch: {
         state: STATE_PENDING,
         kind: kind,
+        edition: deliveryEdition({ state: STATE_PENDING, kind: kind }),
         sequence_id: sequenceId,
         pending_at: isoUtc(startedAt),
         scheduled_instant: isoUtc(scheduledInstant),
@@ -3359,6 +3388,7 @@ async function deliverDigestPlan(env, slot, writer, options) {
     const record = {
       state: STATE_SENT,
       kind: kind,
+      edition: deliveryEdition({ state: STATE_SENT, kind: kind }),
       sequence_id: sequenceId,
       // Cleared, not omitted: see the ntfy_failed note above. The read-back
       // proved the digest IS on the topic, so any earlier failure for this slot
@@ -3442,6 +3472,8 @@ async function deliverDigestPlan(env, slot, writer, options) {
         patch: {
           state: STATE_FAILED,
           kind: kind,
+          edition: deliveryEdition({
+            state: STATE_FAILED, kind: kind, ntfy_failed: true }),
           sequence_id: sequenceId,
           ntfy_failed: true,
           ntfy_quota_exhausted: published.quota_exhausted === true,
@@ -3472,6 +3504,7 @@ async function deliverDigestPlan(env, slot, writer, options) {
   const record = {
     state: STATE_SENT,
     kind: kind,
+    edition: deliveryEdition({ state: STATE_SENT, kind: kind, ntfy_failed: false }),
     sequence_id: sequenceId,
     ntfy_failed: false,
     ntfy_sent_at: sentAt,
@@ -3912,6 +3945,78 @@ async function escalateToActions(env, slotName, today, reason, nowMs) {
   };
 }
 
+// ONE ALERT PER SLOT WHEN WHAT THE OWNER WAS SHOWN IS A STALE EDITION.
+//
+// The fallback push says "showing 2026-10-18" once, in a message the owner reads
+// as news. Nothing follows it: the ladder re-fires on the same slot up to four
+// times, and if every build for the day fails, his phone holds a delayed-news
+// push and no statement that the edition is permanently stale. Nine days of that
+// is what made a fallback chain look like a working pipeline from the outside.
+//
+// ONCE PER SLOT, NOT ONCE PER RUN. The marker is keyed by date+slot, so the
+// re-fires that follow the first fallback find it and stay quiet — and it is
+// burned only on a SUCCESSFUL send, so a failed alert is retried on the next tick
+// rather than lost. That is the same rule alertBudgetRefusedOnce and
+// alertTokenExpiryOnce follow, for the same reason.
+//
+// A PROBE MUST NOT BURN IT. `writer` is null on ?deliver_now=1, so a probe pushes
+// the fallback and then leaves the marker alone; burning it there would silence
+// the real alert for a slot the probe only pretended to deliver.
+const STALE_EDITION_ALERT_KEY_PREFIX = "digest:stale_alert:";  // + YYYY-MM-DD:slot
+const STALE_EDITION_ALERT_TTL_S = DELIVERY_RETENTION_DAYS * 24 * 60 * 60;
+
+async function announceStaleEditionOnce(env, writer, date, slot, lastGoodShown,
+                                        reason, dispatched, startedAt) {
+  if (!writer) return { alerted: false, reason: "no ledger writer (probe)" };
+  const key = STALE_EDITION_ALERT_KEY_PREFIX + date + ":" + slot;
+  try {
+    if (await env.KV.get(key)) {
+      return { alerted: false, reason: "already announced for this slot" };
+    }
+  } catch (err) {
+    // An unreadable marker sends at most one extra alert, never a wrong one.
+    console.log("stale-edition alert marker unreadable:", String(err));
+  }
+  const title = "⚠️ " + slotLabel(slot) + " digest is STALE — it is the " +
+    String(lastGoodShown) + " edition";
+  const message =
+    "The " + slotLabel(slot).toLowerCase() + " digest for " + String(date) +
+    " could not be built, so what you were shown is the edition from " +
+    String(lastGoodShown) + ". It is not today's news.\n\n" +
+    "**Why:** " + String(reason || "no reason was recorded") + "\n\n" +
+    (dispatched
+      ? "**A fresh build was started.** If it succeeds the new edition is pushed " +
+        "on its own, and this notice is not repeated."
+      : "**No fresh build was started.** Nothing else will replace this edition " +
+        "unless a later scheduled run succeeds.");
+  const res = await publishToNtfy(env, {
+    topic: ntfyTopicOf(env),
+    title: title,
+    message: message,
+    priority: 4,
+    tags: ["warning", "stale"],
+  }, "dmn-" + date + "-" + slot + "-stale-notice", "stale-edition alert");
+  if (res && res.ok) {
+    try {
+      await env.KV.put(key, isoUtc(Number.isFinite(startedAt) ? startedAt : Date.now()),
+                       { expirationTtl: STALE_EDITION_ALERT_TTL_S });
+    } catch (err) {
+      // At worst one more alert on the next tick.
+    }
+  }
+  console.log(
+    "stale-edition alert for " + String(date) + " " + String(slot) + ": " +
+      (res && res.ok
+        ? "sent once for this slot"
+        : "NOT sent (" + String((res && res.error) || "unknown") +
+          "), so the next tick retries it")
+  );
+  return {
+    alerted: !!(res && res.ok),
+    reason: res && res.ok ? "" : String((res && res.error) || "send failed"),
+  };
+}
+
 async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
                                  writer, opts, label, startedAt) {
   const topic = ntfyTopicOf(env);
@@ -3930,6 +4035,7 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
       patch: {
         state: STATE_PENDING,
         kind: kind,
+        edition: deliveryEdition({ state: STATE_PENDING, kind: kind }),
         sequence_id: sequenceId,
         pending_at: isoUtc(startedAt),
         scheduled_instant: isoUtc(scheduledInstant),
@@ -3947,6 +4053,7 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
         date: today, slot: slotName,
         patch: {
           state: STATE_SENT, kind: kind, sequence_id: sequenceId,
+          edition: deliveryEdition({ state: STATE_SENT, kind: kind }),
           ntfy_failed: false,
           ntfy_sent_at: sentAt, first_ntfy_sent_at: sentAt,
           scheduled_instant: isoUtc(scheduledInstant),
@@ -4181,6 +4288,11 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
       patch: {
         state: published.ok ? STATE_SENT : STATE_FAILED,
         kind: kind,
+        // "fallback" or "notice", or "failed" when the push did not land. This
+        // is the field that stops `state: sent` being read as a delivery.
+        edition: deliveryEdition({
+          state: published.ok ? STATE_SENT : STATE_FAILED,
+          kind: kind, ntfy_failed: published.ok ? false : true }),
         sequence_id: sequenceId,
         // The fallback ladder is a delivery like any other: a successful
         // `fallback_last_good` push DID reach the owner and must clear any
@@ -4229,6 +4341,15 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
       },
     }, now0(opts, startedAt));
   }
+  // THE RECOVERY SIGNAL, and it fires OUTSIDE the `writer` block on purpose: the
+  // ledger write can fail, and the owner's knowledge that the edition is stale
+  // must not depend on a KV write succeeding. Only the marker is burned here,
+  // and `announceStaleEditionOnce` refuses to burn it without a writer.
+  const staleAlert = published.ok && usable
+    ? await announceStaleEditionOnce(
+        env, writer, today, slotName, String(lastGood.date), reason, dispatched,
+        startedAt)
+    : { alerted: false, reason: published.ok ? "no last good edition" : "push failed" };
   console.log(
     label + ": " + JSON.stringify({
       kind: kind, reject_reason: reason, pushed: published.ok,
@@ -4236,6 +4357,8 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
       sequence_id: sequenceId,
       late_build_dispatched: dispatched,
       last_good_shown: usable ? String(lastGood.date) : null,
+      stale_alert: staleAlert.alerted,
+      stale_alert_reason: staleAlert.reason || null,
     })
   );
   return {
@@ -4250,6 +4373,8 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
     reject_reason: reason,
 late_build_dispatched: dispatched,
       last_good_shown: usable ? String(lastGood.date) : null,
+      stale_alert: staleAlert.alerted,
+      stale_alert_reason: staleAlert.reason || null,
       // Carried on the pushed path too, so `delivery_evidence` is a field every
       // outcome from this function has and a reader never has to infer it from
       // which other fields happen to be set.
@@ -4664,11 +4789,22 @@ function latestLedgerDelivery(ledger) {
   const delta = deliveryDeltaSeconds(
     best.first_ntfy_sent_at || best.ntfy_sent_at,
     Date.parse(String(best.scheduled_instant || "")));
+  const edition = deliveryEdition(best);
   return {
     date: bestDate,
     slot: bestSlot,
     kind: best.kind || null,
     state: best.state || null,
+    // THE HONESTY FIELDS. `state: sent` only ever meant "a push landed"; it says
+    // nothing about WHICH edition landed, and a reader that treats it as "a fresh
+    // digest was delivered" is reading a fallback as a success. These four make
+    // that mistake impossible without changing `kind` or `state`, which the
+    // ladder and scripts/delivery_ledger.py both depend on.
+    edition: edition,
+    fresh_edition: edition === "fresh",
+    fallback_shown: edition === "fallback",
+    last_good_shown: best.last_good_shown || null,
+    reason: best.reject_reason || null,
     sequence_id: best.sequence_id || null,
     ntfy_sent_at: best.ntfy_sent_at || null,
     delta_s: delta,

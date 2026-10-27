@@ -102,6 +102,10 @@ const EXPORT_NAMES = [
   "touchHeartbeat", "planTickFor", "dispatchSchedule", "refireWindowFor",
   "REFIRE_GAP_MINUTES", "REFIRE_ATTEMPTS",
   "ARTIFACT_TTL_S", "DISPATCH_URL", "DIGEST_DISPATCH_URL",
+  // §14. The honesty split: the derived edition of the last delivery, and the
+  // once-per-slot recovery alert that names what was actually shown.
+  "deliveryEdition", "announceStaleEditionOnce",
+  "STALE_EDITION_ALERT_KEY_PREFIX",
 ];
 
 const loadCounter = { n: 0 };
@@ -867,8 +871,14 @@ test("a stale-dated artifact falls back to the last good digest, LABELLED as old
     },
   });
   const posts = postCalls(r.net);
-  assert.strictEqual(posts.length, 1);
-  const payload = JSON.parse(posts[0].body);
+  // TWO POSTs since 5d added the once-per-slot stale-edition alert: the fallback
+  // itself, plus the warning that says the edition is old. The count is pinned
+  // exactly — "at least one" would let a third message appear unnoticed.
+  assert.strictEqual(posts.length, 2);
+  const fallbackPosts = posts.filter((c) =>
+    c.headers["X-Sequence-Id"] === w.digestFullSequenceId(TODAY, SLOT));
+  assert.strictEqual(fallbackPosts.length, 1);
+  const payload = JSON.parse(fallbackPosts[0].body);
   assert.strictEqual(payload.title, "⚠️ Morning digest delayed — showing " + YESTERDAY);
   assert.ok(/^\*\*Why you are seeing this\*\*/.test(payload.message),
     "the fallback must OPEN with why he is seeing it: " + payload.message);
@@ -878,7 +888,7 @@ test("a stale-dated artifact falls back to the last good digest, LABELLED as old
   assert.ok(payload.message.indexOf(good.body) > 0,
     "the last good digest's body must actually be shown: " + payload.message);
   assert.strictEqual(payload.click, good.page_url);
-  assert.strictEqual(postCalls(r.net)[0].headers["X-Sequence-Id"],
+  assert.strictEqual(fallbackPosts[0].headers["X-Sequence-Id"],
     w.digestFullSequenceId(TODAY, SLOT));
   assert.strictEqual(r.outcome.kind, w.KIND_FALLBACK_LAST_GOOD);
   // The ledger must remember what was shown WITHOUT promoting it to last_good.
@@ -915,6 +925,185 @@ test("no artifact and no last good still PUSHES, naming the reason", async () =>
   assert.strictEqual(payload.click, w.digestArchiveIndexUrl(ARCHIVE_ENV));
   assert.strictEqual(r.outcome.kind, w.KIND_UNAVAILABLE);
   assert.strictEqual(ledgerOf(r.kv).days[TODAY][SLOT].kind, w.KIND_UNAVAILABLE);
+});
+
+// ===========================================================================
+// 5d. A FALLBACK IS NEVER REPORTED AS A DELIVERED EDITION.
+//
+// The ladder suppression elsewhere in this repo stays exactly as it is: a push
+// the owner CAN read must not re-run the email/Telegram ladder, because he has
+// already been given something to read (see
+// tests/digest/test_ladder_trigger.py::test_a_push_the_owner_CAN_read_does_not_run_the_ladder).
+//
+// That contract is about the LADDER, and it was silently extended into a lie by
+// the reporting layer: `state: "sent"` was read as "today's digest arrived", and
+// a fallback_last_good entry carries `state: "sent"` because a push really did
+// land. On 2026-10-27 the owner was shown the 18th's edition, `?health=1`
+// reported a send, and nothing anywhere said the news was nine days old.
+//
+// So: `kind` and `state` keep their meaning for the ladder and for
+// scripts/delivery_ledger.py, and `edition` answers the different question —
+// WHICH edition was shown. A fallback must read as `edition: "fallback"` with
+// `fresh_edition: false`, and the slot must get ONE recovery alert naming the
+// edition actually shown and the reason the build failed.
+// ===========================================================================
+
+function staleAlerts(w, net) {
+  const seq = "dmn-" + TODAY + "-" + SLOT + "-stale-notice";
+  return postCalls(net).filter((c) => c.headers["X-Sequence-Id"] === seq);
+}
+
+test("deliveryEdition answers WHICH edition was shown, not whether a push landed", () => {
+  const w = loadWorker();
+  const none = (entry) => w.deliveryEdition(entry);
+  assert.strictEqual(none(null), "unknown");
+  assert.strictEqual(none({}), "unknown");
+  assert.strictEqual(none({ state: "pending", kind: "delivered" }), "pending");
+  // THE ONE THAT MATTERED. A landed fallback is `state: sent`.
+  assert.strictEqual(
+    w.deliveryEdition({ state: "sent", kind: "fallback_last_good",
+                        ntfy_sent_at: "2026-10-09T01:36:00Z" }), "fallback");
+  assert.strictEqual(
+    w.deliveryEdition({ state: "sent", kind: "delivered",
+                        ntfy_sent_at: "2026-10-09T01:36:00Z" }), "fresh");
+  assert.strictEqual(
+    w.deliveryEdition({ state: "sent", kind: "partial",
+                        ntfy_sent_at: "2026-10-09T01:36:00Z" }), "partial");
+  assert.strictEqual(
+    w.deliveryEdition({ state: "sent", kind: "unavailable",
+                        ntfy_sent_at: "2026-10-09T01:36:00Z" }), "notice");
+  assert.strictEqual(
+    w.deliveryEdition({ state: "failed", kind: "fallback_last_good",
+                        ntfy_failed: true }), "failed");
+  assert.strictEqual(none({ state: "sent", kind: "duplicate_suppressed" }),
+    "duplicate");
+  assert.strictEqual(none({ state: "sent", kind: "stood_down" }), "stood_down");
+});
+
+test("a fallback slot reads as a fallback in the ledger AND in ?health=1", async () => {
+  const w = loadWorker();
+  const good = lastGood(YESTERDAY, "Yesterday's news, which did build.");
+  const r = await deliver(w, {
+    initial: {
+      [artifactKey()]: artifact({ date: YESTERDAY }),  // stale -> the ladder
+      "digest:ledger": JSON.stringify({
+        schema_version: 1, as_of: new Date(T0 - HOUR).toISOString(),
+        days: {}, last_good: good,
+      }),
+    },
+  });
+  assert.strictEqual(r.outcome.kind, w.KIND_FALLBACK_LAST_GOOD);
+  const entry = ledgerOf(r.kv).days[TODAY][SLOT];
+  assert.strictEqual(entry.state, "sent");
+  assert.strictEqual(entry.edition, "fallback",
+    "the ledger stored no edition for a fallback, so every reader has to infer " +
+    "it from `kind` — the inference that made 2026-10-27 look like a delivery");
+  assert.strictEqual(entry.last_good_shown, YESTERDAY);
+
+  const clock = fakeClock(T0);
+  let res;
+  try {
+    res = await w.WORKER.fetch(
+      new Request("https://probe.invalid/?health=1"), ntfyEnv(r.kv));
+  } finally {
+    clock.restore();
+  }
+  const d = JSON.parse(await res.text()).digest;
+  assert.strictEqual(d.last_delivery.edition, "fallback");
+  assert.strictEqual(d.last_delivery.fresh_edition, false,
+    "?health=1 called a fallback a fresh edition");
+  assert.strictEqual(d.last_delivery.fallback_shown, true);
+  assert.strictEqual(d.last_delivery.last_good_shown, YESTERDAY,
+    "?health=1 must name the date of the edition actually shown");
+  assert.ok(d.last_delivery.reason,
+    "?health=1 must carry WHY the build fell back: " +
+    JSON.stringify(d.last_delivery));
+});
+
+test("a real digest reads as a fresh edition and raises NO stale alert", async () => {
+  const w = loadWorker();
+  const r = await deliver(w, { initial: { [artifactKey()]: artifact() } });
+  assert.strictEqual(r.outcome.kind, w.KIND_DELIVERED);
+  const entry = ledgerOf(r.kv).days[TODAY][SLOT];
+  assert.strictEqual(entry.edition, "fresh");
+  const clock = fakeClock(T0);
+  let res;
+  try {
+    res = await w.WORKER.fetch(
+      new Request("https://probe.invalid/?health=1"), ntfyEnv(r.kv));
+  } finally {
+    clock.restore();
+  }
+  const d = JSON.parse(await res.text()).digest;
+  assert.strictEqual(d.last_delivery.edition, "fresh");
+  assert.strictEqual(d.last_delivery.fresh_edition, true);
+  assert.strictEqual(d.last_delivery.fallback_shown, false);
+  assert.strictEqual(staleAlerts(w, r.net).length, 0,
+    "a successful build must not tell the owner his edition is stale");
+  assert.ok(!Object.keys(r.kv.store).some(
+    (k) => k.indexOf(w.STALE_EDITION_ALERT_KEY_PREFIX) === 0),
+    "a fresh delivery must not write the stale-alert marker either");
+});
+
+test("a fallback also sends the recovery alert, naming the date and the reason", async () => {
+  const w = loadWorker();
+  const good = lastGood(YESTERDAY, "Yesterday's news, which did build.");
+  const r = await deliver(w, {
+    initial: {
+      [artifactKey()]: artifact({ date: YESTERDAY }),
+      "digest:ledger": JSON.stringify({
+        schema_version: 1, as_of: new Date(T0 - HOUR).toISOString(),
+        days: {}, last_good: good,
+      }),
+    },
+  });
+  const alerts = staleAlerts(w, r.net);
+  assert.strictEqual(alerts.length, 1,
+    "the fallback push went out and NOTHING said the edition is stale; the " +
+    "owner has to notice the date in the title of a push he reads as news. " +
+    "POSTs seen: " + JSON.stringify(
+      postCalls(r.net).map((c) => c.headers["X-Sequence-Id"])));
+  const payload = JSON.parse(alerts[0].body);
+  assert.match(payload.title, /STALE/);
+  assert.ok(payload.title.indexOf(YESTERDAY) >= 0,
+    "the alert must name the edition actually shown: " + payload.title);
+  assert.match(payload.message, /Why:/,
+    "the alert must carry the reason the build failed: " + payload.message);
+  assert.ok(payload.message.indexOf(good.body) < 0,
+    "the alert must be short — it is a warning, not a second copy of the digest");
+  assert.strictEqual(r.outcome.stale_alert, true);
+});
+
+test("the stale-edition alert is once per SLOT, and a probe cannot burn the marker", async () => {
+  const w = loadWorker();
+  const h = makeHarness({});
+  const env = ntfyEnv(h.kv);
+  const writer = async () => {};
+  const clock = fakeClock(T0);
+  let first, second, probe;
+  try {
+    first = await w.announceStaleEditionOnce(
+      env, writer, TODAY, SLOT, YESTERDAY, "stale_date", true, T0);
+    second = await w.announceStaleEditionOnce(
+      env, writer, TODAY, SLOT, YESTERDAY, "stale_date", true, T0 + MIN);
+    probe = await w.announceStaleEditionOnce(
+      env, null, TODAY, SLOT, YESTERDAY, "stale_date", true, T0 + 2 * MIN);
+  } finally {
+    clock.restore();
+  }
+  const posts = postCalls(h.net);
+  assert.strictEqual(first.alerted, true);
+  assert.strictEqual(second.alerted, false,
+    "a second re-fire of the SAME slot alerted again — the owner's phone is " +
+    "the thing this marker exists to protect");
+  assert.match(String(second.reason), /already announced/);
+  assert.strictEqual(probe.alerted, false);
+  assert.match(String(probe.reason), /probe/);
+  assert.strictEqual(posts.length, 1,
+    "exactly one alert must reach ntfy for one slot, and a probe must add none");
+  assert.ok(h.kv.store[w.STALE_EDITION_ALERT_KEY_PREFIX + TODAY + ":" + SLOT],
+    "the marker must be keyed by date AND slot, or a re-fire of another slot " +
+    "would be silenced by this one");
 });
 
 test("a corrupt artifact takes the same ladder as an absent one", async () => {
