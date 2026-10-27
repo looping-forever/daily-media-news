@@ -84,7 +84,7 @@ const EXPORT_NAMES = [
   "digestSequenceId", "digestFullSequenceId", "digestArchiveHost",
   "digestArchiveOrigin", "digestArchiveIndexUrl", "deliveryDeltaSeconds",
   "DIGEST_LEDGER_KEY", "DIGEST_ARTIFACT_PREFIX", "DIGEST_SCHEMA_VERSION",
-  "DIGEST_ARCHIVE_ORIGIN", "DIGEST_SLOTS", "DIGEST_CRON_ARM",
+  "DIGEST_SLOTS", "DIGEST_CRON_ARM",
   "DELIVERY_ON_TIME_S", "DELIVERY_RETENTION_DAYS", "ARTIFACT_MAX_BUILD_AGE_S",
   "NTFY_TITLE_MAX_CHARS", "NTFY_BODY_MAX_BYTES", "DELIVERY_ATTEMPTS",
   "DELIVERY_BUDGET_MS", "DELIVERY_ATTEMPT_TIMEOUT_MS",
@@ -163,7 +163,16 @@ const NTFY_SERVER = "https://ntfy.example.invalid";
 const TOPIC = "dmn-secret-topic-7f3a91c4";
 const INGEST_SECRET = "ingest-token-under-test";
 
-const ARCHIVE_PAGE = "https://daily-digest.example.pages.dev/digests/2026-10-09-morning.html";
+/** The archive host every fixture uses. It is the SANITISED name, not the
+ *  deployed one, and it reaches the Worker the only way it can: through env.
+ *
+ *  THE WORKER NO LONGER INVENTS A HOST. digestArchiveOrigin() throws when
+ *  DIGEST_ARCHIVE_ORIGIN is absent, so a test env that omits it is testing a
+ *  Worker that refuses to start work — which is why it is set here, once, for
+ *  every test that runs a delivery or an ingest. */
+const ARCHIVE_HOST = "daily-digest.example.pages.dev";
+const ARCHIVE_ENV = { DIGEST_ARCHIVE_ORIGIN: "https://" + ARCHIVE_HOST };
+const ARCHIVE_PAGE = "https://" + ARCHIVE_HOST + "/digests/2026-10-09-morning.html";
 
 function ntfyEnv(kv, extra) {
   return Object.assign({
@@ -171,6 +180,7 @@ function ntfyEnv(kv, extra) {
     NTFY_SERVER: NTFY_SERVER,
     NTFY_TOPIC: TOPIC,
     DIGEST_INGEST_TOKEN: INGEST_SECRET,
+    DIGEST_ARCHIVE_ORIGIN: ARCHIVE_ENV.DIGEST_ARCHIVE_ORIGIN,
     WORKER_BUILD: "testbuild",
     // NOTE: no GH_TOKEN anywhere in this file's env. The delivery path must not
     // need it, and the "no GitHub API" test below asserts that it does not.
@@ -417,7 +427,7 @@ async function runScheduledAtT0(WORKER, cron, env) {
 
 test("validateArtifact accepts a well-formed artifact for today and this slot", async () => {
   const w = loadWorker();
-  const out = w.validateArtifact(artifact(), SLOT, TODAY, T0);
+  const out = w.validateArtifact(artifact(), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(out.ok, true, JSON.stringify(out));
   assert.strictEqual(out.artifact.slot, SLOT);
   assert.strictEqual(out.artifact.date, TODAY);
@@ -426,7 +436,7 @@ test("validateArtifact accepts a well-formed artifact for today and this slot", 
 test("validateArtifact refuses an absent artifact as `absent`", async () => {
   const w = loadWorker();
   for (const raw of [null, undefined, ""]) {
-    const out = w.validateArtifact(raw, SLOT, TODAY, T0);
+    const out = w.validateArtifact(raw, SLOT, TODAY, T0, ARCHIVE_ENV);
     assert.strictEqual(out.ok, false);
     assert.strictEqual(out.reason, "absent", "for " + JSON.stringify(raw));
     assert.ok(/no digest was built/.test(out.plain),
@@ -436,17 +446,17 @@ test("validateArtifact refuses an absent artifact as `absent`", async () => {
 
 test("validateArtifact refuses unparseable JSON as `corrupt`, not as absent", async () => {
   const w = loadWorker();
-  const out = w.validateArtifact("{not json", SLOT, TODAY, T0);
+  const out = w.validateArtifact("{not json", SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(out.ok, false);
   assert.strictEqual(out.reason, "corrupt");
   assert.ok(/could not be parsed/.test(out.plain), out.plain);
-  const notARecord = w.validateArtifact("[1,2,3]", SLOT, TODAY, T0);
+  const notARecord = w.validateArtifact("[1,2,3]", SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(notARecord.reason, "corrupt");
 });
 
 test("validateArtifact refuses a schema_version other than 1", async () => {
   const w = loadWorker();
-  const out = w.validateArtifact(artifact({ schema_version: 2 }), SLOT, TODAY, T0);
+  const out = w.validateArtifact(artifact({ schema_version: 2 }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(out.ok, false);
   assert.strictEqual(out.reason, "schema");
   assert.ok(/version 2/.test(out.plain), out.plain);
@@ -454,7 +464,7 @@ test("validateArtifact refuses a schema_version other than 1", async () => {
 
 test("validateArtifact refuses an artifact filed under the other slot", async () => {
   const w = loadWorker();
-  const out = w.validateArtifact(artifact({ slot: "evening" }), SLOT, TODAY, T0);
+  const out = w.validateArtifact(artifact({ slot: "evening" }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(out.ok, false);
   assert.strictEqual(out.reason, "slot");
   assert.ok(/evening/.test(out.plain), out.plain);
@@ -462,7 +472,7 @@ test("validateArtifact refuses an artifact filed under the other slot", async ()
 
 test("validateArtifact refuses YESTERDAY's digest — the critical refusal", async () => {
   const w = loadWorker();
-  const out = w.validateArtifact(artifact({ date: YESTERDAY }), SLOT, TODAY, T0);
+  const out = w.validateArtifact(artifact({ date: YESTERDAY }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(out.ok, false,
     "a well-formed artifact dated yesterday was ACCEPTED as today's digest. " +
     "Every other field is correct, so nothing downstream could tell — the " +
@@ -478,7 +488,7 @@ test("validateArtifact refuses YESTERDAY's digest — the critical refusal", asy
 test("validateArtifact refuses an artifact older than the 26h freshness limit", async () => {
   const w = loadWorker();
   const stale = artifact({ built_at: new Date(T0 - (w.ARTIFACT_MAX_BUILD_AGE_S + 60) * 1000).toISOString() });
-  const out = w.validateArtifact(stale, SLOT, TODAY, T0);
+  const out = w.validateArtifact(stale, SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(out.ok, false);
   assert.strictEqual(out.reason, "stale_build");
   assert.ok(/past the 26h freshness limit/.test(out.plain), out.plain);
@@ -486,11 +496,11 @@ test("validateArtifact refuses an artifact older than the 26h freshness limit", 
 
 test("validateArtifact refuses an artifact with no usable build time, or one from the future", async () => {
   const w = loadWorker();
-  const missing = w.validateArtifact(artifact({ built_at: "" }), SLOT, TODAY, T0);
+  const missing = w.validateArtifact(artifact({ built_at: "" }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(missing.ok, false);
   assert.strictEqual(missing.reason, "stale_build");
   const future = w.validateArtifact(
-    artifact({ built_at: new Date(T0 + 30 * MIN).toISOString() }), SLOT, TODAY, T0);
+    artifact({ built_at: new Date(T0 + 30 * MIN).toISOString() }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(future.ok, false,
     "an artifact stamped half an hour in the FUTURE was accepted, so every " +
     "age computed from it — including the freshness limit just above — is a " +
@@ -500,14 +510,14 @@ test("validateArtifact refuses an artifact with no usable build time, or one fro
 
 test("validateArtifact refuses an absent or off-archive page_url", async () => {
   const w = loadWorker();
-  const absent = w.validateArtifact(artifact({ page_url: "" }), SLOT, TODAY, T0);
+  const absent = w.validateArtifact(artifact({ page_url: "" }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(absent.ok, false);
   assert.strictEqual(absent.reason, "page");
   // An off-host click target is the shape a phishing push takes.
   for (const bad of ["https://evil.example.invalid/x.html",
                      "https://daily-digest.example.pages.dev.evil.invalid/x.html",
                      "not-a-url"]) {
-    const out = w.validateArtifact(artifact({ page_url: bad }), SLOT, TODAY, T0);
+    const out = w.validateArtifact(artifact({ page_url: bad }), SLOT, TODAY, T0, ARCHIVE_ENV);
     assert.strictEqual(out.ok, false, "accepted " + bad);
     assert.strictEqual(out.reason, "page", "for " + bad);
   }
@@ -516,13 +526,13 @@ test("validateArtifact refuses an absent or off-archive page_url", async () => {
 test("validateArtifact refuses an empty or over-long title, at exactly 72 chars", async () => {
   const w = loadWorker();
   assert.strictEqual(w.NTFY_TITLE_MAX_CHARS, 72);
-  const empty = w.validateArtifact(artifact({ ntfy: { title: "" } }), SLOT, TODAY, T0);
+  const empty = w.validateArtifact(artifact({ ntfy: { title: "" } }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(empty.reason, "title");
   const atLimit = w.validateArtifact(
-    artifact({ ntfy: { title: "T".repeat(72) } }), SLOT, TODAY, T0);
+    artifact({ ntfy: { title: "T".repeat(72) } }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(atLimit.ok, true, "72 chars is the ceiling, not the first rejected value");
   const over = w.validateArtifact(
-    artifact({ ntfy: { title: "T".repeat(73) } }), SLOT, TODAY, T0);
+    artifact({ ntfy: { title: "T".repeat(73) } }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(over.ok, false);
   assert.strictEqual(over.reason, "title");
   assert.ok(/73 characters/.test(over.plain), over.plain);
@@ -531,17 +541,17 @@ test("validateArtifact refuses an empty or over-long title, at exactly 72 chars"
 test("validateArtifact measures the body in BYTES, not characters", async () => {
   const w = loadWorker();
   assert.strictEqual(w.NTFY_BODY_MAX_BYTES, 4096);
-  const empty = w.validateArtifact(artifact({ ntfy: { body: "" } }), SLOT, TODAY, T0);
+  const empty = w.validateArtifact(artifact({ ntfy: { body: "" } }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(empty.reason, "body");
   // 2049 emoji = 8196 bytes but only 2049 characters: a character count would
   // have accepted this and the server would have rejected it.
   const overBytes = w.validateArtifact(
-    artifact({ ntfy: { body: "🙂".repeat(2049) } }), SLOT, TODAY, T0);
+    artifact({ ntfy: { body: "🙂".repeat(2049) } }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(overBytes.ok, false,
     "a 2049-character body of 4-byte emoji was accepted; ntfy counts bytes");
   assert.strictEqual(overBytes.reason, "body");
   const atLimit = w.validateArtifact(
-    artifact({ ntfy: { body: "a".repeat(4096) } }), SLOT, TODAY, T0);
+    artifact({ ntfy: { body: "a".repeat(4096) } }), SLOT, TODAY, T0, ARCHIVE_ENV);
   assert.strictEqual(atLimit.ok, true, "4096 bytes is the ceiling");
 });
 
@@ -900,9 +910,9 @@ test("no artifact and no last good still PUSHES, naming the reason", async () =>
   const payload = JSON.parse(posts[0].body);
   assert.strictEqual(payload.title, "⚠️ Morning digest unavailable");
   assert.ok(/no digest was built for morning/.test(payload.message), payload.message);
-  assert.ok(payload.message.indexOf(w.digestArchiveIndexUrl()) >= 0,
+  assert.ok(payload.message.indexOf(w.digestArchiveIndexUrl(ARCHIVE_ENV)) >= 0,
     "the unavailable push must point at the archive index: " + payload.message);
-  assert.strictEqual(payload.click, w.digestArchiveIndexUrl());
+  assert.strictEqual(payload.click, w.digestArchiveIndexUrl(ARCHIVE_ENV));
   assert.strictEqual(r.outcome.kind, w.KIND_UNAVAILABLE);
   assert.strictEqual(ledgerOf(r.kv).days[TODAY][SLOT].kind, w.KIND_UNAVAILABLE);
 });
@@ -982,7 +992,7 @@ test("a failed prebuild DISPATCHES a late build, and the push still lands", asyn
   // the boolean dispatchDigest actually returned.
   assert.ok(/A fresh build is on its way/.test(payload.message),
     "a dispatch was accepted and the push does not say so: " + payload.message);
-  assert.ok(payload.message.indexOf(w.digestArchiveIndexUrl()) >= 0,
+  assert.ok(payload.message.indexOf(w.digestArchiveIndexUrl(ARCHIVE_ENV)) >= 0,
     "the dispatch note displaced the archive index link: " + payload.message);
 
   // The ledger must record the verdict for the watchdog and the next reader.
@@ -1590,7 +1600,8 @@ test("a missing NTFY_TOPIC is reported by NAME, and the value never appears", as
   const logs = captureLogs();
   try {
     const outcome = await w.deliverDigest(
-      { KV: harness.kv, NTFY_SERVER: NTFY_SERVER, WORKER_BUILD: "t" }, SLOT,
+      { KV: harness.kv, NTFY_SERVER: NTFY_SERVER, WORKER_BUILD: "t",
+        DIGEST_ARCHIVE_ORIGIN: ARCHIVE_ENV.DIGEST_ARCHIVE_ORIGIN }, SLOT,
       { now: () => T0, sleep: async () => {} });
     assert.strictEqual(outcome.ok, false);
   } finally {
@@ -1775,13 +1786,17 @@ test("the ingest endpoint rejects a wrong schema, a key that disagrees, and an o
 // ==========================================================================
 //
 // The real Pages host cannot be committed (scripts/check_public_sanitisation.py
-// fails the build if it appears), so the Worker used to compare every incoming
-// `page_url` against a committed PLACEHOLDER that no deployment serves. The
-// result was a 400 on every real digest: authentication passed, the host check
-// failed. These tests pin BOTH halves of the fix -- the override is honoured,
-// and the check is still a check.
+// fails the build if it appears), so the Worker compares every incoming
+// `page_url` against DIGEST_ARCHIVE_ORIGIN and nothing else. It used to fall back
+// to a committed PLACEHOLDER that no deployment serves, and the result was a 400
+// on every real digest: authentication passed, the host check failed, and the
+// response named the placeholder host -- so the failure looked like a bad
+// artifact instead of a missing secret, for nine days.
+//
+// These tests pin BOTH halves of the fix -- the override is honoured, the check
+// is still a check, and there is no fallback host to silently compare against.
 
-test("the archive origin comes from env, falls back to the placeholder, and ignores a malformed override", async () => {
+test("the archive origin comes from env, and a malformed value is REFUSED rather than replaced", async () => {
   const w = loadWorker();
   const SENTINEL = "https://archive.sentinel.invalid";
 
@@ -1793,39 +1808,59 @@ test("the archive origin comes from env, falls back to the placeholder, and igno
     SENTINEL + "/",
     "the index URL helper does not honour DIGEST_ARCHIVE_ORIGIN");
 
-  // No env at all -> the committed placeholder, unchanged.
-  assert.strictEqual(w.digestArchiveOrigin({}), "https://daily-digest.example.pages.dev");
-  assert.strictEqual(w.digestArchiveHost({}), "daily-digest.example.pages.dev");
-
-  // A value that is not an absolute http(s) URL with a dotted host is IGNORED,
+  // A value that is not an absolute http(s) URL with a dotted host is REFUSED,
   // not trusted: the host check compares against whatever this returns, so a
-  // typo must never be able to widen it. "https:///nohost" is the interesting
-  // one -- `new URL` turns it into the hostname "nohost", and a single label
-  // can never serve the digest, so it has to be refused rather than used.
+  // typo must never be able to widen it -- and it must never be quietly swapped
+  // for a placeholder either, because that is the bug this replaced. "https:///nohost"
+  // is the interesting one: `new URL` turns it into the hostname "nohost", and a
+  // single label can never serve the digest.
   for (const bad of ["not a url", "/relative", "javascript:alert(1)",
                      "https:///nohost", "ftp://archive.example.invalid",
                      "https://archive"]) {
-    assert.strictEqual(w.digestArchiveHost({ DIGEST_ARCHIVE_ORIGIN: bad }),
-      "daily-digest.example.pages.dev",
-      "a malformed DIGEST_ARCHIVE_ORIGIN (" + JSON.stringify(bad) + ") was " +
-      "accepted as the archive host, so a typo could widen the host check");
+    assert.throws(
+      () => w.digestArchiveHost({ DIGEST_ARCHIVE_ORIGIN: bad }),
+      /DIGEST_ARCHIVE_ORIGIN/,
+      "a malformed DIGEST_ARCHIVE_ORIGIN (" + JSON.stringify(bad) + ") did not " +
+      "fail: it was either accepted as the archive host, which widens the host " +
+      "check, or replaced by a placeholder, which blames the artifact");
   }
 });
 
-test("a missing DIGEST_ARCHIVE_ORIGIN is SAID OUT LOUD, not silently degraded", async () => {
+test("a missing DIGEST_ARCHIVE_ORIGIN FAILS LOUDLY instead of degrading to a placeholder", async () => {
   const w = loadWorker();
-  const logs = captureLogs();
-  let host;
+  let message = "";
   try {
-    host = w.digestArchiveHost({});
-  } finally {
-    logs.restore();
+    w.digestArchiveHost({});
+  } catch (err) {
+    message = String(err && err.message || err);
   }
-  assert.strictEqual(host, "daily-digest.example.pages.dev");
-  assert.ok(logs.text().indexOf("DIGEST_ARCHIVE_ORIGIN") >= 0,
-    "the Worker used the placeholder archive host without naming the unset " +
-    "secret. That is the silent degradation that kept every digest at HTTP " +
-    "400. Logs were: " + JSON.stringify(logs.text()));
+  assert.ok(message.indexOf("DIGEST_ARCHIVE_ORIGIN") >= 0,
+    "a Worker with no DIGEST_ARCHIVE_ORIGIN did not fail. The placeholder " +
+    "fallback is back, and with it the 400 that blames every real artifact. " +
+    "Got: " + JSON.stringify(message));
+  assert.ok(message.indexOf("wrangler secret put") >= 0,
+    "the failure does not say how to fix it. The owner reads this in a log at " +
+    "06:42, not a wiki page: " + JSON.stringify(message));
+  assert.ok(message.indexOf("daily-digest.example.pages.dev") < 0,
+    "the failure message still names the placeholder host, so a reader is again " +
+    "told to look at the wrong end of the problem: " + JSON.stringify(message));
+  assert.throws(() => w.digestArchiveIndexUrl({}), /DIGEST_ARCHIVE_ORIGIN/,
+    "the archive index helper still invents a URL when the origin is unset");
+
+  // And the same through the two callers that face a real request, because a
+  // helper that throws while its callers swallow it is not loud at all.
+  const ingestRes = await ingest(w, makeHarness({}).kv, JSON.parse(artifact()),
+                                 null, null, { DIGEST_ARCHIVE_ORIGIN: "" });
+  assert.strictEqual(ingestRes.res.status, 500,
+    "a misconfigured Worker answered the ingest with " + ingestRes.res.status +
+    ", so the refusal is still being reported as something other than a " +
+    "configuration failure");
+  const refused = w.validateArtifact(artifact(), SLOT, TODAY, T0, {});
+  assert.strictEqual(refused.ok, false);
+  assert.strictEqual(refused.reason, "config",
+    "validateArtifact did not name the missing origin as a configuration " +
+    "problem, so the delivery ladder hunts an artifact defect instead: " +
+    JSON.stringify(refused));
 });
 
 test("the ingest accepts the CONFIGURED archive host and still refuses every other host", async () => {
@@ -1874,14 +1909,18 @@ test("validateArtifact gates the delivery path on the same runtime origin", asyn
     "validateArtifact rejected the configured archive host: " + right.reason +
     " -- " + right.plain);
 
-  // Without env the committed placeholder is still the expected host, so a
-  // caller that has not been taught about env behaves exactly as before.
+  // With the sentinel configured, the fixture's own host is now a FOREIGN host:
+  // the delivery path and the ingest path must agree that it is refused.
   assert.strictEqual(w.validateArtifact(artifact(), SLOT, TODAY, T0, env).ok, false,
-    "validateArtifact accepted the PLACEHOLDER host while a real one was " +
+    "validateArtifact accepted the placeholder host while a real one was " +
     "configured, so the delivery path and the ingest path disagree");
-  assert.strictEqual(w.validateArtifact(artifact(), SLOT, TODAY, T0).ok, true,
-    "the 4-argument call changed behaviour, which breaks every caller that " +
-    "has not been taught about env");
+  // And a 4-argument call no longer means "use the placeholder": there is no
+  // placeholder to use, so it is a configuration failure and must say so.
+  const noEnv = w.validateArtifact(artifact(), SLOT, TODAY, T0);
+  assert.strictEqual(noEnv.ok, false,
+    "the 4-argument call still validated an artifact. There is no fallback " +
+    "archive host any more, so it must refuse and name the configuration.");
+  assert.strictEqual(noEnv.reason, "config", JSON.stringify(noEnv));
 });
 
 test("the ingest token is compared in constant time, not with ===", async () => {
@@ -2571,20 +2610,43 @@ test("a full simulated day of dispatcher ticks stays far under the free KV write
 // ==========================================================================
 // 16. The archive origin has exactly one place to be corrected
 // ==========================================================================
+//
+// THE LITERAL IS GONE, and that is what makes this test possible to state
+// honestly. The Worker used to carry its own copy of the archive host; the two
+// could drift, and the placeholder copy is exactly what refused every real
+// digest. The host now lives in the DIGEST_ARCHIVE_ORIGIN secret, and the ONE
+// committed record of it is drift-canary.yml's HOSTS list -- which the canary
+// probes unauthenticated, so a wrong value there is visible within minutes.
+// What is asserted here is that the Worker carries no host of its own to drift
+// from the canary, and that it returns precisely the host it is given.
 
-test("the archive origin is the host the drift canary already probes", async () => {
+test("the archive origin is the host the drift canary already probes, and the Worker keeps no copy of it", async () => {
   const w = loadWorker();
   const canary = fs.readFileSync(path.join(REPO_ROOT, ".github", "workflows",
                                            "drift-canary.yml"), "utf8");
   const hosts = /HOSTS="([^"]+)"/.exec(canary);
   assert.ok(hosts, "drift-canary.yml no longer declares its origin HOSTS list");
   const archiveHost = hosts[1].split(/\s+/)[0];
-  assert.strictEqual(w.digestArchiveHost(), archiveHost,
-    "the Worker's archive origin (" + w.digestArchiveHost() + ") is not the " +
-    "host the origin canary probes first (" + archiveHost + "). Two literals " +
-    "means two places to correct the subdomain, which is the drift class this " +
-    "suite exists to catch.");
-  assert.strictEqual(w.digestArchiveIndexUrl(), "https://" + archiveHost + "/");
+
+  assert.strictEqual(w.digestArchiveHost(ARCHIVE_ENV), ARCHIVE_HOST,
+    "the Worker did not return the origin it was given, so the secret is not " +
+    "the single source of the archive host");
+  assert.strictEqual(w.digestArchiveIndexUrl(ARCHIVE_ENV),
+    "https://" + ARCHIVE_HOST + "/");
+
+  // The canary's first host is the sanitised name in this tree, so the fixture
+  // and the canary must agree -- a divergence means one of them is stale.
+  assert.strictEqual(ARCHIVE_HOST, archiveHost,
+    "the fixture host (" + ARCHIVE_HOST + ") is not the host the origin canary " +
+    "probes first (" + archiveHost + ")");
+
+  // And the Worker source itself must contain no pages.dev literal at all: a
+  // host in the source is a second place to correct, which is the drift class
+  // this suite exists to catch, and the one that caused the nine-day outage.
+  const src = fs.readFileSync(WORKER_PATH, "utf8");
+  const literals = src.match(/["'`][^"'`\n]*\.pages\.dev[^"'`\n]*["'`]/g) || [];
+  assert.deepStrictEqual(literals, [],
+    "the Worker still carries an archive host literal: " + JSON.stringify(literals));
 });
 
 // ==========================================================================

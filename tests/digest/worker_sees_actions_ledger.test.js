@@ -124,7 +124,8 @@ test("the Worker's guard sees an Actions delivery and suppresses its own push", 
   });
   const calls = makeFetch([]);
   const res = await deliverDigest({ KV: kv, NTFY_SERVER: NTFY_SERVER,
-                                    NTFY_TOPIC: TOPIC, WORKER_BUILD: "testbuild" },
+                                    NTFY_TOPIC: TOPIC, WORKER_BUILD: "testbuild",
+                                    DIGEST_ARCHIVE_ORIGIN: new URL(ARCHIVE_PAGE).origin },
                                   "evening", { now: () => T0 });
   const posts = calls.filter((c) => c.method === "POST");
   assert.strictEqual(posts.length, 0,
@@ -178,7 +179,8 @@ test("the Worker's guard does NOT suppress a slot the Actions arm never touched"
   });
   const calls = makeFetch([]);
   const res = await deliverDigest({ KV: kv, NTFY_SERVER: NTFY_SERVER,
-                                    NTFY_TOPIC: TOPIC, WORKER_BUILD: "testbuild" },
+                                    NTFY_TOPIC: TOPIC, WORKER_BUILD: "testbuild",
+                                    DIGEST_ARCHIVE_ORIGIN: new URL(ARCHIVE_PAGE).origin },
                                   "evening", { now: () => T0 });
   assert.strictEqual(calls.filter((c) => c.method === "POST").length, 1,
     "yesterday's delivery suppressed today's digest. A duplicate is the accepted " +

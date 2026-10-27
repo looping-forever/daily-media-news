@@ -136,6 +136,9 @@ function ntfyEnv(kv, extra) {
     NTFY_SERVER: NTFY_SERVER,
     NTFY_TOPIC: TOPIC,
     WORKER_BUILD: "testbuild",
+    // The archive host is a SECRET on the Worker now. No value here is a
+    // fallback the Worker can lean on: it throws when this is absent.
+    DIGEST_ARCHIVE_ORIGIN: new URL(ARCHIVE_PAGE).origin,
   }, extra || {});
 }
 

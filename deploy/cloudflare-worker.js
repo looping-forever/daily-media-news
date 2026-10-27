@@ -2190,13 +2190,16 @@ const NTFY_BODY_MAX_BYTES = 4096;
 // and the archive-index link in the unavailable push read it, so there is no
 // second place to correct the archive subdomain inside the Worker.
 //
-// THE LITERAL IS A PLACEHOLDER, NOT THE DEPLOYED VALUE. The real host cannot be
-// committed — scripts/check_public_sanitisation.py fails the build if it appears
-// in this public tree — so it comes from the DIGEST_ARCHIVE_ORIGIN secret and
-// this string is used only when that secret is unset. digestArchiveOrigin()
-// logs loudly in that case, because a deployment that forgets the secret does
-// not "degrade gently": it refuses every real digest, which is what the host
-// check is for.
+// THERE IS NO FALLBACK, DELIBERATELY. The real host cannot be committed —
+// scripts/check_public_sanitisation.py fails the build if it appears in this
+// public tree — so it comes from the DIGEST_ARCHIVE_ORIGIN secret and from
+// nothing else. A committed placeholder used to stand in when the secret was
+// unset, and that placeholder is what cost nine days of digests: the host check
+// refused every real artifact with "page_url host ... is not the digest archive
+// host daily-digest.example.pages.dev", which reads like a bad artifact instead
+// of a missing secret. digestArchiveOrigin() therefore THROWS when the secret is
+// absent or malformed, and each caller turns that into a visible failure rather
+// than quietly comparing against a host no deployment serves.
 //
 // It is the same origin `.github/workflows/daily-news.yml` builds `pages_url`
 // from (the CF_ARCHIVE_ORIGIN repository variable) and the same host the drift
@@ -2204,59 +2207,48 @@ const NTFY_BODY_MAX_BYTES = 4096;
 // supply this: it is the WORKER's own endpoint on workers.dev, a different host
 // from the Pages project, so "derive the archive base from it" is not possible
 // and guessing it would have been worse than saying so.)
-const DIGEST_ARCHIVE_ORIGIN = "https://daily-digest.example.pages.dev";
 
-// The secret that overrides the placeholder. The NAME may appear anywhere; the
-// VALUE is a host rather than a credential, and is still never logged.
+// The secret that supplies the origin. The NAME may appear anywhere; the VALUE
+// is a host rather than a credential, and is still never logged.
 const DIGEST_ARCHIVE_ORIGIN_ENV = "DIGEST_ARCHIVE_ORIGIN";
 
-// The origin this deployment actually trusts: the configured value, or the
-// placeholder when nothing is configured.
+// The origin this deployment actually trusts, or a thrown Error. Never a
+// substituted host.
 //
-// An override that is not an absolute http(s) URL with a dotted host is IGNORED
-// rather than trusted. The host check compares against whatever this function
-// returns, so a typo must not be able to widen it — the safe reading of a
-// malformed value is "no override", never "accept whatever it parses to".
-// The dot requirement is there because `new URL` happily turns "https:///nohost"
-// into the hostname "nohost": a single label can never serve the digest, so
-// accepting it would recreate the exact silent 400 this change removes.
-//
-// `env` being undefined is the pure-call case (tests, and any caller that
-// predates this change) and stays silent; a real request path always passes
-// `env`, and that is where the missing-secret error is worth shouting about.
+// A value that is not an absolute http(s) URL with a dotted host is REFUSED
+// rather than ignored: the host check compares against whatever this returns, so
+// a typo must not be able to widen it, and falling back to a placeholder would
+// turn a configuration typo into the same misleading 400. The dot requirement is
+// there because `new URL` happily turns "https:///nohost" into the hostname
+// "nohost": a single label can never serve the digest.
 function digestArchiveOrigin(env) {
   const configured = env && typeof env[DIGEST_ARCHIVE_ORIGIN_ENV] === "string"
     ? env[DIGEST_ARCHIVE_ORIGIN_ENV].trim()
     : "";
-  if (configured) {
-    try {
-      const parsed = new URL(configured);
-      const httpish = parsed.protocol === "https:" || parsed.protocol === "http:";
-      const dotted = parsed.hostname.indexOf(".") > 0 &&
-        !parsed.hostname.endsWith(".");
-      if (httpish && dotted) {
-        return configured;
-      }
-    } catch (err) {
-      // reported below, together with the non-http(s) and dotless cases
+  if (!configured) {
+    throw new Error(
+      DIGEST_ARCHIVE_ORIGIN_ENV + " is not set on this Worker, so the digest " +
+        "archive origin is unknown and no artifact can be trusted, sealed or " +
+        "delivered. Set it with `wrangler secret put " +
+        DIGEST_ARCHIVE_ORIGIN_ENV + " -c deploy/wrangler.toml`. The value is " +
+        "not printed.");
+  }
+  try {
+    const parsed = new URL(configured);
+    const httpish = parsed.protocol === "https:" || parsed.protocol === "http:";
+    const dotted = parsed.hostname.indexOf(".") > 0 &&
+      !parsed.hostname.endsWith(".");
+    if (httpish && dotted) {
+      return configured;
     }
-    console.error(
-      "digest archive origin: " + DIGEST_ARCHIVE_ORIGIN_ENV + " is set but is " +
-        "not an absolute http(s) URL with a dotted host, so it is IGNORED and " +
-        "the committed placeholder is used. The configured value is not printed."
-    );
-    return DIGEST_ARCHIVE_ORIGIN;
+  } catch (err) {
+    // refused below, together with the non-http(s) and dotless cases
   }
-  if (env) {
-    console.error(
-      "digest archive origin: " + DIGEST_ARCHIVE_ORIGIN_ENV + " is not set on " +
-        "this Worker, so the committed PLACEHOLDER host is in use and every " +
-        "real digest will be refused by the page_url host check. Set it with " +
-        "`wrangler secret put " + DIGEST_ARCHIVE_ORIGIN_ENV +
-        " -c deploy/wrangler.toml`."
-    );
-  }
-  return DIGEST_ARCHIVE_ORIGIN;
+  throw new Error(
+    DIGEST_ARCHIVE_ORIGIN_ENV + " is set but is not an absolute http(s) URL " +
+      "with a dotted host, so it is refused rather than used. Fix the secret " +
+      "with `wrangler secret put " + DIGEST_ARCHIVE_ORIGIN_ENV +
+      " -c deploy/wrangler.toml`; the configured value is not printed.");
 }
 
 // Retry budget for the publish. Three attempts, 8s each, 2s then 6s of backoff:
@@ -2434,9 +2426,11 @@ function clipToNtfyLimit(text) {
 // validateArtifact(raw, slot, todayNpt, nowMs, env) ->
 //                                     {ok:true, artifact} | {ok:false, reason, plain}
 //
-// PURE, except that `env` may be passed so the `page_url` host check compares
-// against the DEPLOYED archive origin (digestArchiveOrigin(env)) rather than the
-// committed placeholder. Omitting `env` keeps the old behaviour exactly.
+// PURE, except that `env` must be passed so the `page_url` host check compares
+// against the DEPLOYED archive origin (digestArchiveOrigin(env)). Omitting `env`
+// is a CONFIGURATION error, not a legacy call shape: it is reported as
+// `reason: "config"` and refuses the artifact, because there is no host to
+// compare against and inventing one is the bug this file no longer has.
 //
 // PURE. No KV, no fetch, no clock of its own (nowMs is passed in and defaults
 // to Date.now only for the caller's convenience), and every rejection carries a
@@ -2558,13 +2552,27 @@ function validateArtifact(raw, slot, todayNpt, nowMs, env) {
   } catch (err) {
     pageHost = "";
   }
-  if (pageHost !== digestArchiveHost(env)) {
+  let archiveHost;
+  try {
+    archiveHost = digestArchiveHost(env);
+  } catch (err) {
+    // A WORKER THAT DOES NOT KNOW ITS ARCHIVE HOST IS BROKEN, NOT THE ARTIFACT.
+    // This reason is separate from `page` for exactly that reason: `page` blames
+    // the digest and sends the ladder hunting a build defect.
+    return {
+      ok: false,
+      reason: "config",
+      plain: "this Worker cannot check the " + slot + " digest for " + today +
+             " because " + String(err && err.message || err),
+    };
+  }
+  if (pageHost !== archiveHost) {
     return {
       ok: false,
       reason: "page",
       plain: "the " + slot + " digest for " + today + " links to " +
              (pageHost || "an unreadable host") + ", which is not the digest " +
-             "archive (" + digestArchiveHost(env) + ").",
+             "archive (" + archiveHost + ").",
     };
   }
 
@@ -2608,12 +2616,12 @@ function validateArtifact(raw, slot, todayNpt, nowMs, env) {
   return { ok: true, artifact: parsed };
 }
 
+// Both of these PROPAGATE digestArchiveOrigin()'s error. Swallowing it would put
+// the silence back one layer down: the host check would compare against "" and
+// the ingest would answer 400 "is not the digest archive host " with nothing
+// after the word "host".
 function digestArchiveHost(env) {
-  try {
-    return new URL(digestArchiveOrigin(env)).hostname.toLowerCase();
-  } catch (err) {
-    return "";
-  }
+  return new URL(digestArchiveOrigin(env)).hostname.toLowerCase();
 }
 
 function digestArchiveIndexUrl(env) {
@@ -4388,13 +4396,22 @@ async function handleDigestIngest(request, env) {
   } catch (err) {
     pageHost = "";
   }
-  if (pageHost !== digestArchiveHost(env)) {
+  // THE ARCHIVE HOST IS RESOLVED BEFORE THE COMPARISON, and a Worker that cannot
+  // resolve one answers 500, never 400. 400 would blame the artifact again, which
+  // is the exact mistake that hid this misconfiguration for nine days.
+  let archiveHost;
+  try {
+    archiveHost = digestArchiveHost(env);
+  } catch (err) {
+    return ingestError(
+      "500 misconfigured: " + String(err && err.message || err), 500);
+  }
+  if (pageHost !== archiveHost) {
     return ingestError(
       "400 bad request: page_url host " +
         JSON.stringify(pageHost || "(unreadable)") +
-        " is not the digest archive host " + digestArchiveHost(env), 400);
+        " is not the digest archive host " + archiveHost, 400);
   }
-
   if (!env || !env.KV) {
     return ingestError("500: no KV binding on this Worker", 500);
   }
