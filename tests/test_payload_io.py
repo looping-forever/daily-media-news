@@ -63,6 +63,7 @@ sys.path.insert(0, SCRIPTS)
 
 import payload_io  # noqa: E402
 import validate_stories as vs  # noqa: E402
+import check_academic_result as academic  # noqa: E402
 
 try:
     from tests import workflows as W
@@ -254,6 +255,9 @@ class PayloadIOFormatTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="payload-io-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
+        # The live writer truncates on the first call of a process; give every
+        # test its own "first call" so a previous test's file cannot leak in.
+        academic._LIVE_WRITTEN["started"] = False
 
     def write(self, text):
         full = os.path.join(self.tmp, "payloads.jsonl")
@@ -282,6 +286,14 @@ class PayloadIOFormatTests(unittest.TestCase):
         function the monitor runs must produce a file the delivery steps can
         parse. Extracted from the shipped source (not re-implemented) so a
         regression to `indent=2` fails here.
+
+        CONTRACT CHANGE (2026-10-27): stdout is NO LONGER the delivery source.
+        It used to be `| tee state/academic_live_payload.jsonl`, so the payload
+        -- roll number included -- was printed into a public Actions log. The
+        function now writes the live file itself and prints a redacted copy, so
+        this asserts the FILE carries the payloads intact and that stdout still
+        parses as one JSON object per line. Both halves are load-bearing: a
+        redacted log is worthless if the file stopped parsing.
         """
         source = (REPO_ROOT / "scripts" / "check_academic_result.py").read_text(
             encoding="utf-8")
@@ -291,8 +303,12 @@ class PayloadIOFormatTests(unittest.TestCase):
         segment = ast.get_source_segment(source, fn)
         self.assertIsNotNone(segment)
 
+        live = os.path.join(self.tmp, "live.jsonl")
         namespace = {"json": json, "save_state": lambda *a, **k: None,
-                     "NOTIFY_PREVIEW_PATH": os.path.join(self.tmp, "preview.json")}
+                     "NOTIFY_PREVIEW_PATH": os.path.join(self.tmp, "preview.json"),
+                     "NOTIFY_LIVE_PATH": live,
+                     "redacted_for_log": academic.redacted_for_log}
+        namespace["_append_live_line"] = academic._append_live_line
         exec(compile(segment, "<emit_notification>", "exec"), namespace)
         emit = namespace["emit_notification"]
 
@@ -303,13 +319,18 @@ class PayloadIOFormatTests(unittest.TestCase):
                 emit(item, dry_run=False)
         printed = buf.getvalue()
         self.assertEqual(4, len(printed.strip().split("\n")),
-                         "each payload must be exactly one line")
+                         "each payload must be exactly one line on stdout too")
 
-        path = os.path.join(self.tmp, "live.jsonl")
+        self.assertEqual(items, payload_io.read_payloads(live),
+                         "the live file the delivery steps read must carry the "
+                         "payloads verbatim, in order, with nothing redacted")
+
+        path = os.path.join(self.tmp, "printed.jsonl")
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(printed)
-        self.assertEqual(items, payload_io.read_payloads(path),
-                         "the producer's stdout must parse back identically")
+        self.assertEqual(4, len(payload_io.read_payloads(path)),
+                         "the redacted stdout must still be one JSON object per "
+                         "line, so the log stays readable")
 
     def test_producer_pins_compact_separators_and_no_indent(self):
         """The one-line contract, asserted on the AST, not on a copy."""
@@ -1160,13 +1181,34 @@ class RetryLadderTests(WorkflowStepHarness):
         self.assertIn("(2/3) — retrying", posts[0]["title"])
 
     def test_broken_is_always_a_priority_five_error(self):
+        """The severity never decays with the attempt number.
+
+        THE 6H WINDOW SUPPRESSES THE PUSH, NEVER THE VERDICT. A broken digest is
+        retried three times, so all three runs used to push; the first one now
+        pushes for the whole window and the later two print `NOT pushed` while
+        still annotating ::error:: and still failing their own run red. Asserting
+        a push on every attempt is exactly the flood the window exists to stop,
+        so this pins both halves instead of dropping the case.
+        """
+        posts = self.capture_posts()
         for attempt in (1, 2, 3):
             with self.subTest(attempt=attempt):
-                out, posts = self.alert("broken", attempt)
-                self.assertIn("::error::", out)
-                self.assertEqual(5, posts[0]["priority"])
-                self.assertEqual("Digest BROKEN: sources returned nothing "
-                                 "usable — fallback will fire", posts[0]["title"])
+                before = len(posts)
+                out, _ = self.alert("broken", attempt)
+                self.assertIn("::error::", out,
+                              "the annotation must survive suppression")
+                if attempt == 1:
+                    self.assertEqual(1, len(posts) - before)
+                    self.assertEqual(5, posts[before]["priority"])
+                    self.assertEqual("Digest BROKEN: sources returned nothing "
+                                     "usable — fallback will fire",
+                                     posts[before]["title"])
+                else:
+                    self.assertEqual(
+                        0, len(posts) - before,
+                        "a second push for the same unchanged cause inside the "
+                        "6h window is the flood this change removes")
+                    self.assertIn("NOT pushed", out)
 
     def test_third_attempt_is_the_falling_back_now_error(self):
         out, posts = self.alert("quiet_day", 3)

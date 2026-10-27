@@ -282,15 +282,17 @@ jobs:
               $ARGS
             rc=$?
           else
-            # Live: capture the printed payload (one COMPACT JSON object per
-            # line) to a file for the delivery steps. The monitor prints the
-            # payload with separators=(",", ":") and no indent, so every
-            # payload is exactly one line; the delivery steps parse it with
+            # Live: the MONITOR writes state/academic_live_payload.jsonl itself
+            # (one COMPACT JSON object per line) and prints only a REDACTED copy.
+            # It used to be `| tee`, which made stdout the delivery source and put
+            # the roll number in a public Actions log on every live run. The
+            # delivery steps unchanged: they read the file through
             # scripts/payload_io.read_payloads, which is total-or-raise.
+            rm -f state/academic_live_payload.jsonl
             python3 scripts/check_academic_result.py \
               --state-file state/academic_state.json \
-              $ARGS | tee state/academic_live_payload.jsonl
-            rc=${PIPESTATUS[0]}
+              $ARGS
+            rc=$?
           fi
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           echo "Academic monitor exit code: $rc"

@@ -9,9 +9,11 @@ Run:
     py tests\\academic\\test_academic_result.py
 """
 
+import contextlib
 import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -3138,6 +3140,77 @@ class CsitMarkerGapDeferTest(unittest.TestCase):
                 car._validate_state(json.loads(json.dumps(state))), reason)
 
 
+class NotificationLogRedactionTest(unittest.TestCase):
+    """The delivered payload carries the roll; the public LOG must not.
+
+    Until 2026-10-27 the live branch printed the payload and the workflow teed
+    stdout into state/academic_live_payload.jsonl, so every live run wrote the
+    owner's roll number into a public Actions log. The delivery file still needs
+    it (the ntfy message and the rendered page both show it), so the roll is
+    masked in the printed COPY only.
+    """
+
+    ROLL = "13572468"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="academic-log-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.live = os.path.join(self.tmp, "live.jsonl")
+        patcher = mock.patch.object(car, "NOTIFY_LIVE_PATH", self.live)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        car._LIVE_WRITTEN["started"] = False
+
+    def _payload(self, semester=1):
+        roll = self.ROLL
+        return {
+            "kind": "academic_result",
+            "semester": semester,
+            "roll_number": roll,
+            "passed": True,
+            "status": "passed",
+            "result_date": "2026-09-29",
+            "title": "Semester %d PASS" % semester,
+            "message": ("Roll %s cleared semester %d. The split form %s too."
+                        % (roll, semester, roll[:4] + " " + roll[4:])),
+            "ntfy": {"topic_hint": "academic", "message": "Roll %s passed" % roll},
+            "sections": [{"heading": "Roll %s" % roll, "body": "ok"}],
+        }
+
+    def test_the_printed_copy_carries_no_roll_and_no_split_form(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            car.emit_notification(self._payload(), dry_run=False)
+        out = buf.getvalue()
+        self.assertNotIn(self.ROLL, out,
+                         "the printed copy still carries the roll number")
+        self.assertNotIn(self.ROLL[:4] + " " + self.ROLL[4:], out,
+                         "the four-four split form is still printable")
+        self.assertIn(car.ROLL_MASK, out, "nothing was masked at all")
+
+    def test_the_delivery_file_still_carries_the_real_roll(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            car.emit_notification(self._payload(), dry_run=False)
+        with io.open(self.live, encoding="utf-8") as fh:
+            lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+        self.assertEqual(1, len(lines), "one payload must be one line")
+        delivered = json.loads(lines[0])
+        self.assertEqual(self.ROLL, delivered["roll_number"],
+                         "the delivery file lost the roll, so ntfy and the "
+                         "rendered page would have nothing to show")
+        self.assertIn(self.ROLL, delivered["ntfy"]["message"])
+
+    def test_the_printed_line_is_still_one_parseable_object_per_payload(self):
+        for semester in (1, 2, 3):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                car.emit_notification(self._payload(semester), dry_run=False)
+            json.loads(buf.getvalue())
+        with io.open(self.live, encoding="utf-8") as fh:
+            self.assertEqual(3, len(fh.read().splitlines()),
+                             "three payloads must be three lines in the file")
+
+
 def main():
     loader = unittest.TestLoader()
     suite = unittest.TestSuite([
@@ -3151,6 +3224,7 @@ def main():
         loader.loadTestsFromTestCase(FalseFailedGuardTest),
         loader.loadTestsFromTestCase(RollFoundNormalisationTest),
         loader.loadTestsFromTestCase(CsitMarkerGapDeferTest),
+        loader.loadTestsFromTestCase(NotificationLogRedactionTest),
     ])
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     return 0 if result.wasSuccessful() else 1

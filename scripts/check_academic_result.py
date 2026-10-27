@@ -119,6 +119,13 @@ STATE_KV_KEY = "academic:state"
 DEFAULT_POLL_URL = "https://iost.tu.edu.np/notices?notice_type=21"
 NOTIFY_PREVIEW_PATH = os.path.join(REPO_ROOT, "state",
                                    "academic_notify_preview.json")
+# The live payload hand-over between this script and the delivery steps. The
+# script WRITES it; stdout only ever carries a redacted copy, because the
+# Actions log of this public repository is readable by anyone.
+NOTIFY_LIVE_PATH = os.path.join(REPO_ROOT, "state",
+                                "academic_live_payload.jsonl")
+ROLL_MASK = "***"
+_LIVE_WRITTEN = {"started": False}
 DEFAULT_EXAM_NOTICES_PATH = os.path.join(REPO_ROOT, "config", "exam_notices.json")
 
 # R2: per-run bound on notices we will actually open.
@@ -2375,15 +2382,61 @@ def process_notice(state, notice, pdf_bytes, text=None):
 # ---------------------------------------------------------------------------
 
 
+def _append_live_line(path, payload):
+    """Append ONE compact JSON line, truncating the file on the first call."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    if not _LIVE_WRITTEN["started"]:
+        with open(path, "w", encoding="utf-8", newline="\n"):
+            pass
+        _LIVE_WRITTEN["started"] = True
+    line = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    with open(path, "a", encoding="utf-8", newline="\n") as f:
+        f.write(line + "\n")
+
+
+def redacted_for_log(payload):
+    """A copy safe to print, with the roll masked everywhere.
+
+    The payload itself still carries the roll: it is what the ntfy message and
+    the rendered page need. Only the copy that goes to stdout is masked.
+    """
+    roll = str(payload.get("roll_number") or "") if isinstance(payload, dict) else ""
+    if not roll:
+        return payload
+    split = roll[:4] + " " + roll[4:] if len(roll) == 8 else ""
+
+    def scrub(value):
+        if isinstance(value, str):
+            out = value.replace(roll, ROLL_MASK)
+            if split:
+                out = out.replace(split, ROLL_MASK)
+            return out
+        if isinstance(value, list):
+            return [scrub(v) for v in value]
+        if isinstance(value, dict):
+            return {k: scrub(v) for k, v in value.items()}
+        return value
+
+    return scrub(payload)
+
+
 def emit_notification(payload, dry_run):
     """dry_run: append payload to state/academic_notify_preview.json.
-    live: print the payload (actual ntfy/website delivery is a separate
-    workflow step).
+    live: write the payload to state/academic_live_payload.jsonl and print a
+    REDACTED copy of it.
 
-    THE LIVE BRANCH PRINTS JSON-LINES: one COMPACT object per line, no
-    indent. This is load-bearing, not cosmetic. The workflow tees stdout to
-    state/academic_live_payload.jsonl, and scripts/payload_io.read_payloads
-    parses that file one line at a time. With `indent=2` a payload spanned
+    THE LIVE FILE IS WRITTEN HERE, NOT TEED BY THE SHELL. It used to be
+    `python3 ... | tee state/academic_live_payload.jsonl`, which made stdout the
+    delivery source -- so the owner's roll number went into a public Actions
+    log on every live run. The script now owns the file and stdout carries a
+    masked copy only: the delivery half reads the file, a reader of the log
+    learns nothing.
+
+    THE LIVE OUTPUT IS JSON-LINES: one COMPACT object per line, no indent.
+    This is load-bearing, not cosmetic. scripts/payload_io.read_payloads
+    parses the live file one line at a time. With `indent=2` a payload spanned
     many lines, so N payloads fused into a file that was not one JSON
     document: the ntfy step's json.load raised "Extra data: line 33" on the
     four-payload run, its try/except turned that into "No notification payload
@@ -2405,7 +2458,9 @@ def emit_notification(payload, dry_run):
         existing.append(payload)
         save_state(NOTIFY_PREVIEW_PATH, existing)
     else:
-        print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        _append_live_line(NOTIFY_LIVE_PATH, payload)
+        print(json.dumps(redacted_for_log(payload), ensure_ascii=False,
+                         separators=(",", ":")))
 
 
 # ---------------------------------------------------------------------------

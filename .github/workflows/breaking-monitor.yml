@@ -283,7 +283,7 @@ jobs:
           fi
           python3 - <<'PY'
           import datetime as _dt
-          import json, os
+          import json, os, sys
           import urllib.request
 
           # A breaking alert is event-driven: the step summary reports the REAL
@@ -399,7 +399,23 @@ jobs:
           # NAME and never printed, logged or echoed — only whether a push was
           # attempted and how the server answered. Same rule as every other ntfy
           # caller in this repository.
+          # ONE ALERT PER CONDITION PER 6 HOURS (scripts/alert_dedupe.py).
+          # The same broken ladder used to page on EVERY run: six identical
+          # "AI ladder returned no verdict" messages in three hours for one
+          # unchanged cause. The condition id below is what keeps this alert
+          # separate from every other failure, and the ledger -- a committed
+          # state file, the same mechanism the rest of the repository uses --
+          # is what makes a 6h window survive between runs. The channel is
+          # unchanged: same topic, same secrets, same titles.
+          sys.path.insert(0, "scripts")
+          import alert_dedupe
+
+          _now = _dt.datetime.now(_dt.timezone.utc)
+          _ledger = alert_dedupe.load()
+          _key = alert_dedupe.condition_key("breaking.honesty_gate")
+
           if ai_failed:
+              decision = alert_dedupe.record(_ledger, _key, _now, reason)
               title = ("Breaking honesty gate FAILED — breaking news was not "
                        "judged this run")
               lead = ("The AI ladder that decides whether something is genuinely "
@@ -407,15 +423,24 @@ jobs:
                       "If something is breaking right now it is being missed: "
                       "detection tripped the gate, the classifier failed, and no "
                       "verdict was reached. That is a fault, not a quiet news day.")
-              body = "%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). The ladder " \
+              body = "%s\n\n%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). The ladder " \
                      "is tried across its model list; every attempt failed or " \
                      "timed out. The classifier output is in this run's log." % (
-                         lead, unjudged_block, reason[:200], last.get("level", ""),
+                         lead, alert_dedupe.describe_window(decision),
+                         unjudged_block, reason[:200], last.get("level", ""),
                          last.get("confidence", ""), last.get("sent"))
               print("::error::%s %s" % (title, reason[:200]))
               topic = (os.environ.get("NTFY_TOPIC") or "").strip()
               server = (os.environ.get("NTFY_SERVER") or "").strip()
-              if not (topic and server.startswith(("http://", "https://"))):
+              if not decision["alert"]:
+                  # Still RED, still annotated, just not a second push: the
+                  # cause has not changed since the alert inside this window.
+                  ntfy_note = "ntfy_suppressed_duplicate"
+                  print("honesty-gate notice NOT pushed: this condition already "
+                        "alerted inside the last %gh (%d run(s) counted in the "
+                        "window). The ::error:: above still stands."
+                        % (alert_dedupe.WINDOW_HOURS, decision["suppressed"]))
+              elif not (topic and server.startswith(("http://", "https://"))):
                   ntfy_note = "ntfy_not_configured"
                   print("::warning::ntfy secrets unset — the honesty-gate "
                         "failure is annotation-only; the ::error:: above stands")
@@ -432,11 +457,50 @@ jobs:
                       with urllib.request.urlopen(req, timeout=15) as resp:
                           resp.read()
                       ntfy_note = "ntfy:delivered"
-                      print("honesty-gate ntfy notice delivered")
+                      print("honesty-gate ntfy notice delivered (%d run(s) in "
+                            "this window)" % decision["runs"])
                   except Exception as exc:
                       ntfy_note = "ntfy_failed"
                       print("::warning::honesty-gate ntfy push failed: %s" % exc)
               lines.append("- Honesty-gate notice: %s" % ntfy_note)
+          elif last is not None:
+              # THE RECOVERY, ONCE. A later run that produced a verdict means the
+              # condition has stopped. resolve() deletes the entry, so a second
+              # healthy run cannot send a second "all clear".
+              recovery = alert_dedupe.resolve(_ledger, _key, _now)
+              if recovery.get("recovery"):
+                  label = "The breaking honesty gate (AI ladder)"
+                  r_title = alert_dedupe.recovery_title(label)
+                  r_body = alert_dedupe.recovery_body(label, recovery)
+                  lines.append("- Honesty-gate recovery: recovery notice sent")
+                  print("honesty-gate RECOVERED: %d run(s) affected over %s"
+                        % (recovery["runs"],
+                           alert_dedupe.human_duration(
+                               recovery["duration_seconds"])))
+                  topic = (os.environ.get("NTFY_TOPIC") or "").strip()
+                  server = (os.environ.get("NTFY_SERVER") or "").strip()
+                  if not (topic and server.startswith(("http://", "https://"))):
+                      print("::warning::ntfy secrets unset — the honesty-gate "
+                            "recovery is annotation-only")
+                  else:
+                      try:
+                          payload = json.dumps({
+                              "topic": topic, "title": r_title,
+                              "message": r_body, "priority": 3,
+                              "tags": ["white_check_mark"]})
+                          req = urllib.request.Request(
+                              server.rstrip("/") + "/",
+                              data=payload.encode("utf-8"),
+                              headers={"Content-Type": "application/json",
+                                       "Accept": "application/json"})
+                          with urllib.request.urlopen(req, timeout=15) as resp:
+                              resp.read()
+                          print("honesty-gate recovery notice delivered")
+                      except Exception as exc:
+                          print("::warning::honesty-gate recovery push failed: %s"
+                                % exc)
+
+          alert_dedupe.save(_ledger, now=_now)
 
           report = "\n".join(lines)
           print(report)
@@ -445,3 +509,42 @@ jobs:
               with open(summary, "a", encoding="utf-8") as fh:
                   fh.write(report + "\n")
           PY
+
+      - name: Commit the alert ledger
+        # The 6h window is real only if it outlives the run that opened it. This
+        # runs AFTER the summary step, because that step is what writes the
+        # ledger -- the state commit above it could only ever stage a stale one.
+        # Staged BY PATH, like every other state commit here, so nothing else can
+        # be swept in. A failure is a warning, not a red run: the alert already
+        # went out, and losing the ledger only costs one duplicate page.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          if [ ! -f state/alert_ledger.json ]; then
+            echo "no alert ledger was written this run"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          git add -- state/alert_ledger.json
+          if git diff --staged --quiet; then
+            echo "alert ledger unchanged"
+            exit 0
+          fi
+          git commit -m "chore: update breaking monitor state [skip ci]"
+          if ! git "${auth[@]}" pull --ff-only; then
+            echo "Fast-forward pull failed, attempting rebase..."
+            if ! git "${auth[@]}" pull --rebase; then
+              echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
+            fi
+          fi
+          git "${auth[@]}" push

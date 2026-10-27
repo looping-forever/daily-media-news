@@ -222,7 +222,7 @@ jobs:
         run: |
           set -eo pipefail
           python3 - <<'PY'
-          import json, os, urllib.request
+          import datetime, json, os, sys, urllib.request
 
           slot = os.environ.get('SLOT', '')
           date = os.environ.get('DATE', '')
@@ -287,8 +287,36 @@ jobs:
           body = '%s\n\n%s' % (lead, detail)
           print('::%s::%s. %s' % (note, title, lead))
 
+          # ONE ALERT PER CONDITION PER 6 HOURS (scripts/alert_dedupe.py).
+          # A broken digest is retried three times, so this step used to post
+          # the same "could not be built" message once per attempt. The key is
+          # condition id + slot + date bucket: it keeps a broken MORNING apart
+          # from a broken EVENING and today apart from yesterday, and it keeps
+          # one digest to ONE message per 6h. The attempt number is deliberately
+          # NOT in the key -- that is what split one condition per run.
+          sys.path.insert(0, 'scripts')
+          import alert_dedupe
+          _now = datetime.datetime.now(datetime.timezone.utc)
+          _ledger = alert_dedupe.load()
+          _key = alert_dedupe.condition_key('digest.broken', slot, date)
+          _post = True
+          if kind == 'broken':
+              _decision = alert_dedupe.record(_ledger, _key, _now, lead)
+              _post = bool(_decision['alert'])
+              if _post:
+                  body = '%s\n\n%s\n\n%s' % (
+                      lead, alert_dedupe.describe_window(_decision), detail)
+              else:
+                  print('broken-digest notice NOT pushed: this condition already '
+                        'alerted inside the last %gh (%d run(s) counted in the '
+                        'window). The ::error:: above still stands.'
+                        % (alert_dedupe.WINDOW_HOURS, _decision['suppressed']))
+          alert_dedupe.save(_ledger, now=_now)
+
           topic = (os.environ.get('NTFY_TOPIC') or '').strip()
           server = (os.environ.get('NTFY_SERVER') or '').strip()
+          if not _post:
+              raise SystemExit(0)
           if not (topic and server.startswith(('http://', 'https://'))):
               print('::warning::ntfy secrets unset — annotation only, no push')
               raise SystemExit(0)
@@ -305,6 +333,64 @@ jobs:
               print('empty-digest ntfy sent to topic %r' % topic)
           except Exception as exc:
               print('::warning::empty-digest ntfy failed: %s' % exc)
+          PY
+
+      - name: Alert on the recovered digest
+        # The RECOVERY half of the 6h window. The ladder itself observed that the
+        # digest now carries stories, so the condition has stopped -- recovery is
+        # signal-driven, never inferred from "it did not run recently". resolve()
+        # returns it exactly once and deletes the entry, so a second healthy run
+        # cannot send a second all-clear.
+        if: steps.retry.outputs.act == 'clear'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          SLOT: ${{ steps.retry.outputs.slot }}
+          DATE: ${{ steps.retry.outputs.date }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import datetime, json, os, sys, urllib.request
+
+          sys.path.insert(0, 'scripts')
+          import alert_dedupe
+
+          slot = os.environ.get('SLOT') or ''
+          date = os.environ.get('DATE') or ''
+          now = datetime.datetime.now(datetime.timezone.utc)
+          ledger = alert_dedupe.load()
+          key = alert_dedupe.condition_key('digest.broken', slot, date)
+          recovery = alert_dedupe.resolve(ledger, key, now)
+          alert_dedupe.save(ledger, now=now)
+          if not recovery.get('recovery'):
+              print('no alerting digest condition to recover for %s %s'
+                    % (slot, date))
+              raise SystemExit(0)
+          label = 'The %s digest' % (slot or 'digest')
+          title = alert_dedupe.recovery_title(label)
+          body = alert_dedupe.recovery_body(label, recovery)
+          print('%s: %d run(s) affected over %s'
+                % (title, recovery['runs'],
+                   alert_dedupe.human_duration(recovery['duration_seconds'])))
+          topic = (os.environ.get('NTFY_TOPIC') or '').strip()
+          server = (os.environ.get('NTFY_SERVER') or '').strip()
+          if not (topic and server.startswith(('http://', 'https://'))):
+              print('::warning::ntfy secrets unset — the digest recovery is '
+                    'annotation-only')
+              raise SystemExit(0)
+          try:
+              payload = json.dumps({'topic': topic, 'title': title,
+                                    'message': body, 'priority': 3,
+                                    'tags': ['white_check_mark']})
+              req = urllib.request.Request(
+                  server.rstrip('/') + '/', data=payload.encode('utf-8'),
+                  headers={'Content-Type': 'application/json',
+                           'Accept': 'application/json'})
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  resp.read()
+              print('digest recovery notice delivered')
+          except Exception as exc:
+              print('::warning::digest recovery push failed: %s' % exc)
           PY
 
       - name: Retire the exhausted ladder
@@ -338,6 +424,41 @@ jobs:
             exit 0
           fi
           git commit -m "chore: retire exhausted empty-digest retry ladder [skip ci]"
+          if ! git "${auth[@]}" pull --ff-only origin master; then
+            git "${auth[@]}" pull --rebase -X theirs origin master || \
+              echo "Fast-forward and rebase both failed — proceeding without pulling"
+          fi
+          git "${auth[@]}" push
+
+      - name: Commit the alert ledger
+        # The 6h window only exists if it outlives the run. Same commit mechanism
+        # as every other state file here, staged BY PATH so nothing else can be
+        # swept in. A failure is a warning, not a red run: the alert already went
+        # out and losing the ledger only costs one duplicate page.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          if [ ! -f state/alert_ledger.json ]; then
+            echo "no alert ledger was written this run"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          git add -- state/alert_ledger.json
+          if git diff --staged --quiet; then
+            echo "alert ledger unchanged"
+            exit 0
+          fi
+          git commit -m "chore: update alert ledger [skip ci]"
           if ! git "${auth[@]}" pull --ff-only origin master; then
             git "${auth[@]}" pull --rebase -X theirs origin master || \
               echo "Fast-forward and rebase both failed — proceeding without pulling"
@@ -2079,7 +2200,40 @@ jobs:
           MSG="${LEAD} ${DETAIL}"
           BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
           echo "::error::$MSG"
-          if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
+          # ONE ALERT PER CONDITION PER 6 HOURS (scripts/alert_dedupe.py).
+          # The watchdog runs many times for one undelivered slot, so "never
+          # arrived" used to page on every run. The key is condition id + slot +
+          # date bucket: two different slots never merge into one suppressed
+          # stream, and one slot is never split into one entry per run. The red
+          # job and the deduped issue below are unchanged -- only the push is
+          # rate-limited.
+          python3 - <<'PY'
+          import datetime, os, sys
+          sys.path.insert(0, 'scripts')
+          import alert_dedupe
+
+          slot = os.environ.get('SLOT') or ''
+          date = os.environ.get('TODAY') or ''
+          now = datetime.datetime.now(datetime.timezone.utc)
+          ledger = alert_dedupe.load()
+          key = alert_dedupe.condition_key('digest.missing', slot, date)
+          decision = alert_dedupe.record(
+              ledger, key, now, 'no delivered marker for %s %s' % (slot, date))
+          alert_dedupe.save(ledger, now=now)
+          gate = os.path.join(os.environ.get('RUNNER_TEMP') or '.',
+                              'digest_alert_gate')
+          with open(gate, 'w', encoding='utf-8') as fh:
+              fh.write('true' if decision['alert'] else 'false')
+          if not decision['alert']:
+              print('missed-digest ntfy NOT sent: this condition already alerted '
+                    'inside the last %gh (%d run(s) counted in the window). The '
+                    '::error:: above and the issue below still stand.'
+                    % (alert_dedupe.WINDOW_HOURS, decision['suppressed']))
+          PY
+          GATE="$(cat "${RUNNER_TEMP:-.}/digest_alert_gate" 2>/dev/null || echo true)"
+          if [ "$GATE" != "true" ]; then
+            echo "::warning::ntfy suppressed by the 6h window (this run is still red)"
+          elif [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
             curl -sS -m 15 \
               -H "Title: Today's ${SLOT} digest never arrived" \
               -H "Priority: 5" \
@@ -2105,6 +2259,66 @@ jobs:
             echo "An open issue for this slot already exists — not duplicating"
           fi
           exit 1
+
+      - name: Alert on the recovered digest slot
+        # RECOVERY, ONCE. A run that finds the slot DELIVERED proves the condition
+        # has stopped, so this is signal-driven rather than "nothing has arrived
+        # recently". The entry that alerted may belong to an older date, so every
+        # missing-slot entry is resolved here; resolve_prefix() returns each one
+        # exactly once and deletes it, so a later healthy run sends nothing.
+        if: always() && steps.watch.outputs.miss == 'false'
+        continue-on-error: true
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          SLOT: ${{ steps.watch.outputs.slot }}
+          TODAY: ${{ steps.watch.outputs.today }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import datetime, json, os, sys, urllib.request
+
+          sys.path.insert(0, 'scripts')
+          import alert_dedupe
+
+          slot = os.environ.get('SLOT') or ''
+          date = os.environ.get('TODAY') or ''
+          now = datetime.datetime.now(datetime.timezone.utc)
+          ledger = alert_dedupe.load()
+          key = alert_dedupe.condition_key('digest.missing', slot, date)
+          recovered = alert_dedupe.resolve_prefix(ledger, 'digest.missing', now,
+                                                  keep_key=key)
+          alert_dedupe.save(ledger, now=now)
+          if not recovered:
+              print('no alerting missing-slot condition to recover')
+              raise SystemExit(0)
+          topic = (os.environ.get('NTFY_TOPIC') or '').strip()
+          server = (os.environ.get('NTFY_SERVER') or '').strip()
+          for recovery in recovered:
+              label = 'The %s %s digest' % (recovery['slot'], recovery['date'])
+              title = alert_dedupe.recovery_title(label)
+              body = alert_dedupe.recovery_body(label, recovery)
+              print('%s: %d run(s) affected over %s'
+                    % (title, recovery['runs'],
+                       alert_dedupe.human_duration(
+                           recovery['duration_seconds'])))
+              if not (topic and server.startswith(('http://', 'https://'))):
+                  print('::warning::ntfy secrets unset — recovery annotation only')
+                  continue
+              try:
+                  payload = json.dumps({'topic': topic, 'title': title,
+                                        'message': body, 'priority': 3,
+                                        'tags': ['white_check_mark']})
+                  req = urllib.request.Request(
+                      server.rstrip('/') + '/', data=payload.encode('utf-8'),
+                      headers={'Content-Type': 'application/json',
+                               'Accept': 'application/json'})
+                  with urllib.request.urlopen(req, timeout=15) as resp:
+                      resp.read()
+                  print('missed-digest recovery notice delivered')
+              except Exception as exc:
+                  print('::warning::missed-digest recovery push failed: %s' % exc)
+          PY
 
       - name: Check prebuild artifact (dead-man's switch, prebuild arm)
         # U6a. THE ARM THAT MAKES A BROKEN PREBUILD LOUD.
@@ -2512,3 +2726,40 @@ jobs:
                   fh.write('- ✅ %s artifact for %s sealed, %d min old\n'
                            % (slot, npt_date, age // 60))
           PY
+
+      - name: Commit the alert ledger
+        # This job used to be read-only, and it still is for everything except the
+        # alert ledger: the missed-slot arm records the condition here, so the 6h
+        # window has to survive the run like it does in the retry job. Staged BY
+        # PATH. A failure is a warning, not a red run -- the missed-slot arm
+        # already failed the job on purpose and this step must not add a second
+        # unrelated red.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          if [ ! -f state/alert_ledger.json ]; then
+            echo "no alert ledger was written this run"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          git add -- state/alert_ledger.json
+          if git diff --staged --quiet; then
+            echo "alert ledger unchanged"
+            exit 0
+          fi
+          git commit -m "chore: update alert ledger [skip ci]"
+          if ! git "${auth[@]}" pull --ff-only origin master; then
+            git "${auth[@]}" pull --rebase -X theirs origin master || \
+              echo "Fast-forward and rebase both failed — proceeding without pulling"
+          fi
+          git "${auth[@]}" push

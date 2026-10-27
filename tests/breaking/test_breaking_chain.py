@@ -1371,9 +1371,16 @@ class AiFailSafeIsVisible(unittest.TestCase):
             json.dump(log_json, fh)
         summary = os.path.join(tmp, "summary.md")
         env = dict(os.environ)
+        # The step imports scripts/alert_dedupe.py (the 6h alert window). In
+        # Actions the working directory IS the repository root, so the step's own
+        # `sys.path.insert(0, "scripts")` resolves; here the step runs in a temp
+        # directory, so the real scripts dir goes on PYTHONPATH instead.
+        env["PYTHONPATH"] = os.pathsep.join(
+            [SCRIPTS] + [p for p in [env.get("PYTHONPATH")] if p])
         env.update({"PAYLOAD_TITLE": "", "TODAY_NPT": "",
                     "GITHUB_STEP_SUMMARY": summary,
                     "NTFY_TOPIC": "", "NTFY_SERVER": ""})
+
         proc = subprocess.run([sys.executable, "-c", code], cwd=tmp, env=env,
                               capture_output=True, text=True, timeout=120)
         out = (proc.stdout or "") + (proc.stderr or "")

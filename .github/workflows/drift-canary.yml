@@ -952,6 +952,13 @@ jobs:
           # change as the fixes it guards, as the entries above were.
           run_suite "payload_io" python3 -m unittest tests.test_payload_io -v
 
+          # Registered 2026-10-27 with the 6h alert window it guards, in the same
+          # change and the same order as tests/ci_local.py. The three flooding
+          # sites each paged once per run for one unchanged cause; the window is a
+          # committed state file, so a suite that only exercised the module would
+          # stay green while all three workflows went unguarded.
+          run_suite "alerts" python3 -m unittest tests.alerts.test_alert_dedupe -v
+
           if [ -n "$FAILED" ]; then
             echo "::error::failing test suites:$FAILED"
             exit 1

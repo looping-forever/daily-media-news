@@ -119,6 +119,13 @@ pytest_output.txt
 # put it into the working tree as an untracked file that `git add -A` picks up.
 state/academic_state.json
 
+# The academic monitor's live payload hand-over (2026-10-27). It carries the
+# roll number too, so it is written by the script and never committed; the
+# workflow removes it before each run and the delivery steps read it from the
+# working tree. Listed here because an untracked copy left behind by a killed
+# run is exactly what `git add -A` would sweep into a public commit.
+state/academic_live_payload.jsonl
+
 # Wrangler local cache (contains Cloudflare account id)
 deploy/.wrangler/
 

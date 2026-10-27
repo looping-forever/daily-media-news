@@ -146,6 +146,15 @@ SUITES = (
     # suite nobody invokes is not a passing suite.
     ("payload_io", [sys.executable, "-m", "unittest",
                     "tests.test_payload_io", "-v"]),
+    # Registered 2026-10-27 with the 6h alert window it guards, in the same
+    # change and the same order as the `run_suite` block above. The three
+    # flooding sites (breaking honesty gate, broken digest, missed digest) each
+    # paged once per run for one unchanged cause; the window lives in a
+    # committed state file, and a suite that only exercised the module would
+    # stay green while all three workflows went unguarded -- so this also
+    # asserts the wiring and that both workflows commit the ledger.
+    ("alerts", [sys.executable, "-m", "unittest",
+                "tests.alerts.test_alert_dedupe", "-v"]),
 )
 
 #: The other step of the same job, and the two suites the `live-parser-canary`
