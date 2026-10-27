@@ -465,7 +465,7 @@ jobs:
         run: |
           set -eo pipefail
           python3 - <<'PY'
-          import json, os, re, urllib.request
+          import datetime, json, os, re, urllib.request
 
           # The Worker's own DIGEST_LEDGER_KEY. tests/digest/test_fallback_
           # ledger.py pins this literal against that constant rather than
@@ -480,6 +480,9 @@ jobs:
           KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
           KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           KIND_UNAVAILABLE = 'unavailable'
+          # The 60s of early slack the archive steps already allow a cron that
+          # fires marginally before its own scheduled minute.
+          SLOT_EARLY_SLACK_S = 60
           # The same literal digest-prebuild.yml's seal lists in its
           # SUPERSEDED_KINDS -- the three kinds a complete digest may replace --
           # and the copy tests/digest/test_ladder_trigger.py pins. A heredoc
@@ -581,6 +584,58 @@ jobs:
                            if status is not None else exc.__class__.__name__)
               return status, code, printable
 
+          def instant_or_none(text):
+              """An aware UTC datetime, or None. A naive or unparseable value is None.
+
+              None means "no usable instant", never "epoch": treating an
+              unreadable stamp as a very old one would make every comparison
+              below silently true.
+              """
+              raw = str(text or '').strip()
+              if not raw:
+                  return None
+              if raw[-1] in 'Zz':
+                  raw = raw[:-1] + '+00:00'
+              try:
+                  moment = datetime.datetime.fromisoformat(raw)
+              except ValueError:
+                  return None
+              if moment.tzinfo is None:
+                  return None
+              return moment.astimezone(datetime.timezone.utc)
+
+          def send_instant_fits_slot(entry, when_text):
+              """False when the recorded send provably cannot belong to this slot.
+
+              THE FALSE-GREEN GUARD. `ntfy_sent_at` alone is not evidence that
+              this slot went out: on 2026-10-26 evening the entry claimed
+              12:34:19Z while the run itself had only written `pending_at`
+              13:55:26Z and its own `scheduled_instant` was 13:35Z — the stamp
+              came from an earlier attempt and the slot never sent. Two
+              comparisons, both from the record itself, no clock of ours:
+
+                * a send cannot precede the write-ahead `pending_at` that this
+                  same run wrote before the first byte went to ntfy;
+                * a send cannot precede the slot's own `scheduled_instant` by
+                  more than the 60s early slack the archive steps allow.
+
+              A stamp that fails either test is not evidence, so this gate does
+              not stand the ladder down on it. An unreadable stamp is not
+              evidence either. A record with neither instant carries no timing
+              claim at all and keeps the pre-existing behaviour.
+              """
+              sent = instant_or_none(when_text)
+              if sent is None:
+                  return False
+              pending = instant_or_none(entry.get('pending_at'))
+              if pending is not None and sent < pending:
+                  return False
+              due = instant_or_none(entry.get('scheduled_instant'))
+              if due is not None and sent < due - datetime.timedelta(
+                      seconds=SLOT_EARLY_SLACK_S):
+                  return False
+              return True
+
           def ledger_verdict():
               """'arm' | 'no_arm' | 'unknown' for this slot, from the ledger.
 
@@ -648,9 +703,9 @@ jobs:
                         f'rule alone decides')
                   return UNKNOWN
               # THE ENTRY IS KEPT FOR THE DECISION LINE, not for the verdict:
-              # the three terms below must stay the two adjacent lines each that
+              # each term below must stay the two adjacent lines that
               # tests/digest/test_fallback_ledger.py mutates by exact string, and
-              # an assignment between them would silently turn that mutation
+              # an assignment between them would silently turn the mutation
               # proof into a no-op that still passed. The reason is derived from
               # the same entry, one place, below — so the log and the verdict
               # can never describe different facts.
@@ -660,6 +715,8 @@ jobs:
               if str(entry.get('kind') or '') == KIND_UNAVAILABLE:
                   return NO_ARM
               if entry.get('ntfy_sent_at'):
+                  if not send_instant_fits_slot(entry, entry.get('ntfy_sent_at')):
+                      return NO_ARM
                   return ARM
               # A `pending` write-ahead entry, or one that never recorded an
               # instant: we cannot say this slot went out, so we do not stand
@@ -691,7 +748,12 @@ jobs:
               elif str(LEDGER_ENTRY.get('kind') or '') == KIND_UNAVAILABLE:
                   LEDGER_REASON = f'entry kind is {KIND_UNAVAILABLE}'
               elif LEDGER_ENTRY.get('ntfy_sent_at'):
-                  LEDGER_REASON = 'entry records ntfy_sent_at'
+                  if send_instant_fits_slot(LEDGER_ENTRY, LEDGER_ENTRY.get('ntfy_sent_at')):
+                      LEDGER_REASON = 'entry records ntfy_sent_at'
+                  else:
+                      LEDGER_REASON = ('entry ntfy_sent_at '
+                                       f'{LEDGER_ENTRY.get("ntfy_sent_at")!r} cannot '
+                                       'belong to this slot — not treated as a send')
               else:
                   LEDGER_REASON = ('entry state is %r with no recorded instant'
                                    % (LEDGER_ENTRY.get('state'),))

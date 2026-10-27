@@ -669,6 +669,78 @@ class FallbackLedgerTests(unittest.TestCase):
                          "kinds are degraded: %r vs %r"
                          % (seal_kinds, ladder_kinds))
 
+    # -- 3c. a stamp is not a send ------------------------------------------
+
+    def test_an_instant_that_predates_the_runs_own_pending_write_is_not_a_send(self):
+        """The second half of the same record: 12:34:19Z against pending 13:55:26Z.
+
+        `pending_at` is written BEFORE the first byte goes to ntfy, so a send
+        stamped earlier than it cannot be this run's send. It also cannot be
+        the slot's, since the slot was not due yet. Either comparison alone
+        catches 2026-10-26; both are asserted here so removing one still leaves
+        the other, and a regression in one is visible on its own.
+        """
+        impossible = entry(state="sent",
+                           ntfy_sent_at="2026-10-09T00:34:19Z",
+                           first_ntfy_sent_at=None,
+                           pending_at="2026-10-09T01:55:26Z",
+                           scheduled_instant="2026-10-09T01:35:00Z",
+                           http_status=None)
+        code, out = self._run(kv_body=ledger_raw(impossible),
+                              marker_obj=marker(delivered=False))
+        self.assertEqual(0, code, out)
+        self.assertFalse(
+            self._armed(),
+            "an ntfy_sent_at earlier than the run's own pending_at (and "
+            "earlier than the slot was even due) stood the ladder down. That "
+            "is a stale instant from an earlier attempt being read as this "
+            "slot's delivery:\n%s" % out)
+
+    def test_a_stamp_before_the_slots_scheduled_instant_does_not_arm(self):
+        """Same gate, from `scheduled_instant` alone — no `pending_at` needed.
+
+        The instant is the one fact the Worker and this step can both read, so
+        the check must not depend on the write-ahead record being present.
+        """
+        impossible = entry(ntfy_sent_at="2026-10-09T01:20:00Z",
+                           first_ntfy_sent_at=None,
+                           scheduled_instant="2026-10-09T01:35:00Z")
+        code, out = self._run(kv_body=ledger_raw(impossible),
+                              marker_obj=marker(delivered=False))
+        self.assertEqual(0, code, out)
+        self.assertFalse(self._armed(),
+                         "a send 15 minutes before the slot was due stood the "
+                         "ladder down:\n%s" % out)
+
+    def test_an_unreadable_instant_is_not_evidence_of_a_send(self):
+        """A stamp nothing can parse is not a delivery, and must not be one."""
+        broken = entry(ntfy_sent_at="last night", first_ntfy_sent_at=None)
+        code, out = self._run(kv_body=ledger_raw(broken),
+                              marker_obj=marker(delivered=False))
+        self.assertEqual(0, code, out)
+        self.assertFalse(self._armed(),
+                         "the string 'last night' armed the fallback:\n%s" % out)
+
+    def test_a_real_send_inside_the_early_slack_still_arms(self):
+        """The gate must not overshoot: a cron firing 30s early is normal.
+
+        Without this, "no instant arms" would pass every test above and break
+        the one behaviour the step exists for — not re-sending a slot that
+        really did go out.
+        """
+        early = entry(ntfy_sent_at="2026-10-09T01:34:30Z",
+                      first_ntfy_sent_at="2026-10-09T01:34:30Z",
+                      pending_at="2026-10-09T01:34:02Z",
+                      scheduled_instant="2026-10-09T01:35:00Z")
+        code, out = self._run(kv_body=ledger_raw(early),
+                              marker_obj=marker(delivered=False))
+        self.assertEqual(0, code, out)
+        self.assertTrue(self._armed(),
+                        "a send 30s before its scheduled instant — inside the "
+                        "60s slack this repository already allows a cron — was "
+                        "rejected, so the owner would be sent the digest "
+                        "twice:\n%s" % out)
+
     # -- 4. the file rule is untouched --------------------------------------
 
     def test_every_term_of_the_original_file_rule_still_stands(self):
@@ -735,6 +807,17 @@ class FallbackLedgerTests(unittest.TestCase):
          lambda: entry(kind="unavailable")),
     )
 
+    #: The false-green gate, as the exact block it is. Mutating it back to the
+    #: pre-2026-10-27 shape ("any ntfy_sent_at is a send") must re-create the
+    #: defect: the ladder stands down on a stale instant.
+    INSTANT_GATE_DROPPED = (
+        "\n    if entry.get('ntfy_sent_at'):\n"
+        "        if not send_instant_fits_slot(entry, entry.get('ntfy_sent_at')):\n"
+        "            return NO_ARM\n"
+        "        return ARM",
+        "\n    if entry.get('ntfy_sent_at'):\n        return ARM",
+    )
+
     def test_removing_the_fail_open_handler_would_break_the_ladder(self):
         """A check never seen red is decoration."""
         old, new = self.FAIL_OPEN_LOST
@@ -771,6 +854,31 @@ class FallbackLedgerTests(unittest.TestCase):
                                 "fallback did NOT arm. The mutation no longer "
                                 "demonstrates the defect it was written for, so "
                                 "this proof is decoration.\n%s" % (name, out))
+
+    def test_dropping_the_instant_gate_would_recreate_the_false_green(self):
+        """The 2026-10-27 gate, proved load-bearing.
+
+        Restores the pre-fix shape — every truthy `ntfy_sent_at` is a send —
+        and requires the impossible-instant case to arm again. If it does not,
+        the gate is not what is blocking that verdict and the tests above are
+        passing for some other reason.
+        """
+        old, new = self.INSTANT_GATE_DROPPED
+
+        def mutate(body):
+            return body.replace(old, new), body.count(old)
+
+        impossible = entry(ntfy_sent_at="2026-10-09T00:34:19Z",
+                           first_ntfy_sent_at=None,
+                           pending_at="2026-10-09T01:55:26Z",
+                           scheduled_instant="2026-10-09T01:35:00Z")
+        code, out = self._run(kv_body=ledger_raw(impossible),
+                              marker_obj=marker(delivered=False), mutate=mutate)
+        self.assertEqual(0, code, out)
+        self.assertTrue(self._armed(),
+                        "with the instant gate removed, the stale instant did "
+                        "NOT arm — so the gate is not what stops it, and the "
+                        "proof above is decoration:\n%s" % out)
 
     # -- 6. the step still obeys the shell and YAML rules --------------------
 
