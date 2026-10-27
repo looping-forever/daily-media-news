@@ -340,15 +340,17 @@ class WatchdogTests(unittest.TestCase):
         """THE REGRESSION, run 40286310047 -- and the whole reason for the split.
 
         The model call opens, and the CLI then goes quiet for the generation
-        (it prints nothing between `llm runtime selected` and `loop step=1`).
-        That gap must be judged on the inter-token window, not the startup one,
-        or every attempt that takes longer than its first-output window dies.
+        (measured: nothing between `llm runtime selected` and the finished
+        message, 90 lines in one burst at +62.89s). That gap must be judged on
+        the inter-token window, not the startup one, or every attempt that takes
+        longer than its first-output window dies.
         COLLAPSE THE TWO WINDOWS INTO ONE AND THIS TEST GOES RED AT 1s.
         """
         sink = io.StringIO()
         child = ("import time\n"
                  "print('timestamp=2026-10-27T10:00:00.000Z level=INFO run=x "
-                 "message=stream providerID=opencode modelID=m', flush=True)\n"
+                 "message=stream providerID=opencode modelID=m small=false "
+                 "agent=manager mode=primary', flush=True)\n"
                  "time.sleep(4)\n"
                  "print('...and the rest of it, finished late.', flush=True)\n")
         started = time.monotonic()
@@ -364,12 +366,13 @@ class WatchdogTests(unittest.TestCase):
 
     def test_the_inter_token_window_fires_at_its_own_limit(self):
         """A genuinely WEDGED stream is still caught -- one window is not a
-        licence to hang. The call opens, then the log stops past the
+        licence to hang. The MAIN call opens, then the log stops past the
         inter-token window: 124, and the marker names the window that fired."""
         sink = io.StringIO()
         child = ("import time\n"
                  "print('timestamp=2026-10-27T10:00:00.000Z level=INFO run=x "
-                 "message=loop session.id=s step=0', flush=True)\n"
+                 "message=stream providerID=opencode modelID=m small=false', "
+                 "flush=True)\n"
                  "time.sleep(30)\n")
         started = time.monotonic()
         rc = mw.supervise([sys.executable, "-c", child],
@@ -424,6 +427,72 @@ class WatchdogTests(unittest.TestCase):
         self.assertIn(mw.FATAL_MARKER, log)
         self.assertIn("kind=quota_or_rate_limited", log)
         self.assertNotIn(ms.WATCHDOG_MARKER, log)
+
+    def test_a_decisive_error_wrapped_in_a_log_line_is_still_decisive(self):
+        """MEASURED 2026-10-27, and it is the whole reason --print-logs needed a
+        second fix. The CLI retried, then printed its final rejection INSIDE a
+        log line and hung for 420s without exiting:
+
+            level=ERROR run=... message="stream error" ...
+            error.error="AI_APICallError: Free usage limit reached. ..."
+
+        Log lines are liveness, but they are not ONLY liveness: treating them as
+        a `continue` made the decisive line invisible and every rejection cost
+        the full window again.
+        """
+        sink = io.StringIO()
+        line = ('timestamp=2026-10-27T11:15:20.754Z level=ERROR run=1d846dd1 '
+                'message="stream error" providerID=opencode '
+                'modelID=deepseek-v4.1-flash-free small=false '
+                'error.error="AI_APICallError: Free usage limit reached. Free '
+                'models work in OpenCode Zen."')
+        child = ("import time\nprint(%r, flush=True)\ntime.sleep(30)\n" % line)
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=90, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertEqual(mw.FAST_FAIL_RC, rc, sink.getvalue())
+        self.assertLess(elapsed, 10, "%.1fs" % elapsed)
+        self.assertIn("kind=quota_or_rate_limited", sink.getvalue())
+
+    def test_repeated_log_errors_collapse_to_one_key(self):
+        """A repeated outage must still be COUNTED when every repeat carries a
+        different `timestamp=` and `run=`. Measured log lines always differ in
+        both, so an unstripped key never reaches the repeat limit."""
+        line = ('timestamp=2026-10-27T11:14:47.%03dZ level=ERROR run=1d846dd1 '
+                'message="stream error" error.error="AI_APICallError: Unknown '
+                'Error"')
+        first = mw._normal_key(line % 100)
+        second = mw._normal_key(line % 900)
+        self.assertEqual(first, second)
+        self.assertNotIn("1d846dd1", first)
+        self.assertNotIn("timestamp=", first)
+
+    def test_the_title_call_does_not_open_the_main_window(self):
+        """MEASURED 2026-10-27: the CLI opens a SMALL call first -- title
+        generation, a DIFFERENT model (`modelID=big-pickle`, `small=true`) --
+        +5.8s in, before the chosen model is contacted at all. Reading that as
+        "the main call is open" put every attempt on the generous window five
+        seconds in and made the per-model first-output table dead code again.
+        """
+        sink = io.StringIO()
+        title = ('timestamp=2026-10-27T11:14:26.213Z level=INFO run=x '
+                 'message=stream providerID=opencode modelID=big-pickle '
+                 'small=true agent=title mode=primary')
+        self.assertFalse(mw.is_phase(title))
+        self.assertTrue(mw.is_phase(title.replace('small=true', 'small=false')))
+        self.assertTrue(mw.is_cli_log(title))
+        # And end to end: a 6s sleep past a 1s first-output window must be
+        # judged on the FIRST-OUTPUT window, which fires at 1s.
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c",
+                           "import time\nprint(%r, flush=True)\ntime.sleep(30)\n"
+                           % title],
+                          no_output_sec=1, inter_token_sec=20, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertEqual(124, rc, sink.getvalue())
+        self.assertIn("no output for 1s", sink.getvalue())
+        self.assertLess(elapsed, 15)
 
     def test_a_not_found_line_is_killed_too(self):
         sink = io.StringIO()

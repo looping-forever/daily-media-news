@@ -142,10 +142,16 @@ _BANNER_RE = re.compile(r"^>\s+\S+\s+·\s+")
 #: A CLI log line: `timestamp=… level=… run=… message=…`. Any of them proves the
 #: process is alive; these are the ONLY liveness signal there is.
 _LOG_RE = re.compile(r"\blevel=(?:DEBUG|INFO|WARN|ERROR)\b.*\bmessage=")
-#: The phases that mean "the model call is now open". Once one of these has been
-#: seen, the inter-token window governs.
-_PHASE_RE = re.compile(
-    r"\bmessage=(?:stream\s+providerID=|loop\s+session\.id=|\"llm runtime selected\")")
+#: A `message=stream` line means a model call was opened -- but the CLI opens a
+#: SMALL one first (title generation, `small=true`, a different model) at ~+5s,
+#: measured 2026-10-27. Counting that as the main call put every attempt on the
+#: generous window five seconds in, before the model it was chosen for had been
+#: contacted at all. Only the non-small stream opens the main call.
+_PHASE_RE = re.compile(r"\bmessage=stream\b")
+#: Log lines carry a wall clock and a run id that change on every line, so a
+#: repeated fatal line never compares equal until both are removed.
+_LOG_TS_RE = re.compile(r"\btimestamp=\S+")
+_LOG_RUN_RE = re.compile(r"\brun=\S+")
 
 
 def is_cli_log(line):
@@ -159,7 +165,9 @@ def is_banner(line):
 
 
 def is_phase(line):
-    """True for a log line that opens the model call."""
+    """True when a log line says the MAIN model call has opened."""
+    if "small=true" in line:
+        return False
     return bool(_PHASE_RE.search(line))
 
 
@@ -180,8 +188,9 @@ def resolve_inter_token_window(explicit=None):
 
 
 def _normal_key(line):
-    """The same fatal line, minus the timestamp the CLI prefixes."""
-    return " ".join(_TS_RE.sub("", (line or "").lower()).split())
+    """The same fatal line, minus the timestamp and run id in front of it."""
+    text = _LOG_TS_RE.sub("", _LOG_RUN_RE.sub("", line or ""))
+    return " ".join(_TS_RE.sub("", text.lower()).split())
 
 
 def _note_fatal_line(state, line):
@@ -206,9 +215,13 @@ def _reader(stream, sink, state):
 
     Three kinds of line, and they are NOT interchangeable:
 
-      * a CLI LOG line -- liveliness. It advances the clock, and a phase line
-        (`message=stream`, `message=loop`, `llm runtime selected`) additionally
-        says the model call is open, which switches to the inter-token window.
+      * a CLI LOG line -- liveness. It advances the clock, and a MAIN-call
+        stream line (`message=stream` without `small=true`) additionally says
+        the model call is open, which switches to the inter-token window. Log
+        lines are ALSO classified: with `--print-logs` the CLI wraps the
+        decisive provider error inside a log line (`level=ERROR ... error.error=
+        "AI_APICallError: Free usage limit reached"`), and treating log lines as
+        liveness-only made every rejection invisible and cost the whole window.
       * the BANNER -- decoration. Neither text nor liveness.
       * anything else -- assistant TEXT. In non-TTY mode this only ever arrives
         once the whole message is complete, so it is recorded as COMPLETION and
@@ -219,15 +232,14 @@ def _reader(stream, sink, state):
             line = _ANSI_RE.sub("", raw)
             sink.write(line)
             sink.flush()
+            if is_banner(line):
+                continue
             if is_cli_log(line):
                 state["last"] = time.monotonic()
                 if is_phase(line):
                     state["phase"] = True
-                continue
-            if is_banner(line):
-                continue
-            if line.strip() and not (is_error_shaped is not None
-                                     and is_error_shaped(line)):
+            elif line.strip() and not (is_error_shaped is not None
+                                       and is_error_shaped(line)):
                 state["text"] = True
                 state["completed"] = True
             if classify_stream_line is None:
