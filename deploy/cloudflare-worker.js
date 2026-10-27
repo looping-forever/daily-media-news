@@ -2190,15 +2190,74 @@ const NTFY_BODY_MAX_BYTES = 4096;
 // and the archive-index link in the unavailable push read it, so there is no
 // second place to correct the archive subdomain inside the Worker.
 //
+// THE LITERAL IS A PLACEHOLDER, NOT THE DEPLOYED VALUE. The real host cannot be
+// committed — scripts/check_public_sanitisation.py fails the build if it appears
+// in this public tree — so it comes from the DIGEST_ARCHIVE_ORIGIN secret and
+// this string is used only when that secret is unset. digestArchiveOrigin()
+// logs loudly in that case, because a deployment that forgets the secret does
+// not "degrade gently": it refuses every real digest, which is what the host
+// check is for.
+//
 // It is the same origin `.github/workflows/daily-news.yml` builds `pages_url`
-// from and the same host the drift canary probes unauthenticated, and
-// tests/digest/digest_delivery.test.js derives the expected value from that
-// canary's committed host list — so a rename is a red test, not a push that
-// quietly stops linking anywhere. (deploy/schedule.json's `health_url` cannot
+// from (the CF_ARCHIVE_ORIGIN repository variable) and the same host the drift
+// canary probes unauthenticated. (deploy/schedule.json's `health_url` cannot
 // supply this: it is the WORKER's own endpoint on workers.dev, a different host
 // from the Pages project, so "derive the archive base from it" is not possible
 // and guessing it would have been worse than saying so.)
 const DIGEST_ARCHIVE_ORIGIN = "https://daily-digest.example.pages.dev";
+
+// The secret that overrides the placeholder. The NAME may appear anywhere; the
+// VALUE is a host rather than a credential, and is still never logged.
+const DIGEST_ARCHIVE_ORIGIN_ENV = "DIGEST_ARCHIVE_ORIGIN";
+
+// The origin this deployment actually trusts: the configured value, or the
+// placeholder when nothing is configured.
+//
+// An override that is not an absolute http(s) URL with a dotted host is IGNORED
+// rather than trusted. The host check compares against whatever this function
+// returns, so a typo must not be able to widen it — the safe reading of a
+// malformed value is "no override", never "accept whatever it parses to".
+// The dot requirement is there because `new URL` happily turns "https:///nohost"
+// into the hostname "nohost": a single label can never serve the digest, so
+// accepting it would recreate the exact silent 400 this change removes.
+//
+// `env` being undefined is the pure-call case (tests, and any caller that
+// predates this change) and stays silent; a real request path always passes
+// `env`, and that is where the missing-secret error is worth shouting about.
+function digestArchiveOrigin(env) {
+  const configured = env && typeof env[DIGEST_ARCHIVE_ORIGIN_ENV] === "string"
+    ? env[DIGEST_ARCHIVE_ORIGIN_ENV].trim()
+    : "";
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      const httpish = parsed.protocol === "https:" || parsed.protocol === "http:";
+      const dotted = parsed.hostname.indexOf(".") > 0 &&
+        !parsed.hostname.endsWith(".");
+      if (httpish && dotted) {
+        return configured;
+      }
+    } catch (err) {
+      // reported below, together with the non-http(s) and dotless cases
+    }
+    console.error(
+      "digest archive origin: " + DIGEST_ARCHIVE_ORIGIN_ENV + " is set but is " +
+        "not an absolute http(s) URL with a dotted host, so it is IGNORED and " +
+        "the committed placeholder is used. The configured value is not printed."
+    );
+    return DIGEST_ARCHIVE_ORIGIN;
+  }
+  if (env) {
+    console.error(
+      "digest archive origin: " + DIGEST_ARCHIVE_ORIGIN_ENV + " is not set on " +
+        "this Worker, so the committed PLACEHOLDER host is in use and every " +
+        "real digest will be refused by the page_url host check. Set it with " +
+        "`wrangler secret put " + DIGEST_ARCHIVE_ORIGIN_ENV +
+        " -c deploy/wrangler.toml`."
+    );
+  }
+  return DIGEST_ARCHIVE_ORIGIN;
+}
 
 // Retry budget for the publish. Three attempts, 8s each, 2s then 6s of backoff:
 // 32s of worst-case work inside a 45s budget, so the budget gate below is a
@@ -2372,8 +2431,12 @@ function clipToNtfyLimit(text) {
 
 // ---- artifact validation -----------------------------------------------------
 
-// validateArtifact(raw, slot, todayNpt, nowMs) -> {ok:true, artifact} |
-//                                                   {ok:false, reason, plain}
+// validateArtifact(raw, slot, todayNpt, nowMs, env) ->
+//                                     {ok:true, artifact} | {ok:false, reason, plain}
+//
+// PURE, except that `env` may be passed so the `page_url` host check compares
+// against the DEPLOYED archive origin (digestArchiveOrigin(env)) rather than the
+// committed placeholder. Omitting `env` keeps the old behaviour exactly.
 //
 // PURE. No KV, no fetch, no clock of its own (nowMs is passed in and defaults
 // to Date.now only for the caller's convenience), and every rejection carries a
@@ -2386,7 +2449,7 @@ function clipToNtfyLimit(text) {
 // indistinguishable from sending today's digest. It is therefore checked before
 // the freshness question, and its `plain` sentence says outright that what he is
 // looking at is not today's digest.
-function validateArtifact(raw, slot, todayNpt, nowMs) {
+function validateArtifact(raw, slot, todayNpt, nowMs, env) {
   const today = String(todayNpt || "");
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now();
 
@@ -2495,13 +2558,13 @@ function validateArtifact(raw, slot, todayNpt, nowMs) {
   } catch (err) {
     pageHost = "";
   }
-  if (pageHost !== digestArchiveHost()) {
+  if (pageHost !== digestArchiveHost(env)) {
     return {
       ok: false,
       reason: "page",
       plain: "the " + slot + " digest for " + today + " links to " +
              (pageHost || "an unreadable host") + ", which is not the digest " +
-             "archive (" + digestArchiveHost() + ").",
+             "archive (" + digestArchiveHost(env) + ").",
     };
   }
 
@@ -2545,16 +2608,16 @@ function validateArtifact(raw, slot, todayNpt, nowMs) {
   return { ok: true, artifact: parsed };
 }
 
-function digestArchiveHost() {
+function digestArchiveHost(env) {
   try {
-    return new URL(DIGEST_ARCHIVE_ORIGIN).hostname.toLowerCase();
+    return new URL(digestArchiveOrigin(env)).hostname.toLowerCase();
   } catch (err) {
     return "";
   }
 }
 
-function digestArchiveIndexUrl() {
-  return DIGEST_ARCHIVE_ORIGIN.replace(/\/+$/, "") + "/";
+function digestArchiveIndexUrl(env) {
+  return digestArchiveOrigin(env).replace(/\/+$/, "") + "/";
 }
 
 // ---- the ledger --------------------------------------------------------------
@@ -3162,7 +3225,7 @@ async function deliverDigestPlan(env, slot, writer, options) {
         "writing NOTHING to the ledger; a ledger written from a failed read " +
         "would erase the punctuality record"
     );
-    const un = unavailableOutcome(topic, today, slotName, opts);
+    const un = unavailableOutcome(env, topic, today, slotName, opts);
     await pushUnrecorded(env, un, label, opts);
     return un;
   }
@@ -3244,14 +3307,14 @@ async function deliverDigestPlan(env, slot, writer, options) {
       label + ": the artifact could not be READ from " + artifactKey + " (" +
         scrubTopic(String(err), topic) + ")"
     );
-    const un = unavailableOutcome(topic, today, slotName, opts,
+    const un = unavailableOutcome(env, topic, today, slotName, opts,
                                   "the digest record for this slot could not " +
                                   "be read.");
     await pushUnrecorded(env, un, label, opts);
     return un;
   }
 
-  const verdict = validateArtifact(artifactRaw, slotName, today, startedAt);
+  const verdict = validateArtifact(artifactRaw, slotName, today, startedAt, env);
   if (!verdict.ok) {
     console.error(label + ": artifact REJECTED (" + verdict.reason + ") — " + verdict.plain);
     return await pushFallbackLadder(env, ledger, today, slotName, verdict.reason,
@@ -3469,10 +3532,11 @@ function deliveryDeltaSeconds(sentIso, scheduledMs) {
   return (sent - Number(scheduledMs)) / 1000;
 }
 
-// The `unavailable` outcome, built without touching the ledger. Takes the topic
-// VALUE rather than `env` because that is the only thing it needs from the
-// binding, and a parameter nobody reads is a parameter that will drift.
-function unavailableOutcome(topic, today, slotName, opts, reason) {
+// The `unavailable` outcome, built without touching the ledger. Takes `env` for
+// the archive-index link only; the topic VALUE is separate because a parameter
+// nobody reads is a parameter that will drift, and env alone would let this
+// function read the publish credential it has no business touching.
+function unavailableOutcome(env, topic, today, slotName, opts, reason) {
   const startedAt = (opts && opts.now ? opts.now : Date.now)();
   return {
     ok: false,
@@ -3489,9 +3553,9 @@ function unavailableOutcome(topic, today, slotName, opts, reason) {
           "for this slot.",
         "",
         "Nothing is lost — the fallback still runs. Archive: " +
-          digestArchiveIndexUrl(),
+          digestArchiveIndexUrl(env),
       ].join("\n"),
-      digestArchiveIndexUrl(),
+      digestArchiveIndexUrl(env),
       "5",
       "warning,rotting_light"
     ),
@@ -4087,7 +4151,7 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
         header + "\n\n" +
           "**The last digest that did build — " + String(lastGood.date) + "**\n" +
           String(lastGood.body),
-        String(lastGood.page_url || digestArchiveIndexUrl()),
+        String(lastGood.page_url || digestArchiveIndexUrl(env)),
         "5",
         "warning,rotting_light"
       )
@@ -4096,8 +4160,8 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
         "⚠️ " + slotLabel(slotName) + " digest unavailable",
         header + "\n\n" +
           "No earlier digest is on file, so this is all there is. The " +
-            "archive index — " + digestArchiveIndexUrl(),
-        digestArchiveIndexUrl(),
+            "archive index — " + digestArchiveIndexUrl(env),
+        digestArchiveIndexUrl(env),
         "5",
         "warning,rotting_light"
       );
@@ -4324,11 +4388,11 @@ async function handleDigestIngest(request, env) {
   } catch (err) {
     pageHost = "";
   }
-  if (pageHost !== digestArchiveHost()) {
+  if (pageHost !== digestArchiveHost(env)) {
     return ingestError(
       "400 bad request: page_url host " +
         JSON.stringify(pageHost || "(unreadable)") +
-        " is not the digest archive host " + digestArchiveHost(), 400);
+        " is not the digest archive host " + digestArchiveHost(env), 400);
   }
 
   if (!env || !env.KV) {

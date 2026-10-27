@@ -82,7 +82,7 @@ const EXPORT_NAMES = [
   "validateArtifact", "digestHealthFields", "handleDigestIngest",
   "handleDeliverNow", "findDeliveredBySequenceId", "normaliseDigestLedger",
   "digestSequenceId", "digestFullSequenceId", "digestArchiveHost",
-  "digestArchiveIndexUrl", "deliveryDeltaSeconds",
+  "digestArchiveOrigin", "digestArchiveIndexUrl", "deliveryDeltaSeconds",
   "DIGEST_LEDGER_KEY", "DIGEST_ARTIFACT_PREFIX", "DIGEST_SCHEMA_VERSION",
   "DIGEST_ARCHIVE_ORIGIN", "DIGEST_SLOTS", "DIGEST_CRON_ARM",
   "DELIVERY_ON_TIME_S", "DELIVERY_RETENTION_DAYS", "ARTIFACT_MAX_BUILD_AGE_S",
@@ -1667,7 +1667,7 @@ test("a ledger entry that CLAIMS sent without ntfy_sent_at does not suppress any
 // 12. The ingest endpoint
 // ==========================================================================
 
-async function ingest(w, kv, body, headers, method) {
+async function ingest(w, kv, body, headers, method, envExtra) {
   const verb = method || "POST";
   const init = {
     method: verb,
@@ -1684,7 +1684,7 @@ async function ingest(w, kv, body, headers, method) {
   try {
     res = await w.WORKER.fetch(
       new Request("https://worker.example.invalid/?ingest=1", init),
-      ntfyEnv(kv));
+      ntfyEnv(kv, envExtra));
   } finally {
     logs.restore();
   }
@@ -1768,6 +1768,120 @@ test("the ingest endpoint rejects a wrong schema, a key that disagrees, and an o
   }
   const badJson = await ingest(w, makeHarness({}).kv, "{not json");
   assert.strictEqual(badJson.res.status, 400);
+});
+
+// ==========================================================================
+// The archive origin is a RUNTIME value, and that must not become a bypass
+// ==========================================================================
+//
+// The real Pages host cannot be committed (scripts/check_public_sanitisation.py
+// fails the build if it appears), so the Worker used to compare every incoming
+// `page_url` against a committed PLACEHOLDER that no deployment serves. The
+// result was a 400 on every real digest: authentication passed, the host check
+// failed. These tests pin BOTH halves of the fix -- the override is honoured,
+// and the check is still a check.
+
+test("the archive origin comes from env, falls back to the placeholder, and ignores a malformed override", async () => {
+  const w = loadWorker();
+  const SENTINEL = "https://archive.sentinel.invalid";
+
+  assert.strictEqual(w.digestArchiveHost({ DIGEST_ARCHIVE_ORIGIN: SENTINEL }),
+    "archive.sentinel.invalid",
+    "DIGEST_ARCHIVE_ORIGIN was not read from env, so every real digest stays " +
+    "refused by the page_url host check.");
+  assert.strictEqual(w.digestArchiveIndexUrl({ DIGEST_ARCHIVE_ORIGIN: SENTINEL + "/" }),
+    SENTINEL + "/",
+    "the index URL helper does not honour DIGEST_ARCHIVE_ORIGIN");
+
+  // No env at all -> the committed placeholder, unchanged.
+  assert.strictEqual(w.digestArchiveOrigin({}), "https://daily-digest.example.pages.dev");
+  assert.strictEqual(w.digestArchiveHost({}), "daily-digest.example.pages.dev");
+
+  // A value that is not an absolute http(s) URL with a dotted host is IGNORED,
+  // not trusted: the host check compares against whatever this returns, so a
+  // typo must never be able to widen it. "https:///nohost" is the interesting
+  // one -- `new URL` turns it into the hostname "nohost", and a single label
+  // can never serve the digest, so it has to be refused rather than used.
+  for (const bad of ["not a url", "/relative", "javascript:alert(1)",
+                     "https:///nohost", "ftp://archive.example.invalid",
+                     "https://archive"]) {
+    assert.strictEqual(w.digestArchiveHost({ DIGEST_ARCHIVE_ORIGIN: bad }),
+      "daily-digest.example.pages.dev",
+      "a malformed DIGEST_ARCHIVE_ORIGIN (" + JSON.stringify(bad) + ") was " +
+      "accepted as the archive host, so a typo could widen the host check");
+  }
+});
+
+test("a missing DIGEST_ARCHIVE_ORIGIN is SAID OUT LOUD, not silently degraded", async () => {
+  const w = loadWorker();
+  const logs = captureLogs();
+  let host;
+  try {
+    host = w.digestArchiveHost({});
+  } finally {
+    logs.restore();
+  }
+  assert.strictEqual(host, "daily-digest.example.pages.dev");
+  assert.ok(logs.text().indexOf("DIGEST_ARCHIVE_ORIGIN") >= 0,
+    "the Worker used the placeholder archive host without naming the unset " +
+    "secret. That is the silent degradation that kept every digest at HTTP " +
+    "400. Logs were: " + JSON.stringify(logs.text()));
+});
+
+test("the ingest accepts the CONFIGURED archive host and still refuses every other host", async () => {
+  const w = loadWorker();
+  const SENTINEL = "https://archive.sentinel.invalid";
+  const env = { DIGEST_ARCHIVE_ORIGIN: SENTINEL };
+
+  // 1. the configured host is accepted
+  const good = makeHarness({});
+  const accepted = await ingest(w, good.kv, Object.assign(JSON.parse(artifact()), {
+    page_url: SENTINEL + "/digests/" + TODAY + "-" + SLOT + ".html",
+  }), null, null, env);
+  assert.strictEqual(accepted.res.status, 200,
+    "an artifact pointing at the CONFIGURED archive host was refused: " +
+    (await accepted.res.text()));
+
+  // 2. the committed placeholder is now a FOREIGN host and must still 400 --
+  //    this is the proof that the override did not turn the check off
+  const placeholder = await ingest(w, good.kv, artifact(), null, null, env);
+  assert.strictEqual(placeholder.res.status, 400,
+    "the placeholder host was accepted once a real host was configured, which " +
+    "means the host check was bypassed rather than parameterised");
+  assert.strictEqual(good.kv.puts.length, 1,
+    "the refused ingest still wrote to KV");
+
+  // 3. and a lookalike of the CONFIGURED host is refused too
+  const lookalike = await ingest(w, good.kv, Object.assign(JSON.parse(artifact()), {
+    page_url: "https://archive.sentinel.invalid.evil.invalid/x.html",
+  }), null, null, env);
+  assert.strictEqual(lookalike.res.status, 400,
+    "a lookalike of the configured host was accepted, so the comparison is a " +
+    "substring test rather than an exact host match");
+});
+
+test("validateArtifact gates the delivery path on the same runtime origin", async () => {
+  const w = loadWorker();
+  const SENTINEL = "https://archive.sentinel.invalid";
+  const env = { DIGEST_ARCHIVE_ORIGIN: SENTINEL };
+  const payload = JSON.parse(artifact());
+
+  const right = w.validateArtifact(
+    JSON.stringify(Object.assign({}, payload, {
+      page_url: SENTINEL + "/digests/" + TODAY + "-" + SLOT + ".html",
+    })), SLOT, TODAY, T0, env);
+  assert.strictEqual(right.ok, true,
+    "validateArtifact rejected the configured archive host: " + right.reason +
+    " -- " + right.plain);
+
+  // Without env the committed placeholder is still the expected host, so a
+  // caller that has not been taught about env behaves exactly as before.
+  assert.strictEqual(w.validateArtifact(artifact(), SLOT, TODAY, T0, env).ok, false,
+    "validateArtifact accepted the PLACEHOLDER host while a real one was " +
+    "configured, so the delivery path and the ingest path disagree");
+  assert.strictEqual(w.validateArtifact(artifact(), SLOT, TODAY, T0).ok, true,
+    "the 4-argument call changed behaviour, which breaks every caller that " +
+    "has not been taught about env");
 });
 
 test("the ingest token is compared in constant time, not with ===", async () => {
