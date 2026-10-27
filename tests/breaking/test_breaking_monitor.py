@@ -2619,6 +2619,104 @@ def test_57_the_topic_never_reaches_a_log_or_a_url():
 # ---------------------------------------------------------------------------
 
 
+def test_58_chat_id_discovery_prefers_the_private_chat_over_a_newer_group():
+    """The defect this closes: "LAST result[].message.chat.id wins" meant a
+    group the bot had been added to could take the destination, silently,
+    because sendMessage succeeds against any chat the bot can see."""
+    bm._TG_CHAT_ID_CACHE.clear()
+    rec = TgRecorder(updates={
+        "ok": True,
+        "result": [
+            {"update_id": 1, "message": {"chat": {"id": 500, "type": "private"}}},
+            {"update_id": 2, "message": {"chat": {"id": -100999, "type": "group"}}},
+            {"update_id": 3, "message": {"chat": {"id": -100888,
+                                                 "type": "supergroup"}}},
+        ],
+    })
+    try:
+        assert bm.tg_get_chat_id("T-PRIVATE", http_fn=rec) == 500, \
+            "a group update newer than the owner's must not win discovery"
+    finally:
+        bm._TG_CHAT_ID_CACHE.clear()
+
+
+def test_59_chat_id_discovery_falls_back_to_newest_of_any_type():
+    """Backwards compatibility: when the queue holds no chat with a type at
+    all, the previous "newest wins" answer is preserved. A tightened rule that
+    broke every existing deployment would trade a silent misdelivery for a
+    silent no-delivery."""
+    bm._TG_CHAT_ID_CACHE.clear()
+    rec = TgRecorder(updates={
+        "ok": True,
+        "result": [
+            {"update_id": 1, "message": {"chat": {"id": 111}}},
+            {"update_id": 2, "message": {"chat": {"id": 4242}}},
+        ],
+    })
+    try:
+        assert bm.tg_get_chat_id("T-UNTYPED", http_fn=rec) == 4242
+    finally:
+        bm._TG_CHAT_ID_CACHE.clear()
+
+
+def test_60_chat_id_discovery_skips_a_chat_whose_sender_is_a_bot():
+    """A bot's own message is not a destination, and a peer bot must never
+    become one -- otherwise a single bot-to-bot message redirects every alert."""
+    bm._TG_CHAT_ID_CACHE.clear()
+    rec = TgRecorder(updates={
+        "ok": True,
+        "result": [
+            {"update_id": 1, "message": {"chat": {"id": 111, "type": "private"},
+                                         "from": {"is_bot": False}}},
+            {"update_id": 2, "message": {"chat": {"id": 222, "type": "private"},
+                                         "from": {"is_bot": True}}},
+        ],
+    })
+    try:
+        assert bm.tg_get_chat_id("T-BOT", http_fn=rec) == 111, \
+            "an update sent by a bot must not supply the chat id"
+    finally:
+        bm._TG_CHAT_ID_CACHE.clear()
+
+
+def test_61_smtp_factory_sets_a_connect_timeout():
+    """smtplib's default is the OS TCP timeout -- minutes. A Gmail that accepts
+    the connection and then goes quiet would hang the job with no output and no
+    failure, leaving only the Actions job timeout to stop it."""
+    captured = {}
+    orig = bm.smtplib.SMTP
+
+    class FakeSmtp(object):
+        def __init__(self, host, port, timeout=None):
+            captured["host"] = host
+            captured["port"] = port
+            captured["timeout"] = timeout
+
+    bm.smtplib.SMTP = FakeSmtp
+    try:
+        bm.default_smtp_factory("smtp.gmail.com", 587)
+    finally:
+        bm.smtplib.SMTP = orig
+    assert captured["host"] == "smtp.gmail.com"
+    assert captured["port"] == 587
+    assert captured["timeout"] == bm.SMTP_TIMEOUT_SEC, \
+        "the SMTP factory must pass an explicit timeout"
+    assert captured["timeout"] is not None
+
+
+def test_62_selftest_payload_matches_tg_send_exactly():
+    """The self-test must exercise PRODUCTION's request shape. If tg_send ever
+    changes what it posts, this comparison goes red instead of the self-test
+    quietly testing something production no longer sends."""
+    sys.path.insert(0, os.path.join(bm.REPO_ROOT, "scripts"))
+    import delivery_selftest as ds
+    rec = TgRecorder(send_ok=True)
+    bm.tg_send("T-SHAPE", 42, "hello", http_fn=rec)
+    _url, production_payload = rec.sends()[0]
+    assert ds.telegram_payload(42, "hello") == production_payload, \
+        "delivery_selftest's Telegram payload drifted from tg_send's"
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -2678,6 +2776,11 @@ def main():
         test_55_critical_ntfy_message_uses_the_detailed_format,
         test_56_dry_run_writes_the_ntfy_preview_and_touches_no_network,
         test_57_the_topic_never_reaches_a_log_or_a_url,
+        test_58_chat_id_discovery_prefers_the_private_chat_over_a_newer_group,
+        test_59_chat_id_discovery_falls_back_to_newest_of_any_type,
+        test_60_chat_id_discovery_skips_a_chat_whose_sender_is_a_bot,
+        test_61_smtp_factory_sets_a_connect_timeout,
+        test_62_selftest_payload_matches_tg_send_exactly,
     ]
     failures = []
     for test in tests:

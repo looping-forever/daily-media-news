@@ -1,0 +1,80 @@
+name: Delivery Self-Test
+
+# MANUAL ONLY, AND THAT IS THE DESIGN.
+#
+# This workflow exists to answer one question on demand: do the two BACKUP
+# delivery channels -- Gmail SMTP and the Telegram Bot API -- actually reach the
+# owner right now? They were previously only ever exercised as a side effect of
+# a real breaking alert or a real digest, so the two channels that matter most
+# when the primary (ntfy) is down were the two nobody could test before the
+# outage they exist for.
+#
+# It sends EXACTLY ONE labelled message per channel and NO digest content:
+#
+#     Telegram : "Test message from daily-media-news, ignore"
+#     Gmail    : subject "Test from daily-media-news, ignore"
+#
+# It runs scripts/delivery_selftest.py, which imports the SAME transport code
+# the production paths use (scripts/breaking_monitor.py) rather than
+# re-implementing an HTTP call or an SMTP session. A test that used its own
+# transport would prove nothing about the transport that ships.
+#
+# NO SCHEDULE, DELIBERATELY. A cron here would send the owner two unsolicited
+# messages a day forever and bill Actions minutes to do it. There is also no
+# repository_dispatch trigger: nothing else in this repository should be able
+# to fire a message at the owner's phone. `delivery-selftest.yml` is registered
+# in tests/workflows/__init__.py and budgeted in config/actions-budget.json, so
+# it is linted and counted like every other workflow.
+#
+# WHAT IT NEVER PRINTS. The bot token, the Gmail app password and the mail
+# address are passed in as environment variables and the script reports only
+# presence, length, a masked chat id and the SMTP status code. Every output
+# line is scrubbed of those values before it reaches the log, because this
+# repository is PUBLIC and a secret in a log is a leaked secret.
+on:
+  workflow_dispatch:
+
+# Nothing here writes to the repository: no state commit, no artifact, no
+# dispatch. Read-only is therefore the whole permission set -- if a future edit
+# needs more, it has to say so here and in the lint.
+permissions:
+  contents: read
+
+concurrency:
+  group: delivery-selftest
+  cancel-in-progress: false
+
+jobs:
+  delivery-selftest:
+    runs-on: ubuntu-latest
+    # The script itself is bounded by SMTP_TIMEOUT_SEC (20s) and the Bot API's
+    # 10s timeout, so a normal run is well under a minute. This is the outer
+    # net for a wedged runner, not the expected duration.
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # The script needs scripts/ and nothing else, and it must not be able
+          # to push. persist-credentials: false keeps the token out of
+          # .git/config for the whole job.
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Send one labelled test per channel
+        # TELEGRAM_CHAT_ID and GMAIL_RECEIVER are deliberately absent from the
+        # repository secrets. An empty value is the supported case: Telegram
+        # then discovers the chat from getUpdates, and Gmail falls back to
+        # GMAIL_USER as the recipient. The script reports which path was taken.
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_RECEIVER: ${{ secrets.GMAIL_RECEIVER }}
+        run: python scripts/delivery_selftest.py

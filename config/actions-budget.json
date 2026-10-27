@@ -95,7 +95,13 @@
   },
   "repo_soft_cap_minutes": 1400,
   "days_per_month": 30,
-  "current_projected_minutes": 1746,
+  "current_projected_minutes": 1776,
+  "_projection_change_2026_10_27": [
+    "delivery-selftest.yml added: 1 job, p95 1.0 min, max 1 run/day, no cron",
+    "-> +30 min/month (1746 -> 1776). Manual dispatch only, so this is a",
+    "CEILING on what a human can spend, not a forecast of what will be spent.",
+    "It is the only line that moved. Hard ceiling 1800 still holds (+24 margin)."
+  ],
   "_cuts_2026_10_19": [
     "drift-canary.yml: the 'Dispatch daily digest dry-run and wait' step was",
     "removed (2 dispatches a day of the real digest, ~366 min/month at the",
@@ -154,6 +160,13 @@
       "crons": ["17 4,10 * * *"],
       "measured_october": {"minutes": 179, "runs": 84},
       "why": "Worker-dispatched on detection; the cron is the dead-man's backstop and was cut from 24 firings a day to 2 on 2026-10-19 (09:02 and 15:02 Nepal time, inside TU office hours). KNOWN LIMIT: the measured 4.7 runs a day was the congested hourly backstop plus rare result dispatches, and the split cannot be recovered from the aggregate -- so this entry declares the 2 scheduled firings and lets budget-sentinel.yml see any dispatch-driven spike rather than assuming one here."
+    },
+    "delivery-selftest.yml": {
+      "max_runs_per_day": 1,
+      "jobs_per_run": 1,
+      "p95_minutes": 1.0,
+      "crons": [],
+      "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch, so it costs nothing until a human asks for it, and `max_runs_per_day: 1` is a ceiling on that asking rather than a forecast. It is budgeted anyway because the checker fails a workflow file with no entry here, and because 'it is only manual' is exactly how an unbudgeted job becomes an unbudgeted habit. One job: checkout, setup-python, one script. The script's own work is bounded by SMTP_TIMEOUT_SEC (20s) and the Bot API's 10s timeout, so 1.0 minute is the honest shape, not the 10-minute job timeout."
     },
     "digest-watchdog.yml": {
       "max_runs_per_day": 2,

@@ -83,8 +83,11 @@ Pipeline
     AFTER the successful SMTP send/dry-run (sendMessage, parse_mode=HTML,
     best-effort).
     Destination chat: env TELEGRAM_CHAT_ID when set, otherwise auto-discovered
-    as the LAST result[].message.chat.id from getUpdates (cached per-run;
-    send the bot a /start message once so its update queue is non-empty).
+    from getUpdates (cached per-run; send the bot a /start message once so its
+    update queue is non-empty). Discovery prefers the newest update whose
+    chat.type is "private" and only falls back to the newest chat id of any
+    type when no private chat appears -- see tg_get_chat_id for why "last
+    update wins" alone was a silent misdelivery risk.
     Any Telegram failure appends "telegram_failed:<err>" to the log row's
     reason and NEVER raises or alters email/state semantics. Token absent =>
     Telegram is skipped silently. --dry-run writes the exact message body to
@@ -1477,8 +1480,17 @@ def build_plain_text(ctx):
     return "\n".join(lines)
 
 
+#: SMTP connect/read timeout. smtplib defaults to the OS TCP timeout, which is
+#: minutes: a blocked egress port or a Gmail that accepts the TCP connection and
+#: then goes quiet would hang the whole job with no output and no failure, and
+#: the Actions job timeout is the only thing left to stop it. 20s is generous
+#: for a STARTTLS handshake and short enough to fail while the step is still
+#: legible.
+SMTP_TIMEOUT_SEC = 20
+
+
 def default_smtp_factory(host, port):
-    return smtplib.SMTP(host, port)
+    return smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT_SEC)
 
 
 def send_email(smtp_factory, subject, html_body, text_body):
@@ -1864,10 +1876,12 @@ def notify_ntfy(verdict, detailed, confidence, label, paths, args,
 #   TELEGRAM_BOT_TOKEN  bot token from @BotFather; absent/empty => Telegram is
 #                       skipped silently and email-only behavior is unchanged.
 #   TELEGRAM_CHAT_ID    optional explicit destination chat id. When unset the
-#                       chat id is auto-discovered as the LAST
-#                       result[].message.chat.id in the bot's getUpdates
+#                       chat id is auto-discovered from the bot's getUpdates
 #                       queue — i.e. the user must have sent /start to the bot
-#                       once; the discovery result is cached per-run.
+#                       once. Discovery prefers a private chat (see
+#                       tg_get_chat_id); the result is cached per-run.
+#                       Setting TELEGRAM_CHAT_ID removes the discovery step
+#                       entirely and is the recommended production shape.
 # ---------------------------------------------------------------------------
 
 _TG_CHAT_ID_CACHE = {}      # token -> chat_id; reset at each main() run
@@ -1889,8 +1903,27 @@ def tg_http(url, payload=None):
 
 
 def tg_get_chat_id(token, http_fn=None):
-    """LAST result[].message.chat.id from getUpdates (10s timeout); None when
-    the queue has no usable chat id or the call fails. Cached per-run."""
+    """The chat id to deliver to, discovered from getUpdates (10s timeout);
+    None when the queue has no usable chat id or the call fails. Cached per-run.
+
+    PREFERENCE ORDER, tightened 2026-10-27. The old rule was "the LAST
+    result[].message.chat.id wins", full stop. That is the fragile shape: the
+    bot is added to a group once, or an old chat's update happens to be newest,
+    and the destination silently moves there -- with no error, because
+    sendMessage succeeds against any chat the bot can see. A delivery channel
+    that quietly answers in the wrong room is worse than one that fails loudly,
+    and nothing recorded which chat won.
+
+    So the newest update is no longer authoritative by itself:
+      1. the newest update whose chat.type is "private" -- the owner talking to
+         the bot directly, which is the only chat this bot is meant to answer;
+      2. only if no private chat appears in the queue, the newest chat id of
+         ANY type, i.e. the previous behaviour, kept as a fallback so an
+         existing deployment whose chat.type is missing does not break.
+
+    Updates sent BY a bot are skipped in both passes: a bot's own outbound
+    message is not a destination, and a peer bot must never become one.
+    """
     if token in _TG_CHAT_ID_CACHE:
         return _TG_CHAT_ID_CACHE[token]
     http_fn = http_fn or tg_http
@@ -1900,17 +1933,29 @@ def tg_get_chat_id(token, http_fn=None):
         payload = json.loads(body)
     except Exception:
         return None
-    last_id = None
+    private_id = None
+    any_id = None
     results = payload.get("result") if isinstance(payload, dict) else None
     for upd in results or []:
         if not isinstance(upd, dict):
             continue
-        chat = (upd.get("message") or {}).get("chat") or {}
-        if isinstance(chat, dict) and chat.get("id") is not None:
-            last_id = chat["id"]
-    if last_id is not None:
-        _TG_CHAT_ID_CACHE[token] = last_id
-    return last_id
+        message = upd.get("message") or {}
+        chat = message.get("chat") or {}
+        if not isinstance(chat, dict) or chat.get("id") is None:
+            continue
+        sender = message.get("from") or {}
+        if isinstance(sender, dict) and sender.get("is_bot") is True:
+            continue
+        # Both assignments are unconditional, so the LAST update of each kind
+        # wins -- the private pass keeps the old "newest" semantics while
+        # narrowing which chats are eligible to supply the answer.
+        any_id = chat["id"]
+        if str(chat.get("type") or "").lower() == "private":
+            private_id = chat["id"]
+    chat_id = private_id if private_id is not None else any_id
+    if chat_id is not None:
+        _TG_CHAT_ID_CACHE[token] = chat_id
+    return chat_id
 
 
 def tg_send(token, chat_id, text, http_fn=None):

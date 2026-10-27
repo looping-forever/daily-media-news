@@ -81,6 +81,13 @@ WORKFLOW_NAMES = (
     # guard minutes still spends minutes, so it is registered, budgeted in
     # config/actions-budget.json, and carries a CRON_NPT_TABLE row.
     "budget-sentinel.yml",
+    # Added 2026-10-27 with the file itself. No schedule and no cron, so it
+    # contributes nothing to the cron table -- but it still runs a job on a
+    # runner, so it carries a budget entry. It is registered here for the
+    # reason this tuple exists at all: an unregistered workflow is one that
+    # every check below silently skips, and a green suite then means "the
+    # workflows I was told about are fine".
+    "delivery-selftest.yml",
 )
 
 try:  # pragma: no cover - environment dependent, both branches are exercised
