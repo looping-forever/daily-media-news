@@ -1147,6 +1147,14 @@ jobs:
           # The bound is therefore the walk budget itself -- it is NOT raised.
           RETRY_BACKOFF=(180 360 720)
           RETRY_MAX_CYCLES=4
+          # AN AUTH REFUSAL IS PER MODEL UNTIL IT REPEATS. Measured 2026-10-27
+          # 16:18Z: the walk stopped after attempt 10 of 12 -- abandoning six
+          # quota refusals that had just proved the pool was throttled, so the
+          # 3/6/12-minute backoff cycles never ran -- on an `auth` that was a
+          # millisecond stamp (`.401Z`) read as a 401. One model refusing its
+          # credentials is that model's entitlement; the SAME refusal from two
+          # different models is the shared credential, and only that is fatal.
+          AUTH_GLOBAL_MODELS=2
           : > state/agent-attempts.log
           while :; do
             cycle=$((cycle+1))
@@ -1156,6 +1164,7 @@ jobs:
             fi
             cycle_quota=0
             cycle_other=0
+            cycle_auth=0
             for model in "${models[@]}"; do
               remaining=$(( deadline - $(date +%s) ))
               allow=$(( remaining < PER ? remaining : PER ))
@@ -1240,15 +1249,36 @@ jobs:
                 continue
               fi
               if [ "$kind" = "auth" ]; then
-                # STOP, deliberately. A bad credential is not a property of this
-                # model: every remaining attempt would fail the same way, burn the
-                # budget and bury the real cause. It is also NOT transient, so it
-                # never earns a backoff.
-                echo "Circuit breaker: $model -> auth. Retrying other models would only hide the cause; stopping the walk."
-                last_err="auth: $model was rejected (credential), walk aborted"
-                cycle_other=$((cycle_other+1))
-                python3 scripts/model_selector.py --record "$model" transport || true
-                break
+                # PER MODEL, NOT PER PROVIDER -- until it repeats. See
+                # AUTH_GLOBAL_MODELS above for the measurement this replaces: an
+                # auth on the FIRST model that reports it aborted a walk six
+                # quota refusals deep, and the backoff cycles that exist for
+                # exactly that wall never got to run.
+                #
+                # The credential is shared, so a real bad key fails every model
+                # identically; one refusal is a property of the model. So a
+                # single auth is recorded, reordered and CONTINUED PAST, and
+                # only AUTH_GLOBAL_MODELS distinct refusals in one cycle stop
+                # the walk -- which is still fast, still names the cause, and no
+                # longer costs the slot.
+                cycle_auth=$((cycle_auth+1))
+                # Recorded as `auth`, not `transport`: the selector cools down
+                # nothing for it (quota and auth share that rule -- cooling
+                # would remove the pool), but health memory should carry what
+                # actually happened.
+                python3 scripts/model_selector.py --record "$model" auth || true
+                if [ "$cycle_auth" -ge "$AUTH_GLOBAL_MODELS" ]; then
+                  echo "Circuit breaker: $model -> auth ($cycle_auth models refused the credential). That is the shared key, not one model; stopping the walk."
+                  last_err="auth: $cycle_auth models rejected the credential, walk aborted"
+                  cycle_other=$((cycle_other+1))
+                  break
+                fi
+                echo "Circuit breaker: $model -> auth. One model only, so the credential is not the problem; trying the next model."
+                last_err="auth on $model"
+                # NOT into cycle_other: one model's refusal is not evidence the
+                # pool is unusable, and counting it here would end a run whose
+                # other ten refusals were quota -- the exact waste this fixes.
+                continue
               fi
               cycle_other=$((cycle_other+1))
               if [ "$run_rc" = "0" ]; then
@@ -1281,8 +1311,12 @@ jobs:
             # failure was quota_or_rate_limited is contention, and contention is
             # the one class that clears by itself (measured: 5/5 answered in
             # 33-44s each minutes after a wall of 1s refusals). Anything else --
-            # a wrong id, a 401, a timeout, a 5xx -- keeps its own cooldown and
-            # ends the walk, because repeating it buys nothing and costs the slot.
+            # a wrong id, a timeout, a 5xx -- keeps its own cooldown and ends the
+            # walk, because repeating it buys nothing and costs the slot.
+            # A SINGLE `auth` IS NOT ON THAT LIST any more: it is one model's
+            # refusal, it is not evidence about the pool, and counting it here is
+            # what turned one misread line into a lost edition. Two of them stop
+            # the walk inside the model loop instead (AUTH_GLOBAL_MODELS).
             if [ "$cycle_quota" -le 0 ] || [ "$cycle_other" -gt 0 ]; then
               break
             fi

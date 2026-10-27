@@ -1018,7 +1018,16 @@ _OUTAGE_MARKERS = ("unknownerror", "unexpected server error",
 
 #: HTTP status codes, matched with boundaries so a timestamp or a model id
 #: cannot be mistaken for one.
-_HTTP_RE = re.compile(r"(?<!\d)(401|403|429|500|502|503|504)(?!\d)")
+#:
+#: THE PRECEDING DOT IS PART OF THE BOUNDARY. Measured 2026-10-27 16:18Z: an
+#: attempt whose only fatal line was `Upstream request failed: Model is
+#: unavailable` was classified `auth` and aborted the walk with "was rejected
+#: (credential)" -- because the CLI's own DEBUG line
+#: `timestamp=...T16:18:47.401Z` contains `401` straight after a decimal point,
+#: and `(?<!\d)` saw the `.` as a boundary. `47.401` is a millisecond field, not
+#: a status. The same hole let `.429Z`, `.500Z` and `.503Z` fake quota and
+#: outage classes too, so this is one fix for a whole family of misreads.
+_HTTP_RE = re.compile(r"(?<![\d.])(401|403|429|500|502|503|504)(?!\d)")
 
 
 def classify_failure(text, returncode=0):

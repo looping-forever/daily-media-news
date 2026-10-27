@@ -367,5 +367,63 @@ class VocabularyTests(unittest.TestCase):
             ms.classify_failure("AI_APICallError: Model is unavailable.", 1))
 
 
+class CommittedCooldownTests(unittest.TestCase):
+    """The veto is worthless unless the file is IN git.
+
+    WHY THIS EXISTS. The cooldown was written on the runner and published by the
+    step `Commit state changes` -- which carries no `always()`, so every run that
+    RECORDED a dead id also failed the walk, and the file died with the
+    container. On 2026-10-27 the repository held no `state/model_cooldown.json`
+    at all (`git ls-files` and `git check-ignore` both confirmed it), so the same
+    three ids were discovered, ranked and tried again on every run -- three
+    attempts of a twelve-attempt walk, exactly the waste the veto was built for.
+    The file is committed now, and this test keeps it honest DATA rather than a
+    file that silently stops vetoing anything.
+    """
+
+    PATH = REPO_ROOT / "state" / ms.COOLDOWN_FILENAME
+
+    def test_the_committed_file_is_a_veto_the_selector_understands(self):
+        self.assertTrue(
+            self.PATH.is_file(),
+            "state/%s must be committed. An uncommitted cooldown is rebuilt from "
+            "nothing on every clean runner, which is the defect it exists to "
+            "remove." % ms.COOLDOWN_FILENAME)
+        doc = ms.load_cooldown(str(self.PATH))
+        self.assertEqual(ms.COOLDOWN_SCHEMA_VERSION, doc.get("schema_version"))
+        models = doc.get("models") or {}
+        self.assertTrue(
+            models,
+            "a committed cooldown with no entries is dead weight: either name "
+            "the ids that must not be tried, or delete the file and let the "
+            "recorder recreate it")
+        for model, row in models.items():
+            with self.subTest(model=model):
+                self.assertTrue(
+                    model.startswith(PROVIDER + "/"),
+                    "%r is not a fully-qualified model id, so it can never match "
+                    "the catalogue" % (model,))
+                self.assertIn(
+                    row.get("reason"), ms.COOLDOWN_SEC,
+                    "the reason must be one of the cooled classes (%r), because "
+                    "that is the only thing that says how long it lasts"
+                    % (sorted(ms.COOLDOWN_SEC),))
+                # `until` is ABSOLUTE. now=0 makes every real future stamp true,
+                # so an unparseable stamp fails here instead of quietly expiring
+                # the entry and re-arming the waste.
+                self.assertTrue(
+                    ms.on_hard_cooldown(doc, model, 0.0),
+                    "%r carries no readable `until`: %r" % (model, row))
+
+    def test_an_expired_committed_entry_stops_vetoing(self):
+        """A cooldown must decay, not become a permanent denylist."""
+        doc = ms.load_cooldown(str(self.PATH))
+        for model in list((doc.get("models") or {})):
+            self.assertFalse(
+                ms.on_hard_cooldown(doc, model, 4_102_444_800.0),  # 2100-01-01
+                "%r would still be vetoed in 2100 -- that is a blacklist, and a "
+                "blacklist never re-tests an id that came back" % (model,))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

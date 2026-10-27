@@ -169,14 +169,22 @@ class RetryLadderTests(AgentWalkHarness):
 class NonTransientTests(AgentWalkHarness):
     def test_no_non_quota_class_ever_backs_off(self):
         """Each class keeps its own fate: a cooldown, an abort, or an ordinary
-        skip. None of them is contention, so none of them may sleep."""
+        skip. None of them is contention, so none of them may sleep.
+
+        THE AUTH ARM CHANGED ON 2026-10-27, from measurement. One `auth` no
+        longer ends the walk (a single model's refusal is not a property of the
+        shared credential -- see tests/workflows/test_agent_walk_step.py
+        AuthIsPerModelTests), so the arm that must fail here is TWO of them.
+        What this test still pins is unchanged and is the point: an abort sleeps
+        for nothing, builds no retry cycle, and never reports contention.
+        """
         cases = (
             ("all-not-found",
              dict(pool=["opencode/dead-a", "opencode/dead-b"],
                   plan="opencode/dead-a:notfound opencode/dead-b:notfound")),
             ("auth",
              dict(pool=["opencode/a", "opencode/b"],
-                  plan="opencode/a:auth opencode/b:ok")),
+                  plan="opencode/a:auth opencode/b:auth")),
             ("timeout",
              dict(pool=["opencode/a", "opencode/b"],
                   plan="opencode/a:124 opencode/b:124")),

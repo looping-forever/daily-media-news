@@ -103,6 +103,70 @@ class ClassifierTests(unittest.TestCase):
         self.assertEqual("other", ms.classify_failure("took 1500ms", 1))
         self.assertEqual("other", ms.classify_failure("request-id 4290", 1))
 
+    def test_a_millisecond_stamp_is_not_an_http_status(self):
+        """THE LINE THAT ABORTED A WALK WITH NO CREDENTIAL PROBLEM IN IT.
+
+        Captured 2026-10-27 16:18:47Z, attempt 10 of 12 -- the last failure
+        before the walk stopped:
+
+            timestamp=2026-10-27T16:18:47.401Z level=INFO run=576d6804 message="init"
+            AI_APICallError: Upstream request failed: Model is unavailable.
+
+        The fatal line is an outage. `47.401Z` matched the 401 rule because the
+        character before it is a dot, not a digit, so the attempt classified
+        `auth`, the walk aborted six quota refusals deep, and the run reported a
+        credential that had never been refused. The same hole made `.403Z`,
+        `.429Z`, `.500Z` and `.503Z` possible -- a whole family of misreads from
+        one missing boundary -- so every one of them is pinned here.
+        """
+        measured = ('timestamp=2026-10-27T16:18:47.401Z level=INFO '
+                    'run=576d6804 message="all formatters are disabled"\n'
+                    'AI_APICallError: Upstream request failed: '
+                    'Model is unavailable.\n')
+        self.assertEqual("provider_outage", ms.classify_failure(measured, 1))
+        for millis in (".401Z", ".403Z", ".429Z", ".500Z", ".502Z", ".503Z"):
+            stamp = ("timestamp=2026-10-27T16:18:47%s level=INFO message=init"
+                     % millis)
+            self.assertEqual("other", ms.classify_failure(stamp, 1),
+                             "%r is a clock, not a status code" % stamp)
+        # AND A REAL STATUS IS STILL MATCHED: this boundary may not be widened
+        # into a fix that hides a 401.
+        self.assertEqual("auth", ms.classify_failure("HTTP 401 Unauthorized", 1))
+        self.assertEqual("auth", ms.classify_failure("status code 403", 1))
+        self.assertEqual("auth", ms.classify_failure("HTTP/1.1 403 Forbidden", 1))
+        self.assertEqual("quota_or_rate_limited",
+                         ms.classify_failure("HTTP 429 Too Many Requests", 1))
+        self.assertEqual("provider_outage",
+                         ms.classify_failure("HTTP 503 Service Unavailable", 1))
+
+    def test_the_measured_attempt_that_aborted_the_walk_is_not_an_auth(self):
+        """THE FIXTURE IS THE REAL LOG, not a paraphrase of it.
+
+        tests/fixtures/walk_auth_abort_2026_10_27.txt holds attempt 10 of run
+        40539483837 verbatim, including the CLI's own `...T16:18:47.401Z`
+        timestamps. That attempt ended the walk with
+
+            auth: <the model> was rejected (credential), walk aborted
+
+        while the model's actual failure was `Model is unavailable` and nothing
+        in the log was ever refused. The watchdog's repeat-breaker had already
+        named its own kind (`kind=provider_outage`), which is what the corrected
+        classification reports -- and, above all, NOT `auth`.
+        """
+        path = REPO_ROOT / "tests" / "fixtures" / "walk_auth_abort_2026_10_27.txt"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("was rejected (credential), walk aborted", text,
+                      "the fixture must still carry the verdict this fix exists "
+                      "to make impossible, or it proves nothing")
+        self.assertIn(".401Z", text,
+                      "the fixture must keep the millisecond stamp that caused "
+                      "the misread")
+        self.assertEqual("provider_outage", ms.classify_failure(text, 1),
+                         "the attempt was an outage the watchdog had already "
+                         "declared, and the decimal field must not turn it into "
+                         "an auth refusal")
+        self.assertNotEqual("auth", ms.classify_failure(text, 1))
+
     def test_auth_outranks_quota_and_outage(self):
         text = "401 Unauthorized after 503 from gateway"
         self.assertEqual("auth", ms.classify_failure(text, 1))
@@ -725,16 +789,42 @@ class ShippedWalkTests(AgentWalkHarness):
         self.assertEqual(["opencode/limited", "opencode/live"], art["models"])
         self.assertIn("kind=quota_or_rate_limited", "\n".join(self.attempt_log()))
 
-    def test_auth_stops_the_whole_walk(self):
-        """One bad credential, one attempt. Another model cannot fix it."""
+    def test_auth_is_per_model_until_it_repeats(self):
+        """CHANGED DELIBERATELY ON 2026-10-27, from measurement.
+
+        This test used to pin the opposite rule -- one `auth` ends the walk --
+        on the reasoning that one bad credential cannot be fixed by another
+        model. Run 40539483837 is the counter-evidence: attempt 10 of 12
+        classified `auth` (a millisecond stamp read as a 401, see
+        test_a_millisecond_stamp_is_not_an_http_status), the walk stopped six
+        quota refusals deep, and the 3/6/12-minute backoff cycles that exist for
+        exactly that wall never ran. The edition was lost in 75s.
+
+        The credential IS shared, so it still stops the walk -- but only when the
+        refusal actually repeats across models. One model refusing is that
+        model's entitlement, and the next model must be tried.
+        """
         proc, art = self.run_step(
             pool=["opencode/a", "opencode/b", "opencode/c"],
             plan="opencode/a:auth opencode/b:ok opencode/c:ok")
+        self.assertGreen(proc, "one auth, then a success")
+        self.assertEqual(
+            ["opencode/a", "opencode/b"], art["models"],
+            "one auth must not stop the walk: %r" % (art["models"],))
+        self.assertIn("trying the next model", proc.stdout)
+        self.assertNotIn("walk aborted", proc.stdout)
+
+    def test_two_auth_refusals_stop_the_walk(self):
+        """The half of the old rule that is still true: a shared key is fatal."""
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b", "opencode/c"],
+            plan="opencode/a:auth opencode/b:auth opencode/c:ok")
         self.assertEqual(1, proc.returncode,
                          "an aborted walk must fail loudly. stdout:\n%s"
                          % proc.stdout)
-        self.assertEqual(["opencode/a"], art["models"],
-                         "auth must stop the walk: %r" % (art["models"],))
+        self.assertEqual(["opencode/a", "opencode/b"], art["models"],
+                         "two refusals must stop the walk: %r"
+                         % (art["models"],))
         self.assertIn("stopping the walk", proc.stdout)
         self.assertIn("auth:", proc.stdout)
 

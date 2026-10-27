@@ -106,6 +106,8 @@ def agent_step_run_block():
 #:   unknown  UnknownError with NO not-found marker -- ambiguous, an outage
 #:   quota    429 with Retry-After, exit 1
 #:   auth     401 invalid api key, exit 1
+#:   authstamp the MEASURED 2026-10-27 shape: an outage whose only "401" is the
+#:            CLI's own millisecond timestamp. Must classify provider_outage.
 #:   <n>      exit n (124 is what `timeout` reports for its own kill)
 #:
 #: A model with no plan entry exits 1, so an attempt nobody expected is loud
@@ -145,6 +147,13 @@ case "$outcome" in
   unknown) printf 'UnknownError: Unexpected server error\n' >&2 ; exit 1 ;;
   quota)   printf '429 Too Many Requests (Retry-After: 30)\n' >&2 ; exit 1 ;;
   auth)    printf '401 Unauthorized: invalid api key\n' >&2 ; exit 1 ;;
+  authstamp)
+    # VERBATIM 2026-10-27 16:18:47Z. The fatal line is an outage; the ONLY
+    # "401" in the log is the clock's millisecond field. Classified `auth`, it
+    # aborted the walk with a credential message that was never true.
+    printf 'timestamp=2026-10-27T16:18:47.401Z level=INFO run=576d6804 message="all formatters are disabled"\n' >&2
+    printf 'AI_APICallError: Upstream request failed: Model is unavailable.\n' >&2
+    exit 1 ;;
   *)       exit "$outcome" ;;
 esac
 """
@@ -637,9 +646,82 @@ class ContinuationTests(AgentWalkHarness):
 
 
 # ==========================================================================
-# 2. The failure line -- the owner's one sentence, honest about the cause
+# 1b. An auth refusal is PER MODEL until it repeats
 # ==========================================================================
 
+
+class AuthIsPerModelTests(AgentWalkHarness):
+    """A single `auth` may not end the walk; a shared credential still must.
+
+    Measured 2026-10-27 16:18Z, run 40539483837: attempt 10 of 12 returned
+    `auth`, the walk stopped there, and six quota refusals that had just proved
+    the pool was throttled were left with the 3/6/12-minute backoff cycles
+    unspent -- the edition was lost in 75s. The credential was never refused:
+    the log's own timestamp (`.401Z`) had been read as a 401.
+    """
+
+    def test_one_model_refusing_its_credentials_does_not_end_the_walk(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b", "opencode/c"],
+            plan="opencode/a:auth opencode/b:ok")
+        self.assertGreen(proc, "auth-then-success")
+        self.assertEqual(
+            ["opencode/a", "opencode/b"], art["models"],
+            "the walk must continue past ONE auth refusal and try the next "
+            "model; stopping there is the 2026-10-27 loss. Invoked: %r\n"
+            "stdout:\n%s" % (art["models"], proc.stdout))
+        self.assertEqual(
+            [["opencode/a", "auth"], ["opencode/b", "ok"]], art["records"],
+            "the refusal must be recorded as `auth`, not as `transport`: the "
+            "class is the evidence, and health memory should carry it")
+        self.assertIn(
+            "Circuit breaker: opencode/a -> auth. One model only, so the "
+            "credential is not the problem; trying the next model.", proc.stdout)
+        self.assertNotIn("walk aborted", proc.stdout)
+
+    def test_a_second_refusal_is_the_shared_credential_and_stops_the_walk(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b", "opencode/c"],
+            plan="opencode/a:auth opencode/b:auth opencode/c:ok")
+        self.assertEqual(
+            1, proc.returncode,
+            "two models refusing the same credential is the key, not a model: "
+            "the run must fail rather than report a digest. stdout:\n%s"
+            % proc.stdout)
+        self.assertEqual(
+            ["opencode/a", "opencode/b"], art["models"],
+            "the walk must stop at the SECOND refusal -- `opencode/c` exists "
+            "only to prove it was never tried. Invoked: %r" % (art["models"],))
+        self.assertIn(
+            "Circuit breaker: opencode/b -> auth (2 models refused the "
+            "credential). That is the shared key, not one model; stopping the "
+            "walk.", proc.stdout)
+        self.assertIn("(last error: auth: 2 models rejected the credential, "
+                      "walk aborted)", proc.stdout)
+
+    def test_the_measured_timestamp_line_is_an_outage_not_an_auth(self):
+        """The exact log that caused the abort, end to end through the step.
+
+        `--classify` is forwarded to the REAL selector by the python3 shim, so
+        this asserts the shipped classifier against the shipped walk: if the
+        HTTP-status boundary ever loses its dot guard, this test fails here
+        instead of in production.
+        """
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:authstamp opencode/b:ok")
+        self.assertGreen(proc, "measured-timestamp")
+        self.assertEqual(
+            [["opencode/a", "provider_outage"], ["opencode/b", "ok"]],
+            art["records"],
+            "`.401Z` is a clock. The attempt must be recorded as the outage it "
+            "was, never as an auth refusal")
+        self.assertNotIn("-> auth", proc.stdout)
+
+
+# ==========================================================================
+# 2. The failure line -- the owner's one sentence, honest about the cause
+# ==========================================================================
 
 class FailureLineTests(AgentWalkHarness):
     def test_the_line_names_the_tried_count_and_the_last_failure_class(self):

@@ -1,0 +1,29 @@
+# VERBATIM. Attempt 10 of 12, run 40539483837, 2026-10-27T16:18:46Z.
+#
+# These are the lines `tee state/agent-log.txt` captured for
+# opencode/nemotron-3-ultra-free -- the last attempt of the walk, and the one
+# that stopped it. The model's own failure was `Model is unavailable`; the walk
+# classified the attempt as an auth failure and ended, because the CLI's DEBUG
+# timestamps carry a millisecond field whose first three digits are four-oh-one
+# straight after a decimal point (see the two `message=` lines below), and the
+# status-code regex read that decimal field as an HTTP status. No credential was
+# ever refused.
+#
+# NOTE FOR ANYONE EDITING THIS HEADER: the classifier reads every line of this
+# file, comments included, so the text above deliberately does NOT spell a bare
+# three-digit status code. Writing one here is enough to make this fixture
+# classify as an auth failure again -- which is exactly the defect being pinned.
+#
+# Kept as a FILE rather than a string literal because `nemotron-3-ultra` is on
+# the stale-id denylist in tests/breaking/test_ladder_sync.py (BANNED_RE) and a
+# .py file may not carry it. A .txt fixture is not scanned by that guard, so the
+# evidence stays exact instead of being paraphrased into a string that no longer
+# matches what production actually printed.
+timestamp=2026-10-27T16:18:47.401Z level=INFO run=576d6804 message="all formatters are disabled"
+timestamp=2026-10-27T16:18:47.401Z level=INFO run=576d6804 message=init
+timestamp=2026-10-27T16:18:48.440Z level=ERROR run=576d6804 message="stream error" providerID=opencode modelID=nemotron-3-ultra-free session.id=ses_e81d7c75dffeMTaOScuH9rSXxT small=true agent=title mode=primary error.error="AI_APICallError: Upstream request failed: Model is unavailable."
+__WATCHDOG_FATAL__ kind=provider_outage repeats=3 :: timestamp=2026-10-27T16:18:55.954Z level=ERROR run=576d6804 message="stream error" providerID=opencode modelID=nemotron-3-ultra-free session.id=ses_e81d7c75dffeMTaOScuH9rSXxT small=false agent=build mode=primary error.error="AI_APICallError: Upstream request failed: Model is unavailable."
+# The step's own verdict, printed one line later -- the text this fix exists to
+# make impossible to produce from that log:
+# Circuit breaker: opencode/nemotron-3-ultra-free -> auth. Retrying other models would only hide the cause; stopping the walk.
+# Digest not built: 10 of 12 free models tried in 1 min, none produced a digest (last error: auth: opencode/nemotron-3-ultra-free was rejected (credential), walk aborted). The next scheduled run will retry.
