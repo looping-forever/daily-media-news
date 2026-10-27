@@ -148,6 +148,13 @@ ALLOWED_SECRETS = frozenset({
     # exists, and `digest-prebuild.yml` treats its absence as a warning rather
     # than a failure, so the workflow is never bricked waiting on it.
     "DIGEST_PASSWORD",
+    # U6. The Basic-auth USERNAME the same middleware compares against. It is a
+    # secret rather than a source literal because the owner's address cannot be
+    # committed here, and because a placeholder in the file meant the only way to
+    # log in was to edit public source -- a correct password under a real address
+    # was refused. Like DIGEST_PASSWORD it is listed while NOT YET CONFIGURED:
+    # `digest-prebuild.yml` treats its absence as a warning, never a failure.
+    "DIGEST_USERNAME",
     # U6. The Worker's `?ingest=1` credential, by NAME only. The value is read
     # from the environment into a header and is never printed or written to a
     # file. The Worker refuses every ingest when this is unset, which is

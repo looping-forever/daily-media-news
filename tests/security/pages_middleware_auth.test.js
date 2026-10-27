@@ -440,6 +440,82 @@ test("the committed username is a non-empty email-shaped constant, echoed in the
 });
 
 // ==========================================================================
+// 11: the username is CONFIGURED, not compiled in
+// ==========================================================================
+
+test("DIGEST_USERNAME overrides the placeholder, and the placeholder then stops working", async () => {
+  const mod = await loadMiddleware();
+  const OWNER = "owner@private.example";
+
+  // The configured username + the configured password opens the door.
+  const ok = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader(TEST_PASSWORD, OWNER) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
+  });
+  assert.strictEqual(ok.nextCalls, 1,
+    "a correct password under the username configured in DIGEST_USERNAME was "
+    + "refused. That is the lockout this override exists to remove: the "
+    + "username used to be a committed placeholder, so a real address could "
+    + "never log in no matter how right the password was.");
+
+  // The committed placeholder is now a DIFFERENT user and must be refused.
+  const placeholder = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
+  });
+  assertRefused(placeholder, "the placeholder username while DIGEST_USERNAME is set");
+});
+
+test("the 401 body names the EFFECTIVE username, so the prompt is not a lie", async () => {
+  const mod = await loadMiddleware();
+  const OWNER = "owner@private.example";
+  const out = await callAsPagesWould(mod, {
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
+  });
+  const body = await out.response.text();
+  assert.ok(body.indexOf(OWNER) >= 0,
+    "the 401 body must name the configured username. A body that still says " +
+    mod.DIGEST_USERNAME + " while DIGEST_USERNAME is set to something else is " +
+    "a prompt that cannot be satisfied.");
+  assert.ok(body.indexOf("DIGEST_USERNAME") < 0,
+    "the 401 body must not leak the secret NAME as a value; it should echo the "
+    + "effective username the operator has to type.");
+});
+
+test("an empty DIGEST_USERNAME falls back to the placeholder instead of opening the door", async () => {
+  const mod = await loadMiddleware();
+  const blank = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader(TEST_PASSWORD, "") },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: "   " },
+  });
+  assertRefused(blank, "an empty username typed at the prompt");
+
+  // The fallback still works, so a whitespace-only secret is "no override"
+  // rather than a second way to lock the owner out.
+  const fallback = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: "   " },
+  });
+  assert.strictEqual(fallback.nextCalls, 1,
+    "a blank DIGEST_USERNAME did not fall back to the committed placeholder, "
+    + "so the deployment is locked out by a whitespace secret");
+});
+
+test("a missing DIGEST_USERNAME is logged by name, never silently tolerated", async () => {
+  const mod = await loadMiddleware();
+  const logs = captureLogs();
+  try {
+    await callAsPagesWould(mod, { env: { DIGEST_PASSWORD: TEST_PASSWORD } });
+  } finally {
+    logs.restore();
+  }
+  const text = logs.lines.join("\n");
+  assert.ok(text.indexOf("DIGEST_USERNAME") >= 0,
+    "the middleware used the placeholder username without naming the missing "
+    + "secret. Logs were: " + JSON.stringify(text));
+});
+
+// ==========================================================================
 // 3: the happy path
 // ==========================================================================
 

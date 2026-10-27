@@ -75,28 +75,47 @@
  * returns 401 in BOTH the healthy case (secret set, no credentials offered)
  * and the broken one (secret unset), so "401 + WWW-Authenticate" proves the
  * middleware is running but does NOT by itself prove the password is set. To
- * confirm the secret really is configured, authenticate with the username
- * above and see whether a real password is accepted.
+ * confirm the secret really is configured, authenticate with the username the
+ * 401 body names and see whether a real password is accepted.
+ *
+ * ---------------------------------------------------------------------------
+ * THE USERNAME IS A SECOND SECRET, AND ITS ABSENCE IS LOUD
+ * ---------------------------------------------------------------------------
+ * `DIGEST_USERNAME` overrides the committed placeholder username. Both halves
+ * of the credential are therefore configured on the Pages project and neither
+ * has to be edited into this public file. When it is unset the placeholder is
+ * used and a real address is refused next to a correct password - logged by
+ * name, and visible in the 401 body the browser is shown.
  */
 
 /**
- * The Basic-auth USERNAME, and the only one that is accepted.
- *
- * Fixed and in source rather than in a variable, deliberately: a second
- * configuration surface would be a second thing to forget, and forgetting it
- * must not be able to turn into "anyone in". The owner's email address is used
- * so the browser's native credential prompt is self-explanatory instead of
- * asking for a bare token the user has to go and look up.
+ * The Basic-auth USERNAME, and the only one that is accepted when the
+ * DIGEST_USERNAME secret is not set.
  *
  * The committed value is a GENERIC placeholder, not a real mailbox: this
- * repository is public. Set your own address here before deploying; it is a
- * username in a Basic-auth prompt, never a secret.
+ * repository is public. The deployment sets DIGEST_USERNAME to the owner's own
+ * address; this constant is what remains when that secret is missing.
  *
- * The 401 body echoes it back on purpose: if this value ever needs to change,
- * the failure mode is a 401 that tells you exactly what to type, not a silent
- * lockout.
+ * Why a secret and not a source literal: the owner's address cannot be
+ * committed here, and a placeholder in source means the only way to log in is to
+ * edit this public file and redeploy. That is the trap this constant used to be
+ * — a correct password was refused because the username typed into the browser
+ * was a real address and the one the middleware compared against was a
+ * placeholder nobody would guess.
+ *
+ * The 401 body echoes the EFFECTIVE username back on purpose: if this value ever
+ * needs to change, the failure mode is a 401 that tells you exactly what to
+ * type, not a silent lockout.
  */
 export const DIGEST_USERNAME = "digest@example.com";
+
+/**
+ * The Pages secret that overrides the username above. Read BY NAME only; the
+ * value is never logged. Unset or empty falls back to `DIGEST_USERNAME`, which
+ * fails CLOSED in the sense that matters: nobody types a placeholder address by
+ * accident.
+ */
+const USERNAME_SECRET_NAME = "DIGEST_USERNAME";
 
 /**
  * The realm string in `WWW-Authenticate`. It is what the browser shows in its
@@ -125,16 +144,51 @@ const MAX_AUTHORIZATION_HEADER_LENGTH = 4096;
  * password" from "unknown user" — every rejection in this file returns these
  * identical bytes.
  */
-function unauthorizedBody() {
+function unauthorizedBody(username) {
+  const shown = typeof username === "string" && username.length > 0
+    ? username
+    : DIGEST_USERNAME;
   return (
     "401 Unauthorized\n" +
     "\n" +
     "This digest archive is private and requires HTTP Basic Auth.\n" +
     "\n" +
-    "  username: " + DIGEST_USERNAME + "\n" +
+    "  username: " + shown + "\n" +
     "  password: the DIGEST_PASSWORD secret configured on the\n" +
     "            daily-digest Cloudflare Pages project.\n"
   );
+}
+
+/**
+ * The username this deployment actually accepts: the DIGEST_USERNAME secret, or
+ * the committed placeholder when it is unset.
+ *
+ * Read inside `decide`'s try so a throwing `env` is caught and answered with a
+ * 401 rather than escaping into Pages' `env.ASSETS.fetch()` fallback. A missing
+ * secret is logged by name because that is the state in which the prompt asks
+ * for an address nobody would type.
+ */
+function effectiveUsername(env) {
+  let configured = "";
+  try {
+    const raw = env ? env[USERNAME_SECRET_NAME] : "";
+    configured = typeof raw === "string" ? raw.trim() : "";
+  } catch (error) {
+    configured = "";
+  }
+  if (configured.length > 0) return configured;
+  if (env) {
+    console.error(
+      "DIGEST_AUTH_MISCONFIGURED: the " + USERNAME_SECRET_NAME + " Pages secret " +
+      "is missing or empty, so the committed PLACEHOLDER username is the only " +
+      "one this deployment accepts and a real address will be refused next to " +
+      "a correct password. Create it on the daily-digest Cloudflare Pages " +
+      "project (Settings -> Environment variables and secrets, Production " +
+      "environment). The 401 body names whichever value is in force, so this " +
+      "is diagnosable from the browser.",
+    );
+  }
+  return DIGEST_USERNAME;
 }
 
 /**
@@ -144,8 +198,11 @@ function unauthorizedBody() {
  *        Cloudflare and RFC 9110 both forbid a body on a HEAD response, and a
  *        HEAD that 401s must still carry `WWW-Authenticate` — so the headers
  *        are identical and only the body differs.
+ * @param {string|null} username  The EFFECTIVE username, echoed in the body so
+ *        the prompt names the value actually in force. Null when the caller
+ *        cannot read one (the catch path), which falls back to the constant.
  */
-function unauthorized(method) {
+function unauthorized(method, username) {
   const headers = new Headers({
     "WWW-Authenticate": 'Basic realm="' + DIGEST_REALM + '"',
     "Content-Type": "text/plain; charset=utf-8",
@@ -153,7 +210,7 @@ function unauthorized(method) {
     // never store a rejection at all.
     "Cache-Control": "no-store",
   });
-  return new Response(method === "HEAD" ? null : unauthorizedBody(), {
+  return new Response(method === "HEAD" ? null : unauthorizedBody(username), {
     status: 401,
     headers,
   });
@@ -300,21 +357,22 @@ async function decide(context) {
       "was deleted on 2026-10-03. (The value itself is never read into " +
       "this message.)",
     );
-    return unauthorized(readMethod(context));
+    return unauthorized(readMethod(context), effectiveUsername(context.env));
   }
 
   const credentials = parseBasicCredentials(
     context.request.headers.get("Authorization"),
   );
-  if (!credentials) return unauthorized(readMethod(context));
+  if (!credentials) return unauthorized(readMethod(context), effectiveUsername(context.env));
 
   // Both comparisons always run. Short-circuiting on the username would make
   // the response time a username oracle, and there is nothing to save: two
   // SHA-256 digests do not measurably differ.
-  const usernameMatches = await constantTimeEquals(credentials.username, DIGEST_USERNAME);
+  const expectedUsername = effectiveUsername(context.env);
+  const usernameMatches = await constantTimeEquals(credentials.username, expectedUsername);
   const passwordMatches = await constantTimeEquals(credentials.password, expectedPassword);
   if (!(usernameMatches && passwordMatches)) {
-    return unauthorized(readMethod(context));
+    return unauthorized(readMethod(context), expectedUsername);
   }
 
   return await context.next();
@@ -353,6 +411,8 @@ export async function onRequest(context) {
       "have fallen back to env.ASSETS.fetch(), serving the archive " +
       "unauthenticated. Answering 401 instead. Cause: " + describe(error),
     );
-    return unauthorized(readMethod(context));
+    // The catch path passes no username on purpose: `context.env` is the thing
+    // that just failed, so re-reading it here could throw a second time.
+    return unauthorized(readMethod(context), null);
   }
 }

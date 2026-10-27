@@ -600,18 +600,23 @@ jobs:
         # AVAILABLE AND AN HONEST WEAKER ONE WHEN IT IS NOT.
         #
         # `DIGEST_PASSWORD` is the Basic-auth password functions/_middleware.js
-        # protects the archive with. With it, the page is fetched WITH auth and
-        # the assertion is the only one that answers the real question: is this
-        # exact page what the owner's browser will load? A real failure there is
-        # a real defect and goes red.
+        # protects the archive with, and `DIGEST_USERNAME` is the username that
+        # goes with it. Both are needed: the middleware accepts ONE username,
+        # taken from the DIGEST_USERNAME Pages secret, and a hardcoded username
+        # here sent the correct password under the wrong name -- a 401 that
+        # looked like a broken page. With both, the page is fetched WITH auth
+        # and the assertion is the only one that answers the real question: is
+        # this exact page what the owner's browser will load? A real failure
+        # there is a real defect and goes red.
         #
-        # The secret almost certainly does not exist yet, and a workflow that
+        # The secrets almost certainly do not exist yet, and a workflow that
         # bricks itself waiting on a secret the owner has not added is a
-        # workflow that ships nothing. So when it is absent the check degrades
-        # to three indirect checks, emits `::warning::` naming exactly what was
-        # skipped, and continues.
+        # workflow that ships nothing. So when either is absent the check
+        # degrades to three indirect checks, emits `::warning::` naming exactly
+        # what was skipped, and continues.
         env:
           DIGEST_PASSWORD: ${{ secrets.DIGEST_PASSWORD }}
+          DIGEST_USERNAME: ${{ secrets.DIGEST_USERNAME }}
           SLOT: ${{ github.event.inputs.digest_time }}
           TODAY: ${{ github.event.inputs.slot_date }}
           CF_PAGES_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
@@ -622,9 +627,9 @@ jobs:
           echo "page under test: $PAGE_URL"
           BODY_FILE="$RUNNER_TEMP/prebuild_page.html"
 
-          if [ -n "${DIGEST_PASSWORD:-}" ]; then
-            CODE="$(curl -sS -m 20 -u "digest:${DIGEST_PASSWORD}" -o "$BODY_FILE" -w '%{http_code}' "$PAGE_URL")"
-            echo "authenticated GET -> HTTP $CODE"
+          if [ -n "${DIGEST_PASSWORD:-}" ] && [ -n "${DIGEST_USERNAME:-}" ]; then
+            CODE="$(curl -sS -m 20 -u "${DIGEST_USERNAME}:${DIGEST_PASSWORD}" -o "$BODY_FILE" -w '%{http_code}' "$PAGE_URL")"
+            echo "authenticated GET as the configured archive user -> HTTP $CODE"
             if [ "$CODE" != "200" ]; then
               echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an AUTHENTICATED request. The archive is not serving the page this artifact points at, so sealing would send the owner to a dead link."
               exit 1
@@ -637,7 +642,11 @@ jobs:
             exit 0
           fi
 
-          echo "::warning::DIGEST_PASSWORD is not set as an Actions secret, so the STRONG page-liveness check (authenticated GET asserting HTTP 200 and the section-header markup) was SKIPPED. Falling back to three indirect checks. To enable the strong check, add DIGEST_PASSWORD to this repository's Actions secrets."
+          if [ -n "${DIGEST_PASSWORD:-}" ] && [ -z "${DIGEST_USERNAME:-}" ]; then
+            echo "::warning::DIGEST_PASSWORD is set but DIGEST_USERNAME is not, so the STRONG page-liveness check was SKIPPED: the middleware accepts only the username configured on the Pages project, so a guessed one returns 401 whatever the password is. Add DIGEST_USERNAME (the same address set on the daily-digest Pages project) to this repository's Actions secrets. Falling back to three indirect checks."
+          else
+            echo "::warning::neither DIGEST_PASSWORD nor DIGEST_USERNAME is set as an Actions secret, so the STRONG page-liveness check (authenticated GET asserting HTTP 200 and the section-header markup) was SKIPPED. Falling back to three indirect checks. To enable the strong check, add both DIGEST_USERNAME and DIGEST_PASSWORD to this repository's Actions secrets."
+          fi
           problems=""
           skipped=0
 

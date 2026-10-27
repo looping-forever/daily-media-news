@@ -164,11 +164,12 @@ project from the same deployment. It is already behind **Cloudflare Access**
 (a **302** to the Access login, serving no digest content), so the apex was the
 only public hostname.
 
-**Username.** The only accepted Basic-auth username is
-`digest@example.com`, fixed in source. Set it to your own address before
-deploying. The 401 body prints it
-deliberately, so a username mismatch is self-diagnosing from the browser instead
-of a silent lockout.
+**Username.** The accepted Basic-auth username is the `DIGEST_USERNAME` secret on
+the Pages project. The committed `digest@example.com` is only the fallback used
+when that secret is unset, and in that state a real address is refused however
+correct the password is — the middleware logs `DIGEST_AUTH_MISCONFIGURED` by
+name. The 401 body prints the username actually in force, deliberately, so a
+mismatch is self-diagnosing from the browser instead of a silent lockout.
 
 ### What is NOT verified
 

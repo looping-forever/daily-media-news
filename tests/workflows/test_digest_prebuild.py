@@ -1898,15 +1898,30 @@ class SealJobTests(unittest.TestCase):
                       "not reported as a sealed artifact.")
 
     def test_the_page_liveness_check_degrades_when_the_password_is_absent(self):
-        run = step_named(PREBUILD_WORKFLOW, "seal",
-                         "Verify the digest page is live before sealing")["run"]
+        step = step_named(PREBUILD_WORKFLOW, "seal",
+                          "Verify the digest page is live before sealing")
+        run = step["run"]
         self.assertIn("DIGEST_PASSWORD", run)
         self.assertIn("::warning::", run,
                       "the fallback path must say out loud that the stronger "
                       "check was skipped. Silently doing a weaker check is how a "
                       "reader comes to trust it.")
         # The strong path must be a real check, not a warning: 200 AND markup.
-        self.assertIn('-u "digest:${DIGEST_PASSWORD}"', run)
+        #
+        # Both halves of the credential, and NEITHER hardcoded: the middleware
+        # accepts one username, taken from the Pages secret, so a literal here
+        # sent the right password under the wrong name and produced a 401 that
+        # read as a dead page.
+        self.assertIn('-u "${DIGEST_USERNAME}:${DIGEST_PASSWORD}"', run,
+                      "the authenticated GET must use the configured username as "
+                      "well as the configured password. A hardcoded username is "
+                      "refused by functions/_middleware.js whatever the password.")
+        self.assertNotIn('-u "digest:', run,
+                         "a hardcoded Basic-auth username is still present in the "
+                         "liveness check")
+        self.assertIn('secrets.DIGEST_USERNAME', json.dumps(step.get("env") or {}),
+                      "the username secret must be wired into the step env, or "
+                      "the strong check degrades on every run")
         self.assertIn("!= \"200\"", run)
         self.assertIn("section-header", run)
         # And the three fallback checks the owner approved.
@@ -2597,6 +2612,9 @@ curl() {
     if [ "$prev" = "-o" ]; then out="$a"; fi
     prev="$a"
   done
+  # Optional argument recorder. Without it, "the step passes the configured
+  # username to curl" can only be asserted as a string in the YAML.
+  if [ -n "${STUB_CURL_ARGS_LOG:-}" ]; then printf '%%s\\n' "$*" >> "$STUB_CURL_ARGS_LOG"; fi
   if [ -n "$out" ]; then printf '%%s' "${STUB_CURL_BODY:-}" > "$out"; fi
   printf '%%s' "${STUB_CURL_CODE:-200}"
 }
@@ -2776,15 +2794,28 @@ class SealStepExecutionTests(TempDirCase):
 
     def test_the_strong_check_is_used_when_the_password_is_present(self):
         self._write_artifact()
+        args_log = self.tmp / "curl_args.txt"
         code, out = self.run_seal_step(
             "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "hunter2", "SLOT": "morning",
+            {"DIGEST_PASSWORD": "hunter2", "DIGEST_USERNAME": "owner@example.invalid",
+             "SLOT": "morning",
              "TODAY": "2026-10-09", "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
+             "STUB_CURL_ARGS_LOG": str(args_log),
              "STUB_CURL_CODE": "200",
              "STUB_CURL_BODY": '<h2 class="section-header" style="--dot:red;">X</h2>'})
         self.assertEqual(0, code, out)
         self.assertIn("STRONG check passed", out)
         self.assertNotIn("FALLBACK check passed", out)
+        # THE CREDENTIAL THAT REACHED curl, not the one typed in the YAML: the
+        # middleware accepts exactly one username, configured on the Pages
+        # project. A literal here is a 401 whatever the password is.
+        args = args_log.read_text(encoding="utf-8") if args_log.exists() else ""
+        self.assertIn("owner@example.invalid:hunter2", args,
+                      "the strong check did not authenticate as the CONFIGURED "
+                      "user. curl was called with:\n%s" % args)
+        self.assertNotIn("digest:hunter2", args,
+                         "the strong check authenticated with a hardcoded "
+                         "username:\n%s" % args)
 
     def test_the_strong_check_is_red_when_the_page_does_not_serve_the_digest(self):
         """With the password present, a 200 that is not the digest IS a real
@@ -2792,7 +2823,8 @@ class SealStepExecutionTests(TempDirCase):
         self._write_artifact()
         code, out = self.run_seal_step(
             "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "hunter2", "SLOT": "morning",
+            {"DIGEST_PASSWORD": "hunter2", "DIGEST_USERNAME": "owner@example.invalid",
+             "SLOT": "morning",
              "TODAY": "2026-10-09", "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
              "STUB_CURL_CODE": "200", "STUB_CURL_BODY": "<html>maintenance</html>"})
         self.assertNotEqual(0, code,
@@ -2803,7 +2835,8 @@ class SealStepExecutionTests(TempDirCase):
 
         code, out = self.run_seal_step(
             "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "hunter2", "SLOT": "morning",
+            {"DIGEST_PASSWORD": "hunter2", "DIGEST_USERNAME": "owner@example.invalid",
+             "SLOT": "morning",
              "TODAY": "2026-10-09", "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
              "STUB_CURL_CODE": "404", "STUB_CURL_BODY": ""})
         self.assertNotEqual(0, code, out)

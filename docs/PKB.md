@@ -1457,10 +1457,13 @@ digest content). The apex was the only public hostname.
    runs. **Cloudflare exposes this through no CLI and no API**, so it can only be
    confirmed in the dashboard.
 
-Basic-auth username: `digest@example.com`, fixed in source, and
-echoed in the 401 body on purpose — so a username mismatch is self-diagnosing
-rather than a silent lockout. Note the Worker checks a **different** username
-(`digest`), so a Worker URL authenticates twice.
+Basic-auth username: the `DIGEST_USERNAME` Pages secret (same project, same
+environment), echoed in the 401 body on purpose — so a mismatch is
+self-diagnosing rather than a silent lockout. The committed `digest@example.com`
+is only the unset fallback, and while it is in force a real address is refused
+next to a correct password and `DIGEST_AUTH_MISCONFIGURED` is logged by name.
+Note the Worker checks a **different** username, so a Worker URL authenticates
+twice.
 
 ### 38.5 The three guards that keep it protected
 
