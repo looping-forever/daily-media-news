@@ -31,8 +31,23 @@ name: Delivery Self-Test
 # presence, length, a masked chat id and the SMTP status code. Every output
 # line is scrubbed of those values before it reaches the log, because this
 # repository is PUBLIC and a secret in a log is a leaked secret.
+#
+# THE `channel` INPUT EXISTS SO A RETRY CANNOT DUPLICATE A SEND. One labelled
+# message per channel per run is the contract; when one channel passes and the
+# other fails, re-running "both" would send a second, unrequested message on the
+# channel that already worked. Narrow the retry to the channel that failed.
 on:
   workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Which channel(s) to test -- narrow this to retry only the one that failed'
+        required: true
+        type: choice
+        options:
+          - both
+          - telegram
+          - gmail
+        default: both
 
 # Nothing here writes to the repository: no state commit, no artifact, no
 # dispatch. Read-only is therefore the whole permission set -- if a future edit
@@ -77,4 +92,9 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           GMAIL_RECEIVER: ${{ secrets.GMAIL_RECEIVER }}
+          # ONE MESSAGE PER CHANNEL PER RUN is the contract. Narrowing the
+          # selection to the channel that failed is how a retry stays honest:
+          # re-running "both" to retry Telegram would send a second, unrequested
+          # email on the channel that already passed.
+          SELFTEST_CHANNELS: ${{ inputs.channel }}
         run: python scripts/delivery_selftest.py

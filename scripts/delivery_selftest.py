@@ -144,7 +144,68 @@ def _report_updates_shape(token):
     and masked ids -- never the token, never a full chat id. Without this the
     owner's only evidence would be "no chat id", which does not say whether the
     queue is empty, holds a group, or holds only bot traffic.
+
+    TWO FOLLOW-UP CALLS, because an empty queue has more than one cause and
+    guessing between them wastes the owner's time:
+
+    * `getMe` names the bot the TOKEN belongs to. The bot username is public
+      (it is searchable in any Telegram client), so printing it is safe and it
+      answers the question an empty queue cannot: did the owner message THIS
+      bot, or a different one? "I sent /start" plus "no updates" is otherwise a
+      contradiction with no way to resolve it from this side.
+    * `getUpdates` with `offset=-1` returns the most recent update EVEN IF it
+      has already been confirmed. If that yields a chat while the unconfirmed
+      queue is empty, the update exists but something consumed it -- a
+      materially different fault from "nothing ever arrived". The update's own
+      `date` is printed so a >24h-old message (Telegram's retention) is
+      distinguishable from a live one.
     """
+    try:
+        _status, body = bm.tg_http(
+            "https://api.telegram.org/bot%s/getMe" % token, None)
+        me = json.loads(body)
+        if isinstance(me, dict) and me.get("ok") is True:
+            result = me.get("result") or {}
+            _emit("  getMe: ok=true username=@%s is_bot=%r"
+                  % (result.get("username"), result.get("is_bot")))
+        else:
+            _emit("  getMe: ok=%r -- the token itself may be wrong"
+                  % (me.get("ok") if isinstance(me, dict) else None))
+    except Exception as exc:
+        _emit("  getMe: transport error %s" % type(exc).__name__)
+
+    try:
+        status, body = bm.tg_http(
+            "https://api.telegram.org/bot%s/getUpdates" % token,
+            {"offset": -1, "limit": 1})
+        data = json.loads(body)
+    except Exception as exc:
+        _emit("  getUpdates offset=-1: transport error %s" % type(exc).__name__)
+        return
+    if not isinstance(data, dict):
+        _emit("  getUpdates offset=-1: non-JSON (HTTP %s)" % status)
+        return
+    results = data.get("result")
+    if not isinstance(results, list) or not results:
+        _emit("  getUpdates offset=-1: result_count=0 -- no update has EVER "
+              "reached this bot, confirmed or not")
+        return
+    for upd in results:
+        if not isinstance(upd, dict):
+            continue
+        message = upd.get("message") or {}
+        chat = message.get("chat") or {}
+        chat_id = chat.get("id")
+        _emit("  getUpdates offset=-1: an update DOES exist -- "
+              "chat.type=%r chat.id=%s date=%s (already confirmed, so the "
+              "unconfirmed queue is empty)"
+              % (chat.get("type"),
+                 _mask(chat_id) if chat_id is not None else None,
+                 message.get("date")))
+
+
+def _report_updates_queue(token):
+    """The plain, unconfirmed-queue shape -- the first thing printed on failure."""
     try:
         status, body = bm.tg_http(
             "https://api.telegram.org/bot%s/getUpdates" % token, None)
@@ -205,8 +266,9 @@ def telegram_test():
 
     if chat_id is None:
         _emit("telegram: FAIL  no chat id -- getUpdates held no usable message.chat.id")
+        _report_updates_queue(token)
         _report_updates_shape(token)
-        _emit("  owner action: open a PRIVATE chat with the bot, send /start, re-run.")
+        _emit("  owner action: open a PRIVATE chat with the bot named above, send /start, re-run.")
         _emit("  durable fix: save the chat id as TELEGRAM_CHAT_ID (see the report).")
         return False
 
@@ -316,13 +378,39 @@ def main():
     _SECRETS[:] = [_env("TELEGRAM_BOT_TOKEN"),
                    _env("GMAIL_APP_PASSWORD"),
                    _env("GMAIL_USER")]
+    # WHICH CHANNELS, AND WHY IT IS SELECTABLE. The contract is ONE labelled
+    # message per channel per run. When one channel passes and the other fails,
+    # re-running BOTH to retry the failure would send a second message on the
+    # channel that already worked -- an extra unrequested email, and a weaker
+    # test (the second send proves nothing the first did not). So a run may be
+    # narrowed to the channel under investigation. "both" is the default and the
+    # only value the normal path uses.
+    selection = (_env("SELFTEST_CHANNELS") or "both").lower()
+    if selection not in ("both", "telegram", "gmail"):
+        _emit("SELFTEST_CHANNELS=%r is not one of both|telegram|gmail" % selection)
+        return 2
+
     _emit("=== delivery self-test: one labelled message per channel, no digest content ===")
-    telegram_ok = telegram_test()
-    gmail_ok = gmail_test()
+    _emit("channels: %s" % selection)
+
+    telegram_ok = gmail_ok = None
+    if selection in ("both", "telegram"):
+        telegram_ok = telegram_test()
+    if selection in ("both", "gmail"):
+        gmail_ok = gmail_test()
+
     _emit("---")
-    _emit("telegram: %s" % ("PASS" if telegram_ok else "FAIL"))
-    _emit("gmail:    %s" % ("PASS" if gmail_ok else "FAIL"))
-    return 0 if (telegram_ok and gmail_ok) else 1
+    if telegram_ok is not None:
+        _emit("telegram: %s" % ("PASS" if telegram_ok else "FAIL"))
+    else:
+        _emit("telegram: SKIPPED (not selected this run)")
+    if gmail_ok is not None:
+        _emit("gmail:    %s" % ("PASS" if gmail_ok else "FAIL"))
+    else:
+        _emit("gmail:    SKIPPED (not selected this run)")
+
+    results = [r for r in (telegram_ok, gmail_ok) if r is not None]
+    return 0 if all(results) else 1
 
 
 if __name__ == "__main__":
