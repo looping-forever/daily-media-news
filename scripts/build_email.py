@@ -27,14 +27,21 @@ import os
 import re
 import sys
 
+try:
+    import private_values as _pv
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import private_values as _pv
+
 # Fixed section order: (category key, display header, accent color)
+# The two institution headers are runtime values (see private_values).
 SECTIONS = [
     ("action",              "ACTION / IMPORTANT",             "#dc2626"),
     ("world_major",         "WORLD &#8212; MAJOR EVENTS",     "#0891b2"),
     ("local_city",        "LOCAL &amp; CITY",             "#0d9488"),
     ("education_tu",        "TU / BSC CSIT",                  "#2563eb"),
-    ("college_local",        "Example College / COLLEGE",                 "#7c3aed"),
-    ("bank_local",     "MY BANK &#8212; EXAMPLE BANK", "#16a34a"),
+    ("college_local",       _pv.college_name(),               "#7c3aed"),
+    ("bank_local",          _pv.bank_name().replace("\u2014", "&#8212;"), "#16a34a"),
     ("nepal",               "IMPORTANT NEPAL",                "#ea580c"),
     ("gaming",              "GAMING",                         "#4f46e5"),
     ("anime",               "ANIME",                          "#db2777"),

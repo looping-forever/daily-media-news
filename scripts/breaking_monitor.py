@@ -159,6 +159,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 
 import ntfy_classes  # noqa: E402  (deliberate: after the sys.path insert)
+import private_values  # noqa: E402  (deliberate: after the sys.path insert)
 
 PROMPT_PATH = os.path.join(REPO_ROOT, "prompts", "breaking-classify.md")
 ALERT_TEMPLATE_PATH = os.path.join(REPO_ROOT, "templates", "alert.html")
@@ -492,9 +493,12 @@ ALERT_SPOILER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The two institution hosts are deployment values (private_values), so this
+# tuple carries whatever hosts the deployment configured, not a placeholder.
 TIER1_DOMAINS = (
-    "gov.np", "nea.org.np", "tu.edu.np", "iost.tu.edu.np", "college.example.edu",
-    "bank.example.com", "moecdc.gov.np", "can.org.np",
+    "gov.np", "nea.org.np", "tu.edu.np", "iost.tu.edu.np",
+    private_values.college_host(), private_values.bank_host(),
+    "moecdc.gov.np", "can.org.np",
 )
 ESTABLISHED_NEWS_DOMAINS = (
     "kathmandupost.com", "thehimalayantimes.com", "onlinekhabar.com",
@@ -1340,7 +1344,7 @@ def ai_classify(pending_path, runner=None, models=None,
 
     try:
         with open(prompt_path, "r", encoding="utf-8") as f:
-            prompt_text = f.read()
+            prompt_text = private_values.substitute_tokens(f.read())
     except OSError as exc:
         return None, "prompt_unreadable: %s" % exc
     runner = runner or default_ai_runner

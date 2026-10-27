@@ -50,16 +50,23 @@ import html
 import json
 import os
 import re
+import sys
+
+try:
+    import private_values as _pv
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import private_values as _pv
 
 # Fixed section order: (category key, display header, accent color)
-# Mirrors build_email.py SECTIONS.
+# The two institution headers are runtime values (see private_values).
 SECTIONS = [
     ("action",              "ACTION / IMPORTANT",             "#dc2626"),
     ("world_major",         "WORLD — MAJOR EVENTS",           "#0891b2"),
     ("local_city",        "LOCAL & CITY",                 "#0d9488"),
     ("education_tu",        "TU / BSC CSIT",                  "#2563eb"),
-    ("college_local",        "Example College / COLLEGE",                 "#7c3aed"),
-    ("bank_local",     "MY BANK — EXAMPLE BANK",      "#16a34a"),
+    ("college_local",       _pv.college_name(),               "#7c3aed"),
+    ("bank_local",          _pv.bank_name(),                  "#16a34a"),
     ("nepal",               "IMPORTANT NEPAL",                "#ea580c"),
     ("gaming",              "GAMING",                         "#4f46e5"),
     ("anime",               "ANIME",                          "#db2777"),
@@ -1116,14 +1123,30 @@ SECTION_TO_LABEL = {
     "WORLD -- MAJOR EVENTS": "world",
     "LOCAL & CITY": "local",
     "TU / BSC CSIT": "education",
-    "Example College / COLLEGE": "college",
-    "MY BANK -- EXAMPLE BANK": "bank",
     "IMPORTANT NEPAL": "nepal",
     "GAMING": "gaming",
     "ANIME": "anime",
     "MANGA - MANHWA - MANHUA": "manga",
     "TECH / CAREER / OPPORTUNITIES": "tech",
 }
+
+
+def _normalise_header(name):
+    """The plain-text key form used by SECTION_TO_LABEL and section_label."""
+    plain = (name or "").strip()
+    # Headers are HTML-escaped in the rendered page (e.g. "LOCAL &amp; CITY"),
+    # so unescape before matching against the plain-text labels.
+    plain = html.unescape(plain)
+    # Strip leading emoji / non-ASCII decoration added by the renderer.
+    plain = re.sub(r"^[^\x00-\x7f]+", "", plain).strip()
+    return plain.replace("\u2014", "--").replace("\u00b7", "-")
+
+
+# The two institution headers are configured, so their mapping is registered
+# from the SAME value the renderer prints. A hardcoded key here would stop
+# matching the moment the deployment set its own name.
+SECTION_TO_LABEL[_normalise_header(_pv.college_name())] = "college"
+SECTION_TO_LABEL[_normalise_header(_pv.bank_name())] = "bank"
 
 
 def section_label(name):
@@ -1134,14 +1157,7 @@ def section_label(name):
     leading non-ASCII characters, then normalize to the plain-text form used
     in SECTION_TO_LABEL. Returns None if the header is not a known section.
     """
-    plain = (name or "").strip()
-    # Headers are HTML-escaped in the rendered page (e.g. "LOCAL &amp; CITY"),
-    # so unescape before matching against the plain-text labels.
-    plain = html.unescape(plain)
-    # Strip leading emoji / non-ASCII decoration added by the renderer.
-    plain = re.sub(r"^[^\x00-\x7f]+", "", plain).strip()
-    plain = plain.replace("\u2014", "--").replace("\u00b7", "-")
-    return SECTION_TO_LABEL.get(plain)
+    return SECTION_TO_LABEL.get(_normalise_header(name))
 
 
 def parse_digest_categories(path):

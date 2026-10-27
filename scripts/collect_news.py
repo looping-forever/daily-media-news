@@ -112,6 +112,14 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     import devanagari as _devanagari
 
 try:
+    # The two institution notice pages and their names are deployment values,
+    # never committed literals (see private_values).
+    import private_values as _pv
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import private_values as _pv
+
+try:
     # THE Nepal-time helper is NOT re-implemented here. Four copies of the
     # +05:45 shift already exist in this repo, and a fifth is how the digest's
     # hero cutoff and its footer ended up disagreeing. validate_stories holds
@@ -451,13 +459,14 @@ WEATHERCODE_TEXT = {
 }
 
 # Best-effort official notice pages: (page URL, domain_category). The two
-# institution-specific entries are placeholders a deployment replaces with its
-# own campus and bank; the public bodies are generic Nepal sources.
+# institution-specific entries come from the environment (private_values), so a
+# deployment points them at its own campus and bank without editing this file;
+# the public bodies are generic Nepal sources.
 NOTICE_SITES = [
-    ("https://www.bank.example.com/", "bank_local"),
+    (_pv.bank_url(), "bank_local"),
     ("https://tu.edu.np/", "education_tu"),
     ("https://iost.tu.edu.np/", "education_tu"),
-    ("https://college.example.edu/", "college_local"),
+    (_pv.college_url(), "college_local"),
     ("https://nea.org.np/", "local_city"),
 ]
 NOTICE_KEYWORDS = ("notice", "result", "exam", "admission", "rate", "branch")

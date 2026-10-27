@@ -169,6 +169,14 @@ ALLOWED_SECRETS = frozenset({
     "NTFY_TOPIC",
     "TELEGRAM_BOT_TOKEN",
     "TELEGRAM_CHAT_ID",
+    # The deployment's own bank and college. Private rather than secret, but a
+    # repository secret is where a value that must not be committed belongs, and
+    # scripts/private_values.py reads each one with a visible placeholder as the
+    # LAST-RESORT default. Absence is a loud warning, never a failure.
+    "BANK_NAME",
+    "BANK_URL",
+    "COLLEGE_NAME",
+    "COLLEGE_URL",
 })
 
 SECRET_REF_RE = re.compile(r"secrets\.([A-Za-z_][A-Za-z0-9_]*)")

@@ -1,5 +1,14 @@
 name: Breaking News Monitor
 
+# The deployment's private proper nouns (see scripts/private_values.py). This
+# job pipes prompts/breaking-classify.md through that module's token
+# substitution, so the classifier is told about the real bank and college.
+env:
+  BANK_NAME: ${{ secrets.BANK_NAME }}
+  COLLEGE_NAME: ${{ secrets.COLLEGE_NAME }}
+  BANK_URL: ${{ secrets.BANK_URL }}
+  COLLEGE_URL: ${{ secrets.COLLEGE_URL }}
+
 # Triggers: manual dispatch (fallback/testing) + repository_dispatch from
 # Cloudflare Worker (primary detection) + a low-frequency schedule that keeps
 # detection alive even if the Worker path dies (see the `on:` block for why that

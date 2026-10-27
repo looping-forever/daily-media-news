@@ -1,5 +1,15 @@
 name: Daily Media News Digest
 
+# The deployment's private proper nouns, read by scripts/private_values.py at
+# the moment they are printed. Unset, each falls back to a visible placeholder
+# AND says so on stderr, because a digest that quietly renders "Example
+# College" reaches the owner's phone looking correct and is not.
+env:
+  BANK_NAME: ${{ secrets.BANK_NAME }}
+  COLLEGE_NAME: ${{ secrets.COLLEGE_NAME }}
+  BANK_URL: ${{ secrets.BANK_URL }}
+  COLLEGE_URL: ${{ secrets.COLLEGE_URL }}
+
 on:
   schedule:
     # DEAD-MAN'S-SWITCH FALLBACK ONLY — Worker normally dispatched this
@@ -1053,7 +1063,7 @@ jobs:
             # decisive error line (~1-2s), the repeating outage (flint printed
             # the same fatal line 5x from 12.6s and burned the lot), and
             # silence, at the window the selector measured for THIS model.
-            if cat prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
+            if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
               --model "$model" -- \
               opencode run \
               --auto \
