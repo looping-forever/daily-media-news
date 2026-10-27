@@ -60,17 +60,66 @@ source code from this file; record decisions here instead.
   `opencode/mimo-v2.6-flash-free` → `opencode/nemotron-3.5-lightning-free`.
 - `scripts/model_selector.py --all` returns the WHOLE live-discovered free pool
   in rank order, and the agent step walks it bounded by WALL CLOCK, not by a
-  count: per-attempt `timeout 360s`, whole walk `1800s`, and it stops once one
+  count: per-attempt `timeout 480s`, whole walk `1800s`, and it stops once one
   more attempt would get less than `90s`
   (`WALK_PER_ATTEMPT_SEC` / `WALK_TOTAL_BUDGET_SEC` / `WALK_MIN_ATTEMPT_SEC`).
+  REVISED 2026-10-27: the cap was `360s`, which afforded five attempts of 360s
+  inside the 1800s walk — a worst case of exactly the whole budget with no
+  slack. Three attempts of 480s is 1440s, so the worst case got 360s shorter
+  while each attempt got long enough to outlast the 420s silence window.
 - No fixed inter-attempt delay: the deadline loop replaced the `0 20 60`
   backoffs (REVISED 2026-10-18 — run 39117668287 discovered ten free models,
   walked a capped three, lost two to the 600s cap and the third to `rc=1`, and
   produced no digest while seven models sat untried).
 - Job `timeout-minutes: 45`; agent step `timeout-minutes: 35`.
-- `opencode` run flags: `--auto --model` (NOT `--print-logs`; `--standalone` is v2/opencode2-only, v1 run is already in-process).
+- `opencode` run flags: `--auto --model --print-logs --log-level DEBUG` (REVISED
+  2026-10-27 — the watchdog's liveness clock is the CLI's own log; see §4.1.
+  `--standalone` is v2/opencode2-only, v1 run is already in-process).
 - `opencode` run has NO built-in timeout.
 - CLI pin: `opencode-ai@1.18.31` (binary `opencode`); provider gate requires >=1.17.0 (run 35171159132).
+
+### 4.1 Measured attempt shape, and why the windows changed (2026-10-27)
+
+`opencode run` in non-TTY mode does NOT stream. Measured with
+`--print-logs --log-level DEBUG`, one attempt, real workload:
+
+| event | at |
+|---|---|
+| first CLI log line | +2.05s |
+| SMALL call opens (`small=true`, `modelID=big-pickle`, title generation) | +5.76s |
+| banner `> manager · <model>` | +5.89s |
+| MAIN call opens (`message=stream … small=false`) | +16.52s |
+| decisive provider error (quota), 3 retries earlier | +60.30s |
+| then 420s of nothing; the CLI never exits | — |
+
+Consequences, each one a defect that existed before:
+
+1. The banner is not text. Counting it as "assistant text seen" flipped the
+   attempt from its per-model first-output window to the inter-token window at
+   +5.9s, which is why seven models "stalled" at exactly 240s.
+2. The title call is not the main call. `small=true` opens a DIFFERENT model at
+   +5.8s, before the chosen model is contacted; only `small=false` may move the
+   clock.
+3. A decisive rejection arrives INSIDE a log line (`level=ERROR message="stream
+   error" … error.error="AI_APICallError: Free usage limit reached…"`) and the
+   CLI then hangs. Log lines must be classified, not only counted.
+
+Measured before/after on the same real CLI, same workload, both through the
+shipped watchdog (quota-blocked free tier, which is the current local reality):
+
+| measure | before | after |
+|---|---|---|
+| rendered prompt | 27,007 B | 26,726 B |
+| `state/candidates.json` | 139,207 B / 140 rows | 67,669 B / 38 rows |
+| total model input | 166,214 B | 94,395 B (−43.2%) |
+| per-attempt cap | 360s | 480s |
+| silence window once the call opens | 240s | 420s |
+| attempts affordable in 1800s | 5 | 3 |
+| walk worst case (all stall) | 5 × 360 = 1800s | 3 × 480 = 1440s |
+| a real quota rejection, end to end | 437.6s, `rc=124` | 34.8s, `rc=125`, `kind=quota_or_rate_limited` |
+
+`WALK_TOTAL_BUDGET_SEC` is unchanged at 1800s, so `docs/PKB.md` §17's
+Actions projection does not move (1776 of 1800 min).
 
 ## 5. Root-cause findings — media not appearing (main open issue)
 
