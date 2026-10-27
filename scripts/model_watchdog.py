@@ -137,8 +137,12 @@ _TS_RE = re.compile(r"^\s*\d{1,2}:\d{2}:\d{2}(?:[.,]\d+)?\s*")
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 #: The non-TTY banner: `> build · <model>`. It is decoration, it arrives ~5s in,
 #: and counting it as assistant text is what made every model look stalled at
-#: exactly the inter-token window.
-_BANNER_RE = re.compile(r"^>\s+\S+\s+·\s+")
+#: exactly the inter-token window. The separator is matched as ANY short
+#: non-word run, not as U+00B7: under a non-UTF-8 locale (Actions runs a bare
+#: `LANG` in places) the `·` arrives as a replacement character, and a pattern
+#: tied to the literal would let the banner through and re-arm the whole defect.
+#: A markdown blockquote cannot match, because its second token is a word.
+_BANNER_RE = re.compile(r"^>\s+\S+\s+[^\w\s]+\s*")
 #: A CLI log line: `timestamp=… level=… run=… message=…`. Any of them proves the
 #: process is alive; these are the ONLY liveness signal there is.
 _LOG_RE = re.compile(r"\blevel=(?:DEBUG|INFO|WARN|ERROR)\b.*\bmessage=")

@@ -494,6 +494,35 @@ class WatchdogTests(unittest.TestCase):
         self.assertIn("no output for 1s", sink.getvalue())
         self.assertLess(elapsed, 15)
 
+    def test_a_banner_does_not_disable_the_repeat_breaker(self):
+        """THE ORIGINAL SEVEN-MODEL DEATH, in one line, and why the banner must
+        be rejected BEFORE the "is this assistant text" test.
+
+        The banner arrives at ~+5.9s. Counting it as assistant text sets
+        state["text"], and the repeat breaker is deliberately disabled once any
+        assistant text exists (a partially working model must not be killed).
+        So a banner was enough to turn the one mechanism that could end a dead
+        endpoint back off -- and the attempt then burned the whole window
+        instead of being abandoned in ~1s.
+        """
+        sink = io.StringIO()
+        fatal = "AI_APICallError: Upstream request failed: Endpoint is unavailable."
+        child = ("import time\n"
+                 "print('\\x1b[0m> manager \\u00b7 deepseek-v4.1-flash-free', "
+                 "flush=True)\n"
+                 "for _ in range(5):\n"
+                 "    print(%r, flush=True)\n"
+                 "time.sleep(30)\n" % fatal)
+        started = time.monotonic()
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=30, sink=sink)
+        elapsed = time.monotonic() - started
+        self.assertTrue(mw.is_banner("> manager \u00b7 m"))
+        self.assertEqual(mw.FAST_FAIL_RC, rc, sink.getvalue())
+        self.assertIn("repeats=", sink.getvalue())
+        self.assertLess(elapsed, 10, "the repeat breaker never fired: %.1fs"
+                        % elapsed)
+
     def test_a_not_found_line_is_killed_too(self):
         sink = io.StringIO()
         child = ("import time\n"
