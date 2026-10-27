@@ -1063,10 +1063,19 @@ jobs:
             # decisive error line (~1-2s), the repeating outage (flint printed
             # the same fatal line 5x from 12.6s and burned the lot), and
             # silence, at the window the selector measured for THIS model.
+            #
+            # --print-logs --log-level DEBUG IS LOAD-BEARING, not debugging
+            # decoration. `opencode run` prints a banner at ~5s and then NOTHING
+            # until the whole message completes, so stdout can only prove
+            # completion; the CLI's own log lines are the only liveness there
+            # is. Without them the watchdog would judge every attempt by its
+            # startup window and kill working models.
             if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
               --model "$model" -- \
               opencode run \
               --auto \
+              --print-logs \
+              --log-level DEBUG \
               --model "$model" \
               2>&1 | tee state/agent-log.txt; then
               :

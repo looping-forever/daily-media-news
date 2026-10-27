@@ -22,9 +22,34 @@ Three different deaths were measured, and they need three triggers:
    legitimately contain "rate limit" or "quota".
 
 2. SILENCE -- in TWO windows, because time-to-first-token and the gap between
-   tokens are different questions and one number cannot answer both:
+   tokens are different questions and one number cannot answer both. WHICH
+   CLOCK THOSE WINDOWS READ WAS WRONG UNTIL 2026-10-27:
 
-       FIRST OUTPUT (nothing emitted yet), per model, from the measurement:
+       STDOUT IS NOT A LIVENESS SIGNAL. In non-TTY mode `opencode run` prints a
+       banner (`> build · <model>`) at ~5s and then NOTHING until the whole
+       assistant message is complete -- measured: 90 lines arriving in one burst
+       at +62.89s. So the ONLY thing stdout can prove is COMPLETION. It is
+       recorded as such and otherwise ignored.
+
+       LIVENESS COMES FROM THE CLI'S OWN LOG. With `--print-logs --log-level
+       DEBUG` on stderr the CLI narrates every phase as it happens:
+
+           timestamp=... level=INFO  message=stream providerID=opencode modelID=...
+           timestamp=... level=INFO  message="llm runtime selected" ...
+           timestamp=... level=INFO  message=loop ... step=N
+
+       Those lines advance the clock. Nothing else does.
+
+   THE BUG THIS FIXES, measured on seven models. The banner used to count as
+   "assistant text seen" (it is neither an error nor a log line), which switched
+   the attempt from the per-model FIRST-OUTPUT window to the 240s inter-token
+   window at +5s and made the first-output window dead code. That is why seven
+   different models "stalled" at exactly 240s: ONE artefact, not seven dead
+   models. The banner is now stripped (ANSI too) and rejected by pattern before
+   any `line.strip()` test can see it.
+
+       FIRST OUTPUT (the model call has not opened yet), per model, from the
+       measurement:
 
            deepseek-v4.1-flash-free   14.59s  -> 60s window
            beam-free                 137.63s  -> 240s window
@@ -32,23 +57,20 @@ Three different deaths were measured, and they need three triggers:
 
        60s for beam would make the only other model that has ever produced a
        digest permanently unreachable, which is why that table lives in
-       model_selector.py (NO_OUTPUT_BY_MODEL) and is read by name here.
+       model_selector.py (NO_OUTPUT_BY_MODEL) and is read by name here. This
+       window only has to cover CLI startup and provider dispatch (measured:
+       13.57s to `message=stream`), because the phase lines above carry the rest.
 
-       INTER TOKEN (text has begun), one generous number:
+       INTER TOKEN (the call has opened), one generous number:
 
-           INTER_TOKEN_SEC = 240s
+           INTER_TOKEN_SEC = 420s
 
-   Run 40286310047 is why the second window exists. deepseek emitted early,
-   went quiet mid-generation, and the 60s window killed it at 112.9s of a
-   generation measured finishing at 127.53s -- 14.7s short -- so beam had to
-   finish the digest. Emission restarts the clock against the inter-token
-   window instead, and the per-attempt cap (360s) stays the real bound on a
-   slow attempt.
-
-   AND THE TRAP, so a quiet attempt is never read as a dead one: stdout carries
-   assistant TEXT only. The probe watched nemotron and glm stream TOOL CALLS
-   with no text at all, so "no output" means "no assistant text yet". These
-   windows are the only silence signal.
+   420s and not 240s: the inter-token window now measures LOG silence across a
+   whole generation, and generation is where the logs are quiet -- the CLI
+   prints nothing between `llm runtime selected` and `loop step=1`. The measured
+   completion for this workload is 127.53s, CI has been observed past 240s, and
+   a window that fires before completion is the defect, not the protection. The
+   per-attempt cap (480s) stays the real bound on a slow attempt.
 
 3. A REPEATING OUTAGE. flint-40b printed the identical line
 
@@ -110,6 +132,35 @@ except Exception:                                          # pragma: no cover
 #: The CLI prefixes log lines with a clock. Two reports of the same dead
 #: endpoint differ only by that prefix, so it is stripped before comparison.
 _TS_RE = re.compile(r"^\s*\d{1,2}:\d{2}:\d{2}(?:[.,]\d+)?\s*")
+#: Colour codes the CLI writes around the banner. Stripped first, so a pattern
+#: test never has to know about them.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+#: The non-TTY banner: `> build · <model>`. It is decoration, it arrives ~5s in,
+#: and counting it as assistant text is what made every model look stalled at
+#: exactly the inter-token window.
+_BANNER_RE = re.compile(r"^>\s+\S+\s+·\s+")
+#: A CLI log line: `timestamp=… level=… run=… message=…`. Any of them proves the
+#: process is alive; these are the ONLY liveness signal there is.
+_LOG_RE = re.compile(r"\blevel=(?:DEBUG|INFO|WARN|ERROR)\b.*\bmessage=")
+#: The phases that mean "the model call is now open". Once one of these has been
+#: seen, the inter-token window governs.
+_PHASE_RE = re.compile(
+    r"\bmessage=(?:stream\s+providerID=|loop\s+session\.id=|\"llm runtime selected\")")
+
+
+def is_cli_log(line):
+    """True for the CLI's own log narration (the liveness signal)."""
+    return bool(_LOG_RE.search(line))
+
+
+def is_banner(line):
+    """True for the non-TTY banner, ANSI stripped, BEFORE any strip() test."""
+    return bool(_BANNER_RE.match(_ANSI_RE.sub("", line)))
+
+
+def is_phase(line):
+    """True for a log line that opens the model call."""
+    return bool(_PHASE_RE.search(line))
 
 
 def resolve_window(model=None, explicit=None):
@@ -151,18 +202,36 @@ def _note_fatal_line(state, line):
 
 
 def _reader(stream, sink, state):
-    """Drain the child's merged output: tee it, classify it, count repeats."""
+    """Drain the child's merged output: tee it, classify it, count repeats.
+
+    Three kinds of line, and they are NOT interchangeable:
+
+      * a CLI LOG line -- liveliness. It advances the clock, and a phase line
+        (`message=stream`, `message=loop`, `llm runtime selected`) additionally
+        says the model call is open, which switches to the inter-token window.
+      * the BANNER -- decoration. Neither text nor liveness.
+      * anything else -- assistant TEXT. In non-TTY mode this only ever arrives
+        once the whole message is complete, so it is recorded as COMPLETION and
+        never used as liveness.
+    """
     try:
-        for line in stream:
-            state["last"] = time.monotonic()
+        for raw in stream:
+            line = _ANSI_RE.sub("", raw)
             sink.write(line)
             sink.flush()
+            if is_cli_log(line):
+                state["last"] = time.monotonic()
+                if is_phase(line):
+                    state["phase"] = True
+                continue
+            if is_banner(line):
+                continue
+            if line.strip() and not (is_error_shaped is not None
+                                     and is_error_shaped(line)):
+                state["text"] = True
+                state["completed"] = True
             if classify_stream_line is None:
                 continue
-            # Assistant TEXT is the only visible sign of life on this stream,
-            # so anything that is not an error/log line counts as text.
-            if not state["text"] and line.strip() and not is_error_shaped(line):
-                state["text"] = True
             if state["fatal"] is None:
                 kind = classify_stream_line(line)
                 if kind:
@@ -210,7 +279,7 @@ def supervise(cmd, no_output_sec=None, sink=None, model=None,
         stderr=subprocess.STDOUT, text=True, errors="replace",
         bufsize=1, encoding="utf-8")
     state = {"last": time.monotonic(), "fatal": None, "repeat": None,
-             "text": False, "outage": {}}
+             "text": False, "phase": False, "completed": False, "outage": {}}
     reader = threading.Thread(target=_reader, args=(proc.stdout, out, state),
                               daemon=True)
     reader.start()
@@ -232,10 +301,14 @@ def supervise(cmd, no_output_sec=None, sink=None, model=None,
                 out.flush()
                 reader.join(timeout=5)
                 return FAST_FAIL_RC
-            # TWO windows, one clock. Before any assistant text the attempt is
-            # judged on time-to-first-token; afterwards a gap is a long
-            # generation, not a dead one, so the generous window applies.
-            window = inter if state["text"] else first
+            # TWO windows, one clock, and the clock is the CLI's LOG. Before
+            # the model call opens the attempt is judged on startup+dispatch;
+            # afterwards a quiet log is a long generation, not a dead stream.
+            # A COMPLETED burst is recorded but deliberately does NOT stop the
+            # clock: stdout proves the message arrived, not that the process
+            # will exit, and an unbounded wait is the failure this file exists
+            # to prevent. The caller's `timeout` is the outer bound either way.
+            window = inter if state["phase"] else first
             if time.monotonic() - state["last"] > float(window):
                 _kill(proc)
                 out.write("%s no output for %ss; attempt abandoned\n"

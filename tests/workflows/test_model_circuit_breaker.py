@@ -262,16 +262,40 @@ class WatchdogTests(unittest.TestCase):
         self.assertIn(ms.WATCHDOG_MARKER, sink.getvalue())
 
     def test_a_talking_attempt_is_not_killed(self):
-        """Silence, not slowness, is the trigger. A child that keeps printing
-        outlives the same window."""
+        """Silence, not slowness, is the trigger -- and the only thing that
+        counts as speech is the CLI's own LOG.
+
+        Since 2026-10-27 stdout is a COMPLETION signal, not a liveness one:
+        `opencode run` in non-TTY mode prints the banner and then nothing until
+        the whole message lands. A child that writes plain stdout is therefore
+        NOT evidence of life, and the log lines below are what keeps an attempt
+        alive.
+        """
         sink = io.StringIO()
         child = ("import time\n"
                  "for _ in range(6):\n"
-                 "    print('token', flush=True); time.sleep(0.4)\n")
+                 "    print('timestamp=2026-10-27T10:00:00.000Z level=INFO "
+                 "run=x message=loop session.id=s step=1', flush=True)\n"
+                 "    time.sleep(0.4)\n")
         rc = mw.supervise([sys.executable, "-c", child],
                           no_output_sec=1, sink=sink)
         self.assertEqual(0, rc, sink.getvalue())
         self.assertNotIn(ms.WATCHDOG_MARKER, sink.getvalue())
+
+    def test_plain_stdout_does_not_keep_a_wedged_attempt_alive(self):
+        """THE OTHER DIRECTION, and the whole defect. A child whose only output
+        is stdout has not demonstrated liveness, so once it STOPS it is
+        abandoned at the window -- if stdout reset the clock the watchdog would
+        wait out every attempt whose CLI had already died after printing its
+        banner, which is exactly what happened on seven models."""
+        sink = io.StringIO()
+        child = ("import time\n"
+                 "print('token', flush=True)\n"
+                 "time.sleep(30)\n")
+        rc = mw.supervise([sys.executable, "-c", child],
+                          no_output_sec=1, sink=sink)
+        self.assertEqual(124, rc, sink.getvalue())
+        self.assertIn(ms.WATCHDOG_MARKER, sink.getvalue())
 
     def test_the_window_follows_the_measurement_per_model(self):
         """ONE GLOBAL NUMBER CANNOT SERVE TWO MODELS 9x APART.
@@ -315,35 +339,37 @@ class WatchdogTests(unittest.TestCase):
     def test_the_inter_token_window_does_not_fire_at_the_first_output_window(self):
         """THE REGRESSION, run 40286310047 -- and the whole reason for the split.
 
-        deepseek emitted at ~0.2s, went quiet mid-generation, and the 60s
-        first-output window killed it at 112.9s of a 127.53s generation. Once
-        text has begun the gap is a long generation, not a dead stream, so the
-        attempt must survive a gap far longer than the first-output window.
+        The model call opens, and the CLI then goes quiet for the generation
+        (it prints nothing between `llm runtime selected` and `loop step=1`).
+        That gap must be judged on the inter-token window, not the startup one,
+        or every attempt that takes longer than its first-output window dies.
         COLLAPSE THE TWO WINDOWS INTO ONE AND THIS TEST GOES RED AT 1s.
         """
         sink = io.StringIO()
         child = ("import time\n"
-                 "print('Here is the digest:', flush=True)\n"
+                 "print('timestamp=2026-10-27T10:00:00.000Z level=INFO run=x "
+                 "message=stream providerID=opencode modelID=m', flush=True)\n"
                  "time.sleep(4)\n"
                  "print('...and the rest of it, finished late.', flush=True)\n")
         started = time.monotonic()
         rc = mw.supervise([sys.executable, "-c", child],
-                          no_output_sec=1, inter_token_sec=240, sink=sink)
+                          no_output_sec=1, inter_token_sec=10, sink=sink)
         elapsed = time.monotonic() - started
         self.assertEqual(0, rc, sink.getvalue())
         self.assertNotIn(ms.WATCHDOG_MARKER, sink.getvalue(),
-                         "a mid-generation gap was read as a dead stream")
+                         "a generation-long quiet log was read as a dead stream")
         self.assertGreaterEqual(elapsed, 4,
                                 "the gap must really have exceeded the first "
                                 "output window: %.1fs" % elapsed)
 
     def test_the_inter_token_window_fires_at_its_own_limit(self):
         """A genuinely WEDGED stream is still caught -- one window is not a
-        licence to hang. Text at 0.2s, then silence past the inter-token
-        window: 124, and the marker names the window that fired."""
+        licence to hang. The call opens, then the log stops past the
+        inter-token window: 124, and the marker names the window that fired."""
         sink = io.StringIO()
         child = ("import time\n"
-                 "print('Here is the digest:', flush=True)\n"
+                 "print('timestamp=2026-10-27T10:00:00.000Z level=INFO run=x "
+                 "message=loop session.id=s step=0', flush=True)\n"
                  "time.sleep(30)\n")
         started = time.monotonic()
         rc = mw.supervise([sys.executable, "-c", child],
@@ -354,18 +380,26 @@ class WatchdogTests(unittest.TestCase):
         self.assertGreaterEqual(elapsed, 2)
         self.assertIn("no output for 2s", sink.getvalue())
 
-    def test_the_inter_token_window_covers_both_measured_completions(self):
-        """240s cannot fire on a measured success: the widest gap either model
-        has ever shown is deepseek's 112.94s (14.59 -> 127.53) against beam's
-        ~0.93s. The per-attempt cap stays the real bound on a slow attempt."""
-        self.assertEqual(240, ms.INTER_TOKEN_SEC)
-        self.assertGreater(ms.INTER_TOKEN_SEC, 127.53 - 14.59)
-        self.assertGreater(ms.INTER_TOKEN_SEC, 138.56 - 137.63)
+    def test_the_inter_token_window_covers_a_whole_generation(self):
+        """420s CANNOT FIRE ON A MEASURED COMPLETION, AND 240S COULD.
+
+        The window no longer measures a gap BETWEEN tokens -- the CLI prints no
+        tokens at all before the message is complete -- so it has to cover the
+        whole generation. Measured completion for this workload is 127.53s and
+        CI has been observed past 240s, which is what made seven models look
+        dead at exactly 240s.
+        """
+        self.assertEqual(420, ms.INTER_TOKEN_SEC)
+        self.assertGreater(ms.INTER_TOKEN_SEC, 240,
+                           "240s is the number that misfired")
+        self.assertGreater(ms.INTER_TOKEN_SEC, 127.53 * 3)
         self.assertGreater(ms.INTER_TOKEN_SEC, ms.no_output_sec_for(
             "opencode/deepseek-v4.1-flash-free"),
             "the inter-token window must be the more generous of the two")
-        self.assertLess(ms.INTER_TOKEN_SEC, ms.WALK_PER_ATTEMPT_SEC)
-        self.assertEqual(240, mw.resolve_inter_token_window())
+        self.assertLess(ms.INTER_TOKEN_SEC, ms.WALK_PER_ATTEMPT_SEC,
+                        "the per-attempt cap must outlast the window, or the "
+                        "cap fires first and the window never runs")
+        self.assertEqual(420, mw.resolve_inter_token_window())
         self.assertEqual(7, mw.resolve_inter_token_window(explicit=7))
 
     def test_a_rejected_attempt_is_killed_at_the_error_line(self):
@@ -513,28 +547,28 @@ class AllFailBoundTests(unittest.TestCase):
     def test_the_arithmetic_of_an_emit_then_stall_walk(self):
         """THE OTHER WORST CASE, and a different number from the 540s bound.
 
-        An attempt that never emits costs its FIRST-OUTPUT window (540s over the
-        six rungs). An attempt that emits and then wedges is measured from its
-        last line, so it costs first-output + INTER_TOKEN, truncated by the
-        per-attempt cap:
+        An attempt that never opens the model call costs its FIRST-OUTPUT window
+        (540s over the six rungs). An attempt that opens the call and then goes
+        quiet is measured from its last LOG line, so it costs
+        first-output + INTER_TOKEN, truncated by the per-attempt cap:
 
-            deepseek   min( 60 + 240, 360) = 300
-            beam       min(240 + 240, 360) = 360   <- the cap is binding
-            other four                     = 300 each
-            = 1860s
+            deepseek   min( 60 + 420, 480) = 480
+            beam       min(240 + 420, 480) = 480   <- the cap is binding
+            other four                     = 480 each
+            = 2880s
 
-        1860s is longer than the 1800s walk budget, which is the honest reading:
+        2880s is longer than the 1800s walk budget, which is the honest reading:
         in this mode the budget and the cap bound the run, not the windows.
         """
         ladder = ms.ladder_model_ids()
         self.assertEqual(6, len(ladder), ladder)
-        self.assertEqual(1860, ms.worst_case_emit_then_stall_sec(ladder))
-        self.assertEqual(1860, ms.worst_case_emit_then_stall_sec(),
+        self.assertEqual(2880, ms.worst_case_emit_then_stall_sec(ladder))
+        self.assertEqual(2880, ms.worst_case_emit_then_stall_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(1890, ms.worst_case_emit_then_stall_sec(
+        self.assertEqual(2910, ms.worst_case_emit_then_stall_sec(
             ladder, overhead_sec=30))
         self.assertEqual(
-            360,
+            480,
             min(ms.no_output_sec_for("opencode/beam-free") + ms.INTER_TOKEN_SEC,
                 ms.WALK_PER_ATTEMPT_SEC),
             "beam's ceiling must be the cap, not the sum of the windows")

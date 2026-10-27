@@ -640,10 +640,19 @@ def on_cooldown(row, now):
 # the WALK is bounded by the clock instead, which is the only bound that adapts
 # to how sick the provider is.
 
-#: Per-attempt cap. The only measurement of a success for this stage is ~300s,
-#: so this is that measurement plus a fifth: 600s let each DEAD model eat four
-#: minutes more than a working one has ever been measured to need.
-WALK_PER_ATTEMPT_SEC = 360
+#: Per-attempt cap. Measured completion for this workload is 127.53s, and the
+#: cap has to clear the WEDGED path too: an attempt that opens the model call
+#: and then goes quiet costs `min(first_output + INTER_TOKEN, this)`. At 480s
+#: the inter-token window (420s) still fires before the cap for every rung, so
+#: the cap is only the backstop it is meant to be.
+#:
+#: RAISING THIS CUTS THE ATTEMPT COUNT, DELIBERATELY. The walk budget stays
+#: 1800s, so 480s affords 3 attempts where 360s afforded 5. The per-run wall
+#: clock is unchanged, which is why the Actions projection in
+#: config/actions-budget.json (1776 of the 1800 ceiling) does not move: fewer,
+#: longer attempts inside the same bounded job. Never raise the budget itself
+#: to buy attempts back -- that is the line the ceiling is guarding.
+WALK_PER_ATTEMPT_SEC = 480
 #: Whole-walk cap. The agent step gets 35 min (2100s); 1800s leaves 5 min for
 #: discovery, the agent-log tail and the step's own bookkeeping.
 WALK_TOTAL_BUDGET_SEC = 1800
@@ -718,14 +727,18 @@ def no_output_sec_for(model_id):
 #: Time-to-FIRST-token is a property of the queue: 14.59s for deepseek, 137.63s
 #: for beam. A gap BETWEEN tokens is a long generation thinking. So the
 #: first-output windows stay exactly as measured (60s / 240s / 60s), and this
-#: one governs only AFTER text has begun.
+#: one governs only AFTER the model call has opened.
 #:
-#: 240s cannot fire on either measured success: deepseek's widest observed gap
-#: is under 113s (first token 14.59s, done 127.53s) and beam's is ~1s (137.63s
-#: -> 138.56s). It is deliberately generous because it is NOT the bound on a
-#: slow attempt -- WALK_PER_ATTEMPT_SEC = 360s is -- so this window only has to
-#: catch a stream that is genuinely WEDGED, which is a multi-minute thing.
-INTER_TOKEN_SEC = 240
+#: 420s, NOT 240s, AND THE WINDOW READS A DIFFERENT CLOCK SINCE 2026-10-27.
+#: `opencode run` does not stream to a pipe: it prints a banner at ~5s and the
+#: whole message in one burst at completion (measured: 90 lines at +62.89s), so
+#: stdout can only prove COMPLETION. The watchdog's liveness clock is the CLI's
+#: own DEBUG log instead, and the logs are quiet for the whole generation --
+#: nothing is printed between `llm runtime selected` and `loop step=1`. This
+#: number therefore has to cover a COMPLETE generation, not a token gap. The
+#: measured completion is 127.53s and CI has been seen past 240s, which is
+#: exactly why 240 fired on seven models that were never dead.
+INTER_TOKEN_SEC = 420
 
 
 def inter_token_sec_for(model_id=None):
