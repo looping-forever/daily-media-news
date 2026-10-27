@@ -70,7 +70,9 @@ Exit codes
 0  normal (including no-op)
 1  config fatal (bad state)
 2  transient network failure
-3  corrupt state (refuse to overwrite)
+3  state present but invalid (refuse to overwrite)
+4  state not found (never re-baselines; restore it from the KV key
+   ``academic:state``)
 
 CLI:
   py scripts/check_academic_result.py --state-file state/academic_state.json \
@@ -111,6 +113,9 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 import ntfy_classes  # noqa: E402  (deliberate: after the sys.path insert)
 
 DEFAULT_STATE_FILE = os.path.join(REPO_ROOT, "state", "academic_state.json")
+# The KV key the workflow restores state from and writes it back to. It holds
+# the roll number, so this file (never the KV value) is what the monitor reads.
+STATE_KV_KEY = "academic:state"
 DEFAULT_POLL_URL = "https://iost.tu.edu.np/notices?notice_type=21"
 NOTIFY_PREVIEW_PATH = os.path.join(REPO_ROOT, "state",
                                    "academic_notify_preview.json")
@@ -255,7 +260,11 @@ KATHMANDU_OFFSET = 5 * 3600 + 45 * 60  # +05:45
 
 
 class StateError(Exception):
-    """Corrupt / schema-invalid state file. Caller must refuse to overwrite."""
+    """State file present but unusable. Caller must refuse to overwrite."""
+
+
+class StateNotFound(StateError):
+    """State file absent. Nothing exists to overwrite; it must be restored."""
 
 
 class FetchError(Exception):
@@ -1978,7 +1987,10 @@ def _normalise_semesters(state):
 def load_state(path, meta=None):
     """Read + validate state JSON, migrating schema 1 -> 2 in memory.
 
-    Raises StateError on corrupt schema (caller must refuse to overwrite).
+    Raises StateNotFound when the file is absent, and StateError when it is
+    present but unusable (caller must refuse to overwrite). The two are
+    separate because the remedies are opposite: an absent file has to be
+    restored, an invalid one must not be replaced.
     ``meta`` is an optional dict; when supplied it receives
     ``{"migrated": bool, "repaired": bool}`` so the caller can print the
     replay-window notice and report any self-healed verdict field.
@@ -1987,10 +1999,16 @@ def load_state(path, meta=None):
         with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
     except FileNotFoundError:
-        raise StateError("state file not found: %s" % path)
+        raise StateNotFound(
+            "state not found: %s -- nothing to overwrite and it will NOT be "
+            "re-baselined; restore it from the KV key %r or a local copy"
+            % (path, STATE_KV_KEY))
     except (OSError, ValueError) as exc:
-        raise StateError("cannot read state %s: %s" % (path, exc))
-    _validate_state(state)
+        raise StateError("state present but unreadable, %s: %s" % (path, exc))
+    try:
+        _validate_state(state)
+    except StateError as exc:
+        raise StateError("state present but invalid, %s: %s" % (path, exc))
     # Between validate and migrate, and for BOTH schema versions: a legacy
     # state and a state written by an older build are exactly where a verdict
     # field can be missing, and the repair must happen before the migration
@@ -3078,12 +3096,15 @@ def run(state_file, poll_url, dry_run, fetch_fn=None, max_notices=MAX_PENDING,
     if isinstance(max_notices, int) and 0 < max_notices < MAX_PENDING:
         cap = max_notices
 
-    # --- Load state (exit 3 on corrupt) -----------------------------------
+    # --- Load state (exit 3 invalid, exit 4 absent) -----------------------
     meta = {}
     try:
         state = load_state(state_file, meta=meta)
+    except StateNotFound as exc:
+        print("academic: %s" % exc, file=sys.stderr)
+        return 4
     except StateError as exc:
-        print("academic: corrupt state: %s" % exc, file=sys.stderr)
+        print("academic: %s" % exc, file=sys.stderr)
         return 3
     if meta.get("migrated"):
         print("academic: replay window opened (%d ids)" % REPLAY_WINDOW)

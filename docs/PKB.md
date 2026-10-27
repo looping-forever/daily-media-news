@@ -326,7 +326,11 @@ When delegating verification or monitoring tasks:
   (`https://iost.tu.edu.np/notices?notice_type=21`), detects CSIT semester result
   notices, downloads the result PDF, searches for the configured roll number, updates
   `state/academic_state.json`, emits a notification payload. Exit codes:
-  `0` normal/no-op, `1` config fatal, `2` transient network, `3` corrupt state.
+  `0` normal/no-op, `1` config fatal, `2` transient network, `3` state present
+  but invalid (refused, never overwritten), `4` state not found (never
+  re-baselined). The state is not committed -- it holds the roll number -- so
+  `academic-result.yml` restores it from the KV key `academic:state` when the
+  file is absent and writes it back after a normal run.
 - **`.github/workflows/academic-result.yml`** (NEW): triggered by
   `repository_dispatch` (type `academic-result`) + manual `workflow_dispatch`.
   Runs the monitor, delivers via ntfy + Cloudflare Pages website, commits state.

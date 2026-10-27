@@ -97,6 +97,116 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
 
+      - name: Restore academic state from KV
+        # WHY: state/academic_state.json is never committed -- it carries the
+        # owner's roll number, and this repository is public. It is also absent
+        # from a clean checkout: this history is fresh (root e090b85), so the
+        # monitor found no file, exited 3, and the degraded message called a
+        # MISSING file a "corrupt" one. The durable copy lives in KV under
+        # academic:state -- the namespace and token the digest ledger already
+        # uses -- and this step materialises it ONLY when the file is absent, so
+        # a local run against a real file is untouched.
+        #
+        # A FAILURE HERE MUST STOP THE JOB. With no file and no usable KV value
+        # there is nothing to poll against, and starting from an empty state is
+        # forbidden: it would re-baseline last_examined_notice_id to the current
+        # maximum and turn an old notice into a fake new result. So this step
+        # exits 1 and names exactly what has to be restored.
+        #
+        # Nothing here ever prints the state's contents or the roll number.
+        env:
+          CF_KV_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_KV_ACCOUNT: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          sys.path.insert(0, 'scripts')
+          import check_academic_result as car
+
+          STATE_FILE = 'state/academic_state.json'
+          KV_API = 'https://api.cloudflare.com/client/v4'
+          KEY = car.STATE_KV_KEY
+
+          if os.path.isfile(STATE_FILE):
+              print('%s is present (%d bytes) -- not reading KV'
+                    % (STATE_FILE, os.path.getsize(STATE_FILE)))
+              sys.exit(0)
+
+          token = (os.environ.get('CF_KV_TOKEN') or '').strip()
+          account = (os.environ.get('CF_KV_ACCOUNT') or '').strip()
+          namespace = (os.environ.get('CF_KV_NAMESPACE_ID') or '').strip()
+          missing = [name for name, value in (
+              ('CF_PAGES_API_TOKEN', token), ('CF_ACCOUNT_ID', account),
+              ('CF_KV_NAMESPACE_ID', namespace)) if not value]
+          if missing:
+              print('::error::%s is absent and %s is unset, so the state cannot '
+                    'be restored. Put the last valid academic state '
+                    '(schema_version 2, with last_examined_notice_id and '
+                    'examined) at KV key %r. The monitor will not re-baseline '
+                    'itself.' % (STATE_FILE, ', '.join(missing), KEY))
+              sys.exit(1)
+
+          def detail(exc):
+              """(HTTP status, Cloudflare error code). Never quotes the URL."""
+              status = getattr(exc, 'code', None)
+              code = None
+              try:
+                  body = json.loads(
+                      (exc.read() or b'').decode('utf-8', 'replace'))
+                  code = (body.get('errors') or [{}])[0].get('code')
+              except Exception:
+                  code = None
+              return status, code
+
+          url = ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
+                 % (KV_API, account, namespace, KEY))
+          request = urllib.request.Request(
+              url, headers={'Authorization': 'Bearer ' + token,
+                            'Accept': 'application/json'})
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  raw = response.read()
+          except Exception as exc:
+              status, code = detail(exc)
+              if status == 404 and code == 10009:
+                  print('::error::%s is absent and the KV key %r is absent too '
+                        '(HTTP 404, Cloudflare 10009). Nothing was polled. '
+                        'Restore it: put the last valid academic state at KV '
+                        'key %r.' % (STATE_FILE, KEY, KEY))
+              else:
+                  print('::error::%s is absent and reading KV key %r failed '
+                        '(HTTP %s, Cloudflare code %s). Nothing was polled.'
+                        % (STATE_FILE, KEY, status or '?',
+                           'none' if code is None else code))
+              sys.exit(1)
+
+          os.makedirs('state', exist_ok=True)
+          tmp = STATE_FILE + '.from-kv'
+          with open(tmp, 'wb') as handle:
+              handle.write(raw)
+          os.replace(tmp, STATE_FILE)
+          try:
+              state = car.load_state(STATE_FILE)
+          except car.StateError as exc:
+              os.remove(STATE_FILE)
+              print('::error::the value at KV key %r is not a usable state, so '
+                    'it was not left on disk: %s' % (KEY, exc))
+              sys.exit(1)
+          print('restored %s from KV key %r: %d bytes, schema_version=%s, '
+                'last_examined_notice_id=%s, examined=%d entries, '
+                'last_poll_time=%s'
+                % (STATE_FILE, KEY, len(raw), state.get('schema_version'),
+                   state.get('last_examined_notice_id'),
+                   len(state.get('examined') or {}),
+                   state.get('last_poll_time')))
+          PY
+
       - name: Self-check exam-notice sources
         # F5 — runs BEFORE the monitor, deliberately isolated:
         #   continue-on-error: true  -> it can never fail the job
@@ -217,7 +327,9 @@ jobs:
               1: 'config/state save failure (exit 1)',
               2: 'transient network failure — the notice board could not be '
                  'fetched, so NOTHING was concluded about your result',
-              3: 'corrupt state file — refused to overwrite (exit 3)',
+              3: 'state present but INVALID — refused to overwrite it (exit 3)',
+              4: 'state NOT FOUND — no state file and no KV copy, so nothing '
+                 'was polled and nothing was re-baselined (exit 4)',
           }
           reason = reasons.get(code, 'unexpected exit code %s' % code)
 
@@ -317,6 +429,95 @@ jobs:
               print('::warning::NTFY secrets unset — degraded payload written '
                     'to state/academic_degraded_payload.json for the delivery '
                     'steps, but no direct ntfy ping')
+          PY
+
+      - name: Persist academic state to KV
+        # THE ONLY DURABLE COPY. state/academic_state.json is never committed
+        # (it carries the roll number, and this repository is public), so the
+        # copy in KV under academic:state is what the next run restores. Without
+        # this step every run would end with a floor advance that nothing kept,
+        # and the next run would re-examine -- and could re-alert on -- notices
+        # it had already decided.
+        #
+        # GATED ON exit 0, NOT ON always(). The monitor saves state only on a
+        # normal completion: on exit 2 (notice board unreachable) it returns
+        # BEFORE save_state on purpose, and on exit 3/4 there is no usable state
+        # at all. Writing in those cases would publish a value the monitor did
+        # not produce. It runs before the delivery steps so a delivery failure
+        # cannot lose a floor advance -- the assert below may redden the run, but
+        # it must not un-decide a result.
+        if: steps.monitor.outputs.exit_code == '0'
+        env:
+          CF_KV_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_KV_ACCOUNT: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          sys.path.insert(0, 'scripts')
+          import check_academic_result as car
+
+          STATE_FILE = 'state/academic_state.json'
+          KV_API = 'https://api.cloudflare.com/client/v4'
+          KEY = car.STATE_KV_KEY
+
+          token = (os.environ.get('CF_KV_TOKEN') or '').strip()
+          account = (os.environ.get('CF_KV_ACCOUNT') or '').strip()
+          namespace = (os.environ.get('CF_KV_NAMESPACE_ID') or '').strip()
+          if not (token and account and namespace):
+              print('::error::the monitor completed but its state cannot be '
+                    'written back: CF_PAGES_API_TOKEN / CF_ACCOUNT_ID / '
+                    'CF_KV_NAMESPACE_ID unset. This run\'s state exists only in '
+                    'the 7-day artifact, and the next run will restore the '
+                    'stale KV copy.')
+              sys.exit(1)
+
+          try:
+              state = car.load_state(STATE_FILE)
+          except car.StateError as exc:
+              print('::error::refusing to publish an unusable state to KV key '
+                    '%r: %s' % (KEY, exc))
+              sys.exit(1)
+
+          with open(STATE_FILE, 'rb') as handle:
+              body = handle.read()
+
+          url = ('%s/accounts/%s/storage/kv/namespaces/%s/values/%s'
+                 % (KV_API, account, namespace, KEY))
+          request = urllib.request.Request(
+              url, data=body, method='PUT',
+              headers={'Authorization': 'Bearer ' + token,
+                       'Content-Type': 'text/plain'})
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  response.read()
+          except Exception as exc:
+              # The status and Cloudflare's own code, never the URL: the URL
+              # carries the account and namespace ids.
+              status = getattr(exc, 'code', None)
+              code = None
+              try:
+                  payload = json.loads(
+                      (exc.read() or b'').decode('utf-8', 'replace'))
+                  code = (payload.get('errors') or [{}])[0].get('code')
+              except Exception:
+                  code = None
+              print('::error::writing the state to KV key %r failed (HTTP %s, '
+                    'Cloudflare code %s, %s). The next run will restore the '
+                    'previous copy and re-poll.'
+                    % (KEY, status or '?', 'none' if code is None else code,
+                       type(exc).__name__))
+              sys.exit(1)
+          print('persisted %s to KV key %r: %d bytes, schema_version=%s, '
+                'last_examined_notice_id=%s, examined=%d entries'
+                % (STATE_FILE, KEY, len(body), state.get('schema_version'),
+                   state.get('last_examined_notice_id'),
+                   len(state.get('examined') or {})))
           PY
 
       - name: Check for emitted notification payload
@@ -977,9 +1178,13 @@ jobs:
               with open('state/academic_state.json', encoding='utf-8') as fh:
                   state = json.load(fh)
               cur = state.get('current_semester')
-              roll = state.get('roll_number')
               sems = state.get('semesters') or {}
-              lines = ['- Roll number: %s' % roll, '- Current semester: %s' % cur]
+              # The roll number itself is NOT printed here. Run logs and this
+              # summary are readable on a public repository, and the state file
+              # stays private only by never being committed -- so the summary
+              # records what the monitor decided, never who owns it.
+              lines = ['- Roll number: held in state (not printed)',
+                       '- Current semester: %s' % cur]
               for key in sorted(sems, key=lambda k: int(k) if str(k).isdigit() else 0):
                   sem = sems[key]
                   lines.append('- Sem %s: %s' % (key, sem.get('status', 'unknown')))
@@ -987,6 +1192,8 @@ jobs:
                            % state.get('schema_version'))
               lines.append('- Last examined notice id: %s'
                            % state.get('last_examined_notice_id'))
+              lines.append('- Examined notices recorded: %d'
+                           % len(state.get('examined') or {}))
               lines.append('- Last poll: %s' % state.get('last_poll_time'))
               lines.append('- Pending overflow: %s'
                            % state.get('pending_overflow'))
@@ -1010,3 +1217,94 @@ jobs:
           else
             echo "- No academic state file present" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Probe TU feed reachability from this runner
+        # ONE DIAGNOSTIC, AND NO NEW ARCHITECTURE. Measured 2026-10-27 from the
+        # owner's machine: iost.tu.edu.np and tu.edu.np resolve to 202.70.90.4,
+        # TCP 443 connects in ~90 ms, the notices feed returns 70 KB in 2.7 s,
+        # and ten third-party check-host nodes answer HTTP 200 in 1.4-3.3 s --
+        # while GitHub runners time out at 15 s. So the board is neither down nor
+        # globally blocked. Nothing here tries to work around that: it times DNS,
+        # TCP connect and the read SEPARATELY, retries once, and logs the
+        # numbers, so the next scheduled run can tell a dropped egress (TCP
+        # fails) from a slow upstream (TCP ok, read slow or timed out).
+        #
+        # It exits 0 unconditionally, with continue-on-error as a second belt: a
+        # diagnostic that can fail the job is a diagnostic the owner ignores.
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import os
+          import socket
+          import sys
+          import time
+          import urllib.parse
+          import urllib.request
+
+          sys.path.insert(0, 'scripts')
+          import check_academic_result as car
+
+          URL = os.environ.get('PROBE_URL') or car.DEFAULT_POLL_URL
+          PARTS = urllib.parse.urlsplit(URL)
+          HOST = PARTS.hostname
+          PORT = PARTS.port or (443 if PARTS.scheme == 'https' else 80)
+          TIMEOUT = 60
+
+          def attempt(number):
+              print('probe %d/2: GET %s (per-phase timeout %ds)'
+                    % (number, URL, TIMEOUT))
+              started = time.monotonic()
+              try:
+                  infos = socket.getaddrinfo(HOST, PORT,
+                                             type=socket.SOCK_STREAM)
+              except Exception as exc:
+                  print('  dns       FAILED after %6.2fs  %s: %s'
+                        % (time.monotonic() - started,
+                           type(exc).__name__, exc))
+                  return False
+              print('  dns       ok     in    %6.2fs  %d address(es)'
+                    % (time.monotonic() - started, len(infos)))
+
+              started = time.monotonic()
+              try:
+                  sock = socket.create_connection(infos[0][4], timeout=TIMEOUT)
+                  sock.close()
+              except Exception as exc:
+                  print('  tcp:%-5d FAILED after %6.2fs  %s: %s'
+                        % (PORT, time.monotonic() - started,
+                           type(exc).__name__, exc))
+                  return False
+              print('  tcp:%-5d ok     in    %6.2fs  connect only'
+                    % (PORT, time.monotonic() - started))
+
+              started = time.monotonic()
+              try:
+                  with urllib.request.urlopen(URL, timeout=TIMEOUT) as response:
+                      body = response.read()
+                      status = response.status
+              except Exception as exc:
+                  print('  read      FAILED after %6.2fs  %s: %s'
+                        % (time.monotonic() - started,
+                           type(exc).__name__, exc))
+                  return False
+              print('  read      ok     in    %6.2fs  HTTP %s, %d bytes'
+                    % (time.monotonic() - started, status, len(body)))
+              return True
+
+          for number in (1, 2):
+              if attempt(number):
+                  print('probe result: the board answered this runner')
+                  sys.exit(0)
+              if number == 1:
+                  print('  retrying once after 5s')
+                  time.sleep(5)
+          print('::warning::the TU notice feed was unreadable from this runner '
+                'after 2 attempts. Read the phase timings above: tcp failing '
+                'means the egress is dropped, tcp ok with the read failing or '
+                'timing out means the upstream is slow from here. This step does '
+                'not fail the job.')
+          sys.exit(0)
+          PY

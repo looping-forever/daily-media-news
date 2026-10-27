@@ -112,6 +112,13 @@ state/ntfy_payload.json
 state/email.txt
 pytest_output.txt
 
+# The academic monitor's state: it carries the owner's ROLL NUMBER, and this
+# repository is public. It is never committed by design -- academic-result.yml
+# restores it from the KV key `academic:state` and writes it back there, and the
+# only other copy is the run's 7-day artifact. Listed here so a local run cannot
+# put it into the working tree as an untracked file that `git add -A` picks up.
+state/academic_state.json
+
 # Wrangler local cache (contains Cloudflare account id)
 deploy/.wrangler/
 
