@@ -1068,8 +1068,10 @@ jobs:
         # in the official sheet). If one appears, the job fails before the
         # commit and nothing reaches history.
         #
-        # The roll itself is supplied at run time from the ACADEMIC_ROLL_NUMBER
-        # secret and is never written to a committed file.
+        # The roll is never hardcoded and never comes from a secret: it lives in
+        # the state the "Restore academic state from KV" step materialises from
+        # the KV key `academic:state`, and is written back there after the run.
+        # Nothing that carries it is committed.
         #
         # `docs/academic/` is deliberately NOT staged any more (see the commit
         # step below); the 7-day artifact upload above is the private channel
@@ -1087,7 +1089,7 @@ jobs:
             echo "::error::a roll-shaped number is staged for commit."
             echo "Matched token(s): $(echo "${offenders}" | sort -u | tr '\n' ' ')"
             echo "This repository is public, so committing it publishes the owner's roll number permanently."
-            echo "Do not commit state files that carry the roll; read it from the ACADEMIC_ROLL_NUMBER secret instead."
+            echo "Do not commit a file that carries the roll: it lives in the KV key academic:state, which the Restore step reads, and state/academic_state.json is gitignored for that reason."
             exit 1
           fi
           echo "No roll-shaped token in the staged diff."
@@ -1110,7 +1112,8 @@ jobs:
         # that expires. `state/academic_state.json` is likewise NOT staged: it
         # carries the roll number, and a committed state file would publish it
         # just as effectively as the page did. The roll is read at run time from
-        # the ACADEMIC_ROLL_NUMBER secret.
+        # the KV key `academic:state` (see the "Restore academic state from KV"
+        # step) and written back there; there is no roll secret.
         #
         # state/academic_live_payload.json is in the artifact list as an
         # IGNORE entry on purpose: it is never written again (the live payload
