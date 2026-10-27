@@ -1023,23 +1023,32 @@ jobs:
           # model_selector.py: this step names the case, never the number.
           NO_WORK_ARGS=()
           if [ "${MODEL_NO_WORK:-0}" = "1" ]; then NO_WORK_ARGS=(--no-work); fi
-          mapfile -t models < <(python3 scripts/model_selector.py --select \
-            --config config/opencode.json --health state/model_health.json \
-            --cache state/model_cache.json --info-out state/digest_model_select.json \
-            --all "${NO_WORK_ARGS[@]}")
-          # AN EMPTY LIST HAS TWO VERY DIFFERENT CAUSES and the step must name
-          # the right one. "All cooled down" means the ladder is real and every
-          # rung is temporarily barred; reporting that as "nothing was
-          # discovered" would send the next reader to the wrong file entirely.
-          if [ "${#models[@]}" -eq 0 ]; then
-            if [ "$(jq -r '.all_cooled // false' state/digest_model_select.json 2>/dev/null || echo false)" = "true" ]; then
-              echo "FATAL: every model is on a hard cooldown ($(jq -rc '.hard_cooled_down // []' state/digest_model_select.json 2>/dev/null || echo '[]')) -- no attempt can be made until one expires. This is the cooldown, not an empty ladder."
-            else
-              echo "FATAL: empty model ladder - nothing was discovered and config/opencode.json has no seed"
+          # THE LADDER IS RESOLVED PER CYCLE, not once per run. A "cycle" is one
+          # pass down the ranked pool. The free pool is throttled per IP bucket,
+          # so the same twelve models that all refuse in one second answer fine
+          # minutes later -- and after the backoff this must re-read the pool:
+          # the cooldown file is re-loaded and pruned, so a model skipped in
+          # cycle 1 is eligible again in cycle 2 once its entry has expired.
+          resolve_ladder() {
+            mapfile -t models < <(python3 scripts/model_selector.py --select \
+              --config config/opencode.json --health state/model_health.json \
+              --cache state/model_cache.json --info-out state/digest_model_select.json \
+              --all "${NO_WORK_ARGS[@]}")
+            # AN EMPTY LIST HAS TWO VERY DIFFERENT CAUSES and the step must name
+            # the right one. "All cooled down" means the ladder is real and every
+            # rung is temporarily barred; reporting that as "nothing was
+            # discovered" would send the next reader to the wrong file entirely.
+            if [ "${#models[@]}" -eq 0 ]; then
+              if [ "$(jq -r '.all_cooled // false' state/digest_model_select.json 2>/dev/null || echo false)" = "true" ]; then
+                echo "FATAL: every model is on a hard cooldown ($(jq -rc '.hard_cooled_down // []' state/digest_model_select.json 2>/dev/null || echo '[]')) -- no attempt can be made until one expires. This is the cooldown, not an empty ladder."
+              else
+                echo "FATAL: empty model ladder - nothing was discovered and config/opencode.json has no seed"
+              fi
+              exit 1
             fi
-            exit 1
-          fi
-          python3 -c "import json;d=json.load(open('state/digest_model_select.json'));print('model ladder: source=%s provider=%s selected=%s cooled_down=%s hard_cooled_down=%s all_cooled=%s dropped_seed=%s dropped_seed_evidence=%s error=%s' % (d.get('source'),d.get('provider'),d.get('selected'),d.get('cooled_down'),d.get('hard_cooled_down'),d.get('all_cooled'),d.get('dropped_seed'),d.get('dropped_seed_evidence'),d.get('error')))" || true
+            python3 -c "import json;d=json.load(open('state/digest_model_select.json'));print('model ladder: source=%s provider=%s selected=%s cooled_down=%s hard_cooled_down=%s all_cooled=%s dropped_seed=%s dropped_seed_evidence=%s error=%s' % (d.get('source'),d.get('provider'),d.get('selected'),d.get('cooled_down'),d.get('hard_cooled_down'),d.get('all_cooled'),d.get('dropped_seed'),d.get('dropped_seed_evidence'),d.get('error')))" || true
+          }
+          resolve_ladder
           # The budget is stated ONCE, by the selector, and read back here. The
           # `// N` defaults plus the `case` guards keep this working when the
           # info file is missing or unwritable (--info-out is best-effort).
@@ -1057,116 +1066,200 @@ jobs:
           deadline=$(( $(date +%s) + BUDGET ))
           tried=0
           last_err="unknown"
+          cycle=0
+          contention_only=0
+          # THE RETRY LADDER, and why these two numbers are safe.
+          #
+          # A contention wall is measured in MINUTES, not attempts: the whole
+          # pool refuses for ~43s and answers 5/5 within 33-44s each a short
+          # while later. So one run gets: cycle, 3 min, cycle, 6 min, cycle,
+          # 12 min, cycle -- 4 cycles, 21 minutes of waiting, worst case ~24
+          # minutes of the 30 the selector budgets.
+          #
+          # WHERE THAT SITS IN THE JOB. This step is capped at 35 minutes and
+          # the job at 45, so the 1800s walk keeps 10 minutes of headroom for
+          # validate, seal, render, deploy, delivery and the state commit that
+          # follow. The loop may not spend it: every wait is clamped to what
+          # leaves one more attempt (MIN) inside `deadline`, and a wait that
+          # cannot leave room ends the loop instead of borrowing from them.
+          # The bound is therefore the walk budget itself -- it is NOT raised.
+          RETRY_BACKOFF=(180 360 720)
+          RETRY_MAX_CYCLES=4
           : > state/agent-attempts.log
-          for model in "${models[@]}"; do
-            remaining=$(( deadline - $(date +%s) ))
-            allow=$(( remaining < PER ? remaining : PER ))
-            if [ "$allow" -lt "$MIN" ]; then
-              echo "Budget spent: ${remaining}s left, below the ${MIN}s one attempt needs. Stopping after ${tried} of ${#models[@]} models."
-              break
+          while :; do
+            cycle=$((cycle+1))
+            if [ "$cycle" -gt 1 ]; then
+              echo "Retry cycle $cycle: resetting the ladder (cooldowns re-read; entries that expired during the wait are eligible again)"
+              resolve_ladder
             fi
-            tried=$((tried+1))
-            rm -f state/stories.json
-            echo "=== Attempt $tried with $model (allow ${allow}s) ==="
-            run_rc=0
-            # The watchdog sits INSIDE `timeout`: timeout still owns the total
-            # allowance, and the watchdog owns all three measured deaths -- the
-            # decisive error line (~1-2s), the repeating outage (flint printed
-            # the same fatal line 5x from 12.6s and burned the lot), and
-            # silence, at the window the selector measured for THIS model.
-            #
-            # --print-logs --log-level DEBUG IS LOAD-BEARING, not debugging
-            # decoration. `opencode run` prints a banner at ~5s and then NOTHING
-            # until the whole message completes, so stdout can only prove
-            # completion; the CLI's own log lines are the only liveness there
-            # is. Without them the watchdog would judge every attempt by its
-            # startup window and kill working models.
-            if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
-              --model "$model" -- \
-              opencode run \
-              --auto \
-              --print-logs \
-              --log-level DEBUG \
-              --model "$model" \
-              2>&1 | tee state/agent-log.txt; then
-              :
-            else
-              run_rc=$?
-            fi
-            # SUCCESS FIRST, AND FROM THE FILE, NOT THE EXIT CODE. Classifying
-            # before this check would discard a GOOD digest whose article text
-            # happens to contain "rate limit" or "quota" -- the classifier reads
-            # the CLI's own words, and a finished digest is full of words. One
-            # row per attempt still goes to the log, with kind=ok here.
-            if [ "$run_rc" = "0" ] && [ -f state/stories.json ] \
-              && python3 -c "import json,sys; json.load(open('state/stories.json'))"; then
-              printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
-                "$(date -u +%FT%TZ)" "$tried" "$model" "$run_rc" "$allow" \
-                >> state/agent-attempts.log
-              echo "Agent wrote valid state/stories.json on attempt $tried ($model)"
-              python3 scripts/model_selector.py --record "$model" ok || true
-              ok=1
-              break
-            fi
-            # CLASSIFY a real failure, then act. `UnknownError` alone is an
-            # outage and a missing model is a not-found ONLY when the marker is
-            # present. The watchdog already wrote its own marker into this log,
-            # so the decision is reproducible from the log alone.
-            kind=$(python3 scripts/model_selector.py --classify \
-              --log state/agent-log.txt --rc "$run_rc" 2>/dev/null || echo other)
-            case "$kind" in
-              model_not_found|quota_or_rate_limited|auth|provider_outage|slow_or_stalled|other) ;;
-              *) kind="other" ;;
-            esac
-            printf '%s attempt=%d model=%s kind=%s rc=%s allow=%s\n' \
-              "$(date -u +%FT%TZ)" "$tried" "$model" "$kind" "$run_rc" "$allow" \
-              >> state/agent-attempts.log
-            if [ "$kind" = "model_not_found" ] || [ "$kind" = "quota_or_rate_limited" ]; then
-              echo "Circuit breaker: $model -> $kind. Skipping to the next model without spending the allowance."
-              last_err="$kind on $model"
-              # RECORD THE REAL CLASS, never a generic "transport". The selector
-              # decides what each class costs: a not-found earns a 24h hard
-              # cooldown (the id is simply wrong), and a quota is recorded but
-              # deliberately NOT cooled down, because the whole free pool shares
-              # that limit and skipping models over it would end the run early.
-              python3 scripts/model_selector.py --record "$model" "$kind" || true
-              continue
-            fi
-            if [ "$kind" = "auth" ]; then
-              # STOP, deliberately. A bad credential is not a property of this
-              # model: every remaining attempt would fail the same way, burn the
-              # budget and bury the real cause.
-              echo "Circuit breaker: $model -> auth. Retrying other models would only hide the cause; stopping the walk."
-              last_err="auth: $model was rejected (credential), walk aborted"
-              python3 scripts/model_selector.py --record "$model" transport || true
-              break
-            fi
-            if [ "$run_rc" = "0" ]; then
-              echo "Attempt $tried finished without a valid state/stories.json"
-              last_err="no stories.json"
-              python3 scripts/model_selector.py --record "$model" transport || true
-            else
-              echo "Attempt $tried command failed (rc=$run_rc, kind=$kind)"
-              if [ "$run_rc" = "124" ]; then
-                last_err="timeout"
-                python3 scripts/model_selector.py --record "$model" timeout || true
-              elif [ "$kind" = "provider_outage" ]; then
-                # RECORDED AS ITSELF so the selector can count a REPEAT. A single
-                # 5xx is still recorded and still reorders the next run, but it
-                # only earns a short hard cooldown on the second hit -- one bad
-                # second must not remove a model from the walk.
-                last_err="command failed rc=$run_rc"
-                python3 scripts/model_selector.py --record "$model" provider_outage || true
-              else
-                last_err="command failed rc=$run_rc"
-                python3 scripts/model_selector.py --record "$model" transport || true
+            cycle_quota=0
+            cycle_other=0
+            for model in "${models[@]}"; do
+              remaining=$(( deadline - $(date +%s) ))
+              allow=$(( remaining < PER ? remaining : PER ))
+              if [ "$allow" -lt "$MIN" ]; then
+                echo "Budget spent: ${remaining}s left, below the ${MIN}s one attempt needs. Stopping after ${tried} of ${#models[@]} models."
+                break
               fi
+              tried=$((tried+1))
+              rm -f state/stories.json
+              echo "=== Attempt $tried with $model (allow ${allow}s) ==="
+              run_rc=0
+              # The watchdog sits INSIDE `timeout`: timeout still owns the total
+              # allowance, and the watchdog owns all three measured deaths -- the
+              # decisive error line (~1-2s), the repeating outage (flint printed
+              # the same fatal line 5x from 12.6s and burned the lot), and
+              # silence, at the window the selector measured for THIS model.
+              #
+              # --print-logs --log-level DEBUG IS LOAD-BEARING, not debugging
+              # decoration. `opencode run` prints a banner at ~5s and then NOTHING
+              # until the whole message completes, so stdout can only prove
+              # completion; the CLI's own log lines are the only liveness there
+              # is. Without them the watchdog would judge every attempt by its
+              # startup window and kill working models.
+              if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
+                --model "$model" -- \
+                opencode run \
+                --auto \
+                --print-logs \
+                --log-level DEBUG \
+                --model "$model" \
+                2>&1 | tee state/agent-log.txt; then
+                :
+              else
+                run_rc=$?
+              fi
+              # SUCCESS FIRST, AND FROM THE FILE, NOT THE EXIT CODE. Classifying
+              # before this check would discard a GOOD digest whose article text
+              # happens to contain "rate limit" or "quota" -- the classifier reads
+              # the CLI's own words, and a finished digest is full of words. One
+              # row per attempt still goes to the log, with kind=ok here.
+              if [ "$run_rc" = "0" ] && [ -f state/stories.json ] \
+                && python3 -c "import json,sys; json.load(open('state/stories.json'))"; then
+                printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
+                  "$(date -u +%FT%TZ)" "$tried" "$model" "$run_rc" "$allow" \
+                  >> state/agent-attempts.log
+                echo "Agent wrote valid state/stories.json on attempt $tried ($model)"
+                python3 scripts/model_selector.py --record "$model" ok || true
+                ok=1
+                break
+              fi
+              # CLASSIFY a real failure, then act. `UnknownError` alone is an
+              # outage and a missing model is a not-found ONLY when the marker is
+              # present. The watchdog already wrote its own marker into this log,
+              # so the decision is reproducible from the log alone.
+              kind=$(python3 scripts/model_selector.py --classify \
+                --log state/agent-log.txt --rc "$run_rc" 2>/dev/null || echo other)
+              case "$kind" in
+                model_not_found|quota_or_rate_limited|auth|provider_outage|slow_or_stalled|other) ;;
+                *) kind="other" ;;
+              esac
+              printf '%s attempt=%d model=%s kind=%s rc=%s allow=%s\n' \
+                "$(date -u +%FT%TZ)" "$tried" "$model" "$kind" "$run_rc" "$allow" \
+                >> state/agent-attempts.log
+              if [ "$kind" = "model_not_found" ] || [ "$kind" = "quota_or_rate_limited" ]; then
+                echo "Circuit breaker: $model -> $kind. Skipping to the next model without spending the allowance."
+                last_err="$kind on $model"
+                # THE COUNTER THAT DECIDES A RETRY. Only a cycle in which EVERY
+                # failure was this transient class may back off and try again:
+                # a not-found is a wrong id, and repeated attempts at it are
+                # exactly the 4-of-12 waste the cooldown removes.
+                if [ "$kind" = "quota_or_rate_limited" ]; then
+                  cycle_quota=$((cycle_quota+1))
+                else
+                  cycle_other=$((cycle_other+1))
+                fi
+                # RECORD THE REAL CLASS, never a generic "transport". The selector
+                # decides what each class costs: a not-found earns a 24h hard
+                # cooldown (the id is simply wrong), and a quota is recorded but
+                # deliberately NOT cooled down, because the whole free pool shares
+                # that limit and skipping models over it would end the run early.
+                python3 scripts/model_selector.py --record "$model" "$kind" || true
+                continue
+              fi
+              if [ "$kind" = "auth" ]; then
+                # STOP, deliberately. A bad credential is not a property of this
+                # model: every remaining attempt would fail the same way, burn the
+                # budget and bury the real cause. It is also NOT transient, so it
+                # never earns a backoff.
+                echo "Circuit breaker: $model -> auth. Retrying other models would only hide the cause; stopping the walk."
+                last_err="auth: $model was rejected (credential), walk aborted"
+                cycle_other=$((cycle_other+1))
+                python3 scripts/model_selector.py --record "$model" transport || true
+                break
+              fi
+              cycle_other=$((cycle_other+1))
+              if [ "$run_rc" = "0" ]; then
+                echo "Attempt $tried finished without a valid state/stories.json"
+                last_err="no stories.json"
+                python3 scripts/model_selector.py --record "$model" transport || true
+              else
+                echo "Attempt $tried command failed (rc=$run_rc, kind=$kind)"
+                if [ "$run_rc" = "124" ]; then
+                  last_err="timeout"
+                  python3 scripts/model_selector.py --record "$model" timeout || true
+                elif [ "$kind" = "provider_outage" ]; then
+                  # RECORDED AS ITSELF so the selector can count a REPEAT. A single
+                  # 5xx is still recorded and still reorders the next run, but it
+                  # only earns a short hard cooldown on the second hit -- one bad
+                  # second must not remove a model from the walk.
+                  last_err="command failed rc=$run_rc"
+                  python3 scripts/model_selector.py --record "$model" provider_outage || true
+                else
+                  last_err="command failed rc=$run_rc"
+                  python3 scripts/model_selector.py --record "$model" transport || true
+                fi
+              fi
+            done
+            # A SUCCESS ENDS THE WALK, not just this cycle.
+            if [ "$ok" = "1" ]; then
+              break
             fi
+            # THE RETRY DECISION IS DELIBERATELY NARROW. A cycle in which EVERY
+            # failure was quota_or_rate_limited is contention, and contention is
+            # the one class that clears by itself (measured: 5/5 answered in
+            # 33-44s each minutes after a wall of 1s refusals). Anything else --
+            # a wrong id, a 401, a timeout, a 5xx -- keeps its own cooldown and
+            # ends the walk, because repeating it buys nothing and costs the slot.
+            if [ "$cycle_quota" -le 0 ] || [ "$cycle_other" -gt 0 ]; then
+              break
+            fi
+            contention_only=1
+            if [ "$cycle" -ge "$RETRY_MAX_CYCLES" ]; then
+              echo "Quota contention: cycle $cycle tried ${#models[@]} models and every one returned quota_or_rate_limited; still throttled after $((cycle-1)) backoff(s), and this run's ${RETRY_MAX_CYCLES}-cycle bound is spent. Stopping the walk -- the model ids are not the problem."
+              break
+            fi
+            # THE CLAMP THAT PROTECTS THE DELIVERY STAGES. A wait may only take
+            # what still leaves one attempt's worth of time inside the walk's own
+            # deadline, so the 10 minutes between this step's cap and the job's
+            # 45 are never borrowed by a retry.
+            remaining=$(( deadline - $(date +%s) ))
+            room=$(( remaining - MIN ))
+            if [ "$room" -lt 1 ]; then
+              echo "Quota contention: cycle $cycle tried ${#models[@]} models and every one returned quota_or_rate_limited; only ${remaining}s of the ${BUDGET}s walk bound remain, below the ${MIN}s one attempt needs. No retry -- the bound keeps the delivery stages' time intact."
+              break
+            fi
+            backoff=${RETRY_BACKOFF[$((cycle-1))]:-720}
+            nap=$(( backoff < room ? backoff : room ))
+            next_at=$(python3 -c 'import datetime,sys;print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=int(sys.argv[1]))).strftime("%Y-%m-%dT%H:%M:%SZ"))' "$nap" 2>/dev/null || echo "in ${nap}s")
+            echo "Quota contention: cycle $cycle tried ${#models[@]} models and every one returned quota_or_rate_limited (the shared free pool throttling this egress bucket, not a broken id). Backing off ${nap}s; next retry at ${next_at}."
+            sleep "$nap"
           done
           END=$(date +%s)
           STAGE_KEY=agent STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
+          if [ "$ok" = "1" ] && [ "$cycle" -gt 1 ]; then
+            echo "Contention cleared: the digest was produced on walk cycle ${cycle} after $((cycle-1)) backoff(s)."
+          fi
           if [ "$ok" != "1" ]; then
-            echo "Digest not built: ${tried} of ${#models[@]} free models tried in $(( (END-START+59) / 60 )) min, none produced a digest (last error: ${last_err}). The next scheduled run will retry."
+            if [ "$contention_only" = "1" ]; then
+              # ONE LINE, AND IT NAMES THE RIGHT CAUSE. "Models are broken" would
+              # be false: the ids are advertised and answer minutes later. What
+              # ran out is the walk's bound, against a per-IP throttle that this
+              # runner shares with every other Azure egress address.
+              echo "Digest not built: ${tried} attempt(s) over ${cycle} cycle(s) in $(( (END-START+59) / 60 )) min. Every model was refused by the free pool's CONTENTION wall (quota_or_rate_limited, last error: ${last_err}) and the walk's ${BUDGET}s bound ran out before the throttle cleared. This is transient throttling of the shared anonymous pool this egress sits behind -- not the account's own allowance and not broken model ids. The next scheduled run will retry."
+            else
+              echo "Digest not built: ${tried} of ${#models[@]} free models tried in $(( (END-START+59) / 60 )) min, none produced a digest (last error: ${last_err}). The next scheduled run will retry."
+            fi
             tail -n 50 state/agent-log.txt || true
             exit 1
           fi

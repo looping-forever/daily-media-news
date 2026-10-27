@@ -194,10 +194,20 @@ for arg in "$@"; do
   prev="$arg"
 done
 if [ -n "$info_out" ]; then
-  for m in ${STUB_POOL:-}; do printf '%s\n' "$m"; done
-  "$real" -c 'import json,os,sys;pool=(os.environ.get("STUB_POOL") or "").split();json.dump({"source":"stub","provider":"opencode","seed":[],"discovered":pool,"rejected":{},"unparsed":[],"error":"","dropped_seed":[],"cooled_down":[],"selected":pool,"cache_fetched_at":None,"cache_age_sec":None,"per_attempt_sec":int(os.environ["STUB_PER"]),"total_budget_sec":int(os.environ["STUB_BUDGET"]),"min_attempt_sec":int(os.environ["STUB_MIN"])},open(sys.argv[1],"w",encoding="utf-8"),indent=2)' "$info_out"
+  # HOW MANY TIMES THE LADDER WAS RESOLVED, and optionally a DIFFERENT pool on
+  # the second resolution. A retry that reuses cycle 1's list would be
+  # indistinguishable from one that re-reads it without these two affordances.
+  sel_n=0
+  if [ -n "${STUB_SELECT_LOG:-}" ]; then
+    if [ -f "$STUB_SELECT_LOG" ]; then sel_n=$(wc -l < "$STUB_SELECT_LOG"); fi
+    printf 'select\n' >> "$STUB_SELECT_LOG"
+  fi
+  pool="${STUB_POOL:-}"
+  if [ "$sel_n" -ge 1 ] && [ -n "${STUB_POOL_2:-}" ]; then pool="$STUB_POOL_2"; fi
+  for m in $pool; do printf '%s\n' "$m"; done
+  STUB_POOL_EFFECTIVE="$pool" "$real" -c 'import json,os,sys;pool=(os.environ.get("STUB_POOL_EFFECTIVE") or "").split();json.dump({"source":"stub","provider":"opencode","seed":[],"discovered":pool,"rejected":{},"unparsed":[],"error":"","dropped_seed":[],"cooled_down":[],"selected":pool,"cache_fetched_at":None,"cache_age_sec":None,"per_attempt_sec":int(os.environ["STUB_PER"]),"total_budget_sec":int(os.environ["STUB_BUDGET"]),"min_attempt_sec":int(os.environ["STUB_MIN"])},open(sys.argv[1],"w",encoding="utf-8"),indent=2)' "$info_out"
   printf 'stub selector: pool=%s budget=%ss per=%ss min=%ss\n' \
-    "${STUB_POOL:-}" "${STUB_BUDGET:-}" "${STUB_PER:-}" "${STUB_MIN:-}" >&2
+    "$pool" "${STUB_BUDGET:-}" "${STUB_PER:-}" "${STUB_MIN:-}" >&2
   exit 0
 fi
 printf '%s\n' "$*" >> "${STUB_RECORD_LOG:?}"
@@ -235,6 +245,13 @@ timeout() {
   esac
   shift
   "$@"
+}
+sleep() {
+  # A retry backoff is minutes long. It is RECORDED and skipped, never slept:
+  # the value is the part that matters (and a test that really slept would look
+  # exactly like a hung suite). No clock tick is consumed, so the deadline
+  # arithmetic stays a pure function of the step's own `date +%s` calls.
+  if [ -n "${STUB_SLEEP_LOG:-}" ]; then printf '%s\n' "${1:-}" >> "$STUB_SLEEP_LOG"; fi
 }
 """
 
@@ -389,7 +406,9 @@ class AgentWalkHarness(unittest.TestCase):
         timeout_log = self.tmp / "timeout_args.txt"
         record_log = self.tmp / "record_calls.txt"
         clock = self.tmp / "clock.txt"
-        for path in (log, timeout_log, record_log, clock):
+        sleep_log = self.tmp / "sleep_args.txt"
+        select_log = self.tmp / "select_calls.txt"
+        for path in (log, timeout_log, record_log, clock, sleep_log, select_log):
             path.write_text("", encoding="utf-8")
         env = self.step_env()
         env.update({
@@ -402,6 +421,8 @@ class AgentWalkHarness(unittest.TestCase):
             "STUB_OPENCODE_PLAN": plan,
             "STUB_OPENCODE_LOG": str(log),
             "STUB_TIMEOUT_LOG": str(timeout_log),
+            "STUB_SLEEP_LOG": str(sleep_log),
+            "STUB_SELECT_LOG": str(select_log),
             "STUB_RECORD_LOG": str(record_log),
             "STUB_CLOCK_FILE": str(clock),
             "STUB_BUDGET": str(budget),
@@ -415,6 +436,8 @@ class AgentWalkHarness(unittest.TestCase):
         return proc, {
             "models": log.read_text(encoding="utf-8").split(),
             "allowances": timeout_log.read_text(encoding="utf-8").split(),
+            "naps": sleep_log.read_text(encoding="utf-8").split(),
+            "selects": select_log.read_text(encoding="utf-8").split(),
             "records": [line.split()[-2:]
                         for line in record_log.read_text(encoding="utf-8").splitlines()
                         if line.split()],
