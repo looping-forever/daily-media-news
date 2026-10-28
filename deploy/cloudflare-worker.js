@@ -5065,9 +5065,11 @@ function honestDeliveryReason(entry) {
       return "sent | the row claims a push but records no push instant";
     }
     const seen = storedEdition(e);
-    return "sent | a push landed at " + pushInstant +
-      " | the row records edition '" + seen.edition + "'" +
-      (seen.disagreement ? " (" + seen.disagreement + ")" : "");
+    // The disagreement sentence already names the stored value, so it is used
+    // INSTEAD of a second "the row records edition ..." clause rather than after
+    // it: one sentence per fact, or the reason reads like two readers arguing.
+    return "sent | a push landed at " + pushInstant + " | " +
+      (seen.disagreement || "the row records edition '" + seen.edition + "'");
   }
   if (state === STATE_PENDING) {
     return "pending | a push was started and its outcome was not recorded yet";
