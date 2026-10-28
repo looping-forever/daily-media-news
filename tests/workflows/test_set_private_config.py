@@ -69,6 +69,18 @@ INSTITUTION_NAMES = ("BANK_NAME", "BANK_URL", "COLLEGE_NAME", "COLLEGE_URL")
 ARCHIVE_VARIABLE = "CF_ARCHIVE_ORIGIN"
 WORKER_SECRET = "DIGEST_ARCHIVE_ORIGIN"
 
+#: The values the behavioural harness types in, in TRIMMED form. RUN_HARNESS
+#: supplies the origin with a trailing slash on purpose; the trimmed spelling here
+#: is what proves the trim, and it is a substring of the untrimmed one, so an argv
+#: scan for it catches both spellings.
+ARCHIVE_ORIGIN_VALUE = "https://example.pages.dev"
+INSTITUTION_VALUES = (
+    "Test Bank (Branch)",
+    "https://bank.example.com",
+    "Test Campus",
+    "https://college.example.com",
+)
+
 #: The variables that hold a value between being read and being stored. A
 #: reference to either inside an output command is the leak this file guards.
 VALUE_VARIABLES = ("value", "origin")
@@ -165,15 +177,16 @@ function Read-Host {
 & __SCRIPT__
 """
 
-#: The stubs are batch shims on purpose. `gh secret set` is called with `--body`
-#: and `wrangler secret put` with `-c`, and a PowerShell script with a parameter
-#: block would try to bind `-c` as a parameter name. Batch `%*` copies argv
-#: verbatim; the one PowerShell helper only handles the two things batch cannot
-#: do cleanly -- printing names and capturing piped stdin.
+#: The stubs are batch shims on purpose. `wrangler secret put` is called with
+#: `-c`, and a PowerShell script with a parameter block would try to bind `-c` as
+#: a parameter name. Batch `%*` copies argv verbatim; the one PowerShell helper
+#: only handles the two things batch cannot do cleanly -- printing names and
+#: capturing piped stdin.
 GH_CMD = r"""@echo off
 >>"%DMNEWS_TEST_LOG%" echo gh %*
 set "DMNEWS_STUB_MODE=none"
 if /i "%1 %2"=="secret set" set "DMNEWS_STUB_MODE=stdin:secret set %3"
+if /i "%1 %2"=="variable set" set "DMNEWS_STUB_MODE=stdin:variable set %3"
 if /i "%1 %2"=="variable list" set "DMNEWS_STUB_MODE=print:CF_ARCHIVE_ORIGIN"
 if /i "%1 %2"=="secret list" set "DMNEWS_STUB_MODE=print:BANK_NAME,BANK_URL,COLLEGE_NAME,COLLEGE_URL"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stub.ps1"
@@ -462,12 +475,29 @@ class StubbedProvidersTest(unittest.TestCase):
                 % (value, "\n".join(argv_lines)))
 
     def test_the_archive_origin_is_trimmed_and_stored_twice(self):
+        """The expectation changed DIRECTION on 2026-10-28 -- deliberately.
+
+        This test used to require `gh variable set CF_ARCHIVE_ORIGIN --body
+        <origin>` exactly, i.e. it pinned the value ONTO argv: the one place the
+        rest of the script is careful never to put it, and exactly what
+        `test_every_institution_value_arrives_on_stdin_not_in_argv` fails an
+        institution value for. The archive variable was the hole in that rule.
+
+        The assertion is now the opposite one and it is not narrower: the
+        trailing-slash trim, both storage halves and the Worker half all stay
+        pinned. What changed is which channel the value may arrive on.
+        """
         origin = "https://example.pages.dev"
+        # The harness supplies the value WITH a trailing slash, so the trimmed
+        # form below is what proves the TrimEnd('/').
         self.assertIn(
-            "gh variable set %s --body %s" % (ARCHIVE_VARIABLE, origin),
-            self.calls,
-            "the archive origin was not set as a repository variable, or its "
-            "trailing slash was not trimmed:\n%s" % "\n".join(self.calls))
+            "gh variable set %s" % ARCHIVE_VARIABLE, self.calls,
+            "the archive origin was not set as a repository variable:\n%s"
+            % "\n".join(self.calls))
+        self.assertIn(
+            "variable set %s <= %s" % (ARCHIVE_VARIABLE, origin), self.stdin_lines,
+            "the archive origin did not reach `gh variable set` on stdin, or its "
+            "trailing slash was not trimmed:\n%s" % "\n".join(self.stdin_lines))
         self.assertTrue(
             any(line.startswith("wrangler secret put %s" % WORKER_SECRET)
                 for line in self.calls),
@@ -477,6 +507,30 @@ class StubbedProvidersTest(unittest.TestCase):
             "secret put %s <= %s" % (WORKER_SECRET, origin), self.stdin_lines,
             "the Worker secret was not handed the value on stdin:\n%s"
             % "\n".join(self.stdin_lines))
+
+    def test_no_value_reaches_any_provider_argv(self):
+        """Every value this run handled is absent from EVERY recorded argv line.
+
+        Deliberately not scoped to `gh secret set` or to the four institution
+        names. The regression this catches is a call somebody ADDS later --
+        `gh variable set --body`, a `wrangler ... --value`, a debug echo with the
+        value spliced in -- so the scan is over every stub invocation and every
+        value the harness supplied.
+
+        Values are the TRIMMED forms, and each is a substring of its untrimmed
+        original, so `https://example.pages.dev` also catches the trailing-slash
+        spelling.
+        """
+        offenders = []
+        for value in (ARCHIVE_ORIGIN_VALUE,) + INSTITUTION_VALUES:
+            offenders.extend(
+                "%r on argv:%s" % (value, line)
+                for line in self.calls if value in line)
+        self.assertEqual(
+            [], offenders,
+            "a value reached a provider on the command line, where the process "
+            "table, the shell history and any `ps` snapshot can read it. Every "
+            "value must travel on stdin:\n%s" % "\n".join(offenders))
 
     def _run_from(self, cwd):
         """Run the REAL script with `cwd=<cwd>` against the same stubs."""
@@ -549,6 +603,103 @@ class StubbedProvidersTest(unittest.TestCase):
             "the archive origin; the run output must name what was set and never "
             "show what it was set to.\n--- stdout ---\n%s\n--- stderr ---\n%s"
             % (", ".join(repr(v) for v in leaked), self.stdout, self.stderr))
+
+
+#: Every script that hands a value to `gh` or `wrangler`. The argv rule is a
+#: CLASS rule, not a property of one line: it was broken in exactly one of these,
+#: and the other two were anecdote until they were parsed.
+SECRET_SCRIPTS = (
+    "scripts/set-private-config.ps1",
+    "scripts/set-archive-password.ps1",
+    "scripts/set-delivery-secrets.ps1",
+)
+
+#: Variables that hold a value between being read and being stored.
+VALUE_BEARING = ("value", "origin", "plain", "password", "username", "secure")
+
+
+def _stores_a_value(command):
+    """Is this command one that writes a secret or variable to a provider?"""
+    name = (command.get("name") or "").lower()
+    args = [str(a).lower() for a in (command.get("args") or [])]
+    if name == "gh":
+        return (("secret" in args and "set" in args)
+                or ("variable" in args and "set" in args))
+    if name in ("wrangler", "wrangler.cmd"):
+        return "secret" in args and "put" in args
+    return False
+
+
+class NoValueOnProviderArgvTest(unittest.TestCase):
+    """Arm 3: the argv rule swept over every script that stores a secret.
+
+    The behavioural arm pinned the bug rather than the promise: it required
+    `--body <origin>`. One fixed line does not make the class safe, so this arm
+    parses all three scripts and fails if a value variable or a `--body`/`-b`
+    flag reaches a provider command's ARGUMENTS. A pipeline input is not an
+    argument, so the correct shape passes and the leaky one does not.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.exe = _powershell()
+        if cls.exe is None:
+            raise unittest.SkipTest(
+                "no PowerShell on PATH, so none of the scripts can be parsed")
+        cls.asts = {}
+        for rel in SECRET_SCRIPTS:
+            path = os.path.join(REPO_ROOT, rel)
+            if not os.path.isfile(path):
+                raise AssertionError(
+                    "%s does not exist, so the argv rule cannot be checked there"
+                    % rel)
+            harness = AST_HARNESS.replace("__SCRIPT__", _ps_literal(path))
+            done = _run_powershell(cls.exe, harness, REPO_ROOT)
+            out = _decode(done.stdout).strip()
+            if done.returncode != 0 or out.startswith("PARSE_ERROR"):
+                raise AssertionError(
+                    "the AST harness could not read %s (exit %s):\n%s\n%s"
+                    % (rel, done.returncode, out or "(no stdout)",
+                       _decode(done.stderr).strip() or "(no stderr)"))
+            cls.asts[rel] = json.loads(out)
+
+    def test_every_swept_script_actually_stores_something(self):
+        """A sweep over a script that stores nothing proves nothing."""
+        for rel, payload in sorted(self.asts.items()):
+            found = [c for c in payload.get("commands") or []
+                     if _stores_a_value(c)]
+            self.assertTrue(
+                found,
+                "%s has no `gh secret set` / `gh variable set` / "
+                "`wrangler secret put` left, so the argv sweep below is vacuous"
+                % rel)
+
+    def test_no_provider_command_takes_a_value_from_argv(self):
+        offenders = []
+        for rel, payload in sorted(self.asts.items()):
+            for command in payload.get("commands") or []:
+                if not _stores_a_value(command):
+                    continue
+                args = command.get("args") or []
+                lowered = [str(a).lower() for a in args]
+                flags = [flag for flag in ("--body", "-b") if flag in lowered]
+                touched = [v for v in (command.get("vars") or [])
+                           if v.lower() in VALUE_BEARING]
+                if flags or touched:
+                    offenders.append(
+                        "%s line %s: %s%s%s"
+                        % (rel, command.get("line"),
+                           " ".join(str(a) for a in args),
+                           ("  [flag %s]" % ", ".join(flags)) if flags else "",
+                           ("  [variable %s]"
+                            % ", ".join("$" + v for v in touched))
+                           if touched else ""))
+        self.assertEqual(
+            [], offenders,
+            "a value reaches a provider on the command line. `gh variable set` "
+            "and `gh secret set` read the value from STDIN when --body is "
+            "omitted, and argv is readable by the process table and the shell "
+            "history:\n  %s" % "\n  ".join(offenders))
 
 
 if __name__ == "__main__":

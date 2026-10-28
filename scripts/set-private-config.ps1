@@ -57,7 +57,9 @@ if (-not [string]::IsNullOrWhiteSpace($origin)) {
         throw 'that is not an absolute http(s) URL with a dotted hostname; nothing was changed'
     }
     try {
-        & gh variable set CF_ARCHIVE_ORIGIN --body $origin
+        # stdin, never --body: gh reads the value from standard input when
+        # --body is omitted, and argv is visible to the process table.
+        $origin | & gh variable set CF_ARCHIVE_ORIGIN
         if ($LASTEXITCODE -ne 0) { throw 'gh variable set CF_ARCHIVE_ORIGIN failed' }
         Write-Host '  set repo variable: CF_ARCHIVE_ORIGIN'
 
