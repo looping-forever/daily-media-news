@@ -1154,17 +1154,20 @@ test("DEFECT 4: a dispatched build that FAILED is named, not denied", async () =
     "the stand-down erased the marker it stood down on");
 });
 
-test("DEFECT 5: ?health=1 cannot report last_good_shown beside fallback_shown: false",
+test("DEFECT 5: a recorded last_good is REPORTED, and the contradiction is named",
   async () => {
-    // THE LIVE CONTRADICTION. The deployed response carried, in one object:
+    // THE LIVE CONTRADICTION, and the contract that replaced "null it out".
+    // The deployed response carried, in one object:
     //   edition: "failed", fallback_shown: false, last_good_shown: "2026-10-18"
-    // The push never landed, so nothing was shown. The stale date was written by
-    // an older build that recorded `last_good_shown` from `usable` alone.
+    // The old reader DELETED the recorded date, which is why the row could not be
+    // read back. A recorded value is now reported as recorded; what stays false
+    // is the claim about the phone (`fallback_shown`), and `edition` says why.
     const w = loadWorker();
     const pushFailed = {
       days: { [TODAY]: { [SLOT]: {
         state: "failed",
         kind: "fallback_last_good",
+        edition: "failed",
         ntfy_failed: true,
         ntfy_sent_at: null,
         pending_at: DISPATCH_AT,
@@ -1177,15 +1180,16 @@ test("DEFECT 5: ?health=1 cannot report last_good_shown beside fallback_shown: f
     assert.strictEqual(legacy.edition, "failed");
     assert.strictEqual(legacy.fallback_shown, false,
       "a push that never landed is reported as a fallback shown");
-    assert.strictEqual(legacy.last_good_shown, null,
-      "a push that never landed still claims an edition was shown: " +
+    assert.strictEqual(legacy.last_good_shown, "2026-10-12",
+      "the recorded last_good date was dropped: " +
       JSON.stringify(legacy.last_good_shown));
 
-    // AND THE OTHER DIRECTION, so this is not a blanket null. A fallback push
+    // AND THE OTHER DIRECTION, so this is not a blanket true. A fallback push
     // that DID land is a fallback shown, and the date is then the point.
     const pushed = w.latestLedgerDelivery({
       days: { [TODAY]: { [SLOT]: {
-        state: "sent", kind: "fallback_last_good", ntfy_failed: false,
+        state: "sent", kind: "fallback_last_good", edition: "fallback",
+        ntfy_failed: false,
         ntfy_sent_at: "2026-10-13T01:50:26Z", pending_at: DISPATCH_AT,
         last_good_shown: "2026-10-12",
       } } },
@@ -1198,16 +1202,165 @@ test("DEFECT 5: ?health=1 cannot report last_good_shown beside fallback_shown: f
     // A fresh digest is not a fallback, whatever else the entry carries.
     const fresh = w.latestLedgerDelivery({
       days: { [TODAY]: { [SLOT]: {
-        state: "sent", kind: "delivered", ntfy_failed: false,
+        state: "sent", kind: "delivered", edition: "fresh",
+        ntfy_failed: false,
         ntfy_sent_at: "2026-10-13T01:50:26Z", pending_at: DISPATCH_AT,
         last_good_shown: "2026-10-12",
       } } },
     });
     assert.ok(fresh, "the fixture entry was not selected as the latest delivery");
     assert.strictEqual(fresh.fallback_shown, false);
-    assert.strictEqual(fresh.last_good_shown, null,
-      "a fresh delivery reports a last_good edition was shown");
+    assert.strictEqual(fresh.last_good_shown, "2026-10-12",
+      "a fresh delivery's recorded last_good is still part of the record");
   });
+
+test("a legacy row whose stored edition says failed is NOT rendered fresh",
+  async () => {
+    // THE RECORD FROM KV, AS IT IS: written before ce60eb3, so `kind` says
+    // `delivered` (a full edition was built) while `edition` says `failed` (the
+    // push never landed). Re-deriving from `kind` published `fresh` about it.
+    const w = loadWorker();
+    const row = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: {
+        state: "sent",
+        kind: "delivered",
+        edition: "failed",
+        ntfy_sent_at: "2026-10-28T11:47:27Z",
+        scheduled_instant: "2026-10-28T01:30:00Z",
+        reject_reason:
+          "absent | a build was dispatched for this slot and its outcome was not recorded",
+        actions_dispatch_at: "2026-10-28T01:35:27Z",
+        last_good_shown: "2026-10-18",
+      } } },
+    });
+    assert.ok(row, "the fixture entry was not selected as the latest delivery");
+    assert.strictEqual(row.kind, "delivered");
+    assert.strictEqual(row.edition, "failed",
+      "the stored edition was overruled by the row's kind");
+    assert.strictEqual(row.fresh_edition, false,
+      "a row that records its push as failed is reported as a fresh edition");
+    assert.strictEqual(row.edition_implied, "fresh",
+      "the reader did not say what the kind alone would have implied");
+    assert.match(String(row.edition_disagreement), /'failed'/,
+      "the disagreement does not name the stored value: " +
+      JSON.stringify(row.edition_disagreement));
+    assert.match(String(row.edition_disagreement), /'fresh'/,
+      "the disagreement does not name what the kind implies: " +
+      JSON.stringify(row.edition_disagreement));
+
+    // A row with NO stored edition cannot be called any edition at all: it says
+    // unknown and names what the rest of the row would have implied.
+    const silent = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: {
+        state: "sent", kind: "delivered",
+        ntfy_sent_at: "2026-10-28T11:47:27Z",
+      } } },
+    });
+    assert.strictEqual(silent.edition, "unknown",
+      "a row with no recorded edition was given one");
+    assert.strictEqual(silent.fresh_edition, false);
+    assert.match(String(silent.edition_disagreement), /no edition/,
+      "the missing edition is not named: " +
+      JSON.stringify(silent.edition_disagreement));
+  });
+
+test("a recorded last_good_shown is surfaced on every arm", async () => {
+  const w = loadWorker();
+  for (const [label, stored] of [
+    ["failed", { state: "failed", edition: "failed", ntfy_sent_at: null,
+                 pending_at: "2026-10-28T01:35:27Z" }],
+    ["sent", { state: "sent", edition: "fresh",
+               ntfy_sent_at: "2026-10-28T11:47:27Z" }],
+    ["pending", { state: "pending", edition: "pending",
+                  pending_at: "2026-10-28T01:35:27Z" }],
+  ]) {
+    const got = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: Object.assign({ kind: "fallback_last_good",
+                                                 last_good_shown: "2026-10-18" },
+                                               stored) } },
+    });
+    assert.ok(got, label + ": the fixture entry was not selected");
+    assert.strictEqual(got.last_good_shown, "2026-10-18",
+      label + ": a recorded last_good_shown was dropped: " +
+      JSON.stringify(got.last_good_shown));
+  }
+});
+
+test("the reason agrees with the state it sits beside", async () => {
+  const w = loadWorker();
+  const stored = "absent | NO build was dispatched";
+
+  // SENT: a push instant is proof of a push, so the reason says so and never
+  // repeats a sentence about a build's outcome that was not recorded.
+  const sent = w.honestDeliveryReason({
+    state: "sent", ntfy_sent_at: "2026-10-28T11:47:27Z",
+    reject_reason: stored, actions_dispatch_at: DISPATCH_AT,
+    edition: "failed", kind: "delivered",
+  });
+  assert.match(sent, /^sent \|/,
+    "the reason does not open with the state it describes: " +
+    JSON.stringify(sent));
+  assert.ok(sent.indexOf("2026-10-28T11:47:27Z") > 0,
+    "the reason does not name the push it describes: " + JSON.stringify(sent));
+  assert.ok(sent.indexOf("outcome was not recorded") < 0,
+    "a sent slot is still described as an unrecorded outcome: " +
+    JSON.stringify(sent));
+
+  // SENT with no instant: the contradiction is named, not smoothed over.
+  const sentNoInstant = w.honestDeliveryReason({
+    state: "sent", reject_reason: stored });
+  assert.match(sentNoInstant, /no push instant/,
+    "a sent row with no push instant read as a clean push: " +
+    JSON.stringify(sentNoInstant));
+
+  // FAILED: opens with failed, keeps the repair of the dispatch denial.
+  const failed = w.honestDeliveryReason({
+    state: "failed", reject_reason: stored,
+    actions_dispatch_at: DISPATCH_AT });
+  assert.match(failed, /^failed \|/,
+    "a failed row's reason does not open with failed: " + JSON.stringify(failed));
+  assert.ok(failed.indexOf("NO build was dispatched") < 0,
+    "a failed row still denies the dispatch: " + JSON.stringify(failed));
+
+  // ABSENT: no evidence of a dispatch, so the true sentence survives untouched.
+  assert.strictEqual(w.honestDeliveryReason({ reject_reason: stored }), stored,
+    "a slot nothing was dispatched for had its true sentence rewritten");
+
+  // And nothing to say is null, not a sentence.
+  assert.strictEqual(w.honestDeliveryReason({ state: "absent" }), null);
+});
+
+test("a recorded push instant is never rendered as null", async () => {
+  // THE SWEEP. `reason` and `delta_s` read `first_ntfy_sent_at` when a row has
+  // no `ntfy_sent_at`, but the rendered field itself did not — so one response
+  // could carry "a push landed at 2026-10-28T11:47:27Z" beside `ntfy_sent_at:
+  // null`. Same class as the dropped `last_good_shown`: a recorded fact nulled
+  // by the reader.
+  const w = loadWorker();
+  const row = w.latestLedgerDelivery({
+    days: { [TODAY]: { [SLOT]: {
+      state: "sent", kind: "delivered", edition: "fresh",
+      first_ntfy_sent_at: "2026-10-28T11:47:27Z",
+      scheduled_instant: "2026-10-28T11:30:00Z",
+    } } },
+  });
+  assert.ok(row, "the fixture entry was not selected as the latest delivery");
+  assert.strictEqual(row.ntfy_sent_at, "2026-10-28T11:47:27Z",
+    "a recorded push instant was dropped: " + JSON.stringify(row.ntfy_sent_at));
+  assert.ok(String(row.reason).indexOf("2026-10-28T11:47:27Z") > 0,
+    "the reason and the field disagree about the push: " +
+    JSON.stringify(row.reason));
+  // And the stored value still wins when both are present.
+  const both = w.latestLedgerDelivery({
+    days: { [TODAY]: { [SLOT]: {
+      state: "sent", kind: "delivered", edition: "fresh",
+      ntfy_sent_at: "2026-10-28T11:47:27Z",
+      first_ntfy_sent_at: "2026-10-28T11:30:02Z",
+    } } },
+  });
+  assert.strictEqual(both.ntfy_sent_at, "2026-10-28T11:47:27Z",
+    "the first push instant overrode the stored ntfy_sent_at");
+});
 
 test("DEFECT 4: the stored sentence in KV is repaired at read time, with no migration",
   async () => {

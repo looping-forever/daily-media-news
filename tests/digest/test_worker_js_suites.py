@@ -283,10 +283,21 @@ class DispatchTruthfulNoticeWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
     `last_good_shown: '2026-10-18'` beside `fallback_shown: false` and
     `edition: failed`, which cannot all be true at once -- a date is only a
     last-good date if that digest is what the owner is actually reading.
+
+    THE DEFECT 5 CONTRACT WAS REVERSED ON THE OWNER'S INSTRUCTION, and the pin
+    moved from 21 to 25. The old repair DELETED the recorded date, which
+    destroyed the only field that could explain the row. Now a recorded value is
+    always reported, `edition` comes from what the row stored rather than from
+    its `kind`, and a disagreement between the two is named in
+    `edition_disagreement`. What stays false is the claim about the phone,
+    `fallback_shown`, and `fresh_edition` cannot be true for a row that
+    contradicts itself. The fifth test is the sweep: a push instant recorded
+    only as `first_ntfy_sent_at` is reported, not nulled, because `reason`
+    already reads it and one response may not contradict itself.
     """
 
     JS = Path(_TESTS) / "digest" / "digest_dispatch_truthful_notice.test.js"
-    TAP_PLAN = 21
+    TAP_PLAN = 25
     WORKER_OVERRIDE = "DIGEST_NOTICE_WORKER"
     WHAT_IT_GUARDS = (
         "the honesty of the fallback ladder's notice. On 2026-10-13 this Worker "
@@ -321,7 +332,11 @@ class DispatchTruthfulNoticeWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
         "DEFECT 4: the dispatch verdict has FOUR states, not two",
         "DEFECT 4: a dispatched build that FAILED is named, not denied",
         "DEFECT 4: the stored sentence in KV is repaired at read time, with no migration",
-        "DEFECT 5: ?health=1 cannot report last_good_shown beside fallback_shown: false",
+        "DEFECT 5: a recorded last_good is REPORTED, and the contradiction is named",
+        "a legacy row whose stored edition says failed is NOT rendered fresh",
+        "a recorded last_good_shown is surfaced on every arm",
+        "a recorded push instant is never rendered as null",
+        "the reason agrees with the state it sits beside",
     )
 
 

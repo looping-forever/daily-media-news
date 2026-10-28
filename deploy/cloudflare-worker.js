@@ -4916,6 +4916,40 @@ async function digestHealthFields(env, nowMs) {
   return out;
 }
 
+// WHAT THE RECORD SAYS, NOT WHAT ITS KIND SUGGESTS.
+//
+// `deliveryEdition` above is the WRITER: it decides what to put in the row. A
+// reader must not run it and call the answer the record, because the row already
+// carries `edition` and the two can disagree. The 2026-10-28 morning row is
+// exactly that: written before `ce60eb3`, it holds `kind: delivered` (the build
+// claimed a full edition) beside `edition: failed` (the push did not land), and
+// re-deriving from `kind` published `fresh` / `fresh_edition: true` about a row
+// that says the opposite. A reader that repairs the record by believing the
+// flattering half is the defect, so the stored value wins and any disagreement
+// is NAMED rather than resolved.
+function storedEdition(entry) {
+  const e = entry || {};
+  const raw = typeof e.edition === "string" ? e.edition.trim() : "";
+  const implied = deliveryEdition(e);
+  if (!raw) {
+    return {
+      edition: "unknown",
+      implied: implied,
+      disagreement: implied === "unknown"
+        ? null
+        : "the row records no edition; its state/kind imply '" + implied + "'",
+    };
+  }
+  return {
+    edition: raw,
+    implied: implied,
+    disagreement: implied === "unknown" || implied === raw
+      ? null
+      : "the row records edition '" + raw + "' but its state/kind imply '" +
+        implied + "'",
+  };
+}
+
 // The most recent entry the ledger holds, by recorded instant rather than by
 // iteration order: a ledger is a list of facts about time and the newest one is
 // the latest instant, not the last key inserted.
@@ -4935,7 +4969,12 @@ function latestLedgerDelivery(ledger) {
     for (const slot of Object.keys(day)) {
       const entry = day[slot];
       if (!entry || typeof entry !== "object") continue;
-      const at = Date.parse(String(entry.ntfy_sent_at || entry.pending_at || ""));
+      // THE SAME THREE INSTANTS `reason`, `delta_s` and `ntfy_sent_at` read. A
+      // row that recorded its push only as `first_ntfy_sent_at` used to be
+      // INVISIBLE here, so health fell back to an older row and reported it as
+      // the last delivery — a stale edition presented as the newest one.
+      const at = Date.parse(String(
+        entry.ntfy_sent_at || entry.first_ntfy_sent_at || entry.pending_at || ""));
       if (Number.isFinite(at) && at >= bestAt) {
         bestAt = at;
         best = entry;
@@ -4948,7 +4987,15 @@ function latestLedgerDelivery(ledger) {
   const delta = deliveryDeltaSeconds(
     best.first_ntfy_sent_at || best.ntfy_sent_at,
     Date.parse(String(best.scheduled_instant || "")));
-  const edition = deliveryEdition(best);
+  const seen = storedEdition(best);
+  const pushInstant = best.first_ntfy_sent_at || best.ntfy_sent_at || null;
+  // A RECORDED DATE IS A FACT AND IS NEVER DROPPED. This used to be nulled
+  // unless the derived edition was "fallback", which deleted the one field that
+  // explained why ?health=1 still looked unhappy.
+  const lastGood = best.last_good_shown === undefined ||
+    best.last_good_shown === null || best.last_good_shown === ""
+    ? null
+    : String(best.last_good_shown);
   return {
     date: bestDate,
     slot: bestSlot,
@@ -4956,26 +5003,31 @@ function latestLedgerDelivery(ledger) {
     state: best.state || null,
     // THE HONESTY FIELDS. `state: sent` only ever meant "a push landed"; it says
     // nothing about WHICH edition landed, and a reader that treats it as "a fresh
-    // digest was delivered" is reading a fallback as a success. These four make
-    // that mistake impossible without changing `kind` or `state`, which the
-    // ladder and scripts/delivery_ledger.py both depend on.
-    edition: edition,
-    fresh_edition: edition === "fresh",
-    // THE THREE FIELDS BELOW ARE ONE FACT, SO THEY COME FROM ONE FACT.
-    // `fallback_shown` and `last_good_shown` are claims about what the owner was
-    // SHOWN, so they are true only if a push actually landed -- and `edition`
-    // already folds the push result in ("failed" when it did not). A stored
-    // `last_good_shown` on a failed push was written by an older build, so it is
-    // nulled HERE rather than trusted: ?health=1 reported `fallback_shown: false`
-    // beside a non-null `last_good_shown` on the same response, which is two
-    // answers to one question, and the wrong one was the reassuring one.
-    fallback_shown: !!best.ntfy_sent_at && edition === "fallback",
-    last_good_shown: !!best.ntfy_sent_at && edition === "fallback"
-      ? (best.last_good_shown || null)
-      : null,
+    // digest was delivered" is reading a fallback as a success. These make that
+    // mistake impossible without changing `kind` or `state`, which the ladder and
+    // scripts/delivery_ledger.py both depend on.
+    //
+    // `edition` is the STORED value. `edition_disagreement` names the case where
+    // the row contradicts itself, and a contradiction can never be fresh.
+    edition: seen.edition,
+    fresh_edition: seen.edition === "fresh" && !seen.disagreement,
+    edition_implied: seen.implied,
+    edition_disagreement: seen.disagreement,
+    // THE THREE FIELDS BELOW ARE ONE QUESTION: did what the owner received
+    // contain a fallback? `last_good_shown` is what the row records; it is
+    // reported as recorded. `fallback_shown` additionally requires that a push
+    // landed AND that the row says the edition was the fallback one, because
+    // "shown" is a claim about the phone, not about the build.
+    fallback_shown: !!pushInstant && lastGood !== null &&
+      seen.edition === "fallback",
+    last_good_shown: lastGood,
     reason: honestDeliveryReason(best),
     sequence_id: best.sequence_id || null,
-    ntfy_sent_at: best.ntfy_sent_at || null,
+    // The SAME instant `reason` names, and the STORED `ntfy_sent_at` wins when
+    // the row has both. A row that recorded its push only as
+    // `first_ntfy_sent_at` used to report `null` here while the reason beside it
+    // said "a push landed at ...", one response contradicting itself.
+    ntfy_sent_at: best.ntfy_sent_at || best.first_ntfy_sent_at || null,
     delta_s: delta,
     // Same window as the ledger writer above and `_delta_s` in
     // scripts/delivery_ledger.py: negative is early, never on time.
@@ -4997,22 +5049,54 @@ function latestLedgerDelivery(ledger) {
 // no recorded failure class it says the outcome was not recorded, which is the
 // truth for a legacy entry.
 function honestDeliveryReason(entry) {
-  const stored = String((entry && entry.reject_reason) || "");
-  if (!stored) return null;
-  const dispatched = !!(entry && entry.actions_dispatch_at) ||
-    (entry && entry.late_build_dispatched === true);
-  if (!dispatched) return stored;
+  const e = entry || {};
+  const state = String(e.state || "");
+  // The SAME order `latestLedgerDelivery` renders under `ntfy_sent_at`: the
+  // reason must name the instant the field beside it shows.
+  const pushInstant = String(e.ntfy_sent_at || e.first_ntfy_sent_at || "");
+
+  // A REASON MUST DESCRIBE THE STATE IT SITS BESIDE. The 2026-10-28 morning row
+  // carries `state: sent` and a push instant, and used to publish "a build was
+  // dispatched for this slot and its outcome was not recorded" -- which reads as
+  // "nothing reached the phone" beside a push that did. The dispatch is a fact
+  // about the build; the reason belongs to the delivery.
+  if (state === STATE_SENT) {
+    if (!pushInstant) {
+      return "sent | the row claims a push but records no push instant";
+    }
+    const seen = storedEdition(e);
+    return "sent | a push landed at " + pushInstant +
+      " | the row records edition '" + seen.edition + "'" +
+      (seen.disagreement ? " (" + seen.disagreement + ")" : "");
+  }
+  if (state === STATE_PENDING) {
+    return "pending | a push was started and its outcome was not recorded yet";
+  }
+
+  const stored = String(e.reject_reason || "").trim();
+  if (!stored) {
+    return state === STATE_FAILED || e.ntfy_failed === true
+      ? "failed | the row records a failed push"
+      : null;
+  }
+  // A `failed` row must not open with the writer's `absent` token: the two say
+  // different things and health shows the reason next to the state.
+  const base = state === STATE_FAILED
+    ? stored.replace(/^absent\s*\|\s*/, "failed | ")
+    : stored;
+  const dispatched = !!(e.actions_dispatch_at) || (e.late_build_dispatched === true);
+  if (!dispatched) return base;
   // Anchored, because the sentence is the TAIL of the stored string and a
   // mid-string match would mangle a reason that merely mentions it.
   const noBuild = /\s*\|\s*NO build was dispatched\s*$/;
-  if (!noBuild.test(stored)) return stored;
-  const failureClass = entry.dispatch_failure_class
-    ? String(entry.dispatch_failure_class)
+  if (!noBuild.test(base)) return base;
+  const failureClass = e.dispatch_failure_class
+    ? String(e.dispatch_failure_class)
     : "";
   const truth = failureClass
     ? "| the build dispatched for this slot FAILED (" + failureClass + ")"
     : "| a build was dispatched for this slot and its outcome was not recorded";
-  return stored.replace(noBuild, " " + truth);
+  return base.replace(noBuild, " " + truth);
 }
 
 // --- main pass ----------------------------------------------------------------
