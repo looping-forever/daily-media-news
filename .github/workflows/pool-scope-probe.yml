@@ -1,0 +1,53 @@
+name: pool-scope-probe
+
+# Temporary experiment: one keyless request via curl and one via the pinned CLI,
+# from a GitHub runner, to see whether the free pool is shared with the laptop.
+# Delete this file after the run.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Credential presence (names only)
+        run: |
+          set -uo pipefail
+          echo "utc_start=$(date -u +%FT%TZ)"
+          echo "--- env names matching credential patterns ---"
+          env | cut -d= -f1 | grep -iE 'OPENCODE|ANTHROPIC|OPENAI|GEMINI|GOOGLE|GROQ|NVIDIA|CEREBRAS|MISTRAL|ZEN|API_KEY' | sort || echo "(none)"
+          echo "--- auth store ---"
+          if [ -d "$HOME/.local/share/opencode" ]; then ls -a "$HOME/.local/share/opencode"; else echo "no ~/.local/share/opencode"; fi
+
+      - name: Keyless direct request (arm 3)
+        run: |
+          set -uo pipefail
+          printf '%s' '{"model":"deepseek-v4.1-flash-free","messages":[{"role":"user","content":"reply with OK"}],"temperature":0,"max_tokens":8}' > /tmp/req.json
+          code=$(curl -sS --max-time 45 -X POST 'https://opencode.ai/inference/openai/v1/chat/completions' \
+            -H 'Content-Type: application/json' --data-binary @/tmp/req.json \
+            -D /tmp/h.txt -o /tmp/b.txt -w '%{http_code}')
+          echo "utc=$(date -u +%FT%TZ) requests=1 http=$code"
+          grep -iE '^(retry-after|x-ratelimit|x-opencode-|cf-ray)' /tmp/h.txt || echo "(no retry-after / x-ratelimit headers present)"
+          echo "body_first300: $(head -c 300 /tmp/b.txt)"
+
+      - name: Pipeline transport, no credential (arm 2, identical to arm 3)
+        run: |
+          set -uo pipefail
+          npm install -g "$(jq -r .pin config/opencode.json)" >/dev/null 2>&1 || npm install -g opencode-ai@1.18.31 >/dev/null 2>&1
+          echo "cli_version=$(opencode --version 2>&1 | tail -n1)"
+          echo "utc=$(date -u +%FT%TZ) requests=1"
+          set +e
+          out=$(timeout 90 opencode run --model opencode/deepseek-v4.1-flash-free "reply with OK" 2>&1)
+          rc=$?
+          set -e
+          echo "cli_exit=$rc"
+          printf '%s\n' "$out" | tail -n 15
+          echo "wall_hit=$(printf '%s' "$out" | grep -c 'Free usage limit reached')"
+          echo "utc_end=$(date -u +%FT%TZ)"
