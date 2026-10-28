@@ -140,6 +140,21 @@ case "$outcome" in
     exit 0 ;;
   garbage) printf '{"stories": [ not json\n' > state/stories.json ; exit 0 ;;
   nofile)  exit 0 ;;
+  nofile_once_reduced)
+    # THE MEASURED HYPOTHESIS, exactly: the FIRST attempt on the full candidate
+    # set finishes 600s having written nothing, and the SAME model succeeds on
+    # the reduced set. If the walk retries with the full set, or with a different
+    # model, this outcome never produces a file and the test goes red.
+    counter="${STUB_OPENCODE_LOG:?}.nofile_once"
+    n=0
+    if [ -f "$counter" ]; then n=$(cat "$counter"); fi
+    n=$((n+1))
+    printf '%s' "$n" > "$counter"
+    if [ "$n" -ge 2 ] && grep -q candidates_per_category state/candidates.json 2>/dev/null; then
+      printf '{"stories": [{"id": "stub"}]}\n' > state/stories.json
+      exit 0
+    fi
+    exit 0 ;;
   notfound)
     printf 'UnknownError: Unexpected server error\n' >&2
     printf 'ProviderModelNotFoundError: Model not found: %s\n' "$model" >&2
@@ -359,7 +374,8 @@ class AgentWalkHarness(unittest.TestCase):
         # private_values.py is what it reads them from. Both are copied for the
         # same reason as model_watchdog.py: the step really runs them.
         for name in ("model_watchdog.py", "model_selector.py",
-                     "render_prompt.py", "private_values.py"):
+                     "render_prompt.py", "private_values.py",
+                     "reduce_candidates.py"):
             shutil.copy(str(REPO_ROOT / "scripts" / name),
                         str(self.tmp / "scripts" / name))
         self.bin_dir = self.tmp / "bin"
@@ -645,6 +661,49 @@ class ContinuationTests(AgentWalkHarness):
                          art["records"])
 
 
+class QuotaEndsTheWalkTests(AgentWalkHarness):
+    """A shared-pool refusal ends the walk after ONE attempt, with no nap.
+
+    WHY. The provider refuses before generation -- 312ms after `message=stream`
+    with tokens.input=0 -- and refuses six different ids inside 16 seconds. So a
+    ladder walked against that wall buys one refusal per rung and learns nothing
+    new, and the old 3/6/12-minute backoff cycles spent the same 1800s walk bound
+    that the delivery stages need. Measured cost of the old shape: 112 model
+    attempts in one day, 181 in a week (62% of the repo's total).
+
+    The replacement is a fact on disk: one shared-pool row, which the next run
+    and the refire slot read before naming a model at all.
+    """
+
+    def test_one_refusal_stops_the_ladder_and_records_the_pool(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b", "opencode/c"],
+            plan="opencode/a:quota opencode/b:quota opencode/c:ok")
+        self.assertEqual(
+            1, proc.returncode,
+            "no digest was produced, so the step must fail rather than report "
+            "success. stdout:\n%s" % proc.stdout)
+        self.assertEqual(
+            ["opencode/a"], art["models"],
+            "the walk must stop at the FIRST shared-pool refusal -- opencode/b "
+            "and opencode/c exist only to prove they were never tried. "
+            "Invoked: %r\nstdout:\n%s" % (art["models"], proc.stdout))
+        self.assertEqual(
+            [], art["naps"],
+            "a pool wall must not be slept off inside the step: the refire slot "
+            "is the retry, and it costs the delivery stages nothing. Naps: %r"
+            % (art["naps"],))
+        calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
+        self.assertIn("--pool-refused", calls,
+                      "the refusal must be written to the shared cooldown file, "
+                      "or the next run pays for the same wall again")
+        self.assertIn("--log state/agent-log.txt", calls,
+                      "the Retry-After is in the attempt log, and it is the "
+                      "provider's own reset")
+        self.assertIn("shared pool", proc.stdout.lower())
+        self.assertIn("Digest not built", proc.stdout)
+
+
 # ==========================================================================
 # 1b. An auth refusal is PER MODEL until it repeats
 # ==========================================================================
@@ -769,6 +828,83 @@ class FailureLineTests(AgentWalkHarness):
             art["records"],
             "an unparseable or missing file is recorded as a transport-class "
             "failure, never as ok")
+
+
+# ==========================================================================
+# 2b. The bounded reduced-candidate retry
+# ==========================================================================
+
+
+class ReducedCandidateRetryTests(AgentWalkHarness):
+    """A no-stories failure earns ONE retry of the same model on less input.
+
+    Measured: the full candidate set ran 600s and wrote nothing while a smaller
+    input finished in 23.7s, so input size -- not the model -- was the
+    constraint. The retry must therefore be the SAME model with FEWER
+    candidates, and it must be bounded to one per run: a per-model allowance
+    would multiply the walk by the ladder length, which is the burn being
+    removed.
+    """
+
+    def seed_candidates(self, per_category=3):
+        rows = []
+        for cat in ("national", "local"):
+            for i in range(per_category):
+                rows.append({"title": "%s %d" % (cat, i),
+                             "url": "https://example.test/%s/%d" % (cat, i),
+                             "domain_category": cat})
+        payload = {"generated_at": "2026-10-18T00:00:00Z",
+                   "weather_summary": "clear",
+                   "weather_advice": [],
+                   "sources_ok": ["a"], "sources_failed": [],
+                   "source_results": [],
+                   "candidates": rows}
+        path = self.tmp / "state" / "candidates.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path, len(rows)
+
+    def test_the_same_model_is_retried_on_the_reduced_set_and_wins(self):
+        self.seed_candidates()
+        proc, art = self.run_step(pool=["opencode/a"],
+                                  plan="opencode/a:nofile_once_reduced")
+        self.assertGreen(proc, "reduced retry")
+        self.assertEqual(
+            ["opencode/a", "opencode/a"], art["models"],
+            "the retry must re-test the SAME model -- a different model on the "
+            "same oversized input repeats the failure")
+        self.assertIn("re-tests opencode/a on the reduced candidate set",
+                      proc.stdout)
+        self.assertIn("Agent wrote valid state/stories.json on attempt 2",
+                      proc.stdout)
+        full = json.loads((self.tmp / "state" / "candidates.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual(
+            6, len(full["candidates"]),
+            "the full candidate set must be restored: later steps read this "
+            "file and must see collection's own output")
+        self.assertNotIn("candidates_per_category", full)
+
+    def test_the_retry_cannot_double_the_walk(self):
+        """Three models, all failing without a file -> four calls, not six."""
+        self.seed_candidates()
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b", "opencode/c"],
+            plan="opencode/a:nofile opencode/b:nofile opencode/c:nofile")
+        self.assertEqual(1, proc.returncode)
+        self.assertEqual(
+            ["opencode/a", "opencode/a", "opencode/b", "opencode/c"],
+            art["models"],
+            "one bounded retry, spent on the first no-stories failure; the "
+            "ladder must not retry every model")
+        self.assertEqual(1, proc.stdout.count("re-tests opencode/a"))
+
+    def test_without_a_candidate_file_there_is_no_retry(self):
+        """Collection failed -> nothing to reduce -> do not spend a model call."""
+        proc, art = self.run_step(pool=["opencode/a"],
+                                  plan="opencode/a:nofile")
+        self.assertEqual(1, proc.returncode)
+        self.assertEqual(["opencode/a"], art["models"])
+        self.assertNotIn("re-tests", proc.stdout)
 
 
 # ==========================================================================
