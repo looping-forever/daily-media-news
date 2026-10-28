@@ -416,6 +416,34 @@ class TestStateFiveMissing(unittest.TestCase):
         self.assertIn("13/14 slots delivered", line)
         self.assertIn("missing: morning 2026-10-07", line)
 
+    def test_a_degraded_edition_still_counts_as_a_delivery(self):
+        """`partial` and `unsummarised` are pushes; this line measures pushes.
+
+        THE DEFECT. The filter was `kind == KIND_DELIVERED`, so the no-AI edition
+        of 2026-10-28 -- which DID reach the owner's phone, with a health line
+        saying so -- made this line report its slot as `missing`. The line would
+        then accuse the system of an outage on the one day the system had told
+        the owner, in the digest itself, that it was running without AI.
+        `unavailable` still counts as missing (the test above), because nothing
+        was pushed.
+        """
+        for kind in (delivery_ledger.KIND_PARTIAL,
+                     delivery_ledger.KIND_UNSUMMARISED):
+            with self.subTest(kind=kind):
+                entries = every_slot(AFTER_BOTH, 41)
+                for item in entries:
+                    if (item["npt_date"], item["slot"]) == ("2026-10-07",
+                                                           "morning"):
+                        item["kind"] = kind
+                line = delivery_ledger.delivery_line(
+                    ledger(AFTER_BOTH, entries))
+                self.assertIn("14/14 slots", line,
+                              "a %r push was not counted as a delivery: %r"
+                              % (kind, line))
+                self.assertNotIn("missing", line,
+                                 "the slot that was pushed as %r is reported "
+                                 "missing: %r" % (kind, line))
+
     def test_several_missing_slots_are_all_named_in_slot_order(self):
         entries = every_slot(AFTER_BOTH, 41,
                              skip=[("2026-10-06", "evening"),

@@ -118,13 +118,49 @@ class TheWordsAreTheSameOnAllThreeSurfaces(unittest.TestCase):
                          "the page's label changed. Every other surface is "
                          "pinned to these words.")
 
-    def test_the_email_subject_and_the_push_title_use_them_too(self):
-        for surface, pattern in (
-                ("the email subject tag",
-                 r"edition_tag = ' - " + re.escape(self.PHRASE) + r"'"),
-                ("the push title", re.escape(self.PHRASE))):
-            self.assertRegex(self.workflow, re.compile(pattern, re.IGNORECASE),
-                             "%s no longer carries %r" % (surface, self.PHRASE))
+    def test_the_push_title_uses_the_agreed_words(self):
+        self.assertRegex(self.workflow, re.compile(re.escape(self.PHRASE),
+                                                   re.IGNORECASE),
+                         "the push title no longer carries %r" % self.PHRASE)
+
+    def test_the_email_subject_folds_the_tag_into_the_subject(self):
+        """The tag has to REACH the subject, not merely exist beside it.
+
+        This used to pin the identifier `edition_tag` by name. That was the wrong
+        thing to hold: renaming a local variable leaves the label untouched, and
+        the assertion would fail on a correct workflow. Worse, it would have
+        passed a broken one -- nothing checked that the variable was ever
+        interpolated into the subject, so a subject built without the tag read as
+        green. So the name is CAPTURED rather than required, and the claim is the
+        composition itself: whatever holds the tag is interpolated into the
+        subject line, and that subject is what the send step reads.
+        """
+        block = self._subject_block()
+        assigned = re.search(
+            r"(\w+)\s*=\s*' - " + re.escape(self.PHRASE) + r"'", block,
+            re.IGNORECASE)
+        self.assertIsNotNone(
+            assigned,
+            "the unsummarised tag is no longer assigned in the build-email step, "
+            "so the subject has nothing to append. Block checked:\n%s" % block)
+        name = assigned.group(1)
+        self.assertRegex(
+            block,
+            re.compile(r"subject\s*=\s*'Daily Media News - %s - %s%s'\s*%\s*"
+                       r"\([^)]*\b" + re.escape(name) + r"\b"),
+            "the subject is composed without the tag variable %r, so an "
+            "unsummarised edition reaches the owner's lock screen labelled as a "
+            "normal digest. Block checked:\n%s" % (name, block))
+        self.assertIn("state/email_subject.txt", block,
+                      "the composed subject is no longer written to the file the "
+                      "send step reads")
+
+    def _subject_block(self):
+        """The build-email step's subject heredoc, as text."""
+        write_at = self.workflow.index("state/email_subject.txt', 'w'")
+        start = self.workflow.rindex("python3 - <<'PY'", 0, write_at)
+        end = re.compile(r"\n\s*PY\b").search(self.workflow, start).start()
+        return self.workflow[start:end]
 
     def test_no_surface_has_silently_reworded_it(self):
         variants = {m.lower() for m in

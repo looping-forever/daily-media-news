@@ -163,11 +163,14 @@ def run_node(script):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-#: The two ledger-state constants and the one helper `enforceLedgerHonesty`
-#: reaches for, stubbed exactly as the Worker defines them.
+#: The ledger-state and ledger-kind constants `enforceLedgerHonesty` reaches for,
+#: stubbed exactly as the Worker defines them.
 HONESTY_PRELUDE = """
 const STATE_SENT = "sent";
 const STATE_FAILED = "failed";
+const KIND_DELIVERED = "delivered";
+const KIND_PARTIAL = "partial";
+const KIND_UNSUMMARISED = "unsummarised";
 function isoUtc(ms) { return new Date(ms).toISOString().replace(/\\.\\d{3}Z$/, "Z"); }
 """
 
@@ -218,6 +221,51 @@ class LedgerHonestyTests(unittest.TestCase):
             "`kind` classifies what was BUILT and the digest did build, so it is "
             "deliberately left alone; only `state` is the delivery verdict: %r"
             % out))
+
+    def test_a_degraded_kind_claiming_a_push_is_downgraded_too(self):
+        """`kind` claims a push on a bad day, in three spellings, not one.
+
+        THE GAP. The gate read `state === "sent" || kind === "delivered"`, and on
+        a degraded day the Actions arm records `state: failed` with
+        `kind: unsummarised` or `kind: partial` -- a digest that IS on the topic
+        and whose push then fails on the retry. Neither half was true under the
+        old test, so a failed push survived as an undelivered digest that nothing
+        reported. `unavailable` is the one kind that claims no push and must stay
+        untouched.
+        """
+        for kind in ("delivered", "partial", "unsummarised"):
+            with self.subTest(kind=kind):
+                out = call_honesty({"state": "failed", "kind": kind,
+                                    "ntfy_failed": True, "http_status": 429,
+                                    "attempts": 3})
+                self.assertEqual(
+                    "failed", out.get("state"),
+                    "a %r entry carrying ntfy_failed=true was not downgraded: %r"
+                    % (kind, out))
+                self.assertIn(
+                    "honesty_downgraded_at", out,
+                    "the correction was not recorded for kind=%r, so nothing in "
+                    "the stored entry says the slot was ever revised: %r"
+                    % (kind, out))
+                self.assertEqual(
+                    kind, out.get("kind"),
+                    "the downgrade rewrote `kind` for %r. `kind` classifies what "
+                    "was BUILT and the digest did build; only `state` is the "
+                    "delivery verdict: %r" % (kind, out))
+
+    def test_the_kind_that_claims_nothing_is_left_alone(self):
+        """`unavailable` is a non-delivery, so it must not be rewritten.
+
+        The control for the test above: widening the gate must not turn every
+        failed slot into a fake downgrade and lose the diagnosis that says the
+        digest was never built.
+        """
+        out = call_honesty({"state": "failed", "kind": "unavailable",
+                            "ntfy_failed": True, "http_status": 400,
+                            "attempts": 3})
+        self.assertNotIn("honesty_downgraded_at", out,
+                         "an `unavailable` slot claims no push and was downgraded "
+                         "anyway: %r" % out)
 
     def test_a_real_delivery_drops_the_failure_metadata_it_outranks(self):
         """The 2026-10-13 shape: delivered at 13:55 after a 429 at 13:35.
@@ -383,6 +431,14 @@ def honesty_namespace():
         shipped_constant(body, "NPT_OFFSET"),
         shipped_constant(body, "SLOT_DUE_UTC"),
         shipped_constant(body, "SLOT_EARLY_SLACK_S"),
+        # The vocabulary the honesty gate reads. Sliced from the step like
+        # everything else: a kind that claims a push must be added in one place
+        # on both sides, and this harness fails loudly if the step's copy and
+        # the names it is built from drift apart.
+        shipped_constant(body, "KIND_DELIVERED"),
+        shipped_constant(body, "KIND_PARTIAL"),
+        shipped_constant(body, "KIND_UNSUMMARISED"),
+        shipped_constant(body, "CLAIMING_KINDS"),
         shipped_def(body, "instant_or_none"),
         shipped_def(body, "slot_due_instant"),
         shipped_def(body, "slot_holding_instant"),
@@ -541,6 +597,46 @@ class LedgerMislabelTests(unittest.TestCase):
                          "the temporal arm changed the record. KV is authoritative "
                          "for delivery (D-008) and D-008 is not this arm's to "
                          "revise; the entry must be reported and left as it is.")
+
+    def test_the_actions_arm_recognises_a_degraded_claim_as_a_claim(self):
+        """The other copy of the rule, on the kind a no-AI day actually records.
+
+        THE GAP, in the Actions arm this time. Its gate was
+        `state != 'sent' and kind != 'delivered'`, so a slot recorded
+        `state: failed, kind: unsummarised` beside `ntfy_failed=true` returned
+        before it looked at anything -- and that is not a hypothetical shape: it
+        is what this arm writes for an unsummarised edition, which is the only
+        edition it can write on a day no model answered.
+        """
+        for kind in ("delivered", "partial", "unsummarised"):
+            with self.subTest(kind=kind):
+                entry = {"state": "failed", "kind": kind, "ntfy_failed": True,
+                         "http_status": 429, "attempts": 3, "error": "429"}
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    self.ns["enforce_ledger_honesty"](
+                        entry, "2026-10-28", "morning", "2026-10-28T12:00:00Z")
+                self.assertIn("honesty_downgraded_at", entry,
+                              "kind=%r kept a delivery claim beside a verified "
+                              "failure without correction: %r" % (kind, entry))
+                self.assertIn("::error::LEDGER HONESTY VIOLATION CORRECTED",
+                              buf.getvalue(),
+                              "the Actions arm corrected kind=%r silently, and a "
+                              "silent correction is why 2026-10-14 went unnoticed"
+                              % kind)
+                self.assertEqual(kind, entry.get("kind"), entry)
+
+    def test_the_kind_that_claims_nothing_is_left_alone_here_too(self):
+        """Control: `unavailable` is a non-delivery in both copies of the rule."""
+        entry = {"state": "failed", "kind": "unavailable", "ntfy_failed": True,
+                 "http_status": 400, "attempts": 3}
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.ns["enforce_ledger_honesty"](entry, "2026-10-12", "morning",
+                                              "2026-10-12T02:00:00Z")
+        self.assertNotIn("honesty_downgraded_at", entry,
+                         "an `unavailable` slot claims no push and was "
+                         "corrected anyway: %r" % (entry,))
 
     def test_the_arm_is_CALLED_where_the_ledger_is_written(self):
         """A defined-but-uncalled arm is decoration, and this file has none."""

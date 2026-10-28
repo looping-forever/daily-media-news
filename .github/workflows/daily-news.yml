@@ -2208,6 +2208,21 @@ jobs:
           KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           LEDGER_RETENTION_DAYS = 7
           SCHEMA_VERSION = 1
+          # THE KIND VOCABULARY. `kind` says what was BUILT; `state` is the
+          # delivery verdict. Four surfaces read it: the sealer's supersede gate
+          # (SUPERSEDED_KINDS in digest-prebuild.yml), the Worker's
+          # deliveryEdition, ?health=1, and the fallback ladder. Recording every
+          # push as `delivered` made a no-AI edition read as a fresh digest on
+          # the health page and left the sealer refusing to replace it
+          # ("the slot was pushed as 'delivered', which is not a degraded push").
+          # Same precedence as the Worker (.js:3374): unsummarised beats partial.
+          KIND_DELIVERED = 'delivered'
+          KIND_PARTIAL = 'partial'
+          KIND_UNSUMMARISED = 'unsummarised'
+          # The kinds that claim a digest of THIS slot went out, so a verified
+          # ntfy failure beside one of them must downgrade the record.
+          # `unavailable` is deliberately absent: it claims nothing.
+          CLAIMING_KINDS = (KIND_DELIVERED, KIND_PARTIAL, KIND_UNSUMMARISED)
 
           def kv_namespace():
               """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
@@ -2493,7 +2508,8 @@ jobs:
                           entry.pop('error', None)
                           entry.pop('honesty_downgraded_at', None)
                       return
-                  if entry.get('state') != 'sent' and entry.get('kind') != 'delivered':
+                  if (entry.get('state') != 'sent'
+                          and entry.get('kind') not in CLAIMING_KINDS):
                       return
                   print('::error::LEDGER HONESTY VIOLATION CORRECTED for %s %s: '
                         'this slot recorded a VERIFIED ntfy failure '
@@ -2626,7 +2642,7 @@ jobs:
                   return None
 
           def record_delivery(date, slot, sequence_id, sent_at, supersede,
-                              inherit_stored_kind=False):
+                              inherit_stored_kind=False, pushed_kind=None):
               """THE ONE RECORD A CONFIRMED DELIVERY WRITES. Both arms call it.
 
               The two arms are the publish that just returned, and the
@@ -2642,6 +2658,11 @@ jobs:
               The ONE difference between the arms is `inherit_stored_kind`: the
               stand-down found a message it did not build, so it keeps whatever
               `kind` the slot already records instead of asserting `delivered`.
+
+              `pushed_kind` is the kind this run MEASURED for what it pushed
+              (see `built_kind` in main). It defaults to `delivered` only for a
+              caller with no opinion, and it is what stops a no-AI edition being
+              recorded as a fresh digest.
               """
               if not kv_configured():
                   print('WARNING: CF_PAGES_API_TOKEN / CF_ACCOUNT_ID or the '
@@ -2662,7 +2683,9 @@ jobs:
               patch = {
                   'sequence_id': sequence_id,
                   'state': 'sent',
-                  'kind': 'delivered',
+                  # WHAT WAS BUILT, NOT WHAT WE HOPE. `delivered` is only the
+                  # default for a caller that measured nothing.
+                  'kind': pushed_kind or KIND_DELIVERED,
               }
               if sent_at:
                   patch['ntfy_sent_at'] = sent_at
@@ -3907,6 +3930,20 @@ jobs:
               # One line, and it was the entire duplicate-delivery defect.
               push_seq = slot_seq + '-full' if is_supersede else slot_seq
 
+              # WHAT THIS PUSH IS MADE OF, measured once, before the push, so
+              # the record describes what was BUILT even when the push then
+              # fails. THE SAME RULE AS THE SEAL AND THE WORKER: digest-prebuild
+              # .yml:567 computes is_partial as "health is not ok, or the edition
+              # is unsummarised", and cloudflare-worker.js:3374 orders the kinds
+              # unsummarised > partial > delivered. A third copy of the rule is
+              # a third place to correct, so it is stated once here and pinned by
+              # tests/digest/test_ledger_kind.py.
+              built_kind = KIND_DELIVERED
+              if unsummarised:
+                  built_kind = KIND_UNSUMMARISED
+              elif health_state(source_health) != 'ok':
+                  built_kind = KIND_PARTIAL
+
               # ---- THE LEDGER GUARD, AND WHY IT READS DIFFERENT FIELDS ----
               #
               # ONE DELIVERY PER (date, slot) -- with exactly one exception, and
@@ -4038,7 +4075,7 @@ jobs:
                       record_delivery(today, kind, push_seq,
                                       iso_utc(datetime.datetime.now(
                                           datetime.timezone.utc)),
-                                      is_supersede)
+                                      is_supersede, pushed_kind=built_kind)
                       write_flag(True)
                   else:
                       desc = str(result.get('description') or result) if isinstance(result, dict) else str(result)

@@ -2737,11 +2737,12 @@ function ledgerCutoffDate(date) {
 // forgetting.
 //
 // TWO DIRECTIONS, BOTH HONESTY:
-//   1. `ntfy_failed: true` can never coexist with `state: sent` or
-//      `kind: delivered`. The verified failure outranks the success claim, and
-//      the slot is downgraded to `failed`. This is recoverable in the right
-//      direction: if the digest really is on the topic, the sequence_id
-//      read-back on a later run proves it and writes `sent` again.
+//   1. `ntfy_failed: true` can never coexist with `state: sent` or a kind that
+//      claims a push (delivered, partial, unsummarised). The verified failure
+//      outranks the success claim, and the slot is downgraded to `failed`. This
+//      is recoverable in the right direction: if the digest really is on the
+//      topic, the sequence_id read-back on a later run proves it and writes
+//      `sent` again.
 //   2. A success CLEARS the failure metadata it outranks. Otherwise a slot that
 //      genuinely delivered at 13:55 keeps `ntfy_quota_exhausted: true` and
 //      `error: "ntfy HTTP 429"` from the 13:35 attempt forever — which is what
@@ -2755,7 +2756,17 @@ function ledgerCutoffDate(date) {
 function enforceLedgerHonesty(entry, update) {
   const out = entry;
   const failed = out.ntfy_failed === true;
-  const claimsSent = out.state === STATE_SENT || out.kind === KIND_DELIVERED;
+  // EVERY KIND THAT CLAIMS A DIGEST OF THIS SLOT WENT OUT, not just the healthy
+  // one. `partial` and `unsummarised` are exactly what a degraded day records,
+  // and they claim a delivery just as loudly: an entry reading
+  // kind=unsummarised beside ntfy_failed=true is the same contradiction this
+  // function exists to correct, and keying on `delivered` alone let it stand.
+  // `unavailable` is deliberately absent -- it claims nothing.
+  const claimsSent =
+    out.state === STATE_SENT ||
+    out.kind === KIND_DELIVERED ||
+    out.kind === KIND_PARTIAL ||
+    out.kind === KIND_UNSUMMARISED;
 
   if (failed && claimsSent) {
     console.error(
@@ -2776,7 +2787,8 @@ function enforceLedgerHonesty(entry, update) {
     // guessing which field to believe.
     out.edition = "failed";
     // `kind` is DELIBERATELY LEFT ALONE. It classifies what was BUILT — the
-    // digest really did build, and really was a full one — so rewriting it to
+    // digest really did build, and its kind says what was in it (a full one, a
+    // partial one, or headlines with no summaries) — so rewriting it to
     // `unavailable` would mean "we tried and there was nothing", which is a NEW
     // lie in place of the old one. `state` is the delivery verdict and `state`
     // is what this corrects.

@@ -89,12 +89,19 @@ SLOT_SPLIT_NPT_HOUR = 12
 ALARM_UNAVAILABLE = ("⚠️ Delivery history unavailable — this digest may have "
                      "arrived late.")
 
-#: The kinds an entry may carry. `delivered` is the only one that counts
-#: towards punctuality; the other three are named facts about a slot.
+#: The kinds an entry may carry. `delivered`, `partial` and `unsummarised` all
+#: mean A DIGEST WAS PUSHED for that slot; they differ in what was in it, and
+#: the edition's own label says which on the page. Punctuality measures pushes,
+#: so all three count. `unavailable` is a notice and is not a delivery.
 KIND_DELIVERED = "delivered"
+KIND_PARTIAL = "partial"
+KIND_UNSUMMARISED = "unsummarised"
 KIND_NTFY_FAILED = "ntfy_failed"
 KIND_UNAVAILABLE = "unavailable"
 KIND_DUPLICATE_SUPPRESSED = "duplicate_suppressed"
+
+#: The kinds that mean a digest reached the owner's phone for its slot.
+PUSHED_KINDS = (KIND_DELIVERED, KIND_PARTIAL, KIND_UNSUMMARISED)
 
 
 # --------------------------------------------------------------------------
@@ -408,7 +415,7 @@ def _delivery_line(ledger):
             _parse_instant(entry["scheduled_instant"])
         except ValueError:
             return ALARM_UNAVAILABLE
-    delivered = [e for e in entries if e.get("kind") == KIND_DELIVERED]
+    delivered = [e for e in entries if e.get("kind") in PUSHED_KINDS]
     by_instant = {}
     for entry in entries:
         if entry.get("scheduled_instant"):

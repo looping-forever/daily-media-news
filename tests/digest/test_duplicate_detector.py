@@ -994,7 +994,15 @@ class StandDownRecordsTests(ActionsHarness):
         own successful push as `delivered`: this arm built the message that went
         out. Without this the fix would trade one lie for the opposite one --
         a healthy digest filed as a fallback -- and no test would fail.
+
+        The health map is MEASURED here on purpose. The recorded kind now
+        describes what was built, so a fixture with no health map is not a
+        healthy edition and would be recorded `partial` -- see
+        tests/digest/test_ledger_kind.py, which pins all three kinds.
         """
+        self.payload["source_health"] = {"state": "ok"}
+        (self.tmp / "state" / "stories.validated.json").write_text(
+            json.dumps(self.payload), encoding="utf-8")
         out = self.run_step(history_body="",
                             seed_ledger=self._seed(self.PENDING))
         self.assertEqual(
@@ -1625,8 +1633,13 @@ class MutationProofTests(unittest.TestCase):
 
     def test_reverting_the_kv_write_makes_the_handoff_fail(self):
         tmp = self._revert_in_copy(
-            "record_delivery(today, kind, push_seq,",
-            "_unused_suppress = (push_seq,",
+            (("record_delivery(today, kind, push_seq,",
+              "_unused_suppress = (push_seq,"),
+             # The call's tail has to lose its keyword argument too, or the
+             # mutated copy is a tuple literal with a keyword in it: a
+             # SyntaxError, which would make this proof pass for the wrong
+             # reason instead of for the missing write.
+             ("is_supersede, pushed_kind=built_kind)", "is_supersede)")),
             ".github/workflows/daily-news.yml")
         proc = subprocess.run(
             [sys.executable, "-m", "unittest",
