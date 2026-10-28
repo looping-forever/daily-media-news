@@ -594,6 +594,104 @@
       "title": "भूपिन र जुनु रानाको किताबलाई विमल गुरुङ कृति पुरस्कार",
       "category": "nepal",
       "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "dev.to/calderhayes9638/apache-kafka-retry-patterns-vs-aws-sqs-e-commerce-digest-jobs-1dd",
+      "title_hash": "6b98ddf9f75207a967175dc6e7ac03b87ac28a46",
+      "title": "Apache Kafka Retry Patterns vs AWS SQS: E-commerce Digest Jobs",
+      "category": "tech_career",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "finance.biggo.com/news/aa34df57-e2a1-418d-9eb8-322d65349056",
+      "title_hash": "02ef86a4c8821790b52aa4533be3ab7423d476bd",
+      "title": "Bank of America Warns Customers: \"Don't Hand Your Account Password to an AI Assistant\" - BigGo Finance",
+      "category": "bank_local",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "alphavilleearredores.com.br/artigo/category/noticias/noticias-brasil",
+      "title_hash": "44e9e52dcbc7eceb02b69cd3e183d32747463aa9",
+      "title": "Child of Mine Carter's Floral Ruffle One Piece Romper Dress 6-9M Tulips Bow alphavilleearredores.com.br - alphavilleearredores.com.br",
+      "category": "anime",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/sports/china-takes-mbappes-apology-seriously-after-companies-drop-football-star-over-mao-remarks",
+      "title_hash": "a12af042c6806eb9ea4e493182a58b1284ce95d2",
+      "title": "China takes Mbappé’s apology seriously after companies drop football star over Mao remarks",
+      "category": "nepal",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "dev.to/urielbitton/content-type-and-seo-check-the-response-before-trusting-the-file-name-3lk4",
+      "title_hash": "8c91a5b703da1cdbba0ac6f2ac020a1afb044b0f",
+      "title": "Content-Type and SEO: Check the Response Before Trusting the File Name",
+      "category": "tech_career",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "komonews.com/news/local/both-directions-2-closed-crash-west-of-monroe-collision-traffic-detours-closure-fryelands-boulevard-roosevelt-road-first-responders-wsdot",
+      "title_hash": "b05963303a14af7e41e438acefd0233b85b911dd",
+      "title": "Crash shuts down US 2 west of Monroe for hours - KOMO",
+      "category": "local_city",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "videogameschronicle.com/news/heres-all-23-games-shown-during-nintendos-latest-indie-world-presentation",
+      "title_hash": "291f03cf2d357e72b434ac6ba7ef96e8adff35b0",
+      "title": "Here’s all 23 games shown during Nintendo’s latest Indie World presentation",
+      "category": "gaming",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/videos/c893zeknlvnno",
+      "title_hash": "4c4cbd2350250fa9c5461a2ea72640eb3ef6c7fd",
+      "title": "Israel's election result is messy - here's why",
+      "category": "world_major",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "northantstelegraph.co.uk/news/people/kettering-to-corby-a43-road-closure-traffic-jams-cause-frustration-and-stress-for-drivers-9315685",
+      "title_hash": "d22593b44c71bcdbead00503b65647f6f3966e96",
+      "title": "Kettering to Corby A43 road closure traffic jams cause ‘frustration and stress’ for drivers - Northamptonshire Telegraph",
+      "category": "local_city",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "cobbcountycourier.com/2026/10/latest-cobb-county-road-and-lane-closures-as-of-wednesday-oct-28",
+      "title_hash": "75b72bfc8f6d2e7de28d02c423f93f9e936a6d21",
+      "title": "Latest Cobb County Road and Lane Closures as of Wednesday Oct. 28 - Cobb Courier",
+      "category": "local_city",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "animeuknews.net/2026/10/mashle-magic-and-muscles-returns-to-crunchyroll-january-2027",
+      "title_hash": "9e5a8bf8a14527cfee3883ef1ae0ff0d241dba47",
+      "title": "MASHLE: MAGIC AND MUSCLES Returns to Crunchyroll January 2027",
+      "category": "anime",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/main-left/nepal-news-evening-briefing-wednesday-october-28-2026",
+      "title_hash": "da07adf3f33356c365bc4601887f68061d802031",
+      "title": "Nepal News Evening Briefing | Wednesday, October 28, 2026",
+      "category": "nepal",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "pcgamer.com/hardware/protons-black-friday-sale-is-already-live-ditch-google-with-up-to-70-percent-off-its-vpn-and-50-percent-off-unlimited-plan",
+      "title_hash": "91a86bf84e8fd412c3b35495fa0e6ed2cf0d5dbf",
+      "title": "Proton's Black Friday sale is already live: ditch Google with up to 70% off its VPN and 50% off unlimited plan",
+      "category": "gaming",
+      "date_sent": "2026-10-28"
+    },
+    {
+      "url_normalized": "dev.to/takin_rezaei_68e7e7614b44/what-is-a-51-attack-understanding-blockchain-consensus-security-4hka",
+      "title_hash": "c655a5c6e68507b3f27ed693c1d5de6394f711cd",
+      "title": "What Is a 51% Attack? Understanding Blockchain Consensus Security",
+      "category": "tech_career",
+      "date_sent": "2026-10-28"
     }
   ]
 }
