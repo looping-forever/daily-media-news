@@ -408,6 +408,16 @@ class AgentWalkHarness(unittest.TestCase):
                 text = text.replace("${{ steps.digest_time.outputs.time }}",
                                     resolved["DIGEST_TIME"])
                 text = text.replace("${{ github.workspace }}", str(self.tmp))
+                # The simulation switch. Empty and `workflow_dispatch` are what
+                # every ORDINARY run sees: the input is unset on a real dispatch
+                # and the event name is the manual one here because the harness
+                # stands in for one. A test that wants the flag, or a cron
+                # event, passes both through `extra_env` -- which is exactly how
+                # a real job supplies them.
+                text = text.replace(
+                    "${{ github.event.inputs.simulate_pool_refusal }}", "")
+                text = text.replace("${{ github.event_name }}",
+                                    "workflow_dispatch")
                 self.assertNotIn(
                     "${{", text,
                     "env[%s] carries an expression this harness does not "
