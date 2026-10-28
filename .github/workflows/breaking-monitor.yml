@@ -240,7 +240,13 @@ jobs:
           else
             echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
           fi
-          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json; do
+          # state/model_cooldown.json IS STAGED because the pool wall is shared
+          # state, not this run's private note. The runner is ephemeral, so a
+          # cooldown written and not committed is re-learned on the next hourly
+          # run -- and the provider's Retry-After lands on UTC midnight, which is
+          # hours of hourly runs. daily-news.yml already commits this file; this
+          # is the other writer, which is why the rebase below resolves it.
+          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json state/model_cooldown.json; do
             if [ -f "$f" ]; then
               git add "$f"
             fi
@@ -252,7 +258,12 @@ jobs:
             # Attempt fast-forward pull; if it fails, try rebase; if that also fails, warn and continue
             if ! git "${auth[@]}" pull --ff-only; then
               echo "Fast-forward pull failed, attempting rebase..."
-              if ! git "${auth[@]}" pull --rebase; then
+              # -X theirs for the same reason daily-news.yml uses it: the state
+              # files are deterministic and TWO workflows now write
+              # state/model_cooldown.json, so a concurrent digest commit can
+              # leave a one-key conflict that a plain rebase stalls on. The
+              # remote's copy wins; the next refusal rewrites the row.
+              if ! git "${auth[@]}" pull --rebase -X theirs; then
                 echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
               fi
             fi

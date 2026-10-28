@@ -34,6 +34,7 @@ import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -423,6 +424,292 @@ class CommittedCooldownTests(unittest.TestCase):
                 ms.on_hard_cooldown(doc, model, 4_102_444_800.0),  # 2100-01-01
                 "%r would still be vetoed in 2100 -- that is a blacklist, and a "
                 "blacklist never re-tests an id that came back" % (model,))
+
+
+class SharedPoolTests(unittest.TestCase):
+    """The refusal is about THE BUCKET, not the model.
+
+    WHY THIS EXISTS. Measured on the live provider: six different ids were refused
+    inside 16 seconds, 312 ms after the request was accepted and with
+    `tokens.input=0` -- the refusal happens BEFORE generation. So the per-model
+    cooldown above cannot help: it would let the walk spend the next five rungs
+    (60 s each) relearning one fact about the pool. On 2026-10-27 that fact cost
+    33 of the week's 47 quota refusals.
+
+    The three things this suite pins:
+
+      1. ONE ROW. A refusal is recorded once, as a `pool` row, with an absolute
+         `until`; it is never recorded per model.
+      2. YIELD. Every model is withdrawn while the pool row is live, and the
+         existing empty-selection path is used -- the caller is told, not failed.
+      3. THE DIGEST RESERVATION. `role="digest"` may ignore a wall it has watched
+         for longer than the grace, because an edition that is never written is a
+         worse outcome than one re-test; `role="other"` may not, and yields for
+         the rest of an open slot window.
+    """
+
+    UTC = timezone.utc
+    SLOT = datetime(2026, 10, 28, 1, 35, tzinfo=UTC).timestamp()
+
+    def test_a_refusal_is_one_absolute_pool_row(self):
+        doc = {}
+        row = ms.record_pool_refusal(doc, at=1000.0, retry_after=300)
+        self.assertEqual(["pool"], list(doc))
+        self.assertEqual("quota_or_rate_limited", row["reason"])
+        self.assertEqual(300, row["seconds"])
+        self.assertEqual("1970-01-01T00:21:40+00:00", row["until"],
+                         "until must be absolute, so expiry does not depend on "
+                         "when the reader runs")
+
+    def test_the_providers_own_retry_after_wins(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=1000.0, retry_after=1200)
+        self.assertEqual(1200, doc["pool"]["seconds"],
+                         "Retry-After is the observed reset; a default is only a "
+                         "fallback")
+
+    def test_an_absent_retry_after_falls_back_and_a_huge_one_is_clamped(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=1000.0, retry_after=None)
+        self.assertEqual(ms.POOL_DEFAULT_SEC, doc["pool"]["seconds"])
+        big = {}
+        ms.record_pool_refusal(big, at=1000.0, retry_after=10 ** 9)
+        self.assertEqual(ms.POOL_MAX_SEC, big["pool"]["seconds"],
+                         "an absurd header must not become a permanent wall")
+
+    def test_a_second_refusal_never_shortens_the_wall(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=1000.0, retry_after=600)
+        ms.record_pool_refusal(doc, at=1010.0, retry_after=60)
+        self.assertEqual(600, doc["pool"]["seconds"],
+                         "a later, shorter report must not re-arm the pool early")
+
+    def test_a_live_pool_row_withdraws_every_model(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=1000.0, retry_after=300)
+        models, info = _select([DEAD, LIVE], doc, now=1100.0)
+        self.assertEqual([], models)
+        self.assertTrue(info["pool_blocked"])
+        self.assertIn("until", info["pool"]["note"],
+                      "the suppression must name its expiry, or a wall with no "
+                      "date is indistinguishable from a broken workflow")
+
+    def test_an_expired_pool_row_withdraws_nothing(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=1000.0, retry_after=300)
+        models, info = _select([LIVE], doc, now=1400.0)
+        self.assertEqual([LIVE], models)
+        self.assertFalse(info.get("pool_blocked"))
+        self.assertFalse(doc.get("pool"), "expiry must prune the row")
+
+    def test_the_digest_may_ignore_a_wall_it_has_watched_past_the_grace(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=self.SLOT - 700, retry_after=7200)
+        fresh = ms.pool_block(doc, now=self.SLOT - 640, role="digest")
+        self.assertTrue(fresh["blocked"],
+                        "inside the grace the digest must still honour the wall")
+        late = ms.pool_block(doc, now=self.SLOT, role="digest")
+        self.assertFalse(late["blocked"],
+                         "after the grace the digest attempts anyway -- losing "
+                         "the edition is the worse failure")
+        self.assertIn("Attempting anyway", late["note"])
+
+    def test_a_non_digest_caller_yields_to_the_end_of_an_open_digest_window(self):
+        """The reservation's only job: do not let another walk eat a pool that
+        has just come back, while the digest that needs it is about to run.
+
+        A wall that expires INSIDE an open slot window is held to the window's
+        end. It is deliberately NOT a blanket hour-long embargo around every
+        slot: with a healthy pool nobody is being refused, and a quiet breaking
+        monitor for two hours a day would be a real cost paid for nothing.
+        """
+        doc = {}
+        # Refused 100s before the slot with 300s to wait: the wall dies at
+        # SLOT+200, which is inside the window ending at SLOT+3600.
+        ms.record_pool_refusal(doc, at=self.SLOT - 100, retry_after=300)
+        out = ms.pool_block(doc, now=self.SLOT, role="other")
+        self.assertTrue(out["blocked"])
+        self.assertTrue(out["digest_window"])
+        self.assertEqual(
+            datetime.fromtimestamp(self.SLOT + ms.DIGEST_WINDOW_TRAIL_SEC,
+                                   timezone.utc).isoformat(),
+            out["until"],
+            "the yield must last exactly as long as the window it protects")
+
+    def test_a_wall_that_outlives_the_window_is_not_shortened(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=self.SLOT, retry_after=7200)
+        out = ms.pool_block(doc, now=self.SLOT, role="other")
+        self.assertEqual(
+            datetime.fromtimestamp(self.SLOT + 7200, timezone.utc).isoformat(),
+            out["until"], "the provider's reset outranks the window")
+
+    def test_no_window_means_no_extension(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=1000.0, retry_after=300)
+        out = ms.pool_block(doc, now=1100.0, role="other")
+        self.assertFalse(out["digest_window"])
+        self.assertEqual(
+            datetime.fromtimestamp(1300.0, timezone.utc).isoformat(),
+            out["until"])
+
+    def test_the_selector_reports_the_reservation_it_is_honouring(self):
+        doc = {}
+        ms.record_pool_refusal(doc, at=self.SLOT - 100, retry_after=300)
+        models, info = _select([LIVE], doc, now=self.SLOT)
+        self.assertEqual([], models)
+        self.assertTrue(info["pool"]["digest_window"])
+
+    def test_the_window_is_closed_outside_the_two_slots(self):
+        self.assertIsNotNone(ms.digest_window(now=self.SLOT))
+        self.assertIsNone(ms.digest_window(now=self.SLOT + 3 * 3600),
+                          "the reservation must not wall the pool all day")
+
+    def test_the_slot_table_comes_from_the_deployment_schedule(self):
+        """The window is derived, not typed twice.
+
+        `deploy/schedule.json` already states the digest slots; a second copy in
+        Python would drift the moment the schedule moved, and the drift would be
+        invisible until a digest slot silently stopped being protected.
+        """
+        self.assertEqual(((1, 35), (13, 35)), ms.digest_slots())
+
+
+class PoolVocabularyTests(unittest.TestCase):
+    def test_the_pre_generation_refusal_is_what_earns_a_pool_row(self):
+        refusal = ("AI_APICallError: Rate limit exceeded. Retry-After: 1200\n"
+                   "message=stream tokens.input=0")
+        self.assertEqual("quota_or_rate_limited",
+                         ms.classify_failure(refusal, 1))
+        self.assertEqual(1200, ms.retry_after_from_text(refusal))
+
+    def test_a_not_found_id_is_not_a_pool_refusal(self):
+        self.assertEqual(
+            "model_not_found",
+            ms.classify_failure(
+                "ProviderModelNotFoundError: Model not found: %s" % DEAD, 1))
+        self.assertIsNone(
+            ms.retry_after_from_text("ProviderModelNotFoundError: Model not "
+                                     "found: %s" % DEAD))
+
+
+class PoolCliTests(unittest.TestCase):
+    """The shell walks speak to this through the CLI, so the CLI is where a
+    suppression has to be legible. A silent empty ladder is the failure mode:
+    `mapfile` discards the exit code, so a caller that exits non-zero on a
+    suppression turns a normal "wait" into a red workflow."""
+
+    def _run(self, argv, discover):
+        saved = ms.discover
+        ms.discover = discover
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = ms._main(argv)
+        finally:
+            ms.discover = saved
+        return code, out.getvalue(), err.getvalue()
+
+    def test_pool_refused_writes_a_row_that_the_next_select_honours(self):
+        with tempfile.TemporaryDirectory(prefix="cool-pool-") as sd:
+            cfg = os.path.join(sd, "opencode.json")
+            health = os.path.join(sd, "health.json")
+            with open(cfg, "w", encoding="utf-8") as fh:
+                json.dump({"provider": PROVIDER, "ladder": [LIVE]}, fh)
+
+            code, _, err = self._run(
+                ["--pool-refused", "--retry-after", "1200", "--health", health],
+                lambda _p, cache_path=None: ([LIVE], {"source": "live"}))
+            self.assertEqual(0, code)
+            self.assertIn("until", err, "the recorded wall must name its expiry")
+
+            doc = ms.load_cooldown(ms.cooldown_path_for(health))
+            self.assertEqual(1200, doc["pool"]["seconds"])
+            self.assertEqual({}, doc.get("models") or {},
+                             "a pool refusal must not cool a model")
+
+            code, out, err = self._run(
+                ["--select", "--all", "--config", cfg, "--health", health],
+                lambda _p, cache_path=None: ([LIVE], {"source": "live"}))
+            self.assertEqual(0, code,
+                             "a suppression is not a failure: the caller's job "
+                             "is to wait, not to go red")
+            self.assertEqual("", out)
+            self.assertIn("pool cooldown", err)
+
+    def test_pool_refused_reads_the_retry_after_out_of_the_attempt_log(self):
+        with tempfile.TemporaryDirectory(prefix="cool-pool-log-") as sd:
+            health = os.path.join(sd, "health.json")
+            log = os.path.join(sd, "attempt.log")
+            with open(log, "w", encoding="utf-8") as fh:
+                fh.write("AI_APICallError: Rate limit exceeded\n"
+                         "Retry-After: 1800\nmessage=stream tokens.input=0\n")
+            code, _, _ = self._run(
+                ["--pool-refused", "--log", log, "--health", health],
+                lambda _p, cache_path=None: ([LIVE], {"source": "live"}))
+            self.assertEqual(0, code)
+            doc = ms.load_cooldown(ms.cooldown_path_for(health))
+            self.assertEqual(1800, doc["pool"]["seconds"],
+                             "the provider's own reset must win over the default")
+
+    def test_role_digest_reaches_the_selector(self):
+        with tempfile.TemporaryDirectory(prefix="cool-pool-role-") as sd:
+            cfg = os.path.join(sd, "opencode.json")
+            health = os.path.join(sd, "health.json")
+            with open(cfg, "w", encoding="utf-8") as fh:
+                json.dump({"provider": PROVIDER, "ladder": [LIVE]}, fh)
+            doc = ms.load_cooldown(ms.cooldown_path_for(health))
+            ms.record_pool_refusal(doc, at=time.time() - 700, retry_after=7200)
+            ms.save_cooldown(ms.cooldown_path_for(health), doc)
+
+            code, out, err = self._run(
+                ["--select", "--all", "--role", "other", "--config", cfg,
+                 "--health", health],
+                lambda _p, cache_path=None: ([LIVE], {"source": "live"}))
+            self.assertEqual(0, code)
+            self.assertEqual("", out)
+
+            code, out, err = self._run(
+                ["--select", "--all", "--role", "digest", "--config", cfg,
+                 "--health", health],
+                lambda _p, cache_path=None: ([LIVE], {"source": "live"}))
+            self.assertEqual(0, code)
+            self.assertEqual([LIVE], out.split(),
+                             "the digest attempts anyway past the grace")
+            self.assertIn("WILL NOT YIELD", err)
+
+
+class WorkflowWiringTests(unittest.TestCase):
+    """The digest walk is the caller the reservation exists for.
+
+    `pool_block` and `--role digest` are covered above, but the SAVING lives in
+    the workflow: a later edit that drops the role, or that stops diagnosing the
+    blocked pool, would leave every unit test green while the digest went back to
+    honouring a stale wall and losing the edition.
+    """
+
+    def _resolve_ladder_body(self):
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))))
+        path = os.path.join(repo, ".github", "workflows", "daily-news.yml")
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        parts = text.split("resolve_ladder() {", 1)
+        self.assertEqual(2, len(parts), "resolve_ladder has been renamed")
+        return parts[1].split("tried=0", 1)[0]
+
+    def test_the_digest_walk_resolves_its_ladder_as_the_digest_role(self):
+        body = self._resolve_ladder_body()
+        self.assertIn("--role digest", body,
+                      "without the role the digest honours a wall younger than "
+                      "its grace, and a stale refusal loses the edition")
+
+    def test_a_blocked_pool_is_diagnosed_rather_than_reported_as_empty(self):
+        body = self._resolve_ladder_body()
+        self.assertIn("pool_blocked", body,
+                      "an empty ladder because the pool is refused must say so; "
+                      "reporting it as an empty ladder sends the reader after "
+                      "broken model ids")
 
 
 if __name__ == "__main__":

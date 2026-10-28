@@ -113,7 +113,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # ---------------------------------------------------------------------------
 # Discovery
@@ -731,8 +731,248 @@ def _epoch(stamp):
     return moment.timestamp()
 
 
+# ---------------------------------------------------------------------------
+# The SHARED POOL cooldown -- one bucket, not one model
+# ---------------------------------------------------------------------------
+# Measured 2026-10-27: six different model ids refused inside 16 s, each refusal
+# 312 ms after `message=stream` with `tokens.input=0` -- i.e. BEFORE any
+# generation. The provider throttles the egress bucket, not the model, so a
+# per-model cooldown is the wrong shape: it would have to cool every id at once
+# (which is what "remove the pool" looks like) and it still would not tell the
+# next workflow anything. So the refusal is recorded ONCE, as a pool fact, in the
+# same committed file as the per-model cooldowns -- `state/model_cooldown.json` --
+# under `pool` rather than `models`. One state file, one save path, one commit.
+#
+# WHY THE DIGEST IS TREATED DIFFERENTLY FROM EVERYTHING ELSE. The digest slot is
+# the product; a breaking sweep, a canary or a watchdog is not. So:
+#   * a NON-digest caller yields: it will not spend the pool during the digest's
+#     own slot window, and it never extends past what the provider asked for;
+#   * the digest may IGNORE a cooldown it has watched for longer than
+#     POOL_DIGEST_GRACE_SEC. That trade is stated out loud at the call site: the
+#     slot is the one thing worth re-testing a stale wall for, and a wall that
+#     never expires would otherwise lose every future edition silently.
+POOL_KEY = "pool"
+
+#: Used when the provider gave no Retry-After. Long enough to cover the measured
+#: ~43 s wall several times over, short enough that a stale marker cannot park
+#: the pool for an hour.
+POOL_DEFAULT_SEC = 15 * 60
+
+#: A Retry-After is an OBSERVED reset (measured: it lands on UTC midnight), and
+#: this ceiling exists only so a malformed one cannot park the pool indefinitely.
+POOL_MAX_SEC = 24 * 3600
+
+#: How long the digest may sit behind a live cooldown before it re-tests the
+#: pool anyway. Ten minutes: one `daily-news` ladder backoff, so a wall that is
+#: clearing is given the chance to clear first.
+POOL_DIGEST_GRACE_SEC = 10 * 60
+
+#: The digest slots, read from `deploy/schedule.json` (`dispatcher_crons.
+#: digest_slots`) so a slot move is one edit, and this constant is only the
+#: fallback for a tree that cannot read that file.
+DIGEST_SLOTS_FALLBACK = ((1, 35), (13, 35))
+#: A slot's protected window: a little lead for the prebuild, an hour of trail
+#: for the walk, validate, render and delivery. Numbers, not prose: the window
+#: only ever makes a NON-digest caller stricter, so a generous window costs a
+#: non-digest call and a tight one loses a digest.
+DIGEST_WINDOW_LEAD_SEC = 10 * 60
+DIGEST_WINDOW_TRAIL_SEC = 60 * 60
+
+_AUTO = object()
+
+#: `Retry-After: 300`, `retry-after=300`, `retry after 300s`. Seconds only: an
+#: HTTP-date form would need a clock agreement this repo cannot verify, and the
+#: measured value is a seconds count.
+_RETRY_AFTER_RE = re.compile(r"retry[-_ ]?after\W{0,3}(\d{1,6})", re.I)
+
+
+def retry_after_from_text(text):
+    """Seconds from the provider's Retry-After in `text`, or None if absent."""
+    found = _RETRY_AFTER_RE.search(text or "")
+    if not found:
+        return None
+    try:
+        return int(found.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def pool_row(doc):
+    """The pool entry, or None. Never raises on a malformed document."""
+    row = (doc or {}).get(POOL_KEY) if isinstance(doc, dict) else None
+    return row if isinstance(row, dict) else None
+
+
+def record_pool_refusal(doc, at=None, retry_after=None, reason="quota_or_rate_limited",
+                        source=""):
+    """Record ONE shared-pool refusal. Returns the row that was written.
+
+    The duration is the provider's own Retry-After when it gave one, because that
+    is the OBSERVED reset and guessing past it is what turns a cooldown into a
+    blacklist. Without one it is POOL_DEFAULT_SEC. Either way it is clamped, and
+    an existing later `until` is never shortened by a shorter later refusal --
+    two refusals ten seconds apart describe the same wall.
+    """
+    at = time.time() if at is None else float(at)
+    observed = retry_after
+    if retry_after is None:
+        seconds = POOL_DEFAULT_SEC
+    else:
+        try:
+            seconds = int(float(retry_after))
+        except (TypeError, ValueError):
+            seconds = POOL_DEFAULT_SEC
+    seconds = max(60, min(seconds, POOL_MAX_SEC))
+    until = at + seconds
+    previous = pool_row(doc) or {}
+    previous_until = _epoch(previous.get("until"))
+    if previous_until > until:
+        # A longer wall is already recorded. Keep it and keep its provenance.
+        previous["last_hit"] = _iso(at)
+        return previous
+    row = {"until": _iso(until),
+           "observed_at": _iso(at),
+           "reason": reason,
+           "seconds": seconds,
+           "retry_after_sec": observed,
+           "source": source}
+    doc[POOL_KEY] = row
+    return row
+
+
+def prune_pool(doc, now=None):
+    """Drop an EXPIRED pool row. Returns True when one was dropped.
+
+    Called before every read, so "the cooldown expired" and "there is no
+    cooldown" are the same state here -- an expired marker must not be able to
+    block anything, which is the whole reason the digest slot can never be
+    permanently barred by one.
+    """
+    now = time.time() if now is None else float(now)
+    row = pool_row(doc)
+    if row and _epoch(row.get("until")) <= now:
+        del doc[POOL_KEY]
+        return True
+    return False
+
+
+def digest_slots(path=None):
+    """The digest slot times as ((hour, minute), ...), UTC.
+
+    Read from `deploy/schedule.json` when it is reachable, because that file is
+    what the Worker actually schedules; the constant is only a fallback.
+    """
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                os.pardir, "deploy", "schedule.json")
+    slots = []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        recorded = ((doc.get("dispatcher_crons") or {}).get("digest_slots")
+                    if isinstance(doc, dict) else None) or {}
+        for value in (recorded or {}).values():
+            fields = str(value).split()
+            if len(fields) == 5:
+                slots.append((int(fields[1]), int(fields[0])))
+    except (OSError, ValueError, TypeError):
+        slots = []
+    return tuple(sorted(slots)) or DIGEST_SLOTS_FALLBACK
+
+
+def digest_window(now=None, slots=None):
+    """(start, end) epoch of the digest slot window containing `now`, or None.
+
+    UTC only, like every other clock in this repository. A window is
+    slot - DIGEST_WINDOW_LEAD_SEC .. slot + DIGEST_WINDOW_TRAIL_SEC, and the
+    three-day sweep is what makes a slot either side of midnight work without
+    special-casing the date roll.
+    """
+    now = time.time() if now is None else float(now)
+    today = datetime.fromtimestamp(now, timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    for day in (-1, 0, 1):
+        base = today + timedelta(days=day)
+        for hour, minute in (slots if slots is not None else digest_slots()):
+            try:
+                slot = base.replace(hour=hour, minute=minute).timestamp()
+            except ValueError:
+                continue
+            start = slot - DIGEST_WINDOW_LEAD_SEC
+            end = slot + DIGEST_WINDOW_TRAIL_SEC
+            if start <= now <= end:
+                return (start, end)
+    return None
+
+
+def pool_block(doc, now=None, role="other", window=_AUTO):
+    """Whether `role` may call a model now. Always a dict, never an exception.
+
+    `blocked` is the verdict; `note` is the single line a caller logs, and it
+    always names the cooldown AND its expiry, because a suppressed run that says
+    only "skipped" is indistinguishable from a broken one.
+
+    role="digest" and a cooldown watched for longer than POOL_DIGEST_GRACE_SEC ->
+    NOT blocked, with the trade stated: the slot is exactly where a fresh pool is
+    worth one attempt, and a stale wall must never lose the edition.
+    role="other" inside a digest window -> the blocker is extended to the END of
+    that window, so a breaking sweep cannot spend the pool minutes before the
+    digest needs it. That is the reservation, and it is the only thing that
+    actually changes a non-digest caller's behaviour.
+    """
+    now = time.time() if now is None else float(now)
+    row = pool_row(doc)
+    if not row:
+        return {"blocked": False, "note": ""}
+    until = _epoch(row.get("until"))
+    if until <= now:
+        return {"blocked": False, "note": ""}
+    observed = _epoch(row.get("observed_at")) or until
+    age = max(0, int(now - observed))
+    reason = str(row.get("reason") or "quota_or_rate_limited")
+    if role == "digest":
+        if age >= POOL_DIGEST_GRACE_SEC:
+            return {"blocked": False,
+                    "until": _iso(until),
+                    "pool_until": _iso(until),
+                    "age_sec": age,
+                    "reason": reason,
+                    "note": ("pool cooldown is EXPIRED-ENOUGH TO IGNORE: the pool "
+                             "refused %ds ago (%s until %s, %ds past the %ds "
+                             "grace). Attempting anyway -- a fresh pool at this "
+                             "slot is exactly what the digest needs, and a wall "
+                             "that never expires would lose the edition."
+                             % (age, reason, _iso(until), age,
+                                POOL_DIGEST_GRACE_SEC))}
+        return {"blocked": True,
+                "until": _iso(until),
+                "pool_until": _iso(until),
+                "age_sec": age,
+                "reason": reason,
+                "note": ("pool cooldown: the shared pool refused %s %ds ago and "
+                         "is refused until %s (the digest honours a wall younger "
+                         "than %ds before re-testing it)"
+                         % (reason, age, _iso(until), POOL_DIGEST_GRACE_SEC))}
+    win = digest_window(now) if window is _AUTO else window
+    effective = until
+    note = ("pool cooldown: the shared pool refused %s and is refused until %s "
+            "(%ds remaining)" % (reason, _iso(until), int(until - now)))
+    if win and win[1] > effective:
+        effective = win[1]
+        note = ("pool cooldown %s, AND the digest slot window is open until %s: "
+                "yielding the pool to the digest, which is the reservation -- a "
+                "non-digest caller may not spend it before the edition is built"
+                % (_iso(until), _iso(effective)))
+    return {"blocked": True,
+            "until": _iso(effective),
+            "pool_until": _iso(until),
+            "age_sec": age,
+            "reason": reason,
+            "digest_window": bool(win),
+            "note": note}
+
+
 def _empty_cooldown():
-    return {"schema_version": COOLDOWN_SCHEMA_VERSION, "models": {}}
+    return {"schema_version": COOLDOWN_SCHEMA_VERSION, "models": {}, POOL_KEY: {}}
 
 
 def load_cooldown(path):
@@ -748,8 +988,16 @@ def load_cooldown(path):
             doc = json.load(fh)
     except (OSError, ValueError):
         return _empty_cooldown()
-    if not isinstance(doc, dict) or not isinstance(doc.get("models"), dict):
+    if not isinstance(doc, dict):
         return _empty_cooldown()
+    # A file that carries ONLY the pool marker is still worth reading: the pool
+    # wall is the cheapest fact in this file, and dropping it because no model
+    # happens to be cooling would silently un-arm the shared cooldown.
+    if not isinstance(doc.get("models"), dict):
+        if isinstance(doc.get(POOL_KEY), dict):
+            doc["models"] = {}
+        else:
+            return _empty_cooldown()
     doc.setdefault("schema_version", COOLDOWN_SCHEMA_VERSION)
     return doc
 
@@ -1291,7 +1539,8 @@ def rank_models(candidates, seed=(), health=None, now=0, release=None):
 
 
 def select(config, health, cache_path=None, state_note=None, max_models=4,
-           now=None, discover_fn=None, cooldown=None, cooldown_path=None):
+           now=None, discover_fn=None, cooldown=None, cooldown_path=None,
+           role="other"):
     """The whole decision, in one call. Returns (models, info).
 
     `models` is the ordered attempt list: capped to `max_models`, or the FULL
@@ -1307,6 +1556,12 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
     falls through to the next ranked model; if that leaves nothing,
     `info["all_cooled"]` is True and the list is empty, so the caller can fail
     loudly instead of reporting an empty ladder it does not have.
+
+    `role` decides what a SHARED-POOL cooldown does to this caller: "other"
+    yields (see pool_block), "digest" may ignore a stale one. When the pool is
+    blocked the list comes back EMPTY with `info["pool"]["blocked"]` set, so a
+    caller can log the cooldown and skip the call instead of discovering it one
+    refused attempt at a time.
     """
     import time as _time
 
@@ -1362,15 +1617,26 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
     cool = cooldown
     if cool is None and cooldown_path:
         cool = load_cooldown(cooldown_path)
+    pool = {"blocked": False, "note": ""}
     if cool is not None:
         prune_cooldown(cool, now)
+        prune_pool(cool, now)
         info["hard_cooled_down"] = [m for m in ordered
                                     if on_hard_cooldown(cool, m, now)]
+        pool = pool_block(cool, now, role=role)
+    info["pool"] = pool
     cooled = set(info["hard_cooled_down"])
     attemptable = [m for m in ordered if m not in cooled]
     info["all_cooled"] = bool(ordered) and not attemptable
 
-    if max_models is None:
+    if pool.get("blocked"):
+        # THE POOL WALL IS NOT AN EMPTY LADDER. Returning ids here would invite
+        # the caller to spend an attempt proving what the marker already knows,
+        # and returning them empty with no reason is what made a cooldown look
+        # like a broken tree. `info["pool"]` carries the reason and the expiry.
+        info["selected"] = []
+        info["pool_blocked"] = True
+    elif max_models is None:
         # The WHOLE ranked pool. The caller bounds the WALK, not the list: it
         # walks in rank order under its own wall-clock budget and stops when one
         # more attempt is no longer affordable. The cap was the defect -- on run
@@ -1434,6 +1700,23 @@ def _write_info(path, doc):
         pass
 
 
+def _read_log_tail(path, limit=262144):
+    """The last `limit` bytes of an attempt log, decoded. "" when unreadable.
+
+    Tail only: a runaway attempt log is never worth loading whole to find a
+    marker that is always near the end.
+    """
+    if not path:
+        return ""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            fh.seek(max(0, fh.tell() - limit))
+            return fh.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+
+
 def _main(argv=None):
     import argparse
 
@@ -1482,6 +1765,20 @@ def _main(argv=None):
                              "only names the case"
                              % (WALK_NO_WORK_TOTAL_BUDGET_SEC,
                                 WALK_TOTAL_BUDGET_SEC))
+    parser.add_argument("--role", choices=("other", "digest"), default="other",
+                        help="what a SHARED-POOL cooldown does to this caller: "
+                             "'other' yields (and yields for the rest of an open "
+                             "digest window), 'digest' may ignore one it has "
+                             "watched for longer than the grace")
+    parser.add_argument("--pool-refused", action="store_true",
+                        help="record a SHARED-POOL refusal in the cooldown file "
+                             "(the whole free pool shares one bucket, so this is "
+                             "one fact, not one per model)")
+    parser.add_argument("--retry-after", dest="retry_after", type=int,
+                        default=None,
+                        help="seconds from the provider's Retry-After (with "
+                             "--pool-refused); omitted or unreadable means the "
+                             "file's own default")
     args = parser.parse_args(argv)
 
     if args.record:
@@ -1504,18 +1801,26 @@ def _main(argv=None):
         return 0
 
     if args.classify:
-        # The log is read from the TAIL only: a runaway attempt log is not worth
-        # loading whole to find a marker that is always near the end.
-        text = ""
-        if args.log:
-            try:
-                with open(args.log, "rb") as fh:
-                    fh.seek(0, os.SEEK_END)
-                    fh.seek(max(0, fh.tell() - 262144))
-                    text = fh.read().decode("utf-8", "replace")
-            except OSError:
-                text = ""
-        print(classify_failure(text, args.rc))
+        print(classify_failure(_read_log_tail(args.log), args.rc))
+        return 0
+
+    if args.pool_refused:
+        cool_path = cooldown_path_for(args.health)
+        cool = load_cooldown(cool_path)
+        retry_after = args.retry_after
+        if retry_after is None:
+            # The provider's own number is the observed reset, so read it out of
+            # the attempt log before falling back to the file's default.
+            retry_after = retry_after_from_text(_read_log_tail(args.log))
+        row = record_pool_refusal(cool, retry_after=retry_after)
+        save_cooldown(cool_path, cool)
+        # ONE LINE, AND IT NAMES THE EXPIRY. A suppression nobody can date is
+        # indistinguishable from a broken workflow.
+        print("model_selector: pool cooldown recorded -- the shared pool refused "
+              "until %s (%s, %ds%s)"
+              % (row.get("until"), row.get("reason"), int(row.get("seconds") or 0),
+                 "" if retry_after is None else ", from the provider's Retry-After"),
+              file=sys.stderr)
         return 0
 
     if args.select:
@@ -1525,7 +1830,7 @@ def _main(argv=None):
         cool = load_cooldown(cool_path)
         models, info = select(config, health, cache_path=args.cache,
                               max_models=None if args.all else args.max,
-                              cooldown=cool)
+                              cooldown=cool, role=args.role)
         if cool.get("models") or os.path.isfile(cool_path or ""):
             save_cooldown(cool_path, cool)
         # The caller states the CASE, never the number: `--no-work` means "there
@@ -1569,9 +1874,23 @@ def _main(argv=None):
                  " no_work=yes" if args.no_work else ""), file=sys.stderr)
         print("model_selector: ranked ids=%s" % (", ".join(models) or "none"),
               file=sys.stderr)
+        # THE POOL VERDICT, ALWAYS. Either the call is being suppressed (named,
+        # with its expiry) or a cooldown was deliberately ignored -- and the
+        # second case is the trade the digest slot makes, so it is stated rather
+        # than left to be inferred from a successful run.
+        pool = info.get("pool") or {}
+        if pool.get("note"):
+            print("model_selector: %s%s"
+                  % ("" if pool.get("blocked") else "WILL NOT YIELD -- ",
+                     pool["note"]), file=sys.stderr)
         for model in models:
             print(model)
         if not models:
+            if info.get("pool_blocked"):
+                # A suppression, and NOT an empty ladder or a cooled-down one.
+                # Exit 0: nothing is broken here, the pool is simply walled, and
+                # the caller's job is to wait or to yield, not to fail the job.
+                return 0
             if info.get("all_cooled"):
                 # THE ONE CASE THAT MAY NOT BE SILENT. Every model is cooling,
                 # so nothing will be attempted -- and that must be named, not
