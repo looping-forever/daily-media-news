@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal News Informer — Evening Digest · due 19:20 — 2026-10-28</title>
+  <style>
+    /* ===================================================================
+       THE APPROVED MOBILE DESIGN. Reproduced, not interpreted.
+
+       There is no desktop layout here on purpose. The owner has no desktop use
+       case: the previous page was max-width 1100px with 260px images, built
+       for a screen he does not use and read on a 390px phone. So the content
+       column is capped at 480px and centred, and there is no min-width media
+       query that reintroduces a wide multi-column grid. On a wider screen the
+       page is a centred 480px column, which is what the design specifies.
+       =================================================================== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #0E1014;
+      color: #ECEEF2;
+      line-height: 1.6;
+      -webkit-text-size-adjust: 100%;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px 18px 32px 18px;
+    }
+    a { color: #FF7A59; }
+
+    /* -- top bar --------------------------------------------------------- */
+    .topbar { border-bottom: 1px solid #272B34; }
+    .topbar-inner {
+      position: relative;
+      padding: 20px 18px 14px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+    }
+    .topbar-title {
+      font-size: 21px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: #ECEEF2;
+      padding-right: 86px;
+    }
+    .topbar-sub {
+      font-size: 12px;
+      font-weight: 500;
+      color: #6C727C;
+    }
+    .topbar-count {
+      position: absolute;
+      top: 20px;
+      right: 18px;
+      background: #1F232C;
+      color: #9BA1AC;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 9px;
+      white-space: nowrap;
+    }
+    .topbar-nav { padding: 9px 18px 11px 18px; }
+    .back-link {
+      color: #6C727C;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* -- your day -------------------------------------------------------- */
+    .your-day {
+      background: #171A21;
+      border-radius: 14px;
+      padding: 15px;
+      margin: 16px 0 0 0;
+    }
+    .your-day-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .your-day-label {
+      color: #FF7A59;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+    }
+    .your-day-spacer { flex: 1 1 auto; }
+    .your-day-weather {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #6BA8F5;
+    }
+    .weather-icon { display: block; flex: 0 0 auto; }
+    .your-day-temp {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6BA8F5;
+    }
+    /* Main line, then supporting lines. Both sizes are fixed; only weight and
+       colour differ, so a one-line block and a three-line block read the same
+       way. */
+    .your-day ul { margin: 10px 0 0 0; padding: 0; list-style: none; }
+    .your-day li {
+      color: #ECEEF2;
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1.45;
+    }
+    .your-day li + li {
+      margin-top: 4px;
+      color: #9BA1AC;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.45;
+    }
+
+    /* -- weather block --------------------------------------------------- */
+    /* Not in the approved design: the design has no separate weather block,
+       because it moves the glyph into the `Your day` header. The advice TEXT
+       is still a tested feature on this surface (an empty engine list renders
+       nothing, a populated one renders its lines, capped at WEATHER_MAX), so
+       the block stays and is restyled onto the same surface card rather than
+       deleted. Reported as a deviation. */
+    .weather-block {
+      background: #171A21;
+      border-radius: 14px;
+      padding: 13px 15px;
+      margin: 10px 0 0 0;
+    }
+    .weather-label {
+      color: #FF7A59;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+    }
+    .weather-block ul {
+      margin: 8px 0 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .weather-block li {
+      color: #9BA1AC;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .weather-block li + li { margin-top: 4px; }
+
+    /* -- honesty + freshness --------------------------------------------- */
+    /* ALSO not in the approved design, and deliberately NOT restyled with it.
+       The health banner is a tested feature in its own right (degraded /
+       down / unverified-cutoff states, and a research note cut on a word
+       boundary), and its amber-on-translucent-red is carrying meaning: "this
+       digest may be missing items" must not read like ordinary content. It
+       keeps its own colours, scaled down to the new type scale. */
+    .health-banner {
+      background: rgba(220, 38, 38, 0.12);
+      border: 1px solid rgba(220, 38, 38, 0.55);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 10px 0 0 0;
+      text-align: left;
+    }
+    .health-line { color: #fbbf24; font-size: 12px; font-weight: 700; }
+    /* The unsummarised fallback. An edition KIND, not a fault: it is not folded
+       away like the research note and it never borrows the alarm colour. */
+    .health-edition {
+      color: #f5f5f5;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .health-down {
+      color: #fca5a5;
+      font-size: 11px;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+    .health-note {
+      color: #ddd;
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+    /* A folded research note. Only the summary shows until the reader taps it,
+       so the summary carries the weight the whole note used to; the detail
+       inside keeps the `health-note` styling. */
+    .health-details { margin-top: 4px; }
+    .health-details-label {
+      color: #ddd;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .hero-cutoff { color: #6C727C; font-size: 11px; margin-top: 12px; }
+    .hero-cutoff-unverified {
+      color: #fbbf24;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* -- sections -------------------------------------------------------- */
+    /* The coloured header bar is gone. What is left is a quiet label row: a
+       6px dot in the section's own accent colour, then the name. The accent
+       arrives as the `--dot` custom property set inline by render_sections,
+       so the eleven existing per-section colours are reused rather than
+       re-invented. */
+    .digest-section { margin-bottom: 28px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: 1px;
+      color: #6C727C;
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .section-header::before {
+      content: "";
+      display: block;
+      flex: 0 0 auto;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--dot, #FF7A59);
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      margin-top: 11px;
+    }
+
+    /* -- stories --------------------------------------------------------- */
+    /* NO card, NO border, NO per-card background. The cyan 1px card border
+       was the loudest thing on a 390px screen and is deleted outright. What
+       separates two stories in the same section is a single hairline. */
+    .card {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 16px 0;
+    }
+    .card + .card { border-top: 1px solid #272B34; }
+    .card-body {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 0;
+    }
+    .card-thumb-col {
+      flex: 0 0 64px;
+      width: 64px;
+      height: 64px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #1F232C;
+    }
+    .card-thumb-col img.card-thumb {
+      display: block;
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+    .card-text { flex: 1 1 auto; min-width: 0; }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: #ECEEF2;
+    }
+
+    /* A playable video is the one thing that is NOT a 64px square: a 16:9
+       embed cannot be, and the brief names the 56.25% wrapper as the case to
+       preserve. It spans the column above the text. */
+    .card-media {
+      margin: 0 0 10px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+    .media-video { position: relative; padding-top: 56.25%; background: #000; }
+    .media-video iframe.video-frame,
+    .media-video video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    .media-watch { padding: 0; }
+    .media-watch a { color: #FF7A59; font-weight: 600; text-decoration: none; }
+    .media-watch a:hover { text-decoration: underline; }
+
+    /* -- chips / meta / body --------------------------------------------- */
+    .card-badges {
+      margin: 6px 0 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .chip {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      vertical-align: middle;
+    }
+    .chip-label { background: #1F232C; color: #FF7A59; }
+    .chip-cat { background: #1F232C; color: #eef; }
+    .chip-deadline { background: #dc2626; color: #fff; }
+    .chip-via { background: #1F232C; color: #eef; }
+    .badge {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      background: #FF7A59;
+      color: #eef;
+    }
+    .badge-high { background: #FF7A59; color: #fff; }
+    .card-meta {
+      font-size: 11px;
+      font-weight: 500;
+      color: #6C727C;
+      margin-top: 5px;
+    }
+    .card-deadline {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6C727C;
+      margin-top: 5px;
+    }
+    /* 16px, not 13px: the story body is what the owner actually READS, and it
+       used to be the smallest text on the page after the chips. Reading text
+       and headline are now the same size and the step between them is carried
+       by weight and colour instead, so nothing that must be read is smaller
+       than the headline above it. */
+    .card-summary {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #9BA1AC;
+      margin-top: 8px;
+    }
+    .card-summary ul { margin: 4px 0 0 16px; }
+    .card-summary li { margin-bottom: 5px; }
+    .card-foryou {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #9BA1AC;
+      margin-top: 8px;
+    }
+    .card-foryou strong { color: #FF7A59; }
+    .card-links {
+      list-style: none;
+      margin: 8px 0 0 0;
+      padding: 0;
+    }
+    .card-links li { margin-bottom: 5px; }
+    .card-links a {
+      color: #FF7A59;
+      text-decoration: none;
+      font-size: 15px;
+      word-break: break-word;
+    }
+    .card-links a:hover { text-decoration: underline; }
+    .story-link { font-weight: 600; }
+
+    /* STATUS TONE (D2 + D3). TWO CLAIMS WERE DRESSED IDENTICALLY.
+       "I checked and there was no news" and "the source failed, so this may
+       be a lie by omission" both rendered as amber #FBBF24 on a translucent
+       red background with a red left bar - the reader could not tell a quiet
+       day from a broken one. Worse, 5 of 9 status lines on the live 3-story
+       page were false alarms about sections with no configured source at all,
+       which made a working digest read as broken.
+
+       So the base class is QUIET: --muted, no background, no bar, not bold.
+       The alarm colours are opt-in via one modifier class, so a tone that is
+       ever forgotten renders quiet rather than loud. Both tones are the same
+       size so COLOUR is the only thing that distinguishes them.
+
+       SIZE: METADATA DOES NOT OUTRANK THE STORIES IT ANNOTATES. This rule was
+       0.95rem = 15.2px, which is LARGER than the 15px story titles directly
+       beneath it, so on a 3-story page the 9 metadata lines were the second
+       loudest thing on the screen - the owner's "no clear priority" and "too
+       cluttered to scan" were this, still alive. A status line is a fact about
+       a SECTION, so it joins the section furniture at 11px rather than
+       competing with the content. Same letter-spacing as .section-header so
+       the label and its status read as one pair. See
+       test_no_metadata_text_outranks_the_story_titles, which asserts the
+       general invariant so this cannot be re-inflated.
+
+       COLOUR: --muted (#9BA1AC), measured 7.33:1 on the page background, which
+       is WCAG AA and AAA for normal text. --dim (#6C727C) was the first choice
+       because the approved palette reserves it for section labels, but it
+       measures 3.93:1 on #0E1014 and FAILS AA's 4.5:1 at this size, so it
+       would have bought the quietness by making the line hard to read. The
+       old #aaa measured 8.20:1, so this is also a genuine small step DOWN in
+       loudness rather than a rename.
+
+       The quiet/alarm distinction above is a correctness property and is
+       unaffected: the base rule still carries neither the amber nor the red,
+       and both tones still render at the same size. */
+    .section-status {
+      color: #9BA1AC;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      background: transparent;
+      border-left: 3px solid transparent;
+      border-radius: 4px;
+      padding: 0.4rem 0.7rem;
+      word-break: break-word;
+    }
+    .section-status-alarm {
+      color: #fbbf24;
+      font-weight: 600;
+      background: rgba(220, 38, 38, 0.10);
+      border-left-color: #dc2626;
+    }
+    .empty-state { text-align: center; padding: 3rem 0; color: #ddd; }
+    footer {
+      text-align: center;
+      padding: 20px 0 0 0;
+      color: #6C727C;
+      font-size: 11px;
+      border-top: 1px solid #272B34;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner"><h1 class="topbar-title">Evening Digest · due 19:20</h1><p class="topbar-sub">Wed 28 Oct · Example City</p><span class="topbar-count">15 stories</span></div><div class="topbar-nav"><a class="back-link" href="/index.html">← All digests</a></div></header>
+  <div class="container">
+    <section class="hero"><div class="health-banner"><p class="health-edition">Unsummarised edition (no AI today)</p><details class="health-details"><summary class="health-details-label">Research note</summary><p class="health-note">Unsummarised edition: no AI was available for this build, so these are collected headlines with no summary.</p></details></div><div class="your-day"><div class="your-day-head"><p class="your-day-label">Your day</p><span class="your-day-spacer"></span><span class="your-day-weather"><svg class="weather-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></svg></span></div><ul><li>Nothing needs you today.</li></ul></div><div class="weather-block"><p class="weather-label">★ Weather</p><ul><li>Nothing to plan for - dry and mild today (25.6C)</li></ul></div><p class="hero-cutoff">Information checked through: 2026-10-28 18:40 NPT</p></section>
+    <section class="digest-section">
+  <h2 class="section-header" style="--dot:#7c3aed;">Example College / COLLEGE</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://static.arynews.tv/zip-archives/wp-content/uploads/2026/10/Girls-Degree-College-Nushki.jpg" alt="Balochistan home minister takes notice of Nushki Girls’ College attack - ARYnews.tv" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Balochistan home minister takes notice of Nushki Girls’ College attack - ARYnews.tv</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T10:35:47+00:00</div>
+      <ul class="card-links"><li><a href="https://arynews.tv/balochistan-home-minister-takes-notice-of-nushki-girls-college-attack" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#16a34a;">MY BANK — EXAMPLE BANK</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://img.helpnetsecurity.com/wp-content/uploads/2026/10/28091514/sony-1500.webp" alt="Data breach at Sony-owned internet provider compromises 2.6 million customer records - Help Net Security" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Data breach at Sony-owned internet provider compromises 2.6 million customer records - Help Net Security</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T10:18:09+00:00</div>
+      <ul class="card-links"><li><a href="https://www.helpnetsecurity.com/2026/10/28/sony-network-communications-data-breach-so-net/" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.itweb.co.za/static/pictures/2024/08/FNB-12Aug2024.jpg" alt="Data exposure shortcomings fixed, says FNB - ITWeb" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Data exposure shortcomings fixed, says FNB - ITWeb</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:32:26+00:00</div>
+      <ul class="card-links"><li><a href="https://www.itweb.co.za/article/data-exposure-shortcomings-fixed-says-fnb/o1Jr5MxP3AbMKdWL" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.itweb.co.za/static/pictures/2026/10/Rein-van-der-Horst-28Oct2026-AI-enhanced.jpg" alt="The e-mail nobody approved just reached your customer - ITWeb" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">The e-mail nobody approved just reached your customer - ITWeb</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T09:01:00+00:00</div>
+      <ul class="card-links"><li><a href="https://www.itweb.co.za/article/the-e-mail-nobody-approved-just-reached-your-customer/6GxRKqYQLg5qb3Wj" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#ea580c;">IMPORTANT NEPAL</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://english.nepalnews.com/wp-content/uploads/2026/10/WhatsApp-Image-2026-10-28-at-6.20.13-PM.jpeg" alt="NRNA launches three-day strategic capacity-building workshop" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">NRNA launches three-day strategic capacity-building workshop</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:40:47+00:00</div>
+      <ul class="card-links"><li><a href="https://english.nepalnews.com/s/diaspora/nrna-launches-three-day-strategic-capacity-building-workshop/" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.onlinekhabar.com/wp-content/uploads/2016/04/loan-1.jpg" alt="मधेस प्रदेशमा ९ अर्ब सहुलियतपूर्ण कर्जा प्रवाह" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">मधेस प्रदेशमा ९ अर्ब सहुलियतपूर्ण कर्जा प्रवाह</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:43:55+00:00</div>
+      <ul class="card-links"><li><a href="https://www.onlinekhabar.com/2026/10/2045880/9-billion-concessional-loans-in-madhes-province" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://english.nepalnews.com/wp-content/uploads/2026/10/kabaddifin.jpg" alt="‘Kabaddi 5’ earns over Rs 70 million at domestic box office" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">‘Kabaddi 5’ earns over Rs 70 million at domestic box office</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:39:47+00:00</div>
+      <ul class="card-links"><li><a href="https://english.nepalnews.com/s/entertainment-lifestyle/kabaddi-5-earns-over-rs-70-million-at-domestic-box-office/" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#4f46e5;">GAMING</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://assetsio.gnwcdn.com/State-of-Decay-3-car-fill-up.jpg?width=1200&amp;height=630&amp;fit=crop&amp;enable=upscale&amp;auto=webp" alt="&quot;We basically rewrote the entire State of Decay game&quot;: Undead Labs spent years trying to make State of Decay 3 into a full-blown zombie apocalypse MMO" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">&quot;We basically rewrote the entire State of Decay game&quot;: Undead Labs spent years trying to make State of Decay 3 into a full-blown zombie apocalypse MMO</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:30:00+00:00</div>
+      <ul class="card-links"><li><a href="https://www.rockpapershotgun.com/we-basically-rewrote-the-entire-state-of-decay-game-undead-labs-spent-years-trying-to-make-state-of-decay-3-into-a-full-blown-zombie-apocalypse-mmo" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.videogameschronicle.com/files/2026/10/COD-MW4-Multiplayer-Best-meta-HAN-86-build-1.jpg" alt="COD MW4 Multiplayer: Best meta HAN 86 build" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">COD MW4 Multiplayer: Best meta HAN 86 build</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:22:09+00:00</div>
+      <ul class="card-links"><li><a href="https://www.videogameschronicle.com/guide/cod-mw4-multiplayer-best-meta-han-86-build/" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.gamespot.com/wp-content/uploads/2026/10/Next-Fest.jpg?w=300" alt="Valve Knows Steam Next Fest Has An AI Slop Problem, And It’s Looking For Solutions" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Valve Knows Steam Next Fest Has An AI Slop Problem, And It’s Looking For Solutions</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:30:33+00:00</div>
+      <ul class="card-links"><li><a href="https://www.gamespot.com/articles/valve-knows-steam-next-fest-has-an-ai-slop-problem-and-its-looking-for-solutions/" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#db2777;">ANIME</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://www.animenewsnetwork.com/thumbnails/crop600x315gJH/cms/episode-review.5/243269/mgrpr-4.jpg" alt="Magical Girl Raising Project restart ‒ Episode 4" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Magical Girl Raising Project restart ‒ Episode 4</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T08:30:00-04:00</div>
+      <ul class="card-links"><li><a href="https://www.animenewsnetwork.com/review/magical-girl-raising-project-restart/episode-4/.243269" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://img.topics.smt.news.goo.ne.jp/picture/funglr_games/m_funglr_games-202610335781.jpg" alt="「BLEACH Mirrors High」配信開始！黒崎一護や朽木ルキアの配布、声優陣のサイン色紙が当たるキャンペーンも（Saiga NAK） - ｄメニューニュース" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">「BLEACH Mirrors High」配信開始！黒崎一護や朽木ルキアの配布、声優陣のサイン色紙が当たるキャンペーンも（Saiga NAK） - ｄメニューニュース</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:01:56+00:00</div>
+      <ul class="card-links"><li><a href="https://topics.smt.docomo.ne.jp/article/funglr_games/trend/funglr_games-202610335781" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+<section class="digest-section">
+  <h2 class="section-header" style="--dot:#475569;">TECH / CAREER / OPPORTUNITIES</h2>
+  <div class="card-grid">
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://media2.dev.to/dynamic/image/width=1200,height=627,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2F52vgbjmhzqwp1kj5dgxx.jpg" alt="I built an MCP connector so Claude/Cursor can deploy live websites for you in 5 seconds" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">I built an MCP connector so Claude/Cursor can deploy live websites for you in 5 seconds</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:45:08+00:00</div>
+      <ul class="card-links"><li><a href="https://dev.to/htmlsave/i-built-an-mcp-connector-so-claudecursor-can-deploy-live-websites-for-you-in-5-seconds-1n10" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://media2.dev.to/dynamic/image/width=1200,height=627,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2Fgqiquthdi4l7wsokqv63.png" alt="Node 26 is LTS today. Should you upgrade? Measure your own app instead of trusting a headline benchmark." loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">Node 26 is LTS today. Should you upgrade? Measure your own app instead of trusting a headline benchmark.</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:44:40+00:00</div>
+      <ul class="card-links"><li><a href="https://dev.to/techdevfun/node-26-is-lts-today-should-you-upgrade-measure-your-own-app-instead-of-trusting-a-headline-3hd5" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+<article class="card">
+  <div class="card-body">
+    <div class="card-thumb-col"><img class="card-thumb" src="https://media2.dev.to/dynamic/image/width=1200,height=627,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Farticles%2F8y5rog3s5z46nooqupr5.png" alt="The folders eating your Mac&#x27;s disk (and which ones are safe to delete)" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-text">
+      <h3 class="card-title">The folders eating your Mac&#x27;s disk (and which ones are safe to delete)</h3>
+      <div class="card-badges"><span class="chip chip-label">[NEW]</span></div>
+      <div class="card-meta">2026-10-28T12:44:58+00:00</div>
+      <ul class="card-links"><li><a href="https://dev.to/diskspaceai/the-folders-eating-your-macs-disk-and-which-ones-are-safe-to-delete-j6" class="story-link" target="_blank" rel="noopener">Read article →</a></li></ul>
+    </div>
+  </div>
+</article>
+  </div>
+</section>
+    <footer>
+      Generated by Personal News Informer · 2026-10-28 18:41 NPT
+    </footer>
+  </div>
+</body>
+</html>
