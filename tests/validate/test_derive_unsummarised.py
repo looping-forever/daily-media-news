@@ -71,7 +71,7 @@ class DeriveOrderAndCaps(unittest.TestCase):
                            category="world_major") for n in range(5)]
         candidates.append(cand("Kathmandu council opens a new pedestrian zone",
                                "https://b.example/l1", category="local_city"))
-        stories, counts = dut.derive(candidates, now=NOW)
+        stories, counts, _ = dut.derive(candidates, now=NOW)
         world = [s for s in stories if s["category"] == "world_major"]
         self.assertEqual(len(world), 3, "the per-category cap is 3, not 5")
         self.assertEqual([s["source_url"] for s in world],
@@ -88,7 +88,7 @@ class DeriveOrderAndCaps(unittest.TestCase):
                      category="tech_career", published=FRESH)
         tier3_old = cand(DISTINCT[3], "https://example.org/n2",
                          category="bank_local", published=OLD)
-        stories, _ = dut.derive([tier1, tier1_old, tier3, tier3_old], now=NOW)
+        stories, _, _ = dut.derive([tier1, tier1_old, tier3, tier3_old], now=NOW)
         by_title = {s["title"]: s for s in stories}
         self.assertEqual(by_title[tier1["title"]]["priority"], 7,
                          "6 + 1 fresh must clamp to 7")
@@ -102,7 +102,7 @@ class DeriveOrderAndCaps(unittest.TestCase):
                                  "priority >= 8 escalates the push")
 
     def test_drops_short_titles_and_empty_categories(self):
-        stories, _ = dut.derive([
+        stories, _, _ = dut.derive([
             cand("Too short", "https://a.example/short"),
             cand(long_title("no category"), "https://a.example/nocat",
                  category=""),
@@ -111,6 +111,34 @@ class DeriveOrderAndCaps(unittest.TestCase):
         self.assertEqual([s["source_url"] for s in stories],
                          ["https://a.example/good"])
 
+    def test_drops_a_category_the_digest_schema_does_not_accept(self):
+        """`weather_forecast` IS IN state/candidates.json ON EVERY RUN.
+
+        The collector emits it, and the digest schema has no such category, so
+        validate_stories drops the story with "schema: invalid category". A
+        deriver that emitted it anyway would count a story that is certain to be
+        thrown away -- the floor could pass here while the page shipped one
+        fewer story than this file claimed.
+        """
+        stories, counts, skipped = dut.derive([
+            cand(long_title("weather"), "https://open-meteo.com/w",
+                 category="weather_forecast"),
+            cand(long_title("real news"), "https://a.example/ok",
+                 category="nepal"),
+        ], now=NOW)
+        self.assertEqual([s["source_url"] for s in stories],
+                         ["https://a.example/ok"])
+        self.assertNotIn("weather_forecast", counts)
+        self.assertEqual(skipped, {"weather_forecast": 1},
+                         "the drop must be counted, not swallowed: it is the "
+                         "evidence that a source cost a candidate for nothing")
+
+    def test_the_category_vocabulary_is_the_validators_own_object(self):
+        """ONE VOCABULARY, IMPORTED. A copy would drift the day either changes."""
+        self.assertIs(dut.VALID_CATEGORIES, vs.VALID_CATEGORIES,
+                      "derive_unsummarised no longer imports the validator's "
+                      "category set, so the two can disagree")
+
     def test_dedupes_near_duplicate_titles(self):
         first = cand("Nepal government announces the annual budget for next year",
                      "https://a.example/1", category="nepal")
@@ -118,14 +146,14 @@ class DeriveOrderAndCaps(unittest.TestCase):
                     "https://b.example/2", category="nepal")
         other = cand("Kathmandu valley reports steady rain through the afternoon",
                      "https://c.example/3", category="local_city")
-        stories, _ = dut.derive([first, near, other], now=NOW)
+        stories, _, _ = dut.derive([first, near, other], now=NOW)
         self.assertEqual(len(stories), 2, "Jaccard >= 0.5 titles are duplicates")
         self.assertNotIn("https://b.example/2", [s["source_url"] for s in stories])
 
     def test_passes_through_language_and_media(self):
         image = {"url": "https://a.example/i.jpg", "type": "image/jpeg"}
         video = {"url": "https://a.example/v.mp4", "type": "video/mp4"}
-        stories, _ = dut.derive([
+        stories, _, _ = dut.derive([
             cand(long_title("media item"), "https://a.example/m", language="ne",
                  image=image, video=video),
         ], now=NOW)
@@ -136,7 +164,7 @@ class DeriveOrderAndCaps(unittest.TestCase):
 
 class DerivedStorySurvivesTheValidator(unittest.TestCase):
     def test_story_shape_passes_validate_story(self):
-        stories, _ = dut.derive([
+        stories, _, _ = dut.derive([
             cand(long_title("validator shape"), "https://kathmandupost.com/a",
                  category="nepal", published=FRESH),
         ], now=NOW)

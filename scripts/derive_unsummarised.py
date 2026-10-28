@@ -20,6 +20,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # The SAME tier-1 list the breaking path trusts, never a second copy of it.
 from breaking_monitor import is_tier1_domain  # noqa: E402
+# And the SAME category vocabulary the validator enforces. The collector emits
+# candidates the digest schema does not accept -- `weather_forecast` is one, and
+# it is in state/candidates.json on every run -- and validate_stories DROPS such
+# a story as "schema: invalid category". Emitting one would spend a story slot on
+# something that is certain to be thrown away, so the floor could pass here and
+# the page still ship fewer stories than this file claimed.
+from validate_stories import VALID_CATEGORIES  # noqa: E402
 
 MIN_STORIES = 5
 PER_CATEGORY = 3
@@ -71,9 +78,14 @@ def priority_for(host, published, now):
 
 
 def derive(candidates, now=None):
-    """(stories, per-category counts) in the collector's freshest-first order."""
+    """(stories, per-category counts, skipped-category counts).
+
+    `skipped` is printed by main rather than swallowed: a candidate the schema
+    will not accept is a candidate the collector spent a source on for nothing,
+    and the count is the evidence for that.
+    """
     now = now or datetime.now(timezone.utc)
-    stories, counts, seen = [], {}, []
+    stories, counts, skipped, seen = [], {}, {}, []
     for cand in candidates or []:
         if not isinstance(cand, dict):
             continue
@@ -81,6 +93,9 @@ def derive(candidates, now=None):
         category = str(cand.get("domain_category") or "").strip()
         url = str(cand.get("url") or "").strip()
         if not title or not category or not url.startswith("http"):
+            continue
+        if category not in VALID_CATEGORIES:
+            skipped[category] = skipped.get(category, 0) + 1
             continue
         if len(title) < MIN_TITLE_CHARS:
             continue
@@ -114,7 +129,7 @@ def derive(candidates, now=None):
         stories.append(story)
         counts[category] = counts.get(category, 0) + 1
         seen.append(tokens)
-    return stories, counts
+    return stories, counts, skipped
 
 
 def main(argv=None):
@@ -139,9 +154,12 @@ def main(argv=None):
         print("FATAL: candidates JSON has no 'candidates' list")
         return 1
 
-    stories, counts = derive(candidates)
+    stories, counts, skipped = derive(candidates)
     for category in sorted(counts):
         print("  %-24s %d" % (category, counts[category]))
+    for category in sorted(skipped):
+        print("  %-24s skipped %d (not a digest category)"
+              % (category, skipped[category]))
     print("derive_unsummarised: %d stories from %d candidates"
           % (len(stories), len(candidates)))
 
