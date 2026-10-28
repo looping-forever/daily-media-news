@@ -64,7 +64,7 @@ on:
         default: ''
       phase:
         # U6. `full` is the delivery build. `prebuild` builds the SAME digest
-        # ahead of its slot (digest-prebuild.yml dispatches it 30 min early) so
+        # ahead of its slot (digest-prebuild.yml dispatches it 40 min early) so
         # the slot's own run only has to hand the artifact to the Worker. A
         # prebuild pushes NOTHING to the owner, which is why it is a choice and
         # not a flag: the difference between the two is a 07:20 push arriving
