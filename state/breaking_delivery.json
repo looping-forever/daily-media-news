@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "last_delivery": {
+    "at": "2026-10-28T04:48:46Z",
+    "ok": true,
+    "channel": "ntfy",
+    "note": "ntfy:delivered",
+    "title": "🚨 CRITICAL: Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com — check this now",
+    "label": "CRITICAL"
+  },
+  "last_attempt": {
+    "at": "2026-10-28T04:48:46Z",
+    "ok": true,
+    "channel": "ntfy",
+    "note": "ntfy:delivered",
+    "title": "🚨 CRITICAL: Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com — check this now",
+    "label": "CRITICAL"
+  },
+  "history": [
+    {
+      "at": "2026-10-28T04:48:46Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com — check this now",
+      "label": "CRITICAL"
+    }
+  ]
+}

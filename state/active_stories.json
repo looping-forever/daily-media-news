@@ -700,6 +700,36 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-27T06:43:53+05:45"
+    },
+    {
+      "event_id": "evt-579bdc4d3e28",
+      "event_key": null,
+      "canonical_title": "Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com",
+      "category": "local_city",
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiqgfbvv95cuxpsu9llufueujhrenyum5osdvduuoxck5rte1hytlytwlmteczbgfcrw93dzfushfqqxbidjl0q202z3rkrmxqt2pmbk1dquzgaflmehrluwn4vhr0zffjvlrbwjk1evjfvedktflwr2hcrwzjmhblbvpzs0x5selouxg0vnj4b0lhdnvrwjh5sf8wyvn5sedprkkzc2tqcdbtse5iywmxtvdtdw"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-10-28T10:33:46+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-28T10:33:46+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []
