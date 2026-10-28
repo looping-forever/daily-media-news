@@ -1026,8 +1026,12 @@ class TestCollectionConfig(unittest.TestCase):
                 seen[call["url"]] = call["timeout"]
         self.assertEqual(seen["https://tu.edu.np/"], 20)
         self.assertEqual(seen["https://iost.tu.edu.np/"], 20)
-        self.assertEqual(seen["https://college.example.edu/"], 10)
-        self.assertEqual(seen["https://www.bank.example.com/"], 10)
+        # The two deployment notice pages (BANK_URL/COLLEGE_URL) are NOT asserted
+        # here any more: they have no placeholder, so with the variables unset the
+        # plans do not exist at all. That they are dropped, and that a configured
+        # one reaches the page, is tests/render/test_private_values.py. Their
+        # timeout class is the same as the public notice hosts above.
+        self.assertEqual(seen["https://nea.org.np/"], 10)
         self.assertTrue(all(t == 10 for u, t in seen.items()
                             if "news.google.com" in u or "open-meteo" in u))
         self.assertGreaterEqual(len(seen), 8)

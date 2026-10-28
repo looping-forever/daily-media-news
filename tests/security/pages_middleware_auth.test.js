@@ -61,8 +61,13 @@
  *   8. the secret comparison goes through `crypto.subtle` and never `===`
  *      (a plain `===` on a secret leaks timing and every scanner flags it);
  *   9. every rejection is byte-identical, so the response is not an oracle;
- *  10. the committed username is non-empty and is echoed in the 401 body, so
- *      a wrong constant is diagnosable instead of a silent lockout.
+ *  10. the 401 body names NO username in either state — secret set or unset —
+ *      because naming the accepted account in an unauthenticated response is a
+ *      disclosure and it made the browser prompt lie;
+ *  11. a missing or blank `DIGEST_USERNAME` fails CLOSED with the same generic
+ *      401 and an operator log line that says the secret is unset. There is no
+ *      placeholder username to fall back to, and the source carries no default
+ *      credential at all.
  */
 
 const test = require("node:test");
@@ -84,6 +89,14 @@ if (process.env.PAGES_MIDDLEWARE) {
 
 /** The password used only by the tests. Never a real secret, never printed. */
 const TEST_PASSWORD = "test-only-digest-password";
+
+/**
+ * The username used only by the tests, supplied through `DIGEST_USERNAME` in
+ * every authenticated case. It is a test value, NOT a default the middleware
+ * carries: the middleware has no username of its own, which is the property
+ * the "no placeholder credential" tests hold down.
+ */
+const TEST_USERNAME = "owner@archive.test";
 const ORIGIN = "https://daily-digest.example.pages.dev";
 
 const loadCounter = { n: 0 };
@@ -283,8 +296,8 @@ test("an empty Authorization header -> 401, not a crash", async () => {
 test("the wrong password -> 401, and next() is never reached", async () => {
   const mod = await loadMiddleware();
   const out = await callAsPagesWould(mod, {
-    headers: { Authorization: basicHeader("not-the-password", mod.DIGEST_USERNAME) },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    headers: { Authorization: basicHeader("not-the-password", TEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assertRefused(out, "a wrong password");
 });
@@ -293,7 +306,7 @@ test("the right password with the wrong username -> 401", async () => {
   const mod = await loadMiddleware();
   const out = await callAsPagesWould(mod, {
     headers: { Authorization: basicHeader(TEST_PASSWORD, "digest") },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assertRefused(out, "the correct password under the wrong username");
 });
@@ -303,8 +316,8 @@ test("a password differing only in its last character -> 401", async () => {
   const near = TEST_PASSWORD.slice(0, -1) +
     (TEST_PASSWORD.endsWith("d") ? "e" : "d");
   const out = await callAsPagesWould(mod, {
-    headers: { Authorization: basicHeader(near, mod.DIGEST_USERNAME) },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    headers: { Authorization: basicHeader(near, TEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assertRefused(out, "a one-character-off password");
 });
@@ -328,7 +341,7 @@ for (const [label, value] of MALFORMED_HEADERS) {
     try {
       out = await callAsPagesWould(mod, {
         headers: { Authorization: value },
-        env: { DIGEST_PASSWORD: TEST_PASSWORD },
+        env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
       });
     } finally {
       logs.restore();
@@ -341,7 +354,7 @@ test("an oversized Authorization header -> 401, and is not parsed", async () => 
   const mod = await loadMiddleware();
   const out = await callAsPagesWould(mod, {
     headers: { Authorization: "Basic " + "A".repeat(20000) },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assertRefused(out, "a 20 KB Authorization header");
 });
@@ -353,7 +366,7 @@ for (const method of PROTECTED_METHODS) {
     const mod = await loadMiddleware();
     const out = await callAsPagesWould(mod, {
       method: method,
-      env: { DIGEST_PASSWORD: TEST_PASSWORD },
+      env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
     });
     assertRefused(out, "an unauthenticated " + method);
   });
@@ -364,7 +377,7 @@ test("a ranged GET (Range: bytes=0-1023) is protected", async () => {
   const out = await callAsPagesWould(mod, {
     method: "GET",
     headers: { Range: "bytes=0-1023" },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assertRefused(out, "an unauthenticated ranged GET");
 });
@@ -373,7 +386,7 @@ test("a HEAD 401 carries the challenge and NO body, as RFC 9110 requires", async
   const mod = await loadMiddleware();
   const out = await callAsPagesWould(mod, {
     method: "HEAD",
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assertRefused(out, "an unauthenticated HEAD");
   assert.strictEqual(
@@ -388,7 +401,7 @@ test("every digest path is protected, not just the index", async () => {
                    "/digests/2026-07-14-evening.html", "/../../etc/passwd"]) {
     const out = await callAsPagesWould(mod, {
       path: p,
-      env: { DIGEST_PASSWORD: TEST_PASSWORD },
+      env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
     });
     assertRefused(out, "an unauthenticated GET of " + p);
   }
@@ -399,11 +412,14 @@ test("every rejection is byte-identical, so the response is not an oracle", asyn
   const cases = [
     {},
     { headers: { Authorization: "Basic Zm9vOmJhcg==" } },
-    { headers: { Authorization: basicHeader("wrong", mod.DIGEST_USERNAME) },
-      env: { DIGEST_PASSWORD: TEST_PASSWORD } },
+    { headers: { Authorization: basicHeader("wrong", TEST_USERNAME) },
+      env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME } },
     { headers: { Authorization: basicHeader(TEST_PASSWORD, "wrong-user") },
-      env: { DIGEST_PASSWORD: TEST_PASSWORD } },
-    { env: { DIGEST_PASSWORD: "" } },
+      env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME } },
+    { env: { DIGEST_PASSWORD: "", DIGEST_USERNAME: TEST_USERNAME } },
+    { env: { DIGEST_PASSWORD: TEST_PASSWORD } },
+    { env: { DIGEST_USERNAME: TEST_USERNAME } },
+    { env: {} },
   ];
   const bodies = [];
   const statuses = [];
@@ -416,34 +432,103 @@ test("every rejection is byte-identical, so the response is not an oracle", asyn
     "every rejection must be a 401: " + JSON.stringify(statuses));
   assert.strictEqual(
     new Set(bodies).size, 1,
-    "the five different rejection reasons produced " + new Set(bodies).size +
-    " distinct bodies. A response that differs between 'no such user' and " +
-    "'wrong password' is a credential oracle.");
+    "the " + cases.length + " different rejection reasons produced " +
+    new Set(bodies).size + " distinct bodies. A response that differs between " +
+    "'no such user' and 'wrong password' is a credential oracle, and a response " +
+    "that differs between 'secret set' and 'secret missing' tells an anonymous " +
+    "client how the deployment is configured.\n" +
+    JSON.stringify(bodies, null, 2));
 });
 
-test("the committed username is a non-empty email-shaped constant, echoed in the 401", async () => {
+// ==========================================================================
+// 10: the 401 body names NOTHING — in either state
+// ==========================================================================
+
+/** Any email-shaped token, i.e. anything that could be an accepted username. */
+const EMAIL_SHAPED = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+
+test("the 401 body names no username when DIGEST_USERNAME is set", async () => {
   const mod = await loadMiddleware();
-  assert.strictEqual(typeof mod.DIGEST_USERNAME, "string",
-    "the middleware must export its username so the test suite and the 401 "
-    + "body read the SAME committed constant instead of two copies that drift");
-  assert.ok(mod.DIGEST_USERNAME.length > 3,
-    "DIGEST_USERNAME is empty or trivially short: " + JSON.stringify(mod.DIGEST_USERNAME));
-  assert.match(mod.DIGEST_USERNAME, /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
-    "DIGEST_USERNAME must be an email-shaped address so the browser prompt "
-    + "is self-explanatory. Got: " + JSON.stringify(mod.DIGEST_USERNAME));
-  const out = await callAsPagesWould(mod, { env: { DIGEST_PASSWORD: TEST_PASSWORD } });
+  const OWNER = "owner@private.example";
+  const out = await callAsPagesWould(mod, {
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
+  });
+  assertRefused(out, "an anonymous GET with the deployment fully configured");
   const body = await out.response.text();
-  assert.ok(body.indexOf(mod.DIGEST_USERNAME) >= 0,
-    "the 401 body must echo the expected username. If the constant is ever "
-    + "wrong, that body is the difference between a diagnosable 401 and a "
-    + "silent lockout of the owner out of their own archive.");
+  assert.ok(body.indexOf(OWNER) < 0,
+    "the 401 body named the accepted username. Naming the account in an " +
+    "unauthenticated response tells an anonymous client which identifier is " +
+    "worth guessing a password against — the disclosure this test exists to " +
+    "stop. Body was: " + JSON.stringify(body));
+  assert.ok(!EMAIL_SHAPED.test(body),
+    "the 401 body contains something shaped like an email address, so it names " +
+    "a username (or a placeholder) whatever the code intended. Body was: " +
+    JSON.stringify(body));
+  assert.ok(body.indexOf("DIGEST_USERNAME") < 0,
+    "the 401 body named the credential's secret. The body must describe no " +
+    "credential at all. Body was: " + JSON.stringify(body));
+});
+
+test("the 401 body names no username when DIGEST_USERNAME is unset", async () => {
+  const mod = await loadMiddleware();
+  const out = await callAsPagesWould(mod, {
+    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+  });
+  assertRefused(out, "an anonymous GET with DIGEST_USERNAME missing");
+  const body = await out.response.text();
+  assert.ok(!EMAIL_SHAPED.test(body),
+    "the 401 body named a placeholder username when the real secret is " +
+    "missing. A committed placeholder is not a safe fallback: it is a " +
+    "published credential, and the prompt built from it rejects the owner's " +
+    "own address. Body was: " + JSON.stringify(body));
+  assert.ok(body.indexOf("DIGEST_USERNAME") < 0,
+    "the 401 body named the credential's secret. Body was: " +
+    JSON.stringify(body));
+});
+
+test("a wrong password and an unset secret return the SAME generic 401", async () => {
+  const mod = await loadMiddleware();
+  const wrongPassword = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader("not-the-password", TEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
+  });
+  const unsetSecret = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
+    env: {},
+  });
+  assertRefused(wrongPassword, "a wrong password");
+  assertRefused(unsetSecret, "no secrets configured at all");
+  const wrongBody = await wrongPassword.response.text();
+  const unsetBody = await unsetSecret.response.text();
+  assert.strictEqual(wrongBody, unsetBody,
+    "a wrong password and an unconfigured deployment returned different bodies, " +
+    "so the refusal leaks how the deployment is configured.\nwrong password: " +
+    JSON.stringify(wrongBody) + "\nunset secret:   " + JSON.stringify(unsetBody));
+  assert.strictEqual(
+    wrongPassword.response.headers.get("WWW-Authenticate"),
+    unsetSecret.response.headers.get("WWW-Authenticate"),
+    "the challenge header must not differ between an unset secret and a wrong " +
+    "password either");
+});
+
+test("the middleware carries no username of its own — no default, no placeholder", async () => {
+  const src = fs.readFileSync(MIDDLEWARE_PATH, "utf8");
+  assert.ok(!/export const DIGEST_USERNAME\s*=/.test(src),
+    "the middleware exports a default username. A committed default is a " +
+    "credential the whole world can read, and it is the value the 401 body " +
+    "used to advertise. The only username that may authenticate is the one " +
+    "DIGEST_USERNAME holds at runtime.");
+  assert.ok(!EMAIL_SHAPED.test(src),
+    "the middleware source contains an email-shaped literal, i.e. a username " +
+    "value inside this public file. Found: " +
+    JSON.stringify(src.match(EMAIL_SHAPED)));
 });
 
 // ==========================================================================
-// 11: the username is CONFIGURED, not compiled in
+// 11: the username is CONFIGURED, and its absence FAILS CLOSED
 // ==========================================================================
 
-test("DIGEST_USERNAME overrides the placeholder, and the placeholder then stops working", async () => {
+test("the configured username is the only one accepted", async () => {
   const mod = await loadMiddleware();
   const OWNER = "owner@private.example";
 
@@ -453,66 +538,78 @@ test("DIGEST_USERNAME overrides the placeholder, and the placeholder then stops 
     env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
   });
   assert.strictEqual(ok.nextCalls, 1,
-    "a correct password under the username configured in DIGEST_USERNAME was "
-    + "refused. That is the lockout this override exists to remove: the "
-    + "username used to be a committed placeholder, so a real address could "
-    + "never log in no matter how right the password was.");
+    "a correct password under the username configured in DIGEST_USERNAME was " +
+    "refused. That is the lockout this secret exists to remove: the username " +
+    "used to be a committed placeholder, so a real address could never log in " +
+    "no matter how right the password was.");
 
-  // The committed placeholder is now a DIFFERENT user and must be refused.
-  const placeholder = await callAsPagesWould(mod, {
-    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
+  // Any OTHER username, including the one this test file uses elsewhere, is a
+  // different user and must be refused.
+  const other = await callAsPagesWould(mod, {
+    headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
     env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
   });
-  assertRefused(placeholder, "the placeholder username while DIGEST_USERNAME is set");
+  assertRefused(other, "a username other than the configured one");
 });
 
-test("the 401 body names the EFFECTIVE username, so the prompt is not a lie", async () => {
-  const mod = await loadMiddleware();
-  const OWNER = "owner@private.example";
-  const out = await callAsPagesWould(mod, {
-    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: OWNER },
-  });
-  const body = await out.response.text();
-  assert.ok(body.indexOf(OWNER) >= 0,
-    "the 401 body must name the configured username. A body that still says " +
-    mod.DIGEST_USERNAME + " while DIGEST_USERNAME is set to something else is " +
-    "a prompt that cannot be satisfied.");
-  assert.ok(body.indexOf("DIGEST_USERNAME") < 0,
-    "the 401 body must not leak the secret NAME as a value; it should echo the "
-    + "effective username the operator has to type.");
-});
+const UNCONFIGURED_USERNAMES = [
+  ["DIGEST_USERNAME absent", {}],
+  ["DIGEST_USERNAME empty", { DIGEST_USERNAME: "" }],
+  ["DIGEST_USERNAME whitespace only", { DIGEST_USERNAME: "   " }],
+  ["DIGEST_USERNAME null", { DIGEST_USERNAME: null }],
+  ["DIGEST_USERNAME a number", { DIGEST_USERNAME: 123456 }],
+];
 
-test("an empty DIGEST_USERNAME falls back to the placeholder instead of opening the door", async () => {
-  const mod = await loadMiddleware();
-  const blank = await callAsPagesWould(mod, {
-    headers: { Authorization: basicHeader(TEST_PASSWORD, "") },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: "   " },
+for (const [label, extra] of UNCONFIGURED_USERNAMES) {
+  test("a missing username (" + label + ") fails CLOSED with the generic 401", async () => {
+    const mod = await loadMiddleware();
+    const logs = captureLogs();
+    let out;
+    try {
+      out = await callAsPagesWould(mod, {
+        headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
+        env: Object.assign({ DIGEST_PASSWORD: TEST_PASSWORD }, extra),
+      });
+    } finally {
+      logs.restore();
+    }
+    assertRefused(out,
+      "DIGEST_USERNAME is not usable (" + label + "). With no username there " +
+      "is no credential that can be right, so the only safe answer is 401 — a " +
+      "placeholder fallback would be a published credential");
+    assert.ok(
+      logs.lines.some((l) => /DIGEST_AUTH_MISCONFIGURED/.test(l)),
+      "a fail-closed rejection must be logged LOUDLY. Captured: " +
+      JSON.stringify(logs.lines));
   });
-  assertRefused(blank, "an empty username typed at the prompt");
+}
 
-  // The fallback still works, so a whitespace-only secret is "no override"
-  // rather than a second way to lock the owner out.
-  const fallback = await callAsPagesWould(mod, {
-    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: "   " },
-  });
-  assert.strictEqual(fallback.nextCalls, 1,
-    "a blank DIGEST_USERNAME did not fall back to the committed placeholder, "
-    + "so the deployment is locked out by a whitespace secret");
-});
-
-test("a missing DIGEST_USERNAME is logged by name, never silently tolerated", async () => {
+test("the missing-username log names the secret and says UNSET, not a credential", async () => {
   const mod = await loadMiddleware();
   const logs = captureLogs();
   try {
-    await callAsPagesWould(mod, { env: { DIGEST_PASSWORD: TEST_PASSWORD } });
+    await callAsPagesWould(mod, {
+      headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
+      env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    });
   } finally {
     logs.restore();
   }
   const text = logs.lines.join("\n");
   assert.ok(text.indexOf("DIGEST_USERNAME") >= 0,
-    "the middleware used the placeholder username without naming the missing "
-    + "secret. Logs were: " + JSON.stringify(text));
+    "the operator log must name the secret that is missing, or nobody can fix " +
+    "it. Logs were: " + JSON.stringify(text));
+  assert.ok(text.indexOf("missing or empty") >= 0,
+    "the operator log must say the secret is missing/empty rather than " +
+    "presenting a placeholder as the accepted user. Logs were: " +
+    JSON.stringify(text));
+  assert.ok(!EMAIL_SHAPED.test(text),
+    "the operator log printed an address as if it were the accepted username. " +
+    "When the secret is unset there is no accepted username, and logging a " +
+    "placeholder as one is the same lie the 401 body used to tell. Logs were: " +
+    JSON.stringify(text));
+  assert.ok(!lines_leak(logs.lines, TEST_PASSWORD),
+    "the operator log contained the submitted password");
 });
 
 // ==========================================================================
@@ -522,8 +619,8 @@ test("a missing DIGEST_USERNAME is logged by name, never silently tolerated", as
 test("correct credentials -> next() runs and the asset is served", async () => {
   const mod = await loadMiddleware();
   const out = await callAsPagesWould(mod, {
-    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assert.strictEqual(out.fellBack, false,
     "the happy path must not take the framework fallback");
@@ -537,8 +634,8 @@ test("correct credentials work for HEAD too", async () => {
   const mod = await loadMiddleware();
   const out = await callAsPagesWould(mod, {
     method: "HEAD",
-    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
-    env: { DIGEST_PASSWORD: TEST_PASSWORD },
+    headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
+    env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME },
   });
   assert.strictEqual(out.fellBack, false);
   assert.strictEqual(out.nextCalls, 1,
@@ -549,11 +646,11 @@ test("a correct latin-1 encoded password is accepted, not locked out", async () 
   const mod = await loadMiddleware();
   const password = "pa§sword-with-1-byte-chars";
   const b64 = Buffer.from(
-    Buffer.from(mod.DIGEST_USERNAME + ":" + password, "utf8").toString("binary"),
+    Buffer.from(TEST_USERNAME + ":" + password, "utf8").toString("binary"),
     "binary").toString("base64");
   const out = await callAsPagesWould(mod, {
     headers: { Authorization: "Basic " + b64 },
-    env: { DIGEST_PASSWORD: password },
+    env: { DIGEST_PASSWORD: password, DIGEST_USERNAME: TEST_USERNAME },
   });
   assert.strictEqual(out.nextCalls, 1,
     "RFC 7617 leaves the charset to the client and some HTTP clients send a "
@@ -571,10 +668,14 @@ test("an internal throw (env getter) answers 401, never a served page", async ()
   let out;
   try {
     out = await callAsPagesWould(mod, {
-      headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
+      headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
       // A `context.env` whose DIGEST_PASSWORD getter throws: the shape of a
       // platform-level fault, and the exact reason the whole body is wrapped.
-      env: { get DIGEST_PASSWORD() { throw new Error("injected env fault"); } },
+      // The username IS configured, so the password getter really is reached.
+      env: {
+        DIGEST_USERNAME: TEST_USERNAME,
+        get DIGEST_PASSWORD() { throw new Error("injected env fault"); },
+      },
     });
   } finally {
     logs.restore();
@@ -601,7 +702,7 @@ test("an internal throw from next() answers 401 rather than escaping", async () 
   // asset-lookup path at all -- a test that passes without testing anything.
   const request = new Request(ORIGIN + "/", {
     method: "GET",
-    headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
+    headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
   });
   let out;
   try {
@@ -609,7 +710,8 @@ test("an internal throw from next() answers 401 rather than escaping", async () 
     try {
       const result = await mod.onRequest({
         request: request,
-        env: { DIGEST_PASSWORD: TEST_PASSWORD, ASSETS: { fetch: async () => served } },
+        env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME,
+               ASSETS: { fetch: async () => served } },
         // Correct credentials, and the asset lookup itself explodes. The
         // middleware owns this call, so it owns the exception.
         next: async () => { throw new Error("injected next() fault"); },
@@ -664,7 +766,8 @@ test("an internal throw while reading the Authorization header answers 401", asy
           method: "GET",
           get headers() { throw new Error("injected headers fault"); },
         },
-        env: { DIGEST_PASSWORD: TEST_PASSWORD, ASSETS: { fetch: async () => served } },
+        env: { DIGEST_PASSWORD: TEST_PASSWORD, DIGEST_USERNAME: TEST_USERNAME,
+               ASSETS: { fetch: async () => served } },
         next: async () => { nextCalls += 1; return served; },
         waitUntil: () => {},
       });
@@ -685,13 +788,17 @@ test("an internal throw while reading the Authorization header answers 401", asy
 // 5: fail closed
 // ==========================================================================
 
+// The USERNAME is configured in every entry, so the password is genuinely the
+// half that is missing and the password branch is the one under test.
 const UNCONFIGURED_ENVS = [
-  ["no env object at all", {}],
-  ["DIGEST_PASSWORD absent", { OTHER: "x" }],
-  ["DIGEST_PASSWORD empty", { DIGEST_PASSWORD: "" }],
-  ["DIGEST_PASSWORD null", { DIGEST_PASSWORD: null }],
-  ["DIGEST_PASSWORD a number", { DIGEST_PASSWORD: 123456 }],
-  ["DIGEST_PASSWORD an empty String object", { DIGEST_PASSWORD: new String("") }],
+  ["no password at all", { DIGEST_USERNAME: TEST_USERNAME }],
+  ["DIGEST_PASSWORD absent", { DIGEST_USERNAME: TEST_USERNAME, OTHER: "x" }],
+  ["DIGEST_PASSWORD empty", { DIGEST_USERNAME: TEST_USERNAME, DIGEST_PASSWORD: "" }],
+  ["DIGEST_PASSWORD null", { DIGEST_USERNAME: TEST_USERNAME, DIGEST_PASSWORD: null }],
+  ["DIGEST_PASSWORD a number",
+   { DIGEST_USERNAME: TEST_USERNAME, DIGEST_PASSWORD: 123456 }],
+  ["DIGEST_PASSWORD an empty String object",
+   { DIGEST_USERNAME: TEST_USERNAME, DIGEST_PASSWORD: new String("") }],
 ];
 
 for (const [label, env] of UNCONFIGURED_ENVS) {
@@ -701,7 +808,7 @@ for (const [label, env] of UNCONFIGURED_ENVS) {
     let out;
     try {
       out = await callAsPagesWould(mod, {
-        headers: { Authorization: basicHeader(TEST_PASSWORD, mod.DIGEST_USERNAME) },
+        headers: { Authorization: basicHeader(TEST_PASSWORD, TEST_USERNAME) },
         env: env,
       });
     } finally {

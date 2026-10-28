@@ -1511,12 +1511,15 @@ digest content). The apex was the only public hostname.
    confirmed in the dashboard.
 
 Basic-auth username: the `DIGEST_USERNAME` Pages secret (same project, same
-environment), echoed in the 401 body on purpose — so a mismatch is
-self-diagnosing rather than a silent lockout. The committed `digest@example.com`
-is only the unset fallback, and while it is in force a real address is refused
-next to a correct password and `DIGEST_AUTH_MISCONFIGURED` is logged by name.
-Note the Worker checks a **different** username, so a Worker URL authenticates
-twice.
+environment), and nothing else — the middleware has no committed default. Unset or
+empty, it fails **closed** and logs `DIGEST_AUTH_MISCONFIGURED` by name. The 401
+body is a fixed generic message that names **no** username: it used to echo the
+username in force, which was self-diagnosing but printed a placeholder address
+that was not the owner's, so the browser prompt asked for a value that could never
+work — and a published default username is a credential anyone can read. The
+username in force is logged on every rejection (`DIGEST_AUTH_REJECTED`) instead.
+Note the (deleted) Worker checked a **different** username, so a Worker URL
+authenticated twice.
 
 ### 38.5 The three guards that keep it protected
 

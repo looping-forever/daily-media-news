@@ -87,6 +87,14 @@ foreach ($spec in @(
 
 Write-Host ''
 Write-Host 'Done. Configured names only (values were never printed):'
-& gh variable list | Select-String -Pattern 'CF_ARCHIVE_ORIGIN'
+# Name only, deliberately. `gh variable list` prints a VALUE column -- a variable
+# is not a secret to GitHub -- so piping it straight to the console published the
+# archive origin while the line above promised names only.
+$repoVariables = & gh variable list
+if ($repoVariables -match 'CF_ARCHIVE_ORIGIN') {
+    Write-Host '  repo variable present: CF_ARCHIVE_ORIGIN'
+} else {
+    Write-Host '  repo variable NOT set: CF_ARCHIVE_ORIGIN'
+}
 & gh secret list | Select-String -Pattern 'BANK_|COLLEGE_'
 & wrangler.cmd secret list -c $WorkerConfig

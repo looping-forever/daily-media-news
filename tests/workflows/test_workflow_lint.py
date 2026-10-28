@@ -171,8 +171,9 @@ ALLOWED_SECRETS = frozenset({
     "TELEGRAM_CHAT_ID",
     # The deployment's own bank and college. Private rather than secret, but a
     # repository secret is where a value that must not be committed belongs, and
-    # scripts/private_values.py reads each one with a visible placeholder as the
-    # LAST-RESORT default. Absence is a loud warning, never a failure.
+    # scripts/private_values.py reads each one with a PRIVATE-CONFIG warning
+    # naming the variable. Absence is a loud warning, never a failure: a display
+    # name falls back to a visible stand-in, a URL to nothing at all.
     "BANK_NAME",
     "BANK_URL",
     "COLLEGE_NAME",

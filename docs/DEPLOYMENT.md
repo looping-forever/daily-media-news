@@ -147,7 +147,7 @@ Verified after-state, **22 unauthenticated probes, no credentials sent**:
 
 | Probe (unauthenticated) | Result |
 |---|---|
-| `GET /` | **401**, 230-byte body, `WWW-Authenticate: Basic realm="Daily Digest (private archive)"`, `Cache-Control: no-store` |
+| `GET /` | **401**, `WWW-Authenticate: Basic realm="Daily Digest (private archive)"`, `Cache-Control: no-store` |
 | `HEAD /` | **401** with those headers and a **zero-byte** body (RFC 9110) |
 | `GET /digests/2026-10-02-evening.html` | **401 directly** — the middleware runs *before* Pages' static handler, so the extensionless redirect never fires for an anonymous client and **no hop can be followed** |
 | `Range: bytes=0-99`, and an absurd range | **401** — never 206, never a partial body |
@@ -159,17 +159,28 @@ standard carve-out so Cloudflare Access can serve resource metadata — but
 "every route answers 401" is therefore **not literally true**. Every route except
 that one endpoint does.
 
+The `GET /` body was **230 bytes** when measured on 2026-10-03, and it printed the
+username in force. Since 2026-10-28 it is a **139-byte** generic message that
+names no username and no secret — see "Username" below for why that changed.
+
 `master.daily-digest.example.pages.dev` is a **second hostname** serving the same
 project from the same deployment. It is already behind **Cloudflare Access**
 (a **302** to the Access login, serving no digest content), so the apex was the
 only public hostname.
 
 **Username.** The accepted Basic-auth username is the `DIGEST_USERNAME` secret on
-the Pages project. The committed `digest@example.com` is only the fallback used
-when that secret is unset, and in that state a real address is refused however
-correct the password is — the middleware logs `DIGEST_AUTH_MISCONFIGURED` by
-name. The 401 body prints the username actually in force, deliberately, so a
-mismatch is self-diagnosing from the browser instead of a silent lockout.
+the Pages project, and that secret is the **only** source: `functions/_middleware.js`
+carries no committed default and no placeholder. If it is unset or empty, every
+request is refused — **fail-closed** — and the middleware logs
+`DIGEST_AUTH_MISCONFIGURED`, naming the secret, server-side.
+
+The 401 body is a fixed generic message that names **no** username and **no**
+secret. It used to print the username in force, which was self-diagnosing, but the
+fallback it printed was a placeholder address that was not the owner's — so the
+browser prompt asked for a value that could never work and a correct password was
+refused. A published default username is also a credential anybody can read. The
+username in force is now logged on every rejection (`DIGEST_AUTH_REJECTED`), so a
+mismatch is still diagnosable — from the Pages log rather than from the browser.
 
 ### What is NOT verified
 
@@ -261,8 +272,9 @@ deployed manually like `breaking-monitor` via `deploy/digest-auth-wrangler.toml`
 
 - It only **proxied**, so the origin stayed directly reachable and the proxy gated
   nothing. See §4a for the measured proof.
-- It checked username **`digest`**, while the origin middleware checks
-  **`digest@example.com`**. Following a Worker URL therefore produced
+- It checked username **`digest`**, while the origin middleware checked whatever
+  `DIGEST_USERNAME` held — a committed placeholder address at the time. Following a
+  Worker URL therefore produced
   **two Basic-auth prompts demanding two different usernames**, and the owner could
   not get into the archive from the ntfy notification link on mobile. This is the
   concrete reason it was removed rather than merely deprecated.

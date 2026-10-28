@@ -32,7 +32,7 @@
  * `onRequest` is a deliberate Response or `next()`:
  *
  *   - absent / wrong / malformed credentials  -> 401
- *   - DIGEST_PASSWORD unset or empty          -> 401 (fail CLOSED, loudly)
+ *   - either secret unset or empty            -> 401 (fail CLOSED, loudly)
  *   - anything at all throws                  -> 401 (logged, never re-thrown)
  *
  * An unconfigured secret means "nobody gets in", never "everybody gets in".
@@ -63,59 +63,46 @@
  *    so that configuration cannot rot unnoticed.
  *
  * ---------------------------------------------------------------------------
- * THE ONE PLACE THE PASSWORD LIVES
+ * BOTH HALVES OF THE CREDENTIAL ARE PAGES SECRETS, AND BOTH ARE REQUIRED
  * ---------------------------------------------------------------------------
- * Secrets are per-project. `DIGEST_PASSWORD` is read from THIS Pages project
- * and nowhere else: the `digest-auth` Worker that used to hold a second copy
- * of it was deleted on 2026-10-03, so this Pages secret (Settings ->
- * Environment variables and secrets, Production environment) is the only one.
+ * `DIGEST_USERNAME` and `DIGEST_PASSWORD` are read from THIS Pages project
+ * (Settings -> Environment variables and secrets, Production environment) and
+ * nowhere else: the `digest-auth` Worker that used to hold a second copy of
+ * the password was deleted on 2026-10-03.
  *
- * If it is absent or empty this middleware returns 401 for EVERY request -
- * fail-closed, deliberately. Note that an unauthenticated probe therefore
- * returns 401 in BOTH the healthy case (secret set, no credentials offered)
- * and the broken one (secret unset), so "401 + WWW-Authenticate" proves the
- * middleware is running but does NOT by itself prove the password is set. To
- * confirm the secret really is configured, authenticate with the username the
- * 401 body names and see whether a real password is accepted.
+ * There is deliberately NO committed default for either one. A placeholder
+ * username was the trap here: the 401 body named it, so the browser prompt
+ * told the owner to type an address that was not his, a correct password was
+ * refused beside it, and the string itself was published in this public
+ * repository. Nothing in this file now names, guesses or falls back to a
+ * username, so the only username that can ever authenticate is the one the
+ * deployment sets.
+ *
+ * If either secret is absent or empty this middleware returns 401 for EVERY
+ * request — fail-closed, deliberately — and logs which secret is missing. Note
+ * that an unauthenticated probe therefore returns 401 in BOTH the healthy case
+ * (secrets set, no credentials offered) and the broken one, so "401 +
+ * WWW-Authenticate" proves the middleware is running but does NOT by itself
+ * prove the credentials are set. The operator log line is how that difference
+ * is observed: it names the missing secret, and never a value.
  *
  * ---------------------------------------------------------------------------
- * THE USERNAME IS A SECOND SECRET, AND ITS ABSENCE IS LOUD
+ * THE 401 BODY NAMES NOTHING
  * ---------------------------------------------------------------------------
- * `DIGEST_USERNAME` overrides the committed placeholder username. Both halves
- * of the credential are therefore configured on the Pages project and neither
- * has to be edited into this public file. When it is unset the placeholder is
- * used and a real address is refused next to a correct password - logged by
- * name, and visible in the 401 body the browser is shown.
- */
-
-/**
- * The Basic-auth USERNAME, and the only one that is accepted when the
- * DIGEST_USERNAME secret is not set.
+ * Naming the accepted account in an unauthenticated response is a disclosure
+ * whatever the value is — it tells an unauthenticated client which identifier
+ * is worth guessing a password against, and it made the browser prompt lie.
+ * So the body is a fixed, generic string with no username, no secret name and
+ * no deployment-specific detail. Every rejection returns the same bytes: absent
+ * credentials, a malformed header, a wrong username, a wrong password and an
+ * unconfigured secret are indistinguishable to the client, which is what stops
+ * the response being a credential oracle.
  *
- * The committed value is a GENERIC placeholder, not a real mailbox: this
- * repository is public. The deployment sets DIGEST_USERNAME to the owner's own
- * address; this constant is what remains when that secret is missing.
- *
- * Why a secret and not a source literal: the owner's address cannot be
- * committed here, and a placeholder in source means the only way to log in is to
- * edit this public file and redeploy. That is the trap this constant used to be
- * — a correct password was refused because the username typed into the browser
- * was a real address and the one the middleware compared against was a
- * placeholder nobody would guess.
- *
- * The 401 body echoes the EFFECTIVE username back on purpose: if this value ever
- * needs to change, the failure mode is a 401 that tells you exactly what to
- * type, not a silent lockout.
+ * The diagnosis that body used to provide lives in the server-side log instead:
+ * a rejection line records the request method and path and the username this
+ * deployment accepts. The password is never logged — not its value, not its
+ * length, not a prefix.
  */
-export const DIGEST_USERNAME = "digest@example.com";
-
-/**
- * The Pages secret that overrides the username above. Read BY NAME only; the
- * value is never logged. Unset or empty falls back to `DIGEST_USERNAME`, which
- * fails CLOSED in the sense that matters: nobody types a placeholder address by
- * accident.
- */
-const USERNAME_SECRET_NAME = "DIGEST_USERNAME";
 
 /**
  * The realm string in `WWW-Authenticate`. It is what the browser shows in its
@@ -123,6 +110,13 @@ const USERNAME_SECRET_NAME = "DIGEST_USERNAME";
  * nobody outside this repository has heard of.
  */
 export const DIGEST_REALM = "Daily Digest (private archive)";
+
+/**
+ * The Pages secret holding the Basic-auth username. Referenced BY NAME only;
+ * the value is never written into this file, a response or a log line that is
+ * not the operator diagnostic below.
+ */
+const USERNAME_SECRET_NAME = "DIGEST_USERNAME";
 
 /**
  * The Pages secret holding the password. Referenced BY NAME only; the value is
@@ -138,71 +132,53 @@ const PASSWORD_SECRET_NAME = "DIGEST_PASSWORD";
 const MAX_AUTHORIZATION_HEADER_LENGTH = 4096;
 
 /**
- * The 401 body. Names the username and where the password comes from, so a
- * correct deployment that is hard to log into is diagnosable from the browser
- * alone. It carries no secret and cannot be used to distinguish "wrong
- * password" from "unknown user" — every rejection in this file returns these
- * identical bytes.
- */
-function unauthorizedBody(username) {
-  const shown = typeof username === "string" && username.length > 0
-    ? username
-    : DIGEST_USERNAME;
-  return (
-    "401 Unauthorized\n" +
-    "\n" +
-    "This digest archive is private and requires HTTP Basic Auth.\n" +
-    "\n" +
-    "  username: " + shown + "\n" +
-    "  password: the DIGEST_PASSWORD secret configured on the\n" +
-    "            daily-digest Cloudflare Pages project.\n"
-  );
-}
-
-/**
- * The username this deployment actually accepts: the DIGEST_USERNAME secret, or
- * the committed placeholder when it is unset.
+ * The 401 body, and it is the SAME bytes for every rejection reason.
  *
- * Read inside `decide`'s try so a throwing `env` is caught and answered with a
- * 401 rather than escaping into Pages' `env.ASSETS.fetch()` fallback. A missing
- * secret is logged by name because that is the state in which the prompt asks
- * for an address nobody would type.
+ * It names no username, no secret and nothing about this deployment: an
+ * unauthenticated response must not tell an unauthenticated client which
+ * identifier to try. The reason for a refusal is logged instead, server-side.
  */
-function effectiveUsername(env) {
-  let configured = "";
-  try {
-    const raw = env ? env[USERNAME_SECRET_NAME] : "";
-    configured = typeof raw === "string" ? raw.trim() : "";
-  } catch (error) {
-    configured = "";
-  }
-  if (configured.length > 0) return configured;
-  if (env) {
-    console.error(
-      "DIGEST_AUTH_MISCONFIGURED: the " + USERNAME_SECRET_NAME + " Pages secret " +
-      "is missing or empty, so the committed PLACEHOLDER username is the only " +
-      "one this deployment accepts and a real address will be refused next to " +
-      "a correct password. Create it on the daily-digest Cloudflare Pages " +
-      "project (Settings -> Environment variables and secrets, Production " +
-      "environment). The 401 body names whichever value is in force, so this " +
-      "is diagnosable from the browser.",
-    );
-  }
-  return DIGEST_USERNAME;
+const UNAUTHORIZED_BODY =
+  "401 Unauthorized\n" +
+  "\n" +
+  "This digest archive is private and requires HTTP Basic Auth.\n" +
+  "\n" +
+  "Use the username and password configured for this archive.\n";
+
+/**
+ * Read one env secret as a string.
+ *
+ * No try/catch here on purpose: a `context.env` whose getter THROWS is a
+ * platform fault, not an unset secret, and it must be reported as one rather
+ * than relabelled "misconfigured". It is swallowed by `onRequest`'s catch —
+ * which logs it as an internal error and still answers 401. A value that is
+ * absent or not a string is the empty string, which every caller reads as "not
+ * configured", i.e. fail closed.
+ */
+function readSecret(env, name) {
+  const raw = env ? env[name] : "";
+  return typeof raw === "string" ? raw : "";
+}
+
+/** The configured username, trimmed: a stray space would be untypeable. */
+function configuredUsername(env) {
+  return readSecret(env, USERNAME_SECRET_NAME).trim();
+}
+
+/** The configured password, NOT trimmed: its bytes are its value. */
+function configuredPassword(env) {
+  return readSecret(env, PASSWORD_SECRET_NAME);
 }
 
 /**
- * A single 401, for every rejection reason.
+ * A single 401, for every rejection reason, carrying the fixed generic body.
  *
  * @param {string|null} method  The request method, so a HEAD gets no body.
  *        Cloudflare and RFC 9110 both forbid a body on a HEAD response, and a
  *        HEAD that 401s must still carry `WWW-Authenticate` — so the headers
  *        are identical and only the body differs.
- * @param {string|null} username  The EFFECTIVE username, echoed in the body so
- *        the prompt names the value actually in force. Null when the caller
- *        cannot read one (the catch path), which falls back to the constant.
  */
-function unauthorized(method, username) {
+function unauthorized(method) {
   const headers = new Headers({
     "WWW-Authenticate": 'Basic realm="' + DIGEST_REALM + '"',
     "Content-Type": "text/plain; charset=utf-8",
@@ -210,10 +186,35 @@ function unauthorized(method, username) {
     // never store a rejection at all.
     "Cache-Control": "no-store",
   });
-  return new Response(method === "HEAD" ? null : unauthorizedBody(username), {
+  return new Response(method === "HEAD" ? null : UNAUTHORIZED_BODY, {
     status: 401,
     headers,
   });
+}
+
+/**
+ * The operator's diagnostic, and the replacement for the username the 401 body
+ * used to print.
+ *
+ * Server-side only. It names the EFFECTIVE username so an operator can tell at
+ * a glance whether `DIGEST_USERNAME` is the address they think it is, and says
+ * why the request was refused. The password is never part of this line: not
+ * the submitted one, not the configured one.
+ *
+ * Never throws — it runs on the rejection path, which must not be able to turn
+ * a 401 into an escaped exception.
+ */
+function logRejection(method, path, username, reason) {
+  try {
+    console.error(
+      "DIGEST_AUTH_REJECTED: " + reason + " on " + method + " " + path +
+      ". This deployment accepts only this username: " + username +
+      ". The password is the " + PASSWORD_SECRET_NAME + " secret and is never " +
+      "logged.",
+    );
+  } catch (error) {
+    // A log that cannot be written must not change the answer.
+  }
 }
 
 /**
@@ -335,6 +336,23 @@ async function constantTimeEquals(left, right) {
 }
 
 /**
+ * The request path, for the operator log, or "" when it cannot be read.
+ *
+ * Never throws: it is called from the rejection path, which must not be able
+ * to turn a 401 into an escaped exception.
+ */
+function readPath(context) {
+  try {
+    const url = context.request.url;
+    if (typeof url !== "string" || !url) return "";
+    const path = url.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]*/, "");
+    return path || "/";
+  } catch (error) {
+    return "";
+  }
+}
+
+/**
  * The actual decision. Called only from inside `onRequest`'s try block.
  *
  * @returns {Promise<Response|*>} a 401 Response, or whatever `context.next()`
@@ -343,8 +361,27 @@ async function constantTimeEquals(left, right) {
 async function decide(context) {
   // `context.env` is read INSIDE the try on purpose. A middleware that reads it
   // outside the try can still throw before the guard is armed.
-  const expectedPassword = context.env[PASSWORD_SECRET_NAME];
-  if (typeof expectedPassword !== "string" || expectedPassword.length === 0) {
+  const method = readMethod(context);
+  const expectedUsername = configuredUsername(context.env);
+  const expectedPassword = configuredPassword(context.env);
+
+  // FAIL CLOSED ON EITHER MISSING HALF. There is no fallback credential, so a
+  // half-configured deployment refuses everyone and says which half is missing.
+  if (expectedUsername.length === 0) {
+    console.error(
+      "DIGEST_AUTH_MISCONFIGURED: the " + USERNAME_SECRET_NAME + " Pages secret " +
+      "is missing or empty, so every request is being refused. This is " +
+      "FAIL-CLOSED and there is no placeholder username to fall back to — a " +
+      "committed default would be a credential the whole world can read, and a " +
+      "401 body that named it would tell the browser to type an address nobody " +
+      "can log in with. Create the secret on the daily-digest Cloudflare Pages " +
+      "project (Settings -> Environment variables and secrets, Production " +
+      "environment). (The value itself is never logged.)",
+    );
+    return unauthorized(method);
+  }
+
+  if (expectedPassword.length === 0) {
     console.error(
       "DIGEST_AUTH_MISCONFIGURED: the " + PASSWORD_SECRET_NAME + " Pages secret " +
       "is missing or empty, so every request is being refused. This is " +
@@ -357,22 +394,32 @@ async function decide(context) {
       "was deleted on 2026-10-03. (The value itself is never read into " +
       "this message.)",
     );
-    return unauthorized(readMethod(context), effectiveUsername(context.env));
+    return unauthorized(method);
   }
 
   const credentials = parseBasicCredentials(
     context.request.headers.get("Authorization"),
   );
-  if (!credentials) return unauthorized(readMethod(context), effectiveUsername(context.env));
+  if (!credentials) {
+    logRejection(method, readPath(context), expectedUsername,
+                 "no usable Basic credentials were presented");
+    return unauthorized(method);
+  }
 
   // Both comparisons always run. Short-circuiting on the username would make
   // the response time a username oracle, and there is nothing to save: two
   // SHA-256 digests do not measurably differ.
-  const expectedUsername = effectiveUsername(context.env);
   const usernameMatches = await constantTimeEquals(credentials.username, expectedUsername);
   const passwordMatches = await constantTimeEquals(credentials.password, expectedPassword);
   if (!(usernameMatches && passwordMatches)) {
-    return unauthorized(readMethod(context), expectedUsername);
+    // One reason string for both halves: the submitted username is NOT logged
+    // (it is a guess, often a fat-fingered real address), only whether it
+    // matched, which is what an operator needs to tell the two cases apart.
+    logRejection(method, readPath(context), expectedUsername,
+                 usernameMatches
+                   ? "the username matched but the password did not"
+                   : "the username did not match");
+    return unauthorized(method);
   }
 
   return await context.next();
@@ -411,8 +458,8 @@ export async function onRequest(context) {
       "have fallen back to env.ASSETS.fetch(), serving the archive " +
       "unauthenticated. Answering 401 instead. Cause: " + describe(error),
     );
-    // The catch path passes no username on purpose: `context.env` is the thing
-    // that just failed, so re-reading it here could throw a second time.
-    return unauthorized(readMethod(context), null);
+    // The catch path passes no method on purpose: `context.request` may be the
+    // thing that just failed, so re-reading it here could throw a second time.
+    return unauthorized(null);
   }
 }

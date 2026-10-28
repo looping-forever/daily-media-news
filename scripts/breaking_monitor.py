@@ -494,12 +494,14 @@ ALERT_SPOILER_RE = re.compile(
 )
 
 # The two institution hosts are deployment values (private_values), so this
-# tuple carries whatever hosts the deployment configured, not a placeholder.
-TIER1_DOMAINS = (
+# tuple carries whatever hosts the deployment configured. An unset value is the
+# empty string and is dropped: `_domain_matches` would answer True for any domain
+# ending in "." against an empty base, and every host would be tier-1.
+TIER1_DOMAINS = tuple(host for host in (
     "gov.np", "nea.org.np", "tu.edu.np", "iost.tu.edu.np",
     private_values.college_host(), private_values.bank_host(),
     "moecdc.gov.np", "can.org.np",
-)
+) if host)
 ESTABLISHED_NEWS_DOMAINS = (
     "kathmandupost.com", "thehimalayantimes.com", "onlinekhabar.com",
     "setopati.com", "risingnepaldaily.com", "gorkhapatraonline.com",

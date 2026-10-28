@@ -209,7 +209,7 @@ prints a value, so no value was read or written. Timestamps below are the
 | `GH_TOKEN` | Worker secret only — **no Actions copy exists** | Dashboard → worker → Variables and Secrets → edit → **Deploy** |
 | `CF_PAGES_API_TOKEN`, `CF_ACCOUNT_ID` | Repo Actions secrets only. `2026-08-27T16:07:43Z` / `2026-08-27T16:08:08Z` | Both needed together; also needs KV **read** scope for U8 |
 | `DIGEST_PASSWORD` | Pages project `daily-digest` → **production** environment only. **No Actions copy** | The one lock on the archive; see §4 and the approved-not-added note below |
-| `DIGEST_USERNAME` | Pages project `daily-digest` → **production** environment. **No Actions copy** (`digest-prebuild.yml` reads it when present) | The Basic-auth username that goes with `DIGEST_PASSWORD`. Changing it is a Pages setting, not a code change — the committed `digest@example.com` is only the unset fallback |
+| `DIGEST_USERNAME` | Pages project `daily-digest` → **production** environment. **No Actions copy** (`digest-prebuild.yml` reads it when present) | The Basic-auth username that goes with `DIGEST_PASSWORD`. Changing it is a Pages setting, not a code change — there is no committed fallback: unset, the middleware fails closed (401 on every route) and logs `DIGEST_AUTH_MISCONFIGURED` |
 | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_RECEIVER`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Repo Actions secrets only | Untouched in practice — these paths have never fired |
 | `OPENCODE_API_KEY` | Repo Actions secret `2026-08-24T10:50:14Z` | Present in the store, but the string `OPENCODE_API_KEY` appears in **no** workflow file. `scripts/ai_classifier.py` reads it from the process environment. Treat as unwired, not as a live credential |
 

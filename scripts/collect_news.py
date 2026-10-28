@@ -471,6 +471,10 @@ WEATHERCODE_TEXT = {
 # institution-specific entries come from the environment (private_values), so a
 # deployment points them at its own campus and bank without editing this file;
 # the public bodies are generic Nepal sources.
+#
+# An unset BANK_URL/COLLEGE_URL is dropped rather than fetched, because the plan
+# name below is built from the host: two empty URLs would both be "notice:" and
+# collide, and there is nothing to fetch anyway.
 NOTICE_SITES = [
     (_pv.bank_url(), "bank_local"),
     ("https://tu.edu.np/", "education_tu"),
@@ -478,6 +482,7 @@ NOTICE_SITES = [
     (_pv.college_url(), "college_local"),
     ("https://nea.org.np/", "local_city"),
 ]
+NOTICE_SITES = [site for site in NOTICE_SITES if site[0]]
 NOTICE_KEYWORDS = ("notice", "result", "exam", "admission", "rate", "branch")
 # Word-boundary match, not substring. The raw substring test is a live bug:
 # `rate` is a substring of "DiRATEorate", so every NEA/Directorate nav link

@@ -44,11 +44,28 @@ REPRODUCING THE RED
 -------------------
 Set `PAGES_MIDDLEWARE` to the path of a deliberately broken copy of
 `functions/_middleware.js` and the JS suite judges that file instead of the
-committed one. Five committed mutants, each proved to go red:
-`m1_fail_open.js` (no auth at all), `m2_no_trycatch.js` (the exception
-escapes into `env.ASSETS.fetch()`), `m3_fail_open_unset_secret.js` (an unset
-secret opens the door), `m4_get_only.js` (only GET is guarded),
-`m5_plain_equals.js` (the comparison regresses to a timing-leaking `===`).
+committed one. Nine mutants are described here and each was proved to go red:
+
+    m1_fail_open.js                 no auth at all
+    m2_no_trycatch.js               the exception escapes into env.ASSETS.fetch()
+    m3_fail_open_unset_secret.js    an unset secret opens the door
+    m4_get_only.js                  only GET is guarded
+    m5_plain_equals.js              the comparison regresses to `===`
+
+and, added when the placeholder username was removed (measured 2026-10-28):
+
+    m1_username_in_body.js          the username is written back into the 401 body
+                                    (3 tests red: both body tests + the source guard)
+    m2_placeholder_fallback.js      a committed placeholder is used when the
+                                    secret is unset (48 red)
+    m3_open_when_unset.js           an unset DIGEST_USERNAME serves the archive
+                                    instead of refusing (11 red)
+    m4_reason_oracle.js             the body varies with the reason for refusal,
+                                    so the 401 answers "is the secret even set?"
+                                    (2 red)
+
+The 401 body must be byte-identical across all of those reasons, which is why
+m4 is caught by the byte-identity test rather than by a status assertion.
 
 `DRIFT_CANARY_FILE` is the same trick for the OTHER half of this module, the
 origin-auth canary step in `drift-canary.yml`. It points the canary tests at a
@@ -121,19 +138,24 @@ STUB_ELSEWHERE_HOST = "elsewhere.invalid"
 STUB_IDP_HOST = "idp.example.invalid"
 
 #: The middleware's own 401 body, transcribed. A faithful transcription rather
-#: than the real thing because `unauthorizedBody()` is not exported and this
-#: suite must not become a Python copy of the middleware — that is the exact
-#: anti-pattern this repository has already paid for. It exists only so a
-#: refusal carries realistic bytes, and `test_the_fixtures_cannot_accidentally_
-#: satisfy_the_archive_check` proves it carries no archive marker.
+#: than the real thing because the body is not exported and this suite must not
+#: become a Python copy of the middleware — that is the exact anti-pattern this
+#: repository has already paid for. It exists only so a refusal carries realistic
+#: bytes, and `test_no_protected_fixture_can_satisfy_the_archive_check` proves it
+#: carries no archive marker.
+#:
+#: It names NO USERNAME, and that is a claim about the committed middleware, not
+#: a convenience: the body used to print `username: digest-owner@example.invalid`
+#: and the middleware used to fall back to that address when `DIGEST_USERNAME`
+#: was unset. Both were removed on 2026-10-28 — a published default username is a
+#: credential the whole world can read, and it made the browser prompt for an
+#: address that is not the owner's. The generic body now says only what to do.
 UNAUTHORIZED_TEXT = (
     "401 Unauthorized\n"
     "\n"
     "This digest archive is private and requires HTTP Basic Auth.\n"
     "\n"
-    "  username: digest-owner@example.invalid\n"
-    "  password: the DIGEST_PASSWORD secret configured on the\n"
-    "            daily-digest Cloudflare Pages project.\n"
+    "Use the username and password configured for this archive.\n"
 )
 
 #: The bare 143-byte nginx body Cloudflare's edge sends with that 302.
@@ -347,6 +369,20 @@ REQUIRED_BEHAVIOURS = (
      "the secret is compared through crypto.subtle, never with ==="),
     ("the middleware has the try/catch the platform fallback requires",
      "the middleware source contains a try/catch around the whole body"),
+    # Added 2026-10-28 with the removal of the placeholder username. The JS
+    # suite names each of these as its own test, so deleting one is visible here.
+    ("the 401 body names no username when DIGEST_USERNAME is set",
+     "the 401 body names no username when DIGEST_USERNAME is set"),
+    ("the 401 body names no username when DIGEST_USERNAME is unset",
+     "the 401 body names no username when DIGEST_USERNAME is unset"),
+    ("the middleware carries no username of its own",
+     "the middleware carries no username of its own"),
+    ("an unset DIGEST_USERNAME fails CLOSED, not open",
+     '["DIGEST_USERNAME absent"'),
+    ("every rejection reason produces a byte-identical body",
+     "every rejection is byte-identical, so the response is not an oracle"),
+    ("a wrong password and an unset secret are indistinguishable",
+     "a wrong password and an unset secret return the SAME generic 401"),
 )
 
 #: node's own TAP plan line. Read from the runner's summary, never counted
@@ -464,6 +500,17 @@ class MiddlewareJsSuiteTests(unittest.TestCase):
             "`functions/_middleware.js` by that name and silently ignores any "
             "other export — the file would compile and protect nothing."
             % MIDDLEWARE)
+        # This file is PUBLIC. A username in it is a published credential, and one
+        # used as a fallback is also a prompt that lies: the browser asks for an
+        # address that is not the owner's, so his own password fails.
+        email_shaped = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+                                  text)
+        self.assertEqual(
+            [], email_shaped,
+            "%s contains an email-shaped literal (%r). This repository is public: "
+            "a username committed here is a credential anyone can read, and a "
+            "fallback username also makes the browser's Basic-auth prompt ask for "
+            "an address that is not the owner's." % (MIDDLEWARE, email_shaped))
 
 
 class WorkflowGuardTests(unittest.TestCase):
