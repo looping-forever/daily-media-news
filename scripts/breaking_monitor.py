@@ -1317,6 +1317,24 @@ def ai_classify(pending_path, runner=None, models=None,
     health_path = os.path.join(state_dir, MODEL_HEALTH_FILENAME)
     health = model_selector.load_health(health_path)
 
+    # THE SHARED POOL COMES FIRST, BEFORE ANY MODEL IS EVEN NAMED. One shared
+    # bucket serves every free model (measured: six ids refused inside 16 s,
+    # 312 ms after `message=stream` with tokens.input=0), so a recorded refusal
+    # is a fact about the bucket and walking the ladder against it spends
+    # attempts to learn nothing. This path is a NON-digest caller, so it also
+    # yields for the rest of an open digest slot window.
+    cooldown_path = model_selector.cooldown_path_for(health_path)
+    cool = model_selector.load_cooldown(cooldown_path)
+    model_selector.prune_pool(cool)
+    pool = model_selector.pool_block(cool, role="other")
+    if pool.get("blocked"):
+        ai_classify.last_models = []
+        ai_classify.last_info = {"source": "pool_cooled", "pool": pool}
+        print("ai_classify: SKIPPED, no model called -- %s" % pool.get("note"))
+        return None, "pool_cooldown: %s" % pool.get("note")
+    if pool.get("note"):
+        print("ai_classify: %s" % pool["note"])
+
     if models is None:
         try:
             selected, info = model_selector.select(
@@ -1355,6 +1373,7 @@ def ai_classify(pending_path, runner=None, models=None,
              (" select_error=%s" % info["select_error"])
              if info.get("select_error") else "")]
     out_of_time = False
+    pool_walled = False
     for model in selected:
         for attempt in range(1, max(1, attempts_per_model) + 1):
             remaining = deadline - time.monotonic()
@@ -1391,6 +1410,32 @@ def ai_classify(pending_path, runner=None, models=None,
                 model_selector.record_success(health, model, at=time.time())
                 model_selector.save_health(health_path, health)
                 return verdict, None
+            # A QUOTA REFUSAL IS THE WHOLE WALK'S INDICTMENT, not this model's.
+            # The provider refuses pre-generation and every free id shares the
+            # bucket, so paying five more 60s attempts to hear the same refusal
+            # is precisely the burn this gate exists to stop. Record the shared
+            # cooldown (until the provider's own Retry-After when it gave one)
+            # and stop.
+            failure = model_selector.classify_failure(
+                "%s\n%s" % (out or "", err or ""), rc)
+            if failure == "quota_or_rate_limited":
+                row = model_selector.record_pool_refusal(
+                    cool, retry_after=model_selector.retry_after_from_text(
+                        "%s\n%s" % (out or "", err or "")),
+                    source="breaking_monitor")
+                model_selector.save_cooldown(cooldown_path, cool)
+                print("ai_classify: %s -> quota_or_rate_limited. The shared free "
+                      "pool refused before generation, so every other model on "
+                      "this bucket would answer the same way; cooldown recorded "
+                      "until %s and the walk stops here."
+                      % (model, row.get("until")))
+                errors.append("%s: quota_or_rate_limited -- shared pool refused "
+                              "until %s; walk stopped"
+                              % (model, row.get("until")))
+                model_selector.record_failure(health, model, "transport",
+                                              at=time.time())
+                pool_walled = True
+                break
             tail = collect_news.clean_ws(out)[-160:]
             errors.append("%s: unparseable verdict (rc=%s) %r"
                           % (model, rc, tail))
@@ -1399,6 +1444,8 @@ def ai_classify(pending_path, runner=None, models=None,
             # run must not pay for it again.
             model_selector.record_failure(health, model, "garbage",
                                           at=time.time())
+            break
+        if pool_walled:
             break
         if out_of_time:
             errors.append("ai_budget_exhausted after %ds"
@@ -2578,6 +2625,16 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
     ap.add_argument("--state-dir", dest="state_dir", default="state")
     ap.add_argument("--config-dir", dest="config_dir", default="config")
     ap.add_argument("--dry-run", dest="dry_run", action="store_true")
+    # A DIAGNOSTIC RUN MAY NOT SPEND THE POOL. `--dry-run` means "render, do not
+    # send" and a real end-to-end check of the classifier is a legitimate use of
+    # it; a canary or a smoke test is not legitimate at any price, so the
+    # suppression is a separate, explicit flag that the canary workflows pass.
+    # Measured: drift-canary's `--dry-run` breaking walk was 29 of a week's 292
+    # model attempts, all of them proving nothing a unit test cannot prove.
+    ap.add_argument("--no-model", dest="no_model", action="store_true",
+                    help="never call a model in this run (canaries, smoke "
+                         "tests, health probes); the deterministic gate and the "
+                         "hard-evidence fast path still run")
     ap.add_argument("--window-min", dest="window_min", type=int, default=90)
     ap.add_argument("--max-candidates", dest="max_candidates", type=int,
                     default=40)
@@ -2639,29 +2696,33 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         append_breaking_log(paths["log"], row)
         return row
 
-    # Stage 2: deterministic pre-gate.
-    # When GMAIL_RECEIVER is set the pre-gate is bypassed so ALL candidates
-    # proceed to AI classification — this supports a dedicated-receiver use
-    # case where every detected item should be evaluated.
-    bypass_pregate = bool(os.environ.get("GMAIL_RECEIVER"))
-    if bypass_pregate:
-        tripped, matched = True, candidates
-        # pre_gate() never runs on the bypass path, so its side-channel still
-        # holds whatever the LAST call in this process left there (or nothing).
-        # Clear it: otherwise a bypass run logs a previous run's audit trail
-        # against these candidates, which is exactly the "widened gate, no
-        # evidence" failure the side-channel exists to prevent.
-        pre_gate.last_why = []
-        print("pre-gate bypassed: GMAIL_RECEIVER is set, forwarding %d "
-              "candidates to AI classifier" % len(candidates))
-    else:
-        tripped, matched = pre_gate(candidates)
+    # Stage 2: deterministic pre-gate, and it runs on EVERY run.
+    #
+    # MEASURED BURN, 2026-10-27: 112 model attempts in one day across the repo,
+    # 33 of the week's 47 quota refusals. The multiplier on this path was a walk,
+    # but the TRIGGER was that `GMAIL_RECEIVER` used to skip this gate entirely
+    # ("forward ALL candidates to the AI classifier"). Any hour that produced one
+    # candidate therefore spent the ladder, whether or not anything qualified.
+    # GMAIL_RECEIVER is a NOTIFICATION recipient -- it answers "where does the
+    # mail go", not "is this worth a model call" -- so it no longer widens the
+    # gate. A sweep with nothing flagged now makes ZERO model calls, and the
+    # decision is written down either way instead of being implied by silence.
+    tripped, matched = pre_gate(candidates)
     # Why each candidate tripped, beside pre_gate_matched in the payload. A
     # wider gate is only auditable if the reason survives the run.
     pre_gate_why = list(getattr(pre_gate, "last_why", []))
+    gate_reason = ("%d of %d candidate(s) met the importance gate"
+                   % (len(matched), checked) if tripped else
+                   "%d candidate(s) checked, none met the importance gate"
+                   % checked)
     if not tripped:
-        log_row(tripped=False)                     # silent heartbeat
+        print("breaking_monitor: gate SUPPRESSED the classifier -- %s. No model "
+              "call was made." % gate_reason)
+        log_row(tripped=False, gate="suppressed", gate_reason=gate_reason)
         return 0
+    print("breaking_monitor: gate passed -- %s. %s"
+          % (gate_reason, "AI classification follows" if not args.no_model
+             else "a model call is suppressed for this run (--no-model)"))
 
     # Stage 3a: the hard-evidence fast path, BEFORE the ladder. A headline that
     # states a mass-casualty death toll is not sent on the classifier's say-so
@@ -2684,6 +2745,18 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         print("breaking_monitor: HARD-EVIDENCE FAST PATH (%s) -- the AI ladder "
               "was not consulted for this run" % fast_why)
         verdict, ai_err = fast_verdict, None
+    elif args.no_model:
+        # A suppression, and a LOUD one: this run would otherwise have asked a
+        # model, and the un-judged headlines ride the log row exactly as they do
+        # on an ai_fail_safe so the honesty gate can still carry them.
+        print("breaking_monitor: model call SUPPRESSED (--no-model) -- the "
+              "classifier was not consulted; %d gated candidate(s) are unjudged"
+              % len(matched))
+        log_row(tripped=True, level=1, confidence="", event_id="", sent=False,
+                pre_gate_why=pre_gate_why, gate="passed", gate_reason=gate_reason,
+                unjudged_titles=[c.get("title", "") for c in matched][:5],
+                reason="model_call_suppressed: --no-model (diagnostic run)")
+        return 0
     else:
         verdict, ai_err = ai_classify(paths["pending"], runner=ai_runner)
 
@@ -2696,6 +2769,7 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         # what it had failed on.
         log_row(tripped=True, level=1, confidence="", event_id="",
                 sent=False, pre_gate_why=pre_gate_why,
+                gate="passed", gate_reason=gate_reason,
                 unjudged_titles=[c.get("title", "") for c in matched][:5],
                 reason="ai_fail_safe: %s" % (ai_err or "unknown")[:200])
         return 0
@@ -2704,6 +2778,7 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         verdict, matched, state, paths, args, smtp_factory=smtp_factory)
     log_row(tripped=True, level=level, confidence=confidence,
             event_id=event_id, sent=sent, pre_gate_why=pre_gate_why,
+            gate="passed", gate_reason=gate_reason,
             reason=reason[:200])
 
     if sent:

@@ -163,7 +163,7 @@ def quake_sources():
 
 
 def run_main(state_dir, fetch, runner=None, dry_run=True, smtp=None,
-             sources_json="", window_min=90):
+             sources_json="", window_min=90, no_model=False, extra_argv=()):
     if not sources_json:
         # Default every run to the single synthetic test feed; otherwise the
         # built-in real-URL source list would bypass the fake fetch layer.
@@ -174,6 +174,9 @@ def run_main(state_dir, fetch, runner=None, dry_run=True, smtp=None,
             "--window-min", str(window_min)]
     if dry_run:
         argv.append("--dry-run")
+    if no_model:
+        argv.append("--no-model")
+    argv.extend(extra_argv)
     return bm.main(argv, fetch_fn=fetch, ai_runner=runner,
                    smtp_factory=smtp or smtp_factory("ok"))
 

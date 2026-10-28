@@ -491,34 +491,170 @@ class PreGateAuditChannelTest(unittest.TestCase):
         finally:
             shutil.rmtree(sd, ignore_errors=True)
 
-    def test_bypass_run_does_not_log_another_runs_reasons(self):
-        """The defect this file was opened to fix.
+    def test_gmail_receiver_no_longer_buys_a_model_call(self):
+        """REPLACES test_bypass_run_does_not_log_another_runs_reasons.
 
-        When GMAIL_RECEIVER is set the pre-gate is bypassed and pre_gate() is
-        never called, so its side-channel still held the previous call's
-        reasons. main() read that stale list into pre_gate_why, so a bypass run
-        logged a previous run's audit trail against this run's candidates.
+        That test mirrored main()'s bypass branch by hand, so it went on passing
+        after the branch was deleted -- a test of the test. This one asserts the
+        behaviour instead: with GMAIL_RECEIVER set (which breaking-monitor.yml
+        does), a sweep whose candidates do not qualify must still make ZERO model
+        calls.
+
+        MEASURED BURN, 2026-10-27: 112 model attempts in one day, 33 of the
+        week's 47 quota refusals on this path. GMAIL_RECEIVER answers "where does
+        the mail go", never "is this worth a model call"; while it widened the
+        gate, every hour that produced one candidate spent the whole ladder.
         """
-        bm.pre_gate([{"title": "Magnitude 6.8 earthquake strikes near Example District",
-                      "snippet": "Strong shaking reported."}])
-        self.assertTrue(bm.pre_gate.last_why, "precondition: channel is warm")
+        from tests.breaking import test_breaking_monitor as mon
+        sd = mon.fresh_dir()
+        calls = []
 
-        # main()'s bypass branch, in isolation.
-        import os as _os
-        prev = _os.environ.get("GMAIL_RECEIVER")
-        _os.environ["GMAIL_RECEIVER"] = "ops@example.invalid"
+        def must_not_run(prompt, model=None, timeout=None):
+            calls.append(model)
+            raise AssertionError("a model was called for a non-qualifying "
+                                 "candidate: %r" % (model,))
+
+        prev = os.environ.get("GMAIL_RECEIVER")
+        os.environ["GMAIL_RECEIVER"] = "ops@example.invalid"
         try:
-            self.assertTrue(bool(_os.environ.get("GMAIL_RECEIVER")))
-            # mirror of the bypass branch in main()
-            bm.pre_gate.last_why = []
+            body = mon.rss_xml([("Local council approves new park in Example City",
+                                 "https://e.test/p", mon.rfc822(mon.NOW),
+                                 "Routine civic news.")])
+            rc = mon.run_main(sd, mon.make_fetch({"feeds.example.test": body}),
+                              runner=must_not_run)
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, [], "the gate must have suppressed the walk")
+            rows = mon.log_rows(sd)
+            self.assertIs(rows[-1]["tripped"], False)
+            self.assertEqual(rows[-1].get("gate"), "suppressed",
+                             "the decision must be recorded, not implied by "
+                             "silence")
+            self.assertIn("none met the importance gate",
+                          rows[-1].get("gate_reason", ""))
         finally:
             if prev is None:
-                _os.environ.pop("GMAIL_RECEIVER", None)
+                os.environ.pop("GMAIL_RECEIVER", None)
             else:
-                _os.environ["GMAIL_RECEIVER"] = prev
-        self.assertEqual(
-            list(bm.pre_gate.last_why), [],
-            "the bypass path must clear the side-channel, not inherit it")
+                os.environ["GMAIL_RECEIVER"] = prev
+            shutil.rmtree(sd, ignore_errors=True)
+
+    def test_gate_still_passes_a_qualifying_candidate(self):
+        """The suppression above must not be a mute button.
+
+        Same wiring, a headline that does qualify: the classifier is reached
+        exactly once, and the decision is logged as passed with its count.
+        """
+        from tests.breaking import test_breaking_monitor as mon
+        sd = mon.fresh_dir()
+        calls = []
+        try:
+            body = mon.rss_xml([mon.EARTHQUAKE_ITEM])
+            rc = mon.run_main(
+                sd, mon.make_fetch({"feeds.example.test": body}),
+                runner=mon.verdict_runner(
+                    {"level": 3, "confidence": "high", "reason": "test"}))
+            self.assertEqual(rc, 0)
+            rows = mon.log_rows(sd)
+            self.assertIs(rows[-1]["tripped"], True)
+            self.assertEqual(rows[-1].get("gate"), "passed")
+            self.assertIn("met the importance gate",
+                          rows[-1].get("gate_reason", ""))
+            # pre_gate_why must describe THIS run, not a previous one.
+            self.assertTrue(rows[-1].get("pre_gate_why"))
+        finally:
+            shutil.rmtree(sd, ignore_errors=True)
+
+    def test_no_model_flag_suppresses_the_call_and_says_so(self):
+        """A diagnostic run may not spend the shared pool.
+
+        Drift-canary's `--dry-run` breaking walk was 29 of the week's 292 model
+        attempts, every one of them proving nothing a unit test cannot. The
+        suppression is a SEPARATE flag precisely because `--dry-run` must keep
+        meaning "render, do not send": an end-to-end check of the classifier is a
+        legitimate use of dry-run, and a canary is not.
+        """
+        from tests.breaking import test_breaking_monitor as mon
+        sd = mon.fresh_dir()
+
+        def must_not_run(prompt, model=None, timeout=None):
+            raise AssertionError("--no-model called a model: %r" % (model,))
+
+        try:
+            body = mon.rss_xml([mon.EARTHQUAKE_ITEM])
+            rc = mon.run_main(sd, mon.make_fetch({"feeds.example.test": body}),
+                              runner=must_not_run, no_model=True)
+            self.assertEqual(rc, 0)
+            rows = mon.log_rows(sd)
+            self.assertIs(rows[-1]["tripped"], True,
+                          "the gate still decides; only the model is suppressed")
+            self.assertIs(rows[-1]["sent"], False)
+            self.assertEqual(rows[-1].get("gate"), "passed")
+            self.assertIn("model_call_suppressed", rows[-1].get("reason", ""))
+            self.assertTrue(rows[-1].get("unjudged_titles"),
+                            "unjudged headlines must ride the row so the "
+                            "honesty gate can still carry them")
+        finally:
+            shutil.rmtree(sd, ignore_errors=True)
+
+    def test_a_recorded_pool_cooldown_stops_the_sweep_before_any_model(self):
+        """The shared pool is honoured BEFORE a model is named.
+
+        The provider refuses pre-generation and every free id shares the bucket
+        (measured: six ids refused inside 16 s, 312 ms after `message=stream`,
+        `tokens.input=0`), so walking the ladder against a recorded refusal spends
+        attempts to learn nothing. This is the caller that spent 82 of a week's
+        292 attempts, so the check has to be here and not only in the selector.
+        """
+        from tests.breaking import test_breaking_monitor as mon
+        import model_selector as ms
+        sd = mon.fresh_dir()
+        calls = []
+
+        def must_not_run(prompt, model=None, timeout=None):
+            calls.append(model)
+            raise AssertionError("a refused pool named a model: %r" % (model,))
+
+        try:
+            cool_path = ms.cooldown_path_for(
+                os.path.join(sd, bm.MODEL_HEALTH_FILENAME))
+            doc = ms.load_cooldown(cool_path)
+            row = ms.record_pool_refusal(doc, retry_after=3600, source="test")
+            ms.save_cooldown(cool_path, doc)
+            body = mon.rss_xml([mon.EARTHQUAKE_ITEM])
+            rc = mon.run_main(sd, mon.make_fetch({"feeds.example.test": body}),
+                              runner=must_not_run)
+            self.assertEqual(rc, 0)
+            self.assertEqual([], calls,
+                             "no model may be named while the pool is refused")
+            rows = mon.log_rows(sd)
+            reason = rows[-1].get("reason", "")
+            self.assertIn("pool_cooldown", reason)
+            self.assertIn(
+                row["until"], reason,
+                "a suppressed run must say WHEN the pool is usable again, or it "
+                "is indistinguishable from a broken one")
+        finally:
+            shutil.rmtree(sd, ignore_errors=True)
+
+    def test_the_canary_workflow_passes_no_model(self):
+        """The flag only saves anything if the canary actually passes it.
+
+        A behavioural test cannot reach this: the saving lives in the workflow
+        file, and a later edit that drops `--no-model` would put 29 model
+        attempts a week back on the shared pool with every test still green.
+        """
+        path = os.path.join(REPO_ROOT, ".github", "workflows",
+                            "drift-canary.yml")
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        step = text.split("Breaking monitor dry-run", 1)
+        self.assertEqual(2, len(step), "the canary step has been renamed")
+        body = step[1].split("- name:", 1)[0]
+        self.assertIn("scripts/breaking_monitor.py", body)
+        self.assertIn("--no-model", body,
+                      "the drift canary's breaking walk must not spend the "
+                      "shared model pool; measured at 29 attempts/week for "
+                      "nothing a unit test cannot prove")
 
     def test_entertainment_spoiler_still_reaches_the_ai_classifier(self):
         """The wider gate must NOT swallow the case test_7 exists to protect.
