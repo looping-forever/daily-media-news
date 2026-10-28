@@ -96,8 +96,12 @@ WRANGLER_TEMPLATE = (
     'id = "%s"\n'
 ) % KV_PLACEHOLDER
 
-#: The three degraded kinds the supersede push and this ladder agree on.
-SUPERSEDED_KINDS = ("partial", "fallback_last_good", "unavailable")
+#: The four degraded kinds the supersede push and this ladder agree on.
+#: `unsummarised` is the no-AI edition: a real digest sealed later the same day
+#: has to be able to replace it. Kept on ONE line because a guard in
+#: tests/digest/test_fallback_ledger.py reads both copies with a single-line
+#: regex and compares the sets.
+SUPERSEDED_KINDS = ("partial", "fallback_last_good", "unavailable", "unsummarised")
 
 
 def step_dict(step_name):

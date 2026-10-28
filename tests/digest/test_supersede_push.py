@@ -301,7 +301,10 @@ class SupersedeHarness(unittest.TestCase):
 
 class WhichEntriesSupersedeTests(SupersedeHarness):
     def test_each_degraded_kind_dispatches_the_full_digest(self):
-        for kind in ("partial", "fallback_last_good", "unavailable"):
+        # `unsummarised` belongs here: it is the no-AI edition, the owner can
+        # read it, and a real digest sealed later the same day must replace it.
+        for kind in ("partial", "fallback_last_good", "unavailable",
+                     "unsummarised"):
             with self.subTest(kind=kind):
                 self.outputs.write_text("", encoding="utf-8")
                 code, out = self._run(kv_body=ledger_raw(degraded_entry(kind)))

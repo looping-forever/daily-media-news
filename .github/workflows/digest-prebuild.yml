@@ -559,7 +559,12 @@ jobs:
           # so the reader knows it is one.
           health = validated.get('source_health')
           state = str(health.get('state') or '').strip().lower() if isinstance(health, dict) else 'unknown'
-          is_partial = state != 'ok'
+          # The no-AI fallback seals as its own KIND. It is folded into
+          # `is_partial` as well, on purpose: a Worker deployed before this
+          # change knows only `is_partial`, and a labelled partial is a far
+          # better failure than an unlabelled "fresh".
+          edition_kind = str(validated.get('edition_kind') or '').strip()
+          is_partial = state != 'ok' or edition_kind == 'unsummarised'
 
           if not built_at:
               die('built_at was not carried through from the dispatched run, so the '
@@ -579,6 +584,7 @@ jobs:
               'built_at': stamp + 'Z' if not stamp.endswith('Z') else stamp,
               'page_url': page_url,
               'is_partial': bool(is_partial),
+              'edition_kind': edition_kind,
               'source_health_state': state,
               'stories': count,
               'html_sha256': hashlib.sha256(html.encode('utf-8')).hexdigest(),
@@ -1219,7 +1225,12 @@ jobs:
           # `delivered` and `duplicate_suppressed` are deliberately absent: the
           # first is what a healthy slot looks like and the second is a second
           # attempt at one, and superseding either is a duplicate push.
-          SUPERSEDED_KINDS = ('partial', 'fallback_last_good', 'unavailable')
+          # `unsummarised` IS degraded in this sense: headlines with no summaries
+          # are what a model outage serves, and a real digest sealed later the
+          # same day must be allowed to replace it. ONE LINE, because a guard in
+          # tests/digest/test_fallback_ledger.py reads this declaration with a
+          # single-line regex rather than parsing the heredoc.
+          SUPERSEDED_KINDS = ('partial', 'fallback_last_good', 'unavailable', 'unsummarised')
 
           slot = os.environ['SLOT']
           today = os.environ['TODAY']
@@ -1346,12 +1357,13 @@ jobs:
           if not isinstance(artifact, dict):
               skip('the sealed artifact is not a JSON object')
           # The artifact on hand IS what the dispatched run would send. If it is
-          # partial too there is no complete digest to replace the partial push
+          # degraded too there is no complete digest to replace the degraded push
           # with, and dispatching would re-run the whole pipeline to deliver the
-          # same degraded news a second time.
+          # same inferior news a second time. The no-AI edition counts as
+          # degraded here for that exact reason.
           if artifact.get('is_partial') is True:
-              skip('the sealed artifact is itself partial — nothing complete to '
-                   'supersede with')
+              skip('the sealed artifact is itself degraded (partial or '
+                   'unsummarised) — nothing complete to supersede with')
           if (str(artifact.get('date') or '') != today
                   or str(artifact.get('slot') or '') != slot):
               skip('the sealed artifact is filed under a different date/slot than '
@@ -1395,7 +1407,7 @@ jobs:
               skip('full_artifact_available_at is already set for this slot (%s) — '
                    'the supersede has already been dispatched'
                    % entry.get('full_artifact_available_at'))
-          # THE `kind` TERM. Only the three pushes the owner cannot read are
+          # THE `kind` TERM. Only the pushes the owner cannot read are
           # eligible; anything else here would be a duplicate.
           if str(entry.get('kind') or '') not in SUPERSEDED_KINDS:
               skip('the slot was pushed as %r, which is not a degraded push'

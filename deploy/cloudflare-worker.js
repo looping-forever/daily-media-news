@@ -2285,6 +2285,11 @@ const KIND_PARTIAL = "partial";
 const KIND_FALLBACK_LAST_GOOD = "fallback_last_good";
 const KIND_UNAVAILABLE = "unavailable";
 const KIND_DUPLICATE_SUPPRESSED = "duplicate_suppressed";
+// THE NO-AI FALLBACK. A real edition built without a model: collected headlines,
+// no summaries. Distinct from `partial`, which is a claim about SOURCE
+// reachability; this one is a claim about the ABSENCE OF A MODEL, and it must
+// never read as `fresh` or advance `last_good`.
+const KIND_UNSUMMARISED = "unsummarised";
 // This arm produced NOTHING for this slot because another arm had already done
 // the job. Deliberately NOT `unavailable` (which means "we tried and there was
 // nothing") and deliberately NOT `delivered` (which would claim this Worker
@@ -2315,6 +2320,9 @@ function deliveryEdition(entry) {
   if (e.ntfy_failed === true || e.state === STATE_FAILED) return "failed";
   if (e.state === STATE_PENDING) return "pending";
   if (e.kind === KIND_DELIVERED) return "fresh";
+  // CHECKED BEFORE `partial`: the artifact carries both facts, and "no AI wrote
+  // this" is the one a reader must not have to infer from a source banner.
+  if (e.kind === KIND_UNSUMMARISED) return "unsummarised";
   if (e.kind === KIND_PARTIAL) return "partial";
   if (e.kind === KIND_FALLBACK_LAST_GOOD) return "fallback";
   if (e.kind === KIND_UNAVAILABLE) return "notice";
@@ -3361,7 +3369,11 @@ async function deliverDigestPlan(env, slot, writer, options) {
   //    to ntfy. A crash from here leaves `pending`, which the next run treats as
   //    unknown and re-pushes — a possible duplicate, never a silent miss.
   const artifact = verdict.artifact;
-  const kind = artifact.is_partial === true ? KIND_PARTIAL : KIND_DELIVERED;
+  // The sealed artifact says which kind of edition it is; `is_partial` alone
+  // would call an unsummarised build `delivered` whenever the sources were ok.
+  const kind = artifact.edition_kind === KIND_UNSUMMARISED
+    ? KIND_UNSUMMARISED
+    : (artifact.is_partial === true ? KIND_PARTIAL : KIND_DELIVERED);
   const scheduledInstant = digestScheduledInstant(today, slotName);
   if (writer) {
     await writer({
@@ -3514,15 +3526,19 @@ async function deliverDigestPlan(env, slot, writer, options) {
     http_status: published.http_status,
     build: workerBuild(env),
     is_partial: artifact.is_partial === true ? true : false,
+    edition_kind: String(artifact.edition_kind || ""),
   };
   if (writer) {
-    await writer({
-      date: today,
-      slot: slotName,
-      patch: record,
-      // `last_good` advances ONLY on a real digest. A fallback push must never
-      // become the next day's fallback, or one bad day would feed itself.
-      last_good: {
+    const update = { date: today, slot: slotName, patch: record };
+    // `last_good` advances ONLY on a real digest. A fallback push must never
+    // become the next day's fallback, or one bad day would feed itself.
+    //
+    // AN UNSUMMARISED EDITION IS THE SAME CASE, and it is the one this gate was
+    // extended for: headlines with no summaries are not a "good" digest to serve
+    // tomorrow, and advancing here would quietly let a model outage on day 1
+    // become the fallback offer on day 2.
+    if (kind !== KIND_UNSUMMARISED) {
+      update.last_good = {
         date: today,
         slot: slotName,
         page_url: String(artifact.page_url),
@@ -3530,8 +3546,9 @@ async function deliverDigestPlan(env, slot, writer, options) {
         body: String(artifact.ntfy.body),
         built_at: String(artifact.built_at || sentAt),
         at: sentAt,
-      },
-    }, sentAtMs);
+      };
+    }
+    await writer(update, sentAtMs);
   }
   const outcome = {
     ok: true,

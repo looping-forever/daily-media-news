@@ -90,7 +90,8 @@ const EXPORT_NAMES = [
   "DELIVERY_BUDGET_MS", "DELIVERY_ATTEMPT_TIMEOUT_MS",
   "INGEST_TOKEN_HEADER", "INGEST_TOKEN_SECRET",
   "KIND_DELIVERED", "KIND_PARTIAL", "KIND_FALLBACK_LAST_GOOD",
-  "KIND_UNAVAILABLE", "KIND_DUPLICATE_SUPPRESSED", "STATE_PENDING", "STATE_SENT",
+  "KIND_UNAVAILABLE", "KIND_DUPLICATE_SUPPRESSED", "KIND_UNSUMMARISED",
+  "STATE_PENDING", "STATE_SENT",
   "CRON_DIGEST_MORNING", "CRON_DIGEST_EVENING",
   "CRON_DIGEST_REFIRE_MORNING", "CRON_DIGEST_REFIRE_EVENING",
   // The merged dispatcher. CRON_DISPATCHER is the ONE deployed trigger;
@@ -858,6 +859,50 @@ test("a PARTIAL artifact IS sent — a labelled partial beats a silent day", asy
   assert.strictEqual(ledgerOf(r.kv).days[TODAY][SLOT].is_partial, true);
 });
 
+test("an UNSUMMARISED artifact is pushed as its own kind and never becomes last_good", async () => {
+  const w = loadWorker();
+  // A last_good on file from yesterday, so "did not advance" is a statement
+  // about a real previous value and not an assertion about null.
+  const previous = lastGood(YESTERDAY, "Yesterday's real digest.");
+  const r = await deliver(w, {
+    initial: {
+      [artifactKey()]: artifact({
+        edition_kind: "unsummarised",
+        ntfy: {
+          title: "Morning Digest · 2026-10-09 · unsummarised edition (no AI today)",
+        },
+      }),
+      "digest:ledger": JSON.stringify({
+        schema_version: 1,
+        as_of: new Date(T0 - HOUR).toISOString(),
+        days: {},
+        last_good: previous,
+      }),
+    },
+  });
+  const posts = postCalls(r.net);
+  assert.strictEqual(posts.length, 1,
+    "the no-AI edition was not pushed at all. Headlines with no summaries are " +
+    "still today's news, and silence is the worse outcome.");
+  assert.strictEqual(r.outcome.kind, w.KIND_UNSUMMARISED,
+    "the artifact said edition_kind=unsummarised and the delivery filed it as " +
+    JSON.stringify(r.outcome.kind));
+
+  const entry = ledgerOf(r.kv).days[TODAY][SLOT];
+  assert.strictEqual(entry.kind, "unsummarised");
+  assert.strictEqual(entry.state, "sent");
+  assert.strictEqual(entry.edition, "unsummarised",
+    "?health=1 and every ledger reader answer with `edition`, which the Worker " +
+    "derives. A no-AI edition filed as 'fresh' is the same lie the fallback " +
+    "kind was introduced to stop: it reads as a normal digest to anyone who " +
+    "stops at `state: sent`.");
+
+  assert.strictEqual(ledgerOf(r.kv).last_good.date, YESTERDAY,
+    "an unsummarised edition advanced last_good, so a model outage on day 1 " +
+    "becomes the fallback offered on day 2 — headlines with no summaries, " +
+    "served as the best available edition.");
+});
+
 test("a stale-dated artifact falls back to the last good digest, LABELLED as older", async () => {
   const w = loadWorker();
   const good = lastGood(YESTERDAY, "Yesterday's news, which did build.");
@@ -972,6 +1017,11 @@ test("deliveryEdition answers WHICH edition was shown, not whether a push landed
   assert.strictEqual(
     w.deliveryEdition({ state: "sent", kind: "unavailable",
                         ntfy_sent_at: "2026-10-09T01:36:00Z" }), "notice");
+  // The no-AI edition has its OWN word. Folding it into "partial" would say the
+  // sources were thin; folding it into "fresh" would say a model wrote it.
+  assert.strictEqual(
+    w.deliveryEdition({ state: "sent", kind: "unsummarised",
+                        ntfy_sent_at: "2026-10-09T01:36:00Z" }), "unsummarised");
   assert.strictEqual(
     w.deliveryEdition({ state: "failed", kind: "fallback_last_good",
                         ntfy_failed: true }), "failed");

@@ -2174,6 +2174,55 @@ class SealMarkupIsTheArchiveScrapersMarkup(TempDirCase):
                       % sealed)
         self.assertEqual("degraded", sealed["source_health_state"])
 
+    def test_an_unsummarised_edition_seals_as_its_own_kind_and_as_partial(self):
+        """THE NO-AI EDITION MUST SAY SO IN THE ARTIFACT, NOT ONLY ON THE PAGE.
+
+        The page and the push title carry the label, but the Worker never reads
+        either: it reads the sealed artifact. So two facts have to be in it.
+
+        `edition_kind` is what tells the Worker this is not a model-written
+        digest. `is_partial` is set as well, deliberately: a Worker deployed
+        before `edition_kind` existed knows only `is_partial`, and a labelled
+        partial is a far better failure than an unlabelled "fresh".
+        """
+        body = python_heredocs(
+            step_named(PREBUILD_WORKFLOW, "seal",
+                       "Assert the rendered page and build the artifact record")["run"])[0]
+
+        def seal(validated_extra):
+            d = Path(tempfile.mkdtemp(prefix="seal-unsummarised-"))
+            self.addCleanup(shutil.rmtree, str(d), True)
+            validated = {
+                "stories": [{"title": "s"}], "stories_outcome": "produced",
+                "digest_time": "morning", "date": "2026-10-09",
+                "generated_at_npt": "2026-10-09 06:41",
+                "source_health": {"state": "ok"}}
+            validated.update(validated_extra)
+            stage_artifact(d, page_html=self.page, validated=validated)
+            code, out = exec_heredoc(body, {
+                "SLOT": "morning", "TODAY": "2026-10-09",
+                "BUILT_AT": "2026-10-09T01:35:00Z"}, d)
+            self.assertEqual(0, code, out)
+            return json.loads(
+                (d / "prebuild" / "artifact.json").read_text(encoding="utf-8"))
+
+        sealed = seal({"edition_kind": "unsummarised"})
+        self.assertEqual(
+            "unsummarised", sealed.get("edition_kind"),
+            "the no-AI edition sealed without an edition_kind, so the Worker "
+            "would file it as an ordinary delivered digest. Sealed: %r" % sealed)
+        self.assertIs(
+            sealed["is_partial"], True,
+            "the no-AI edition sealed with is_partial false. A Worker that does "
+            "not know edition_kind then labels it fresh, which is the one claim "
+            "this whole fallback must not make. Sealed: %r" % sealed)
+        # The CONTROL: a healthy model-written digest is still neither.
+        normal = seal({})
+        self.assertEqual("", normal.get("edition_kind"),
+                         "a normal digest sealed with an edition_kind")
+        self.assertIs(normal["is_partial"], False,
+                      "a healthy digest sealed as partial")
+
     def test_the_seal_refuses_a_page_that_dropped_a_load_bearing_marker(self):
         body = python_heredocs(
             step_named(PREBUILD_WORKFLOW, "seal",

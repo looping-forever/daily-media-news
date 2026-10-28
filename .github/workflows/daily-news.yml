@@ -484,10 +484,11 @@ jobs:
           # fires marginally before its own scheduled minute.
           SLOT_EARLY_SLACK_S = 60
           # The same literal digest-prebuild.yml's seal lists in its
-          # SUPERSEDED_KINDS -- the three kinds a complete digest may replace --
-          # and the copy tests/digest/test_ladder_trigger.py pins. A heredoc
-          # cannot import from another workflow, so instead of hoping the three
-          # stay equal, the pin test below fails if any one of them is renamed.
+          # SUPERSEDED_KINDS -- the kinds a complete digest may replace, now four
+          # with the no-AI `unsummarised` edition -- and the copy
+          # tests/digest/test_ladder_trigger.py pins. A heredoc cannot import from
+          # another workflow, so instead of hoping they stay equal, the pin test
+          # below fails if any one of them is renamed.
           # Every way this step can fail to read the ledger. One tuple, one
           # branch: a new failure mode cannot be added without being asked
           # which of the three answers it gets.
