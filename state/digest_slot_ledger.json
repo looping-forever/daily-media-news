@@ -1,50 +1,6 @@
 {
-  "as_of": "2026-10-28T12:56:46Z",
+  "as_of": "2026-10-28T17:02:02Z",
   "days": {
-    "2026-10-22": {
-      "evening": {
-        "actions_dispatch_at": "2026-10-22T13:35:27Z",
-        "actions_dispatch_cause": "already_dispatched",
-        "actions_dispatch_http_status": 0,
-        "actions_dispatch_reason": "already dispatched this slot",
-        "attempts": 1,
-        "build": "045b838cb58551875637a55a78daacb9457a827c",
-        "first_ntfy_sent_at": null,
-        "http_status": 429,
-        "kind": "fallback_last_good",
-        "last_good_shown": "2026-10-18",
-        "late_build_dispatched": false,
-        "ntfy_failed": true,
-        "ntfy_sent_at": null,
-        "pending_at": "2026-10-22T13:55:26Z",
-        "reject_plain": "no digest was built for evening 2026-10-22.",
-        "reject_reason": "absent | NO build was dispatched",
-        "scheduled_instant": "2026-10-22T13:35:00Z",
-        "sequence_id": "dmn-2026-10-22-evening-full",
-        "state": "failed"
-      },
-      "morning": {
-        "actions_dispatch_at": "2026-10-22T01:35:25Z",
-        "actions_dispatch_cause": "already_dispatched",
-        "actions_dispatch_http_status": 0,
-        "actions_dispatch_reason": "already dispatched this slot",
-        "attempts": 1,
-        "build": "045b838cb58551875637a55a78daacb9457a827c",
-        "first_ntfy_sent_at": "2026-10-22T01:50:34Z",
-        "http_status": 200,
-        "kind": "fallback_last_good",
-        "last_good_shown": "2026-10-18",
-        "late_build_dispatched": false,
-        "ntfy_failed": false,
-        "ntfy_sent_at": "2026-10-22T01:50:34Z",
-        "pending_at": "2026-10-22T01:50:25Z",
-        "reject_plain": "no digest was built for morning 2026-10-22.",
-        "reject_reason": "absent | NO build was dispatched",
-        "scheduled_instant": "2026-10-22T01:35:00Z",
-        "sequence_id": "dmn-2026-10-22-morning-full",
-        "state": "sent"
-      }
-    },
     "2026-10-23": {
       "evening": {
         "actions_dispatch_at": "2026-10-23T13:35:26Z",
@@ -265,9 +221,25 @@
     },
     "2026-10-28": {
       "evening": {
-        "built_at": "2026-10-28T12:56:39Z",
-        "source_health_state": "unknown",
-        "story_count": 0
+        "actions_dispatch_at": "2026-10-28T13:35:26Z",
+        "actions_dispatch_cause": null,
+        "actions_dispatch_http_status": null,
+        "actions_dispatch_reason": null,
+        "attempts": 1,
+        "build": "500c732",
+        "dispatch_failure_class": null,
+        "edition": "failed",
+        "first_ntfy_sent_at": null,
+        "kind": "unsummarised",
+        "last_good_shown": null,
+        "late_build_dispatched": true,
+        "ntfy_sent_at": "2026-10-28T13:36:50Z",
+        "pending_at": "2026-10-28T13:35:26Z",
+        "reject_plain": "the evening push title is 75 characters, past the 72-character limit a phone notification shows.",
+        "reject_reason": "title | a late build was dispatched",
+        "scheduled_instant": "2026-10-28T13:35:00Z",
+        "sequence_id": "dmn-2026-10-28-evening",
+        "state": "sent"
       },
       "morning": {
         "actions_dispatch_at": "2026-10-28T01:35:25Z",
@@ -276,7 +248,7 @@
         "actions_dispatch_reason": "already dispatched this slot",
         "attempts": 1,
         "build": "adcdc21",
-        "built_at": "",
+        "built_at": "2026-10-28T17:01:56Z",
         "edition": "failed",
         "first_ntfy_sent_at": null,
         "kind": "delivered",
@@ -288,9 +260,19 @@
         "reject_reason": "absent | NO build was dispatched",
         "scheduled_instant": "2026-10-28T01:35:00Z",
         "sequence_id": "dmn-2026-10-28-morning",
-        "source_health_state": "unknown",
+        "source_health_state": "ok",
         "state": "sent",
-        "story_count": 0
+        "story_count": 15
+      }
+    },
+    "2026-10-29": {
+      "morning": {
+        "edition": "unsummarised",
+        "first_ntfy_sent_at": "2026-10-28T14:44:00Z",
+        "kind": "unsummarised",
+        "ntfy_sent_at": "2026-10-28T14:44:00Z",
+        "sequence_id": "dmn-2026-10-29-morning",
+        "state": "sent"
       }
     }
   },
