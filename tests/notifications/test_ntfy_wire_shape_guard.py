@@ -42,6 +42,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -303,15 +304,21 @@ class WorkerDigestSiteTest(unittest.TestCase):
     the same call the sibling suite makes, for the same reason.
     """
 
-    def _eval(self, args_js):
+    def _eval(self, args_js, worker_path=None):
+        # Line endings are normalised before `grab` looks for its terminator: a
+        # CRLF working copy has no `\n}\n` and the old search sliced an empty
+        # string, so node said `digestPayload is not defined` about a healthy
+        # worker. An unterminated function now throws instead of slicing empty.
         preamble = (
             "const fs=require('fs');\n"
-            "const src=fs.readFileSync(process.argv[1],'utf8');\n"
+            "const src=fs.readFileSync(process.argv[1],'utf8')"
+            ".replace(/\\r\\n/g,'\\n');\n"
             "function grab(name){\n"
             "  const s=src.indexOf('function '+name+'(');\n"
             "  if(s<0) throw new Error('missing '+name);\n"
-            "  const e=src.indexOf('\\n}\\n', s)+2;\n"
-            "  return src.slice(s,e);\n"
+            "  const at=src.indexOf('\\n}\\n', s);\n"
+            "  if(at<0) throw new Error('unterminated '+name);\n"
+            "  return src.slice(s,at+2);\n"
             "}\n"
             "const fns=['utf8Bytes','clipToNtfyLimit','digestPayload']"
             ".map(grab);\n"
@@ -319,7 +326,7 @@ class WorkerDigestSiteTest(unittest.TestCase):
             "eval(fns.join('\\n')+'\\n'+(consts?consts[0]:''));\n"
         )
         return subprocess.run(["node", "-e", preamble + args_js,
-                               WORKER_PATH],
+                               worker_path or WORKER_PATH],
                               capture_output=True, text=True, timeout=60)
 
     def test_the_digest_push_bytes_are_acceptable(self):
@@ -340,6 +347,32 @@ class WorkerDigestSiteTest(unittest.TestCase):
             "'t','T','b',null,'4','newspaper')));\n")
         self.assertEqual(out.returncode, 0, out.stderr)
         assert_ntfy_accepts(self, out.stdout, "the worker string form")
+
+    def test_a_crlf_working_copy_still_evaluates(self):
+        """A CRLF checkout must not look like a broken worker.
+
+        Regression for the extraction bug, not for the Worker: `grab` searched
+        for a bare `\\n}\\n`, found none in a CRLF copy, sliced an empty string,
+        and node failed with `digestPayload is not defined` while the Worker was
+        fine. A real `core.autocrlf` checkout, or any tool that rewrites the file
+        in text mode, produces exactly that copy.
+        """
+        with open(WORKER_PATH, "r", encoding="utf-8") as fh:
+            crlf = fh.read().replace("\r\n", "\n").replace("\n", "\r\n")
+        self.assertIn("\r\n}\r\n", crlf, "fixture sanity: the copy is CRLF")
+        handle, path = tempfile.mkstemp(suffix=".js")
+        os.close(handle)
+        self.addCleanup(os.unlink, path)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            fh.write(crlf)
+        out = self._eval(
+            "process.stdout.write(JSON.stringify(digestPayload("
+            "'t','T','b',null,'4','newspaper')));\n", worker_path=path)
+        self.assertEqual(out.returncode, 0,
+                         "a CRLF copy of the worker failed to evaluate: %s"
+                         % (out.stderr or out.stdout))
+        assert_ntfy_accepts(self, out.stdout,
+                            "the worker string form on a CRLF copy")
 
 
 if __name__ == "__main__":
