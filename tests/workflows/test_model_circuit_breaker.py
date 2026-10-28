@@ -781,12 +781,26 @@ class ShippedWalkTests(AgentWalkHarness):
             "a not-found must not be recorded as a timeout: it is not slow, it "
             "is absent")
 
-    def test_quota_skips_to_the_next_model(self):
+    def test_quota_stops_the_walk_and_records_the_shared_pool(self):
+        """CHANGED DELIBERATELY, from measurement (see test_model_quota_retry).
+
+        This test used to pin "a quota skips to the NEXT model". That is exactly
+        the multiplier: the refusal is pre-generation (312ms after
+        `message=stream`, tokens.input=0) and six ids were refused inside 16s, so
+        every further rung cost an attempt to hear one fact about the bucket. The
+        walk now records that fact once and stops.
+        """
         proc, art = self.run_step(
             pool=["opencode/limited", "opencode/live"],
             plan="opencode/limited:quota opencode/live:ok")
-        self.assertGreen(proc, "quota skip")
-        self.assertEqual(["opencode/limited", "opencode/live"], art["models"])
+        self.assertEqual(
+            1, proc.returncode,
+            "no digest was produced, so the step must fail. stdout:\n%s"
+            % proc.stdout)
+        self.assertEqual(
+            ["opencode/limited"], art["models"],
+            "the next model asks the same bucket, so it must not be tried: %r"
+            % (art["models"],))
         self.assertIn("kind=quota_or_rate_limited", "\n".join(self.attempt_log()))
 
     def test_auth_is_per_model_until_it_repeats(self):

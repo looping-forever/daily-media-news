@@ -1,33 +1,46 @@
 #!/usr/bin/env python3
-"""Quota CONTENTION is transient, so one run must ride it out -- not die in 43s.
+"""Quota CONTENTION is transient -- but the walk no longer rides it out in-step.
 
-WHY THIS FILE EXISTS
---------------------
+WHY THIS FILE CHANGED (read this before "restoring" the backoff)
+---------------------------------------------------------------
 The `opencode/*-free` models are not paid seats. They run on an anonymous shared
 pool throttled per IP bucket, and GitHub Actions egress sits in a contended one,
 so the refusal is `Free usage limit reached` even when the account has used
-nothing. Measured: a wall of 1-second refusals across the whole ladder, then
-5/5 models answering in 33-44 seconds each minutes later, two at a time.
+nothing. Measured: a wall of 1-second refusals across the whole ladder, then 5/5
+models answering in 33-44 seconds each minutes later.
 
-The defect was the reaction, not the throttle. Every model returned
-`quota_or_rate_limited`, the walk had no rung left, the step exited 1, and the
-slot's edition was gone -- when waiting three minutes would have produced it.
+That measurement produced the ORIGINAL contract of this file: an all-quota cycle
+slept 180s, 360s, then 720s and walked the ladder again, up to four cycles. It
+worked, and it cost more than it was worth:
+
+  * the refusal is PRE-GENERATION -- 312ms after `message=stream`, with
+    tokens.input=0 -- and six different ids were refused inside 16 seconds, so
+    the extra rungs learned nothing the first one had not;
+  * `--all` returns the whole ranked pool, so one cycle is every rung and four
+    cycles is a 48-attempt ceiling per slot;
+  * MEASURED BURN, 2026-10-27: 112 model attempts in one day on this workflow,
+    181 in the week (62% of the repository's total), 33 of the week's 47 quota
+    refusals.
+
+So the ride-out moved OUT of the step. A refusal now records ONE shared-pool row
+(`state/model_cooldown.json`, with the provider's own Retry-After when it gave
+one) and ends the walk; the refire slot (+5/+10/+15/+20 min) retries the edition
+with a fresh 1800s budget instead of spending this one on sleep.
 
 WHAT IS PINNED HERE, AND WHAT MUST NEVER CHANGE
-  * an all-quota cycle backs off (180s, 360s, 720s) and RETRIES THE LADDER,
-    re-resolving it so a cooldown that expired during the wait is eligible;
-  * a cycle in which any model ANSWERS is not contention: no wait, no second
-    pass, the walk proceeds exactly as before;
-  * a NON-quota class -- a wrong id, a 401, a timeout, a 5xx -- never backs off,
-    because repeating it buys nothing and a retry is not a fix for it;
-  * when the walk's own bound runs out, the step fails with ONE line that names
-    contention, not a false "the models are broken";
-  * the wait is clamped so it can never borrow the time the seal, render,
-    deploy and state commit need after this step.
+  * a quota refusal stops the ladder after ONE attempt: no nap, no second cycle,
+    and the pool row is written so the next run starts from the fact;
+  * a cycle in which a model ANSWERS is not contention: no wait, no pool row;
+  * a NON-quota class -- a wrong id, a 401, a timeout, a 5xx -- never writes a
+    pool row, because the pool is not what refused;
+  * the step fails with ONE line that names the shared-pool wall rather than a
+    false "the models are broken" or a false "every model was quota";
+  * the walk bound itself is unchanged: nothing here borrows the time the seal,
+    render, deploy and state commit need after this step.
 
 The step is executed from the shipped YAML by `AgentWalkHarness`; `sleep` is
-shadowed (recorded, never slept) and `date +%s` is a stepwise clock, so a
-21-minute retry ladder runs in milliseconds with its arithmetic intact.
+shadowed (recorded, never slept) and `date +%s` is a stepwise clock, so the
+arithmetic stays observable without waiting.
 """
 
 import unittest
@@ -35,72 +48,76 @@ import unittest
 from tests.workflows.test_agent_walk_step import AgentWalkHarness
 
 
-class BackoffThenRetryTests(AgentWalkHarness):
-    def test_an_all_quota_cycle_backs_off_and_retries_the_ladder(self):
-        """THE WHOLE FIX. Two refusals must buy a wait and a second pass, and
-        the second pass must produce the digest."""
+class StopOnPoolWallTests(AgentWalkHarness):
+    def test_a_quota_refusal_ends_the_walk_after_one_attempt(self):
+        """THE WHOLE REDUCTION. One refusal, one recorded fact, no ladder walk.
+
+        `opencode/live` answers, so a walk that continued would have produced a
+        digest. It must not get the chance: the pool is the thing that refused,
+        and the next model asks the same bucket.
+        """
         proc, art = self.run_step(
             pool=["opencode/a", "opencode/b"],
             plan="opencode/a:quota opencode/b:quota opencode/live:ok",
             extra_env={"STUB_POOL_2": "opencode/live"})
 
-        self.assertGreen(proc, "quota contention retry")
         self.assertEqual(
-            ["180"], art["naps"],
-            "the first contention wait is the 3-minute rung. Naps: %r\nstdout:\n%s"
-            % (art["naps"], proc.stdout))
+            1, proc.returncode,
+            "no digest was produced, so the step must fail rather than finish "
+            "green. stdout:\n%s" % proc.stdout)
         self.assertEqual(
-            ["opencode/a", "opencode/b", "opencode/live"], art["models"],
-            "both models must be tried in cycle 1, then the re-resolved ladder "
-            "in cycle 2: %r" % (art["models"],))
-        self.assertEqual(
-            2, len(art["selects"]),
-            "the ladder must be RE-RESOLVED for the retry, never reused: a "
-            "reused list cannot pick up a cooldown that expired while waiting")
-        self.assertIn(
-            "Quota contention: cycle 1 tried 2 models and every one returned "
-            "quota_or_rate_limited", proc.stdout)
-        self.assertIn("next retry at", proc.stdout,
-                      "the cycle line must say WHEN the next attempt is due")
-        self.assertIn("Contention cleared: the digest was produced on walk "
-                      "cycle 2 after 1 backoff(s).", proc.stdout)
-        self.assertTrue(art["stories"].is_file(),
-                        "the successful cycle must leave the digest on disk")
-        self.assertNotIn("Digest not built", proc.stdout)
+            ["opencode/a"], art["models"],
+            "the walk must stop at the FIRST shared-pool refusal: %r"
+            % (art["models"],))
+        self.assertEqual([], art["naps"],
+                         "a pool wall must not be slept off inside the step: %r"
+                         % (art["naps"],))
+        self.assertEqual(1, len(art["selects"]),
+                         "one cycle. A second resolution is the 48-attempt "
+                         "ceiling coming back")
+        calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
+        self.assertIn("--pool-refused", calls,
+                      "the refusal must become a shared cooldown row, or the "
+                      "next run pays for the same wall again")
 
-    def test_the_retry_re_resolves_so_a_dropped_model_is_not_retried(self):
-        """Cycle 2 walks what the selector NOW returns, not cycle 1's list.
+    def test_the_failure_line_names_the_wall_and_not_broken_models(self):
+        proc, _art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:quota opencode/b:quota")
+        lines = [ln for ln in proc.stdout.splitlines()
+                 if ln.startswith("Digest not built:")]
+        self.assertEqual(
+            1, len(lines),
+            "the walk must produce exactly ONE failure line. stdout:\n%s"
+            % proc.stdout)
+        self.assertIn("SHARED POOL's contention wall", lines[0])
+        self.assertIn("refire slot retries this edition", lines[0])
+        self.assertIn("not the account's own allowance and not broken model "
+                      "ids", lines[0])
 
-        The stub answers one outcome per model id, so the proof is a changed
-        pool rather than a changed verdict: cycle 1 ranks two models that both
-        refuse, and the re-resolved ladder returns a THIRD one that answers. A
-        walk that replayed its first list would attempt the first two again and
-        never reach it.
+    def test_a_successful_run_writes_no_pool_row(self):
+        """The cooldown may only ever be earned by a refusal.
+
+        A pool row written on a good run would wall the NEXT run off a pool that
+        had just served a digest, which is the same class of bug as the old
+        bypass: a signal used for something it does not mean.
         """
         proc, art = self.run_step(
-            pool=["opencode/a", "opencode/b"],
-            plan="opencode/a:quota opencode/b:quota opencode/c:ok",
-            extra_env={"STUB_POOL_2": "opencode/c"})
-        self.assertGreen(proc, "re-resolved ladder")
-        self.assertEqual(
-            ["opencode/a", "opencode/b", "opencode/c"], art["models"],
-            "cycle 2 must attempt only what the re-resolved ladder names: %r"
-            % (art["models"],))
-
-    def test_a_cycle_where_one_model_answers_never_waits(self):
-        proc, art = self.run_step(
             pool=["opencode/limited", "opencode/live"],
-            plan="opencode/limited:quota opencode/live:ok")
+            plan="opencode/limited:ok")
         self.assertGreen(proc, "mixed result")
-        self.assertEqual([], art["naps"],
-                         "a model answered, so there is no contention to wait "
-                         "out. Naps: %r" % (art["naps"],))
+        self.assertEqual([], art["naps"])
         self.assertEqual(1, len(art["selects"]))
-        self.assertEqual(["opencode/limited", "opencode/live"], art["models"])
+        self.assertEqual(["opencode/limited"], art["models"])
+        calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "--pool-refused", calls,
+            "a model answered, so the pool did not refuse this run: writing a "
+            "cooldown here would wall the next run off a working pool")
 
     def test_a_quota_failure_is_recorded_but_never_cools_the_model(self):
-        """Backing off must not be confused with a cooldown: the pool shares
-        the limit, so cooling it would empty the ladder."""
+        """A pool row is not a per-model cooldown: the pool shares the limit, so
+        cooling the id would empty the ladder for a fact about the bucket."""
         _proc, art = self.run_step(
             pool=["opencode/a"],
             plan="opencode/a:quota",
@@ -108,75 +125,15 @@ class BackoffThenRetryTests(AgentWalkHarness):
         self.assertIn(["opencode/a", "quota_or_rate_limited"], art["records"])
 
 
-class RetryLadderTests(AgentWalkHarness):
-    def test_the_wait_ladder_is_3_6_12_and_then_it_stops(self):
-        proc, art = self.run_step(
-            pool=["opencode/a", "opencode/b"],
-            plan="opencode/a:quota opencode/b:quota")
-        self.assertEqual(
-            1, proc.returncode,
-            "after the bound is spent the step must FAIL, never finish green "
-            "with no digest. stdout:\n%s" % proc.stdout)
-        self.assertEqual(
-            ["180", "360", "720"], art["naps"],
-            "the waits must grow 3, 6, 12 minutes and then stop: %r"
-            % (art["naps"],))
-        self.assertEqual(4, len(art["selects"]),
-                         "four cycles: the first pass plus three retries")
-        self.assertIn("this run's 4-cycle bound is spent", proc.stdout)
-
-    def test_a_spent_bound_fails_with_one_line_naming_contention(self):
-        proc, art = self.run_step(
-            pool=["opencode/a", "opencode/b"],
-            plan="opencode/a:quota opencode/b:quota")
-        self.assertEqual(["180", "360", "720"], art["naps"])
-        line = [ln for ln in proc.stdout.splitlines()
-                if ln.startswith("Digest not built:")]
-        self.assertEqual(
-            1, len(line),
-            "the bound must produce exactly ONE failure line, not a paragraph "
-            "repeated per cycle. stdout:\n%s" % proc.stdout)
-        self.assertIn("CONTENTION wall", line[0])
-        self.assertIn("not the account's own allowance and not broken model "
-                      "ids", line[0])
-        self.assertNotIn(
-            "free models tried", line[0],
-            "the generic all-classes-dead wording is a FALSE cause here: %r"
-            % line[0])
-
-    def test_the_wait_is_clamped_to_the_walk_bound(self):
-        """Budget exhaustion, made observable on the clock.
-
-        With a 1000s bound and 250s per clock tick the second attempt leaves
-        250s, so the 180s wait would leave only 160s of room once one attempt
-        (90s) is kept -- the wait must shrink to 160 and the NEXT cycle must
-        stop at the floor rather than borrow from the delivery stages.
-        """
-        proc, art = self.run_step(
-            pool=["opencode/a", "opencode/b"],
-            plan="opencode/a:quota opencode/b:quota",
-            budget=1000, per=360, min_attempt=90, clock_step=250)
-        self.assertEqual(
-            ["160"], art["naps"],
-            "the wait must be clamped to what leaves one attempt inside the "
-            "bound. Naps: %r\nstdout:\n%s" % (art["naps"], proc.stdout))
-        self.assertEqual(1, proc.returncode)
-        self.assertIn("Budget spent: 0s left", proc.stdout)
-        self.assertIn("over 2 cycle(s)", proc.stdout)
-        self.assertIn("CONTENTION wall", proc.stdout)
-
-
 class NonTransientTests(AgentWalkHarness):
-    def test_no_non_quota_class_ever_backs_off(self):
+    def test_no_non_quota_class_ever_writes_a_pool_row(self):
         """Each class keeps its own fate: a cooldown, an abort, or an ordinary
-        skip. None of them is contention, so none of them may sleep.
+        skip. None of them is the pool refusing, so none of them may wall it.
 
         THE AUTH ARM CHANGED ON 2026-10-27, from measurement. One `auth` no
         longer ends the walk (a single model's refusal is not a property of the
         shared credential -- see tests/workflows/test_agent_walk_step.py
         AuthIsPerModelTests), so the arm that must fail here is TWO of them.
-        What this test still pins is unchanged and is the point: an abort sleeps
-        for nothing, builds no retry cycle, and never reports contention.
         """
         cases = (
             ("all-not-found",
@@ -212,20 +169,31 @@ class NonTransientTests(AgentWalkHarness):
                     "%s: no retry cycle, so the ladder is resolved once"
                     % label)
                 self.assertNotIn("Quota contention", proc.stdout)
+                self.assertNotIn("SHARED POOL", proc.stdout,
+                                 "%s: the pool did not refuse, so the failure "
+                                 "line must not blame it" % label)
+                calls = (self.tmp / "record_calls.txt").read_text(
+                    encoding="utf-8")
+                self.assertNotIn("--pool-refused", calls,
+                                 "%s: no pool row for a non-pool failure"
+                                 % label)
 
-    def test_a_not_found_is_not_retried_even_next_to_quotas(self):
-        """A wrong id makes the cycle non-transient: one pass, then the honest
-        failure. Retrying it is the 4-of-12 waste the cooldown removes."""
+    def test_a_not_found_is_not_reported_as_contention(self):
+        """A wrong id next to a quota wall: the line names the wall (that is
+        what stopped the walk) and still reports the generic tried-count, so the
+        not-found is not buried under a false cause."""
         proc, art = self.run_step(
             pool=["opencode/dead", "opencode/limited"],
             plan="opencode/dead:notfound opencode/limited:quota")
         self.assertEqual(1, proc.returncode)
         self.assertEqual([], art["naps"])
-        self.assertIn("Digest not built: 2 of 2 free models tried",
-                      proc.stdout,
-                      "with a non-transient failure present the failure line "
-                      "must keep its generic wording. stdout:\n%s"
+        self.assertIn("2 attempt(s) over 1 cycle(s)", proc.stdout,
+                      "the line must count what was actually tried. stdout:\n%s"
                       % proc.stdout)
+        self.assertIn("SHARED POOL's contention wall", proc.stdout)
+        self.assertNotIn("Every model was refused", proc.stdout,
+                         "one of the two was a not-found, so 'every model' "
+                         "would be false. stdout:\n%s" % proc.stdout)
 
 
 if __name__ == "__main__":

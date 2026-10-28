@@ -1092,16 +1092,25 @@ jobs:
           # the cooldown file is re-loaded and pruned, so a model skipped in
           # cycle 1 is eligible again in cycle 2 once its entry has expired.
           resolve_ladder() {
+            # --role digest: the digest is the caller the shared-pool cooldown
+            # RESERVES the pool for, so it may re-test a wall it has watched for
+            # longer than the grace (see POOL_DIGEST_GRACE_SEC). Every other
+            # workflow yields to it instead.
             mapfile -t models < <(python3 scripts/model_selector.py --select \
+              --role digest \
               --config config/opencode.json --health state/model_health.json \
               --cache state/model_cache.json --info-out state/digest_model_select.json \
               --all "${NO_WORK_ARGS[@]}")
-            # AN EMPTY LIST HAS TWO VERY DIFFERENT CAUSES and the step must name
+            # AN EMPTY LIST HAS THREE VERY DIFFERENT CAUSES and the step must name
             # the right one. "All cooled down" means the ladder is real and every
-            # rung is temporarily barred; reporting that as "nothing was
-            # discovered" would send the next reader to the wrong file entirely.
+            # rung is temporarily barred; a POOL wall means the bucket refused a
+            # short while ago and no id can be tried at all. Reporting either as
+            # "nothing was discovered" would send the next reader to the wrong
+            # file entirely.
             if [ "${#models[@]}" -eq 0 ]; then
-              if [ "$(jq -r '.all_cooled // false' state/digest_model_select.json 2>/dev/null || echo false)" = "true" ]; then
+              if [ "$(jq -r '.pool_blocked // false' state/digest_model_select.json 2>/dev/null || echo false)" = "true" ]; then
+                echo "FATAL: the SHARED POOL is on cooldown -- $(jq -r '.pool.note // ""' state/digest_model_select.json 2>/dev/null). No model id can be tried: the free pool refuses before generation, so every rung would hear the same refusal. Not an empty ladder and not a broken id. The refire slot retries this edition."
+              elif [ "$(jq -r '.all_cooled // false' state/digest_model_select.json 2>/dev/null || echo false)" = "true" ]; then
                 echo "FATAL: every model is on a hard cooldown ($(jq -rc '.hard_cooled_down // []' state/digest_model_select.json 2>/dev/null || echo '[]')) -- no attempt can be made until one expires. This is the cooldown, not an empty ladder."
               else
                 echo "FATAL: empty model ladder - nothing was discovered and config/opencode.json has no seed"
@@ -1130,23 +1139,31 @@ jobs:
           last_err="unknown"
           cycle=0
           contention_only=0
-          # THE RETRY LADDER, and why these two numbers are safe.
+          pool_walled=0
+          # ONE reduced-candidate retry per run, not per model: the point is to
+          # re-test the SAME model on a smaller input, and a per-model allowance
+          # would multiply the walk by the ladder length, which is the burn this
+          # whole change exists to remove.
+          reduced_retry_used=0
+          # THE RETRY LADDER, and why these numbers are what they are now.
           #
-          # A contention wall is measured in MINUTES, not attempts: the whole
-          # pool refuses for ~43s and answers 5/5 within 33-44s each a short
-          # while later. So one run gets: cycle, 3 min, cycle, 6 min, cycle,
-          # 12 min, cycle -- 4 cycles, 21 minutes of waiting, worst case ~24
-          # minutes of the 30 the selector budgets.
+          # MEASURED BURN, 2026-10-27: 112 model attempts in one day on this
+          # workflow alone (181 in the week, 62% of the repo's total). The
+          # multiplier was this loop: `--all` returns the whole ranked pool and
+          # four cycles of it is a 48-attempt ceiling per slot, with 21 minutes of
+          # sleep inside a 30-minute step.
           #
-          # WHERE THAT SITS IN THE JOB. This step is capped at 35 minutes and
-          # the job at 45, so the 1800s walk keeps 10 minutes of headroom for
-          # validate, seal, render, deploy, delivery and the state commit that
-          # follow. The loop may not spend it: every wait is clamped to what
-          # leaves one more attempt (MIN) inside `deadline`, and a wait that
-          # cannot leave room ends the loop instead of borrowing from them.
-          # The bound is therefore the walk budget itself -- it is NOT raised.
+          # The premise of the backoff was that contention clears in minutes and a
+          # nap outlasts it. Both halves are now handled better and cheaper: the
+          # refusal is pre-generation and SHARED (so the pool cooldown records it
+          # once and the walk stops), and the refire slot retries the edition with
+          # a fresh 1800s budget instead of spending this one on sleep. So the
+          # bound is one cycle. The machinery below is kept, not deleted: it still
+          # guards the case where a cycle ends with quota refusals that did not
+          # trip the pool row, and deleting a tested loop to save lines is not a
+          # reduction in burn.
           RETRY_BACKOFF=(180 360 720)
-          RETRY_MAX_CYCLES=4
+          RETRY_MAX_CYCLES=1
           # AN AUTH REFUSAL IS PER MODEL UNTIL IT REPEATS. Measured 2026-10-27
           # 16:18Z: the walk stopped after attempt 10 of 12 -- abandoning six
           # quota refusals that had just proved the pool was throttled, so the
@@ -1155,6 +1172,53 @@ jobs:
           # credentials is that model's entitlement; the SAME refusal from two
           # different models is the shared credential, and only that is fatal.
           AUTH_GLOBAL_MODELS=2
+          # ONE attempt = one model, one candidate set. Extracted because the
+          # bounded reduced-candidate retry must run the IDENTICAL pipeline: a
+          # near-copy would drift, and a retry that differs from the attempt it
+          # retries proves nothing about input size.
+          run_digest_attempt() {
+            model="$1"
+            allow="$2"
+            echo "=== Attempt $tried with $model (allow ${allow}s) ==="
+            run_rc=0
+            # The watchdog sits INSIDE `timeout`: timeout still owns the total
+            # allowance, and the watchdog owns all three measured deaths -- the
+            # decisive error line (~1-2s), the repeating outage (flint printed
+            # the same fatal line 5x from 12.6s and burned the lot), and
+            # silence, at the window the selector measured for THIS model.
+            #
+            # --print-logs --log-level DEBUG IS LOAD-BEARING, not debugging
+            # decoration. `opencode run` prints a banner at ~5s and then NOTHING
+            # until the whole message completes, so stdout can only prove
+            # completion; the CLI's own log lines are the only liveness there
+            # is. Without them the watchdog would judge every attempt by its
+            # startup window and kill working models.
+            if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
+              --model "$model" -- \
+              opencode run \
+              --auto \
+              --print-logs \
+              --log-level DEBUG \
+              --model "$model" \
+              2>&1 | tee state/agent-log.txt; then
+              :
+            else
+              run_rc=$?
+            fi
+          }
+          # Success is the FILE, not the exit code; see the note at the call.
+          stories_ok() {
+            [ "$run_rc" = "0" ] && [ -f state/stories.json ] \
+              && python3 -c "import json,sys; json.load(open('state/stories.json'))"
+          }
+          digest_success() {
+            printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
+              "$(date -u +%FT%TZ)" "$tried" "$1" "$run_rc" "$2" \
+              >> state/agent-attempts.log
+            echo "Agent wrote valid state/stories.json on attempt $tried ($1)"
+            python3 scripts/model_selector.py --record "$1" ok || true
+            ok=1
+          }
           : > state/agent-attempts.log
           while :; do
             cycle=$((cycle+1))
@@ -1174,46 +1238,43 @@ jobs:
               fi
               tried=$((tried+1))
               rm -f state/stories.json
-              echo "=== Attempt $tried with $model (allow ${allow}s) ==="
-              run_rc=0
-              # The watchdog sits INSIDE `timeout`: timeout still owns the total
-              # allowance, and the watchdog owns all three measured deaths -- the
-              # decisive error line (~1-2s), the repeating outage (flint printed
-              # the same fatal line 5x from 12.6s and burned the lot), and
-              # silence, at the window the selector measured for THIS model.
-              #
-              # --print-logs --log-level DEBUG IS LOAD-BEARING, not debugging
-              # decoration. `opencode run` prints a banner at ~5s and then NOTHING
-              # until the whole message completes, so stdout can only prove
-              # completion; the CLI's own log lines are the only liveness there
-              # is. Without them the watchdog would judge every attempt by its
-              # startup window and kill working models.
-              if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
-                --model "$model" -- \
-                opencode run \
-                --auto \
-                --print-logs \
-                --log-level DEBUG \
-                --model "$model" \
-                2>&1 | tee state/agent-log.txt; then
-                :
-              else
-                run_rc=$?
-              fi
+              run_digest_attempt "$model" "$allow"
               # SUCCESS FIRST, AND FROM THE FILE, NOT THE EXIT CODE. Classifying
               # before this check would discard a GOOD digest whose article text
               # happens to contain "rate limit" or "quota" -- the classifier reads
               # the CLI's own words, and a finished digest is full of words. One
               # row per attempt still goes to the log, with kind=ok here.
-              if [ "$run_rc" = "0" ] && [ -f state/stories.json ] \
-                && python3 -c "import json,sys; json.load(open('state/stories.json'))"; then
-                printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
-                  "$(date -u +%FT%TZ)" "$tried" "$model" "$run_rc" "$allow" \
-                  >> state/agent-attempts.log
-                echo "Agent wrote valid state/stories.json on attempt $tried ($model)"
-                python3 scripts/model_selector.py --record "$model" ok || true
-                ok=1
+              if stories_ok; then
+                digest_success "$model" "$allow"
                 break
+              fi
+              # NO STORIES FILE, rc 0, AND THE ONE RETRY IS UNSPENT. Measured: a
+              # 600s attempt on the full candidate set wrote nothing while a
+              # smaller input finished in 23.7s, so the useful second attempt is
+              # the SAME model on a SMALLER input -- a different model on the same
+              # oversized input repeats the failure and spends the pool. Bounded
+              # to one per run (`reduced_retry_used`), so it adds a single attempt
+              # and can never double the walk.
+              if [ "$run_rc" = "0" ] && [ "$reduced_retry_used" = "0" ] \
+                && [ -f state/candidates.json ] \
+                && python3 scripts/reduce_candidates.py --in state/candidates.json \
+                     --out state/candidates_limited.json --per-category 1; then
+                reduced_retry_used=1
+                # The prompt names state/candidates.json as PRIMARY INPUT, so the
+                # reduced set is swapped INTO that path and the full set restored
+                # afterwards: an env var alone would leave the agent reading the
+                # oversized file the retry exists to avoid.
+                cp state/candidates.json state/candidates.full.json
+                cp state/candidates_limited.json state/candidates.json
+                tried=$((tried+1))
+                rm -f state/stories.json
+                echo "Attempt $tried re-tests $model on the reduced candidate set (one bounded retry per run; the full set is restored afterwards)"
+                run_digest_attempt "$model" "$allow"
+                mv -f state/candidates.full.json state/candidates.json
+                if stories_ok; then
+                  digest_success "$model" "$allow"
+                  break
+                fi
               fi
               # CLASSIFY a real failure, then act. `UnknownError` alone is an
               # outage and a missing model is a not-found ONLY when the marker is
@@ -1243,9 +1304,26 @@ jobs:
                 # RECORD THE REAL CLASS, never a generic "transport". The selector
                 # decides what each class costs: a not-found earns a 24h hard
                 # cooldown (the id is simply wrong), and a quota is recorded but
-                # deliberately NOT cooled down, because the whole free pool shares
-                # that limit and skipping models over it would end the run early.
+                # deliberately NOT cooled down per model, because the whole free
+                # pool shares that limit.
                 python3 scripts/model_selector.py --record "$model" "$kind" || true
+                if [ "$kind" = "quota_or_rate_limited" ]; then
+                  # THE WALK ENDS HERE, AND THE REASON IS MEASURED. The provider
+                  # refuses BEFORE generation (312ms after `message=stream`, with
+                  # tokens.input=0) and does it to six different ids inside 16s,
+                  # so the remaining rungs cannot learn anything the first one did
+                  # not. On 2026-10-27 that cost 33 of the week's 47 quota
+                  # refusals. One shared-pool row is written instead -- with the
+                  # provider's own Retry-After when it gave one -- so the NEXT run
+                  # (and the refire slot) starts from the fact rather than
+                  # rediscovering it.
+                  python3 scripts/model_selector.py --pool-refused \
+                    --log state/agent-log.txt || true
+                  echo "Shared pool refused ($kind on $model). The refusal is pre-generation and shared by every id on this bucket, so the rest of the ladder would spend one allowance each to hear the same thing. Recording the pool cooldown and ending the walk; the refire slot retries the edition."
+                  last_err="$kind on $model (shared pool)"
+                  pool_walled=1
+                  break
+                fi
                 continue
               fi
               if [ "$kind" = "auth" ]; then
@@ -1307,6 +1385,16 @@ jobs:
             if [ "$ok" = "1" ]; then
               break
             fi
+            # A POOL WALL ENDS THE WALK TOO, AND WITH NO NAP. The old shape slept
+            # 3, then 6, then 12 minutes inside this step to outlast a throttle
+            # that clears in ~43s -- spending the same 1800s walk bound that the
+            # delivery stages need, to buy attempts the pool had already refused.
+            # The refire slot (+5/+10/+15/+20 min) is the retry, with a fresh
+            # budget and a fresh reading of the cooldown file.
+            if [ "$pool_walled" = "1" ]; then
+              contention_only=1
+              break
+            fi
             # THE RETRY DECISION IS DELIBERATELY NARROW. A cycle in which EVERY
             # failure was quota_or_rate_limited is contention, and contention is
             # the one class that clears by itself (measured: 5/5 answered in
@@ -1347,7 +1435,14 @@ jobs:
             echo "Contention cleared: the digest was produced on walk cycle ${cycle} after $((cycle-1)) backoff(s)."
           fi
           if [ "$ok" != "1" ]; then
-            if [ "$contention_only" = "1" ]; then
+            if [ "$pool_walled" = "1" ]; then
+              # ONE LINE, AND IT NAMES THE RIGHT CAUSE. "Models are broken" would
+              # be false: the ids are advertised and answer minutes later. What
+              # happened is that the shared free pool refused BEFORE generation,
+              # which is why the walk stopped instead of paying one allowance per
+              # rung to hear it again.
+              echo "Digest not built: ${tried} attempt(s) over ${cycle} cycle(s) in $(( (END-START+59) / 60 )) min. The walk stopped on the SHARED POOL's contention wall (last error: ${last_err}): the free pool refuses before generation, so every remaining rung would have heard the same refusal and spent an attempt doing it. A shared cooldown was recorded; the refire slot retries this edition with a fresh budget. This is transient throttling of the shared anonymous pool this egress sits behind -- not the account's own allowance and not broken model ids."
+            elif [ "$contention_only" = "1" ]; then
               # ONE LINE, AND IT NAMES THE RIGHT CAUSE. "Models are broken" would
               # be false: the ids are advertised and answer minutes later. What
               # ran out is the walk's bound, against a per-IP throttle that this
@@ -4432,7 +4527,7 @@ jobs:
         # digest-archive/ plus state/active_stories.json when it exists.
         run: |
           set -eo pipefail
-          rm -f state/stories.json state/stories.validated.json state/email.txt state/agent-log.txt state/candidates.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
+          rm -f state/stories.json state/stories.validated.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
 
       - name: Commit state changes
         # DRY_RUN guard: `git push` is an outward-facing side effect, so a dry
