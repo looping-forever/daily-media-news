@@ -682,12 +682,21 @@ jobs:
         # Exercises the breaking path end to end without sending anything:
         # --dry-run skips SMTP, and no Telegram token is passed so fan-out
         # is skipped. State writes land in this ephemeral checkout only.
+        #
+        # --no-model IS THE POINT, and it is not the same thing as --dry-run.
+        # --dry-run means "render, do not send" and an end-to-end check of the
+        # classifier is a legitimate use of it; a canary is not. Measured: this
+        # walk was 29 of the week's 292 model attempts (10%), every one of them
+        # proving only that the CLI starts. What this step exists to prove -- that
+        # the fetch, the gate and the render path still run -- is proved without
+        # spending the shared pool, so the flag is passed here and only here.
         run: |
           set -eo pipefail
           python3 scripts/breaking_monitor.py \
             --state-dir state \
             --config-dir config \
             --dry-run \
+            --no-model \
             --window-min 5 \
             --max-candidates 5
 
