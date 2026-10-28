@@ -276,6 +276,7 @@
         "actions_dispatch_reason": "already dispatched this slot",
         "attempts": 1,
         "build": "adcdc21",
+        "built_at": "",
         "edition": "failed",
         "first_ntfy_sent_at": null,
         "kind": "delivered",
@@ -287,7 +288,9 @@
         "reject_reason": "absent | NO build was dispatched",
         "scheduled_instant": "2026-10-28T01:35:00Z",
         "sequence_id": "dmn-2026-10-28-morning",
-        "state": "sent"
+        "source_health_state": "unknown",
+        "state": "sent",
+        "story_count": 0
       }
     }
   },
