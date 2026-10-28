@@ -1,15 +1,4 @@
 {
-  "conditions": {
-    "breaking.honesty_gate||": {
-      "alerted_at": "2026-10-28T12:39:32Z",
-      "cause": "ai_fail_safe: pool_cooldown: pool cooldown: the shared pool refused quota_or_rate_limited and is refused until 2026-10-28T13:11:09.121948+00:00 (618s remaining)",
-      "first_seen": "2026-10-28T06:36:25Z",
-      "last_seen": "2026-10-28T13:00:51Z",
-      "runs": 9,
-      "window_first": "2026-10-28T12:51:28Z",
-      "window_last": "2026-10-28T13:00:51Z",
-      "window_runs": 3
-    }
-  },
+  "conditions": {},
   "schema_version": 1
 }
