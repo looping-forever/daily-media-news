@@ -36,23 +36,90 @@ telegram: false`. They are exercised by the test suite, not by production. Treat
 a real backup send as unproven until a primary has actually failed once.
 
 **How a digest is actually produced (Phase U6/U7).** The digest is built *ahead*
-of its slot, not during it:
+of its slot, not during it. Every time below was read from the committed config,
+not from prose: the Worker's `dispatcher_crons` in `deploy/schedule.json`, the one
+deployed trigger in `deploy/wrangler.toml`, and each workflow's own `on.schedule`.
 
 ```
-06:50 / 18:50 NPT   prebuild cron -> daily-news.yml (phase=prebuild)
-                    builds + renders + deploys the page, pushes NOTHING
-                    then digest-prebuild.yml seals it into Worker KV
+06:40 / 18:40 NPT   the Worker dispatches digest-prebuild.yml. That workflow runs
+                    daily-news.yml with phase=prebuild, which builds + renders +
+                    deploys the page and pushes NOTHING; digest-prebuild.yml then
+                    seals the artifact into Worker KV.
 
 07:20 / 19:20 NPT   the Worker's delivery arm finds the sealed artifact and
                     pushes it -> your phone. This is a KV lookup, not a build.
+                    It re-fires at :25 / :30 / :35 / :40 only if no send is
+                    recorded for that slot.
 
-07:50 / 19:50 NPT   the GitHub-side fallback cron, which stands itself down
-                    if the ledger says the slot already went out
+07:50 / 19:50 NPT   the GitHub-side fallback cron (daily-news.yml), which stands
+                    itself down if the ledger says the slot already went out
 ```
+
+> This block used to say **06:50 / 18:50** and to call the prebuild a *cron on
+> daily-news.yml*. Both were wrong. There is no GitHub cron for the prebuild at
+> all, and the Worker asks for it at 00:55 / 12:55 UTC — 40 minutes ahead of the
+> slot, not 30. Corrected 2026-10-28 against `deploy/schedule.json`.
 
 A failed prebuild is not a lost digest: the slot's own run then builds it from
 scratch, which is slower but still delivers. The watchdog has a dedicated arm
 that goes red if a slot's artifact was never sealed.
+
+### The clock, in Nepal time
+
+Every row was read from the file named in its "where" column on 2026-10-28; none
+of it is restated from memory. Nepal is UTC+05:45 all year, with no daylight
+saving. There is exactly **one** Cloudflare cron trigger (`* * * * *`) — every
+Worker row below is a branch of that single dispatcher, not a separate trigger.
+
+| Time (NPT) | What runs | Where it is written | What it does |
+|---|---|---|---|
+| every 2 min, all day | Worker academic sweep | `deploy/schedule.json` → `dispatcher_crons.academic_sweep` (`*/2 * * * *`) | Checks the TU IOST result feed and dispatches `academic-result.yml` only on a new notice |
+| every 3 min, all day | Worker breaking sweep | `deploy/schedule.json` → `dispatcher_crons.breaking_sweep` (`*/3 * * * *`) | Cheap deterministic tripwire; dispatches `breaking-monitor.yml` only on a candidate |
+| :17 past every hour | Worker health check | `deploy/schedule.json` → `dispatcher_crons.healthcheck` (`17 * * * *`) | Writes the heartbeat key the `?health=1` page reads |
+| :17 / :32 / :47 past every hour | Worker retry-ladder check | `deploy/schedule.json` → `dispatcher_crons.digest_ladder` | Reads the retry state and dials `digest-watchdog.yml` (`ladder_only=true`) only if a retry is actually due |
+| 06:15 | `drift-canary.yml` | its own `on.schedule` (`30 0 * * *`) | One job running every drift check, before the morning slot |
+| 06:40 | Worker → `digest-prebuild.yml` | `dispatcher_crons.digest_prebuild.morning` (`55 0 * * *`) | Builds and seals the morning artifact; pushes nothing |
+| 07:05 | `breaking-monitor.yml` (GitHub net) | its own `on.schedule` (`20 1 * * *`) | Fallback detector if the Worker path is dead |
+| 07:20, re-firing 07:25–07:40 | Worker delivery arm, morning | `dispatcher_crons.digest_slots.morning` (`35 1 * * *`) plus `digest_refire_window.morning` (4 attempts, 5 min apart) | Pushes the sealed morning artifact |
+| 07:50 | `daily-news.yml`, GitHub fallback, morning | its own `on.schedule` (`5 2 * * *`) | Stands itself down unless the slot was never delivered |
+| 09:45 | `digest-watchdog.yml`, morning leg | its own `on.schedule` (`0 4,16 * * *`) | Judges the morning slot and pages if it never arrived |
+| 10:02 | `academic-result.yml` (GitHub net) | its own `on.schedule` (`17 4,10 * * *`) | Makes a dead academic monitor visible |
+| 12:08 | `budget-sentinel.yml` | its own `on.schedule` (`23 6 * * *`) | Files or updates the Actions-minutes level |
+| 16:02 | `academic-result.yml` (GitHub net) | its own `on.schedule` (`17 4,10 * * *`) | Second daily net |
+| 18:40 | Worker → `digest-prebuild.yml` | `dispatcher_crons.digest_prebuild.evening` (`55 12 * * *`) | Builds and seals the evening artifact; pushes nothing |
+| 19:20, re-firing 19:25–19:40 | Worker delivery arm, evening | `dispatcher_crons.digest_slots.evening` (`35 13 * * *`) plus `digest_refire_window.evening` | Pushes the sealed evening artifact |
+| 19:50 | `daily-news.yml`, GitHub fallback, evening | its own `on.schedule` (`5 14 * * *`) | Stands itself down unless the slot was never delivered |
+| 21:45 | `digest-watchdog.yml`, evening leg | its own `on.schedule` (`0 4,16 * * *`) | Judges the evening slot |
+
+`tests/workflows/test_workflow_lint.py` re-derives every GitHub row above from the
+committed cron, so a time in this table that drifts away from a workflow goes red.
+
+### What reaches your phone
+
+**A normal AI digest.** One push at 07:20 / 19:20 NPT, a few minutes later if the
+delivery arm had to re-fire. The title is a time-of-day icon, then the slot, the
+date and the story count — `Morning · 2026-10-28 · 12 items` — and the body is the
+digest itself with a tap-through to the page. It stays quiet unless something needs
+you: then the title gains `· 2 deadlines due` (or `· action needed`), and the top
+priority is reserved for a critical source host being down.
+
+**The unsummarised edition, when no model responds.** Same push, same slot, but the
+title ends `· unsummarised edition (no AI today)` and the page and email carry the
+same label. The stories are collected headlines, links and hosts with nothing
+written by a model. It is deliberately capped below the escalation threshold, so a
+fallback never pages the way a real digest can.
+
+**A fault, when nothing could be built.** Exactly one page, deduplicated to one per
+slot per 6 hours (`scripts/alert_dedupe.py`), plus one GitHub issue:
+
+| What happened | What you see |
+|---|---|
+| The sources themselves were down or empty | `Digest BROKEN: sources returned nothing usable — fallback will fire` (high priority) |
+| The sources were fine and it was simply a quiet day | `Digest: no stories (1/3) — sources were fine` (a notice, **not** a fault) |
+| A slot never produced a delivery at all | `Today's <slot> digest never arrived` (high priority) |
+
+A recovery sends one all-clear push and nothing after it.
+
 
 ## 3. Deploying the Worker
 
@@ -325,14 +392,14 @@ that cannot work.
    **rejected before any KV write**, so the probe is side-effect-free — it
    cannot overwrite a sealed artifact and cannot page anyone.
 
-**Proposed shape:** a step in the existing `drift-canary.yml` (currently 06:15
-and 09:02 NPT), with 401 as a hard failure. Never `set -x` around it, never
+**Proposed shape:** a step in the existing `drift-canary.yml` (currently one run
+a day, 06:15 NPT), with 401 as a hard failure. Never `set -x` around it, never
 interpolate the token into an echo, and on failure print **only** the two
 `updated_at` timestamps and the status code.
 
 **Honest limit of this proposal.** It proves the copies agree **at the moment it
 runs** — it is a detector, not a preventer. Without it, a one-sided rotation is
-caught by the next seal at 06:50/18:50 as a bare 401 that reads like a network
+caught by the next seal at 06:40/18:40 as a bare 401 that reads like a network
 fault; with it, the same event is caught as an unambiguous "diverged". The
 difference is diagnosis, not detection.
 

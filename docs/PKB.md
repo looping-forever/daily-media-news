@@ -1686,7 +1686,8 @@ Check 16 compares it against `deploy/wrangler.toml`'s crons and the worker's
   > **SUPERSEDED 2026-10-10 (§41.2).** These five crons no longer exist. They
   > were merged into ONE `* * * * *` dispatcher, so `deploy/schedule.json`'s
   > `expected_invocations_per_day` is now **1440** and
-  > `expected_internal_job_fires_per_day` is **1234**. The figures above are kept
+  > `expected_internal_job_fires_per_day` is **1308** (1014 work ticks + 426
+  > no-op ticks), as `deploy/schedule.json` currently states. The figures above are kept
   > as the pre-merge arithmetic and describe a schedule that is no longer
   > deployed. The KV write budget below did **not** move — see §41.2.
   *(`docs/DEPLOYMENT.md` §7 still says "~288 scheduled invocations/day", which
@@ -1892,8 +1893,8 @@ owner also **explicitly refused a Workers Paid upgrade** on cost grounds.
 | Metric | Value |
 |---|---|
 | Cloudflare invocations (1 trigger × 1440 min) | **1440/day** vs ~100,000 free |
-| Internal job fires decided by the dispatcher | **1234** inside **988 work ticks** |
-| No-op ticks (**zero** KV reads, **zero** KV writes) | **452**; 988 + 452 = 1440 |
+| Internal job fires decided by the dispatcher | **1308** inside **1014 work ticks** |
+| No-op ticks (**zero** KV reads, **zero** KV writes) | **426**; 1014 + 426 = 1440 |
 | KV writes — heartbeat | **100** (breaking 48 + academic 48 + alarm 4) |
 | KV writes — digest | **8** (artifact 2 + ledger 4 + expiry deletes 2) |
 | **KV writes — system total** | **`system_total_max` = 108** vs ~1,000/day free |
