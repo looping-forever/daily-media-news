@@ -5076,29 +5076,31 @@ function honestDeliveryReason(entry) {
   }
 
   const stored = String(e.reject_reason || "").trim();
+  // A FAILED PUSH IS NAMED FIRST, WHATEVER TOKEN THE WRITER LEFT THERE. The
+  // 2026-10-28 evening row is the case: `state: failed` (the fallback push never
+  // landed, so the owner received nothing) beside a reason that opened `title |
+  // ...`, which is the ARTIFACT's token and says nothing about the delivery.
+  // Rewriting only `absent` left every other token reading like a delivery
+  // report, so the token is kept as detail and the state leads.
+  const failedRow = state === STATE_FAILED || e.ntfy_failed === true;
   if (!stored) {
-    return state === STATE_FAILED || e.ntfy_failed === true
-      ? "failed | the row records a failed push"
-      : null;
+    return failedRow ? "failed | the row records a failed push" : null;
   }
-  // A `failed` row must not open with the writer's `absent` token: the two say
-  // different things and health shows the reason next to the state.
-  const base = state === STATE_FAILED
-    ? stored.replace(/^absent\s*\|\s*/, "failed | ")
-    : stored;
+  let tail = stored;
   const dispatched = !!(e.actions_dispatch_at) || (e.late_build_dispatched === true);
-  if (!dispatched) return base;
   // Anchored, because the sentence is the TAIL of the stored string and a
   // mid-string match would mangle a reason that merely mentions it.
   const noBuild = /\s*\|\s*NO build was dispatched\s*$/;
-  if (!noBuild.test(base)) return base;
-  const failureClass = e.dispatch_failure_class
-    ? String(e.dispatch_failure_class)
-    : "";
-  const truth = failureClass
-    ? "| the build dispatched for this slot FAILED (" + failureClass + ")"
-    : "| a build was dispatched for this slot and its outcome was not recorded";
-  return base.replace(noBuild, " " + truth);
+  if (dispatched && noBuild.test(tail)) {
+    const failureClass = e.dispatch_failure_class
+      ? String(e.dispatch_failure_class)
+      : "";
+    const truth = failureClass
+      ? "| the build dispatched for this slot FAILED (" + failureClass + ")"
+      : "| a build was dispatched for this slot and its outcome was not recorded";
+    tail = tail.replace(noBuild, " " + truth);
+  }
+  return failedRow ? "failed | the push did not land | " + tail : tail;
 }
 
 // --- main pass ----------------------------------------------------------------
