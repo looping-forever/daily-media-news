@@ -7233,7 +7233,8 @@ class ActionsBudgetTests(unittest.TestCase):
         (self.dir / name).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def _budget(self, entries, cap=1300.0, projected=None, reserve=100.0,
-                included=1400.0, ceiling=None, budget_reserve=0.0):
+                included=1400.0, ceiling=None, budget_reserve=0.0,
+                enforcement=False):
         return {
             "included_minutes": included,
             "other_repos_reserve_minutes": reserve,
@@ -7246,6 +7247,13 @@ class ActionsBudgetTests(unittest.TestCase):
             "freeze_ratio": 0.9,
             "days_per_month": self.DAYS,
             "current_projected_minutes": projected,
+            # Defaults to DISARMED, which is what the real file ships: a synthetic
+            # tree that forgot to say would otherwise silently test the armed path.
+            "enforcement": {
+                "enabled": bool(enforcement),
+                "reason": ("synthetic: armed" if enforcement
+                           else "synthetic: public repo, standard runners free"),
+            },
             "workflows": entries,
         }
 
@@ -7295,14 +7303,90 @@ class ActionsBudgetTests(unittest.TestCase):
         self.assertIn("DESIGN TARGET", warns[0])
 
     def test_a_tree_over_the_hard_ceiling_IS_rejected(self):
-        """The ENFORCED number: the allowance minus the reserve."""
+        """The ENFORCED number: the allowance minus the reserve, WHILE ARMED."""
         self._workflow("cheap.yml", cron="20 */6 * * *", jobs=2)
         budget = self._budget(
             {"cheap.yml": self._entry(4, 2, 5.0, ["20 */6 * * *"])},
-            cap=1000.0, projected=1200.0, included=1100.0, budget_reserve=0.0)
+            cap=1000.0, projected=1200.0, included=1100.0, budget_reserve=0.0,
+            enforcement=True)
         problems, _total = self._problems(budget)
         self.assertEqual(1, len(problems), "\n  ".join(problems))
         self.assertIn("hard ceiling", problems[0])
+
+    # ------------------------------------------------------------------
+    # The switch, end to end. `main()` is what CI runs, so the EXIT STATUS is
+    # the claim under test here, not an internal list.
+    # ------------------------------------------------------------------
+
+    def _run_main(self, budget):
+        """Run the real entry point against a synthetic tree: (exit code, stdout)."""
+        import contextlib
+        import io
+
+        path = Path(self._tmp) / "actions-budget.json"
+        path.write_text(json.dumps(budget, indent=2) + "\n", encoding="utf-8")
+        self.addCleanup(setattr, self.check, "BUDGET_PATH", self.check.BUDGET_PATH)
+        self.check.BUDGET_PATH = path
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = self.check.main([])
+        return code, buffer.getvalue()
+
+    def _over_ceiling(self, enforcement):
+        """1200 min projected against a 1100 min ceiling, and nothing else wrong.
+
+        Every structural check is satisfied on purpose, so the ONLY thing that can
+        decide the exit code is the ceiling and the switch.
+        """
+        self._workflow("cheap.yml", cron="20 */6 * * *", jobs=2)
+        return self._budget(
+            {"cheap.yml": self._entry(4, 2, 5.0, ["20 */6 * * *"])},
+            cap=1000.0, projected=1200.0, included=1400.0, budget_reserve=300.0,
+            enforcement=enforcement)
+
+    def test_an_over_ceiling_month_with_enforcement_OFF_exits_0_and_reports(self):
+        """REPORT-ONLY: free minutes on a public repo cannot be over budget.
+
+        This is the 2026-10-28 change. The projection is still COMPUTED and
+        PRINTED -- 1200 against a ceiling of 1100 -- but with
+        `enforcement.enabled` false it is information, so the check exits 0 and
+        says so in words a reader cannot mistake for a blocker.
+
+        MUTATION PROOF: drop the `enforcement_enabled(budget)` guard in
+        `problems()` and this goes red on the exit code.
+        """
+        code, out = self._run_main(self._over_ceiling(False))
+        self.assertEqual(0, code,
+                         "an over-ceiling projection must NOT fail while "
+                         "enforcement is off:\n%s" % out)
+        self.assertIn("REPORT-ONLY", out)
+        self.assertIn("1200", out, "the projection must still be printed")
+        self.assertIn("1100", out, "the ceiling must still be printed")
+        self.assertNotIn("FAIL:", out, "nothing may gate on the free-minute "
+                                       "ceiling while enforcement is off:\n%s" % out)
+        self.assertNotIn("problem(s)", out,
+                         "the summary must not read as 'problems' while the only "
+                         "finding is an informational overage:\n%s" % out)
+
+    def test_an_over_ceiling_month_with_enforcement_ON_still_fails(self):
+        """ARMED: the old ceiling failure returns, and fires on the same numbers.
+
+        The pair matters. Report-only is a decision about a PUBLIC repository, not
+        a softening of the check: flip the switch and the identical tree is
+        rejected again, which is what makes re-arming safe after a private change.
+
+        MUTATION PROOF: remove the switch from `problems()` and this exits 0, so
+        this test goes red.
+        """
+        code, out = self._run_main(self._over_ceiling(True))
+        self.assertEqual(1, code,
+                         "an over-ceiling projection must fail while enforcement "
+                         "is on:\n%s" % out)
+        self.assertIn("FAIL:", out)
+        self.assertIn("hard ceiling", out)
+        self.assertNotIn("REPORT-ONLY", out,
+                         "the report-only wording must not appear while the "
+                         "ceiling is a live gate:\n%s" % out)
 
     def test_a_scheduled_workflow_with_no_budget_entry_is_rejected(self):
         """The failure that let the account reach 2,016 minutes by the 18th.

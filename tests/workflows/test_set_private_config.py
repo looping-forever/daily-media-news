@@ -183,7 +183,8 @@ exit /b %ERRORLEVEL%
 WRANGLER_CMD = r"""@echo off
 >>"%DMNEWS_TEST_LOG%" echo wrangler %*
 set "DMNEWS_STUB_MODE=none"
-if /i "%1 %2"=="secret put" set "DMNEWS_STUB_MODE=stdin:secret put %3"
+if /i "%1 %2"=="secret put" if not exist "%~5" (>>"%DMNEWS_TEST_LOG%" echo MISSING_CONFIG %~5 & exit /b 1)
+if /i "%1 %2"=="secret put" if exist "%~5" set "DMNEWS_STUB_MODE=stdin:secret put %3"
 if /i "%1 %2"=="secret list" set "DMNEWS_STUB_MODE=print:DIGEST_ARCHIVE_ORIGIN"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stub.ps1"
 exit /b %ERRORLEVEL%
@@ -476,6 +477,63 @@ class StubbedProvidersTest(unittest.TestCase):
             "secret put %s <= %s" % (WORKER_SECRET, origin), self.stdin_lines,
             "the Worker secret was not handed the value on stdin:\n%s"
             % "\n".join(self.stdin_lines))
+
+    def _run_from(self, cwd):
+        """Run the REAL script with `cwd=<cwd>` against the same stubs."""
+        log = os.path.join(self.tmp, "calls-cwd.log")
+        stdin_log = os.path.join(self.tmp, "stdin-cwd.log")
+        for path in (log, stdin_log):
+            with open(path, "w", encoding="ascii") as handle:
+                handle.write("")
+        harness = (RUN_HARNESS
+                   .replace("__STUBDIR__", _ps_literal(self.stub_dir))
+                   .replace("__LOGFILE__", _ps_literal(log))
+                   .replace("__STDINFILE__", _ps_literal(stdin_log))
+                   .replace("__SCRIPT__", _ps_literal(self.script_path)))
+        done = _run_powershell(self.exe, harness, cwd)
+        with open(log, encoding="ascii") as handle:
+            calls = [line.strip() for line in handle if line.strip()]
+        with open(stdin_log, encoding="ascii") as handle:
+            lines = [line.strip() for line in handle if line.strip()]
+        return done, calls, lines
+
+    def test_the_script_works_from_any_directory(self):
+        """It resolves the repo from ITS OWN location, not from the caller's cwd.
+
+        Two lines here read the current directory: the `deploy/wrangler.local.toml`
+        probe, and `gh`'s own repository lookup. Run from anywhere else, the probe
+        used to fall through to `deploy/wrangler.toml` -- a DIFFERENT config,
+        silently -- and `gh` targeted whichever repo the cwd happened to be in.
+
+        The wrangler stub records `MISSING_CONFIG` and exits non-zero when the
+        `-c` path does not exist, so the pre-fix behaviour cannot pass quietly:
+        the origin never reaches the Worker. Both are asserted below.
+        """
+        foreign = os.path.join(self.tmp, "elsewhere")
+        os.makedirs(foreign, exist_ok=True)
+        done, calls, stdin_lines = self._run_from(foreign)
+        self.assertEqual(
+            [], [line for line in calls if line.startswith("MISSING_CONFIG")],
+            "the script handed wrangler a `-c` path that does not exist, so it "
+            "resolved `deploy/wrangler.*` against the CALLER's directory instead "
+            "of its own (%r):\n%s" % (foreign, "\n".join(calls)))
+        self.assertEqual(
+            0, done.returncode,
+            "the script failed when run from %r, so it still depends on the "
+            "current directory:\n--- stdout ---\n%s\n--- stderr ---\n%s\n--- "
+            "calls ---\n%s" % (foreign, _decode(done.stdout),
+                               _decode(done.stderr), "\n".join(calls)))
+        self.assertIn("gh secret set BANK_NAME", calls)
+        self.assertTrue(
+            any(line.startswith("wrangler secret put %s" % WORKER_SECRET)
+                for line in calls),
+            "the Worker secret was never reached from a foreign cwd:\n%s"
+            % "\n".join(calls))
+        self.assertIn(
+            "secret put %s <= https://example.pages.dev" % WORKER_SECRET,
+            stdin_lines,
+            "the archive origin did not reach the Worker on stdin from a foreign "
+            "cwd:\n%s" % "\n".join(stdin_lines))
 
     def test_no_value_reaches_the_script_output(self):
         """The whole point: stdout and stderr carry names, never values."""

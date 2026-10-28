@@ -11,16 +11,22 @@ cannot buy more -- there is no USD access from Nepal -- so the system had to liv
 under the allowance permanently, and it had to be unable to creep back over it
 quietly.
 
-WHAT CHANGED ON 2026-10-25, AND WHAT DID NOT. The repository is PUBLIC now, so
-standard runners are free and no minute is billed. The ARITHMETIC here is
-deliberately unchanged: it is the record of what this tree costs, and the whole
-point of this file is that the record is recomputed rather than asserted. What
-changed is the CONSEQUENCE -- `config/actions-budget.json` now carries
-`enforcement.enabled: false`, so the Worker's runtime quota reports the ceiling
-and no longer refuses a dispatch on it. This script still gates the declared
-projection, because a volume that can be raised silently is a lie told to the next
-reader, and because the repository could be made private again (set
-`enforcement.enabled` back to true and the refusal returns).
+WHAT CHANGED ON 2026-10-25, AND WHAT CHANGED AGAIN ON 2026-10-28. The repository
+is PUBLIC now, so standard runners are free and no minute is billed. The
+ARITHMETIC here is deliberately unchanged: it is the record of what this tree
+costs, and the whole point of this file is that the record is recomputed rather
+than asserted. What changed is the CONSEQUENCE -- `config/actions-budget.json`
+carries `enforcement.enabled: false`, so the Worker's runtime quota reports the
+ceiling and refuses nothing on it. Since 2026-10-28 this script follows the SAME
+switch: with enforcement DISABLED the ceiling is PRINTED and never gates, because
+a minute that costs nothing cannot be over budget. Set `enforcement.enabled` back
+to true and the old ceiling failure returns unchanged.
+
+The switch disarms the CEILING and nothing else. The structural checks below -- a
+workflow with no budget entry, a cron or a job count that no longer matches the
+workflow, a recorded projection that disagrees with this tree -- keep failing,
+because they protect the TRUTH of the record rather than the height of the number.
+A record that lies is a defect on a public repository too.
 
 Actions bills PER JOB PER MINUTE, ROUNDED UP, so both halves of that matter:
 a 5-second job costs a whole minute, and a 4-job workflow costs at least 4
@@ -38,13 +44,18 @@ the entire point. A hardcoded list would agree with itself forever.
 
 WHAT IT FAILS ON
 ----------------
-1. the projected month exceeds the hard ceiling (the allowance minus the reserve);
+1. the projected month exceeds the hard ceiling (the allowance minus the reserve)
+   **and** `enforcement.enabled` is true. With enforcement false the same number
+   is printed as REPORT-ONLY, with an explicit line saying standard runners are
+   free on a public repository, and the check exits 0;
 2. a workflow file has no budget entry at all;
 3. an entry's `crons` no longer match the crons in the workflow it describes;
 4. an entry bills more jobs per run than the workflow actually declares;
 5. the recorded projection no longer matches the computed one, so a number
    cannot be raised (or lowered) without the file being edited on purpose;
 6. the cap plus the reserve for other repositories exceeds the allowance.
+
+Items 2-6 are NOT the 1776/1800 comparison and are not disarmed by the switch.
 
 THE MODEL, AND WHAT IT IS NOT
 -----------------------------
@@ -171,6 +182,21 @@ def load_budget(path=None):
         return json.load(fh)
 
 
+def hard_ceiling(budget):
+    """The margin-protected number: the allowance minus the reserve."""
+    return float(budget.get("hard_ceiling_minutes") or budget["included_minutes"])
+
+
+def enforcement_enabled(budget):
+    """Whether the Worker may REFUSE a dispatch once the month is at the ceiling.
+
+    Read from the budget file and nowhere else, so this check tells the same
+    story as the deployed Worker. `enforcement.reason` is not consulted: it is
+    prose, and a switch must not be inferred from prose.
+    """
+    return bool((budget.get("enforcement") or {}).get("enabled"))
+
+
 # --------------------------------------------------------------------------
 # The accounting
 # --------------------------------------------------------------------------
@@ -208,8 +234,7 @@ def projects(budget, names=None):
 def problems(budget, rows, total):
     """Every reason this tree is not allowed. Empty list means allowed."""
     found = []
-    ceiling = float(budget.get("hard_ceiling_minutes")
-                    or budget["included_minutes"])
+    ceiling = hard_ceiling(budget)
 
     for row in rows:
         name = row["name"]
@@ -239,14 +264,17 @@ def problems(budget, rows, total):
             if entry.get(field) is None:
                 found.append("%s: budget entry has no `%s`." % (name, field))
 
-    if total > ceiling:
+    # The ONLY check the enforcement switch disarms. With the switch false this
+    # number is still printed -- by ceiling_notice() -- but it cannot fail a
+    # build, because a free minute cannot be over budget.
+    if total > ceiling and enforcement_enabled(budget):
         found.append(
             "the projection is %.0f minutes a month against the hard ceiling of "
             "%.0f (%+.0f). The ceiling is the allowance MINUS the reserve, so this "
-            "month is out of the margin this repository declared for itself. The "
-            "Worker no longer refuses a dispatch on it (enforcement is off while "
-            "the repository is public), so this is the static gate doing its job: "
-            "the projection was raised without the file being edited to say so."
+            "month is out of the margin this repository declared for itself. "
+            "Enforcement is ON, so the Worker refuses a dispatch at this ceiling "
+            "as well: this is the static gate doing its job, and the projection "
+            "was raised without the file being edited to say so."
             % (total, ceiling, total - ceiling))
 
     recorded = budget.get("current_projected_minutes")
@@ -281,8 +309,7 @@ def warnings(budget, total):
     """Non-fatal reports. The design target is an aspiration, not a gate.
 
     Kept separate from `problems` on purpose: an overage of the DESIGN TARGET is
-    what the owner wants to SEE every run, not what should stop the build. The
-    only minute count that fails this check is the hard ceiling.
+    what the owner wants to SEE every run, not what should stop the build.
     """
     target = float(budget.get("design_target_minutes")
                    or budget["repo_soft_cap_minutes"])
@@ -295,6 +322,57 @@ def warnings(budget, total):
             "or accept it while the hard ceiling holds."
             % (total, target, total - target))
     return out
+
+
+def ceiling_notice(budget, total):
+    """The ceiling as INFORMATION while enforcement is DISABLED.
+
+    Empty while enforcement is ON, because then the ceiling is a real gate and
+    `problems()` already speaks for it. While it is OFF nothing here may read as
+    "you are over budget, stop": a public repository's standard runners are free,
+    so the projection is measured against a self-imposed margin, not a bill.
+    """
+    if enforcement_enabled(budget):
+        return []
+    ceiling = hard_ceiling(budget)
+    if total <= ceiling:
+        return ["REPORT-ONLY: the projected month (%.0f min) fits the hard ceiling "
+                "(%.0f min, %+.0f spare)."
+                % (total, ceiling, ceiling - total)]
+    return [
+        "REPORT-ONLY: the projected month is %.0f min against a hard ceiling of "
+        "%.0f min (%+.0f min over)."
+        % (total, ceiling, total - ceiling),
+        "REPORT-ONLY: INFORMATIONAL, NOT A BLOCKER -- standard runners are free "
+        "on a public repository, so no minute is billed and no allowance is "
+        "exceeded. Nothing needs to change; `enforcement.enabled` is false, which "
+        "is why this line reports instead of failing.",
+    ]
+
+
+def verdict(budget, total):
+    """The closing sentence, which must not claim a gate that is not there.
+
+    The fit is DERIVED rather than assumed: a sentence that says "fits the hard
+    ceiling" while the table above it says otherwise is the kind of output that
+    teaches a reader to stop reading the output.
+    """
+    ceiling = hard_ceiling(budget)
+    standing = ("the projected month fits the HARD CEILING"
+                if total <= ceiling else
+                "the projected month is OVER the HARD CEILING")
+    rest = ("(the design-target overage, if any, is a warning above), every "
+            "workflow is budgeted, and no cron or job moved without the budget "
+            "following.")
+    if enforcement_enabled(budget):
+        return ("%s %s The Worker's runtime quota REFUSES a dispatch at the "
+                "ceiling." % (standing, rest))
+    if total > ceiling:
+        return ("%s %s REPORTED, never enforced: standard runners are free on a "
+                "public repository, so this number is information and not a "
+                "limit, and nothing has to change." % (standing, rest))
+    return ("%s %s The Worker's runtime quota only REPORTS at the ceiling "
+            "(enforcement.enabled is false)." % (standing, rest))
 
 
 def report(budget, rows, total):
@@ -345,20 +423,22 @@ def main(argv=None):
     rows, total = projects(budget)
     report(budget, rows, total)
     found = problems(budget, rows, total)
+    for notice in ceiling_notice(budget, total):
+        print(notice)
     for warning in warnings(budget, total):
         print("WARN: %s" % warning)
     for problem in found:
         print("FAIL: %s" % problem)
     if found:
-        print("\n%d problem(s). The budget is not satisfied." % len(found))
+        print("\n%d problem(s)." % len(found))
+        # Say which failures these are NOT, or a structural failure reads as the
+        # ceiling and the reader stops after the number.
+        if not enforcement_enabled(budget):
+            print("None of these is the Actions minute ceiling: with "
+                  "`enforcement.enabled` false that number is reported above and "
+                  "never gates. These are failures of the record itself.")
         return 1
-    print("\nOK: the projected month fits the HARD CEILING (the design-target "
-          "overage, if any, is a warning above), every workflow is budgeted, and "
-          "no cron or job moved without the budget following. %s"
-          % ("The Worker's runtime quota REFUSES a dispatch at the ceiling."
-             if (budget.get("enforcement") or {}).get("enabled")
-             else "The Worker's runtime quota only REPORTS at the ceiling "
-                  "(enforcement.enabled is false)."))
+    print("\nOK: %s" % verdict(budget, total))
     return 0
 
 

@@ -17,6 +17,11 @@
 #                            breaking-monitor.yml.
 
 $ErrorActionPreference = 'Stop'
+# Anchor to the repo this file lives in: `deploy/wrangler.*` below and `gh`'s own
+# repo lookup both read the CURRENT DIRECTORY, so from anywhere else the probe
+# silently fell through to wrangler.toml and gh targeted the wrong (or no) repo.
+if (-not $PSScriptRoot) { throw 'run this with -File <path>\set-private-config.ps1' }
+Set-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
 $WorkerConfig = if (Test-Path 'deploy/wrangler.local.toml') { 'deploy/wrangler.local.toml' } else { 'deploy/wrangler.toml' }
 
 function Read-Hidden([string]$Prompt) {
