@@ -3955,9 +3955,9 @@ jobs:
               # reported on 2026-10-13, not a feature.
               #
               # The SUPERSEDE push reads `ntfy_full_sent_at` instead, and MUST.
-              # Every degraded kind (partial, fallback_last_good, unavailable)
-              # sets `ntfy_sent_at`, because a push happened; guarding on it
-              # would make the repair unreachable on precisely the slots it
+              # Every degraded kind (partial, unsummarised, fallback_last_good,
+              # unavailable) sets `ntfy_sent_at`, because a push happened; guarding
+              # on it would make the repair unreachable on precisely the slots it
               # exists for, and a complete digest would sit sealed and never
               # sent. That asymmetry is pinned by tests/digest/test_supersede_push.py
               # on the dispatch side, and it is the same rule here.
