@@ -1262,6 +1262,28 @@ test("a legacy row whose stored edition says failed is NOT rendered fresh",
     assert.match(String(silent.edition_disagreement), /no edition/,
       "the missing edition is not named: " +
       JSON.stringify(silent.edition_disagreement));
+
+    // THE MIRROR DIRECTION, and the one that can UPGRADE a bad row: a row whose
+    // state says the push failed must never be promoted to fresh because its
+    // stored edition says so. A contradiction is not fresh either way round.
+    const mirror = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: {
+        state: "failed",
+        kind: "delivered",
+        edition: "fresh",
+        pending_at: "2026-10-28T01:35:27Z",
+      } } },
+    });
+    assert.ok(mirror, "the mirror fixture entry was not selected");
+    assert.strictEqual(mirror.fresh_edition, false,
+      "a row whose state says the push failed was rendered fresh because its " +
+      "stored edition said so");
+    assert.match(String(mirror.edition_disagreement), /'fresh'/,
+      "the mirror disagreement does not name the stored value: " +
+      JSON.stringify(mirror.edition_disagreement));
+    assert.match(String(mirror.edition_disagreement), /'failed'/,
+      "the mirror disagreement does not name what the state implies: " +
+      JSON.stringify(mirror.edition_disagreement));
   });
 
 test("a recorded last_good_shown is surfaced on every arm", async () => {
