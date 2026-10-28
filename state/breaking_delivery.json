@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-10-28T04:48:46Z",
+    "at": "2026-10-28T15:37:05Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com — check this now",
+    "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-10-28T04:48:46Z",
+    "at": "2026-10-28T15:37:05Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com — check this now",
+    "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-10-28T15:37:05Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-10-28T04:48:46Z",
       "ok": true,

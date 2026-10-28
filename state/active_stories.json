@@ -3026,6 +3026,36 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-28T20:28:40+05:45"
+    },
+    {
+      "event_id": "evt-1f6eb02625d0",
+      "event_key": null,
+      "canonical_title": "Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com",
+      "category": "local_city",
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmitwfbvv95cuxowwtmnddszfvncgwysnjvbkhulvhsvlfld3hxvulpsglzqjl1u2zsmkd1qu44wktoaesxqzvlsunuqve5zjbpt0xsrg82oupmqmvowmfuvuvoemwtb01kzhazchjanenld0c1q1f1tup4bmdnwnlxvg9notnulwprvuetewxydvrhsetvsg5zchy5y0fynvmzv3hiu0t4s1djyvy1ew1zauf6vlnsn21qvzg5zmzfqw8"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-10-28T21:22:05+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-28T21:22:05+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []
