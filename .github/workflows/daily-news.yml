@@ -2224,6 +2224,44 @@ jobs:
           # `unavailable` is deliberately absent: it claims nothing.
           CLAIMING_KINDS = (KIND_DELIVERED, KIND_PARTIAL, KIND_UNSUMMARISED)
 
+          # THE VERDICT A READER NEEDS, DERIVED AT THE WRITE. `edition` answers
+          # "did the owner get TODAY's edition?" and is a function of `state` and
+          # `kind` alone, so the arm that writes the record must not hold an
+          # opinion about it. It used to be written by nobody here: the patch set
+          # `state` and `kind` and left `edition` at whatever the last attempt
+          # stored, so the 2026-10-28 evening row read `state: sent, kind:
+          # unsummarised` beside `edition: failed` and ?health=1 could only report
+          # the contradiction. Same table as the Worker's deliveryEdition, pinned
+          # by tests/digest/test_ledger_kind.py.
+          EDITION_BY_KIND = {
+              'delivered': 'fresh',
+              'unsummarised': 'unsummarised',
+              'partial': 'partial',
+              # Written only by the Worker, but this arm MERGES onto the Worker's
+              # entry, so every value it can meet is mapped here.
+              'fallback_last_good': 'fallback',
+              'unavailable': 'notice',
+              'duplicate_suppressed': 'duplicate',
+              'stood_down': 'stood_down',
+          }
+
+          def edition_for(entry):
+              """What the owner actually received, in one word. Never raises."""
+              if entry.get('ntfy_failed') is True or entry.get('state') == 'failed':
+                  return 'failed'
+              if entry.get('state') == 'pending':
+                  return 'pending'
+              # `entry_kind`, not `kind` and not `label`: tests/render/
+              # test_digest_label.py forbids this heredoc comparing `kind` to
+              # anything (that is how the push icon used to be chosen) and keeps
+              # a whitelist of the functions allowed a bare `label` (that name
+              # belongs to the push title). This is a membership test on the
+              # delivery kind, and the name says so.
+              entry_kind = str(entry.get('kind') or '')
+              if entry_kind in EDITION_BY_KIND:
+                  return EDITION_BY_KIND[entry_kind]
+              return 'other' if entry.get('state') == 'sent' else 'unknown'
+
           def kv_namespace():
               """The KV namespace id, from the CF_KV_NAMESPACE_ID variable.
 
@@ -2529,7 +2567,8 @@ jobs:
                   entry['honesty_downgraded_at'] = now
 
           def kv_record_delivery(date, slot, patch, clear=(),
-                                 inherit_stored_kind=False):
+                                 inherit_stored_kind=False,
+                                 preserve_stored_kind_as=None):
               """Read-modify-write the slot's delivery record. NEVER raises.
 
               This runs AFTER the push succeeded. A failure here costs the
@@ -2560,6 +2599,13 @@ jobs:
                              .replace('+00:00', 'Z'))
                   day = ledger['days'].setdefault(date, {})
                   entry = dict(day.get(slot) or {})
+                  # WHAT THE ROW SAID BEFORE THIS WRITE, when the write REPLACES
+                  # it rather than confirming it. A supersede records what the
+                  # phone now holds, which overwrites `kind`; the degraded kind it
+                  # replaced is a fact worth keeping, so it is moved aside instead
+                  # of being erased.
+                  if preserve_stored_kind_as and entry.get('kind'):
+                      entry[preserve_stored_kind_as] = entry['kind']
                   # A STAND-DOWN DID NOT BUILD THE MESSAGE IT FOUND, SO IT DOES
                   # NOT GET TO CLASSIFY IT. `kind` says what was built, and an
                   # entry that already carries one has that evidence; stamping
@@ -2573,6 +2619,10 @@ jobs:
                       entry.pop(key, None)
                   entry.setdefault('first_ntfy_sent_at', patch.get('ntfy_sent_at', now))
                   enforce_ledger_honesty(entry, date, slot, now)
+                  # AFTER the correction, never before: the temporal arm may have
+                  # just downgraded this entry to `failed`, and a cached verdict
+                  # computed from the pre-correction fields would contradict it.
+                  entry['edition'] = edition_for(entry)
                   day[slot] = entry
                   cutoff = (datetime.date.fromisoformat(date)
                             - datetime.timedelta(days=LEDGER_RETENTION_DAYS - 1)
@@ -2676,10 +2726,21 @@ jobs:
                   # `ntfy_sent_at` is deliberately NOT set here. The Worker's
                   # ledger guard suppresses on it, and the degraded push this
                   # replaces already set it.
+                  #
+                  # WHAT THE SUPERSEDE PUSHED IS RECORDED, AND IT USED NOT TO BE.
+                  # This branch wrote only `ntfy_full_sent_at`/`full_sequence_id`
+                  # and threw away the `pushed_kind` it was handed, so a slot whose
+                  # degraded push was replaced by a complete AI edition still read
+                  # `kind: unsummarised, edition: unsummarised` for the rest of the
+                  # day -- the newest attempt's truth lost to the record of the one
+                  # it superseded. `kind` moves aside rather than being erased, so
+                  # "this slot was first served something degraded" stays readable.
                   return kv_record_delivery(date, slot, {
                       'ntfy_full_sent_at': sent_at,
                       'full_sequence_id': sequence_id,
-                  })
+                      'state': 'sent',
+                      'kind': pushed_kind or KIND_DELIVERED,
+                  }, preserve_stored_kind_as='superseded_kind')
               patch = {
                   'sequence_id': sequence_id,
                   'state': 'sent',

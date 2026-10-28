@@ -294,10 +294,20 @@ class DispatchTruthfulNoticeWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
     contradicts itself. The fifth test is the sweep: a push instant recorded
     only as `first_ntfy_sent_at` is reported, not nulled, because `reason`
     already reads it and one response may not contradict itself.
+
+    THE FOUR ADDED FOR THE WRITER BUG. `edition` is a function of `state` and
+    `kind`, and both writers MERGE a patch onto what the slot already holds, so
+    a cached `edition` in either half can contradict the other. The Actions arm
+    wrote `state`/`kind` and no `edition` at all, which is why the 2026-10-28
+    evening row reads `state: sent` beside `edition: failed`. The funnel now
+    derives the field itself, and the four tests pin the shapes that used to
+    survive the merge: a failure after a success, a stale value inside the patch,
+    and the supersede row that must name the full edition it pushed rather than
+    the degraded one it replaced.
     """
 
     JS = Path(_TESTS) / "digest" / "digest_dispatch_truthful_notice.test.js"
-    TAP_PLAN = 25
+    TAP_PLAN = 29
     WORKER_OVERRIDE = "DIGEST_NOTICE_WORKER"
     WHAT_IT_GUARDS = (
         "the honesty of the fallback ladder's notice. On 2026-10-13 this Worker "
@@ -337,6 +347,10 @@ class DispatchTruthfulNoticeWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
         "a recorded last_good_shown is surfaced on every arm",
         "a recorded push instant is never rendered as null",
         "the reason agrees with the state it sits beside",
+        "a failed attempt after a success records the failure, not the old success",
+        "a stale edition in a patch cannot survive the merge",
+        "a superseded slot reports the full edition that replaced the degraded one",
+        "a superseded slot is still the newest delivery, by its full push",
     )
 
 

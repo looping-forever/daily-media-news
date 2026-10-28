@@ -88,6 +88,10 @@ const EXPORT_NAMES = [
   // The dispatch verdict and the ?health=1 projection, so both can be pinned
   // directly as well as end-to-end.
   "dispatchVerdictSuffix", "latestLedgerDelivery", "honestDeliveryReason",
+  // The ledger funnel itself: `edition` is derived there, so the invariant that
+  // a write cannot leave `state`/`kind`/`edition` disagreeing is pinned on the
+  // function that writes, not on the callers that happen to pass the field.
+  "enforceLedgerHonesty",
 ];
 
 const loadCounter = { n: 0 };
@@ -1286,8 +1290,7 @@ test("a legacy row whose stored edition says failed is NOT rendered fresh",
       JSON.stringify(mirror.edition_disagreement));
   });
 
-test("a recorded last_good_shown is surfaced on every arm", async () => {
-  const w = loadWorker();
+test("a recorded last_good_shown is surfaced on every arm", async () => {  const w = loadWorker();
   for (const [label, stored] of [
     ["failed", { state: "failed", edition: "failed", ntfy_sent_at: null,
                  pending_at: "2026-10-28T01:35:27Z" }],
@@ -1446,3 +1449,106 @@ test("DEFECT 4: the stored sentence in KV is repaired at read time, with no migr
       "the live ?health=1 reason still denies the dispatch: " +
       JSON.stringify(seen.reason));
   });
+
+// ---- THE WRITER'S OWN INVARIANT ---------------------------------------------
+//
+// `edition` is a FUNCTION of `state` and `kind`. Every write goes through
+// enforceLedgerHonesty, which merges a patch onto whatever the slot already
+// records, so a cached `edition` in either half can contradict the other half.
+// The 2026-10-28 evening row is that shape in KV right now: the Actions arm
+// recorded `state: sent, kind: unsummarised` and left the Worker's earlier
+// `edition: "failed"` in place. ?health=1 could only report the contradiction;
+// the fix is that the funnel cannot produce one.
+
+test("a failed attempt after a success records the failure, not the old success",
+  async () => {
+    const w = loadWorker();
+    const stored = {
+      state: "sent", kind: "delivered", edition: "fresh",
+      ntfy_sent_at: "2026-10-13T01:40:03Z",
+      first_ntfy_sent_at: "2026-10-13T01:40:03Z",
+    };
+    const got = w.enforceLedgerHonesty(Object.assign(
+      {}, stored,
+      { state: "failed", ntfy_failed: true, http_status: 429,
+        attempts: 3, error: "rate limited" }),
+      { date: TODAY, slot: SLOT, patch: {} });
+    assert.strictEqual(got.state, "failed",
+      "a verified failure did not downgrade the record: " + JSON.stringify(got));
+    assert.strictEqual(got.edition, "failed",
+      "the row kept the earlier success's edition beside a failed push: " +
+      JSON.stringify(got.edition));
+    assert.strictEqual(got.ntfy_sent_at, undefined,
+      "a push instant survived beside a failed push: " +
+      JSON.stringify(got.ntfy_sent_at));
+  });
+
+test("a stale edition in a patch cannot survive the merge", async () => {
+  // THE 2026-10-28 EVENING SHAPE, exactly: the patch carries the field, and the
+  // field is wrong, because it was copied from an earlier failed attempt.
+  const w = loadWorker();
+  const got = w.enforceLedgerHonesty({
+    state: "sent", kind: "unsummarised", edition: "failed",
+    ntfy_sent_at: "2026-10-28T13:36:50Z",
+  }, {
+    date: TODAY, slot: SLOT, patch: {},
+  });
+  assert.strictEqual(got.state, "sent");
+  assert.strictEqual(got.kind, "unsummarised");
+  assert.strictEqual(got.edition, "unsummarised",
+    "a caller's cached edition outlived the state and kind merged beside it, " +
+    "so the record contradicts itself: " + JSON.stringify(got.edition));
+});
+
+test("a superseded slot reports the full edition that replaced the degraded one",
+  async () => {
+    // THE SUPERSEDE RECORDS TWO PUSHES. `ntfy_sent_at` is the degraded push the
+    // owner first received; `ntfy_full_sent_at` is the complete AI edition that
+    // replaced it. health must name the one the phone now shows, and must say
+    // the other one was replaced rather than pretending it never happened.
+    const w = loadWorker();
+    const row = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: {
+        state: "sent",
+        kind: "delivered",
+        edition: "fresh",
+        ntfy_sent_at: "2026-10-13T01:30:00Z",
+        first_ntfy_sent_at: "2026-10-13T01:30:00Z",
+        ntfy_full_sent_at: "2026-10-13T03:10:00Z",
+        full_sequence_id: "dmn-2026-10-13-morning-full",
+        superseded_kind: "unsummarised",
+      } } },
+    });
+    assert.strictEqual(row.edition, "fresh");
+    assert.strictEqual(row.fresh_edition, true,
+      "a slot replaced by a complete digest is still reported degraded");
+    assert.strictEqual(row.edition_disagreement, null);
+    assert.strictEqual(row.ntfy_sent_at, "2026-10-13T03:10:00Z",
+      "health named the replaced push as the latest one: " +
+      JSON.stringify(row.ntfy_sent_at));
+    assert.match(String(row.reason), /03:10:00Z/,
+      "the reason does not name the push health shows: " +
+      JSON.stringify(row.reason));
+    assert.match(String(row.reason), /replacing the degraded push at 2026-10-13T01:30:00Z/,
+      "the reason hides that the slot was first served something degraded: " +
+      JSON.stringify(row.reason));
+  });
+
+test("a superseded slot is still the newest delivery, by its full push", async () => {
+  // Selection used to key on `ntfy_sent_at`, so a slot whose NEWEST push was the
+  // supersede could be ranked behind a slot that has not been touched since.
+  const w = loadWorker();
+  const row = w.latestLedgerDelivery({
+    days: {
+      "2026-10-12": { evening: {
+        state: "sent", kind: "delivered", ntfy_sent_at: "2026-10-12T13:40:00Z" } },
+      [TODAY]: { [SLOT]: {
+        state: "sent", kind: "delivered", edition: "fresh",
+        ntfy_sent_at: "2026-10-13T01:30:00Z",
+        ntfy_full_sent_at: "2026-10-13T03:10:00Z" } },
+    },
+  });
+  assert.strictEqual(row.date, TODAY,
+    "the superseded slot was not recognised as the newest: " +
+    JSON.stringify([row.date, row.slot]));
+});

@@ -2811,6 +2811,14 @@ function enforceLedgerHonesty(entry, update) {
     if (out.error) delete out.error;
     if (out.honesty_downgraded_at) delete out.honesty_downgraded_at;
   }
+  // DERIVED HERE, ONCE, AFTER EVERY CORRECTION. `edition` is a function of
+  // `state` and `kind`, so a caller that passes it is passing a cached answer
+  // that this funnel's own merge can invalidate: an earlier attempt's
+  // `edition: "failed"` merged under a later `state: sent, kind: unsummarised`
+  // patch left a record that contradicted itself, and ?health=1 could only
+  // report the contradiction. Recomputing it at the write makes that shape
+  // impossible for every caller, including the Actions arm's own merge.
+  out.edition = deliveryEdition(out);
   return out;
 }
 
@@ -4969,12 +4977,15 @@ function latestLedgerDelivery(ledger) {
     for (const slot of Object.keys(day)) {
       const entry = day[slot];
       if (!entry || typeof entry !== "object") continue;
-      // THE SAME THREE INSTANTS `reason`, `delta_s` and `ntfy_sent_at` read. A
+      // THE SAME INSTANTS `reason`, `delta_s` and `ntfy_sent_at` read. A
       // row that recorded its push only as `first_ntfy_sent_at` used to be
       // INVISIBLE here, so health fell back to an older row and reported it as
       // the last delivery — a stale edition presented as the newest one.
+      // `ntfy_full_sent_at` leads because it is the NEWEST push of the slot: a
+      // degraded push that a full edition replaced is not what the owner holds.
       const at = Date.parse(String(
-        entry.ntfy_sent_at || entry.first_ntfy_sent_at || entry.pending_at || ""));
+        entry.ntfy_full_sent_at || entry.ntfy_sent_at ||
+        entry.first_ntfy_sent_at || entry.pending_at || ""));
       if (Number.isFinite(at) && at >= bestAt) {
         bestAt = at;
         best = entry;
@@ -4988,7 +4999,11 @@ function latestLedgerDelivery(ledger) {
     best.first_ntfy_sent_at || best.ntfy_sent_at,
     Date.parse(String(best.scheduled_instant || "")));
   const seen = storedEdition(best);
-  const pushInstant = best.first_ntfy_sent_at || best.ntfy_sent_at || null;
+  // The NEWEST push of this slot. `ntfy_full_sent_at` is what a supersede
+  // records, and a slot whose degraded push was replaced by a full edition must
+  // not keep naming the replaced push as the latest thing that went out.
+  const pushInstant = best.ntfy_full_sent_at || best.ntfy_sent_at ||
+    best.first_ntfy_sent_at || null;
   // A RECORDED DATE IS A FACT AND IS NEVER DROPPED. This used to be nulled
   // unless the derived edition was "fallback", which deleted the one field that
   // explained why ?health=1 still looked unhappy.
@@ -5023,11 +5038,12 @@ function latestLedgerDelivery(ledger) {
     last_good_shown: lastGood,
     reason: honestDeliveryReason(best),
     sequence_id: best.sequence_id || null,
-    // The SAME instant `reason` names, and the STORED `ntfy_sent_at` wins when
-    // the row has both. A row that recorded its push only as
-    // `first_ntfy_sent_at` used to report `null` here while the reason beside it
-    // said "a push landed at ...", one response contradicting itself.
-    ntfy_sent_at: best.ntfy_sent_at || best.first_ntfy_sent_at || null,
+    // The SAME instant `reason` names, and the NEWEST push of the slot wins. A
+    // row that recorded its push only as `first_ntfy_sent_at` used to report
+    // `null` here while the reason beside it said "a push landed at ...", one
+    // response contradicting itself; a superseded slot used to name the push the
+    // full edition had already replaced.
+    ntfy_sent_at: pushInstant,
     delta_s: delta,
     // Same window as the ledger writer above and `_delta_s` in
     // scripts/delivery_ledger.py: negative is early, never on time.
@@ -5052,8 +5068,11 @@ function honestDeliveryReason(entry) {
   const e = entry || {};
   const state = String(e.state || "");
   // The SAME order `latestLedgerDelivery` renders under `ntfy_sent_at`: the
-  // reason must name the instant the field beside it shows.
-  const pushInstant = String(e.ntfy_sent_at || e.first_ntfy_sent_at || "");
+  // reason must name the instant the field beside it shows, and the newest push
+  // of the slot is the full edition when a supersede recorded one.
+  const fullInstant = String(e.ntfy_full_sent_at || "");
+  const pushInstant = String(fullInstant || e.ntfy_sent_at ||
+    e.first_ntfy_sent_at || "");
 
   // A REASON MUST DESCRIBE THE STATE IT SITS BESIDE. The 2026-10-28 morning row
   // carries `state: sent` and a push instant, and used to publish "a build was
@@ -5068,8 +5087,18 @@ function honestDeliveryReason(entry) {
     // The disagreement sentence already names the stored value, so it is used
     // INSTEAD of a second "the row records edition ..." clause rather than after
     // it: one sentence per fact, or the reason reads like two readers arguing.
-    return "sent | a push landed at " + pushInstant + " | " +
-      (seen.disagreement || "the row records edition '" + seen.edition + "'");
+    const editionClause = seen.disagreement ||
+      "the row records edition '" + seen.edition + "'";
+    // A SUPERSEDE IS TWO PUSHES AND THE PHONE SHOWS THE SECOND ONE. Saying only
+    // "a push landed at <full>" hides that the slot was first served something
+    // degraded; saying only the degraded instant names a push the full edition
+    // replaced. Both facts, once.
+    const replaced = fullInstant && e.ntfy_sent_at &&
+      String(e.ntfy_sent_at) !== fullInstant
+      ? " (replacing the degraded push at " + String(e.ntfy_sent_at) + ")"
+      : "";
+    return "sent | a push landed at " + pushInstant + replaced + " | " +
+      editionClause;
   }
   if (state === STATE_PENDING) {
     return "pending | a push was started and its outcome was not recorded yet";

@@ -163,25 +163,39 @@ def run_node(script):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-#: The ledger-state and ledger-kind constants `enforceLedgerHonesty` reaches for,
-#: stubbed exactly as the Worker defines them.
+#: The ledger-state and ledger-kind constants `enforceLedgerHonesty` and the
+#: `deliveryEdition` it now ends by calling reach for, stubbed exactly as the
+#: Worker defines them.
 HONESTY_PRELUDE = """
 const STATE_SENT = "sent";
 const STATE_FAILED = "failed";
+const STATE_PENDING = "pending";
 const KIND_DELIVERED = "delivered";
 const KIND_PARTIAL = "partial";
 const KIND_UNSUMMARISED = "unsummarised";
+const KIND_FALLBACK_LAST_GOOD = "fallback_last_good";
+const KIND_UNAVAILABLE = "unavailable";
+const KIND_DUPLICATE_SUPPRESSED = "duplicate_suppressed";
+const DELIVERY_KIND_STOOD_DOWN = "stood_down";
 function isoUtc(ms) { return new Date(ms).toISOString().replace(/\\.\\d{3}Z$/, "Z"); }
 """
 
 
 def call_honesty(entry):
-    """Run the shipped `enforceLedgerHonesty` over `entry`; return the result."""
-    script = HONESTY_PRELUDE + extract_js_function("enforceLedgerHonesty") + """
+    """Run the shipped `enforceLedgerHonesty` over `entry`; return the result.
+
+    `deliveryEdition` comes along because the shipped function now ENDS by
+    calling it: the derived `edition` is written by the same function that
+    corrects the state, so a slice that left it out would fail with
+    `deliveryEdition is not defined` rather than testing anything.
+    """
+    script = (HONESTY_PRELUDE
+              + extract_js_function("deliveryEdition")
+              + extract_js_function("enforceLedgerHonesty") + """
 const entry = %s;
 const out = enforceLedgerHonesty(entry, {date: "2026-10-14", slot: "evening"});
 console.log(JSON.stringify(out));
-""" % json.dumps(entry)
+""" % json.dumps(entry))
     return run_node(script)
 
 

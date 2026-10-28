@@ -34,7 +34,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from tests.digest.test_duplicate_detector import ActionsHarness
+from tests.digest.test_duplicate_detector import ActionsHarness, SLOT, TODAY
 
 
 class TheRecordedKindIsWhatWasBuiltTests(ActionsHarness):
@@ -111,6 +111,139 @@ class TheRecordedKindIsWhatWasBuiltTests(ActionsHarness):
             "as kind=%r, which would make the sealer supersede a complete "
             "edition and the health page call a fresh digest degraded: %r"
             % (entry.get("kind"), entry))
+
+
+class TheRecordedEditionIsWhatWasBuiltTests(ActionsHarness):
+    """`edition` is DERIVED at the write, so the newest attempt always wins.
+
+    THE DEFECT THIS FILE'S SECOND HALF EXISTS FOR. `kv_record_delivery` merges
+    its patch onto whatever the slot already records and wrote `state`/`kind`
+    but never `edition`. The 2026-10-28 evening row is the residue:
+
+        "state": "sent", "kind": "unsummarised", "edition": "failed"
+
+    A success inherited the failed edition of the attempt it replaced, and
+    ?health=1 could only report a contradiction it had no authority to resolve.
+    `edition` is a function of the two fields beside it, so it is computed where
+    they are written -- after the honesty correction, never before it.
+    """
+
+    def push(self, seed=None, env=None, **fields):
+        """Push with this payload onto this seeded slot; return STORED entry."""
+        self.payload.update(fields)
+        (self.tmp / "state" / "stories.validated.json").write_text(
+            json.dumps(self.payload), encoding="utf-8")
+        out = self.run_step(history_body="", seed_ledger=seed,
+                            env_overrides=env)
+        self.assertEqual(
+            1, len(self.posts),
+            "the push did not happen, so the record inspected below would "
+            "describe nothing:\n%s" % out)
+        entry = self.stored_slot_entry()
+        self.assertIsNotNone(
+            entry, "nothing was recorded in KV: %r" % (self.kv_ledger(),))
+        return entry
+
+    @staticmethod
+    def seeded(entry):
+        """A ledger whose slot already holds `entry` -- what a merge runs onto."""
+        return {"schema_version": 1, "as_of": "2026-10-28T11:00:00Z",
+                "days": {TODAY: {SLOT: entry}}}
+
+    def test_a_success_after_a_failure_clears_the_stale_failed(self):
+        """The 2026-10-28 evening shape, replayed forwards.
+
+        The slot holds a VERIFIED failure from an earlier attempt. This run's
+        push succeeds, so the record must stop calling the edition failed -- the
+        success is the newest fact and the only one the owner's phone agrees
+        with.
+        """
+        seed = self.seeded({
+            "state": "failed", "kind": "fallback_last_good", "edition": "failed",
+            "ntfy_failed": True, "http_status": 429, "attempts": 3,
+            "pending_at": "2026-10-28T11:00:00Z",
+        })
+        entry = self.push(seed=seed, source_health={"state": "ok"})
+        self.assertEqual("sent", entry.get("state"), entry)
+        self.assertEqual(
+            "fresh", entry.get("edition"),
+            "a success inherited the earlier attempt's failed edition: %r"
+            % (entry,))
+        self.assertNotIn(
+            "ntfy_failed", entry,
+            "the earlier attempt's verified failure survived a success: %r"
+            % (entry,))
+
+    def test_an_unsummarised_build_records_edition_unsummarised(self):
+        entry = self.push(seed=None, edition_kind="unsummarised",
+                          source_health={"state": "ok"})
+        self.assertEqual("unsummarised", entry.get("kind"), entry)
+        self.assertEqual(
+            "unsummarised", entry.get("edition"),
+            "a no-AI edition was recorded with edition=%r, which is the field "
+            "?health=1 reads to decide whether the owner got TODAY's news: %r"
+            % (entry.get("edition"), entry))
+
+    def test_a_degraded_build_after_a_success_records_the_degradation(self):
+        """The mirror, and the direction that under-claims if it is wrong.
+
+        A slot already records a complete digest; this run pushes an
+        unsummarised one. The record must describe the NEWEST push, not keep the
+        flattering one: the phone is showing headlines, not AI summaries.
+
+        THE SEED CARRIES NO `ntfy_sent_at`, DELIBERATELY. With one, the
+        duplicate guard stands down and pushes nothing -- which is the correct
+        behaviour for a slot that already went out, and is pinned next door in
+        tests/digest/test_duplicate_detector.py. The seed here is the slot whose
+        instant was LOST (the 2026-10-26 evening shape: the message was on the
+        topic and KV still read `pending`), which is the case where a second
+        push really happens.
+        """
+        seed = self.seeded({
+            "state": "pending", "kind": "delivered", "edition": "fresh",
+            "sequence_id": "dmn-2026-10-13-morning",
+            "pending_at": "2026-10-28T11:00:00Z",
+        })
+        entry = self.push(seed=seed, edition_kind="unsummarised",
+                          source_health={"state": "ok"})
+        self.assertEqual("unsummarised", entry.get("kind"), entry)
+        self.assertEqual(
+            "unsummarised", entry.get("edition"),
+            "the slot kept the earlier success's edition beside a degraded "
+            "push: %r" % (entry,))
+
+    def test_the_supersede_records_what_it_pushed_not_what_it_replaced(self):
+        """A supersede is a SECOND push, and the phone shows the second one.
+
+        `record_delivery` used to write only `ntfy_full_sent_at` and drop the
+        `pushed_kind` it was handed, so a slot replaced by a complete AI edition
+        kept reading `kind: partial` for the rest of the day. The replaced kind
+        is moved aside, never erased.
+        """
+        seed = self.seeded({
+            "state": "sent", "kind": "partial", "edition": "partial",
+            "sequence_id": "dmn-2026-10-13-morning",
+            "ntfy_sent_at": "2026-10-28T11:00:00Z",
+            "first_ntfy_sent_at": "2026-10-28T11:00:00Z",
+        })
+        entry = self.push(seed=seed, env={"TRIGGER_SOURCE": "supersede"},
+                          source_health={"state": "ok"})
+        self.assertIn("ntfy_full_sent_at", entry, entry)
+        self.assertEqual(
+            "delivered", entry.get("kind"),
+            "the supersede left the slot describing the degraded push it "
+            "replaced: %r" % (entry,))
+        self.assertEqual(
+            "fresh", entry.get("edition"),
+            "a slot replaced by a complete digest is still recorded degraded: %r"
+            % (entry,))
+        self.assertEqual(
+            "partial", entry.get("superseded_kind"),
+            "the replaced kind was erased instead of kept: %r" % (entry,))
+        self.assertEqual(
+            "2026-10-28T11:00:00Z", entry.get("ntfy_sent_at"),
+            "the supersede wrote ntfy_sent_at, which the duplicate guard reads "
+            "as 'this slot already went out': %r" % (entry,))
 
 
 if __name__ == "__main__":
