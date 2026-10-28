@@ -7530,6 +7530,41 @@ class ActionsBudgetTests(unittest.TestCase):
         print("check 21: the Worker's enforcement switch is %r (%s)"
               % (enforcement.get("enabled"), enforcement.get("reason")))
 
+    def test_the_record_describes_the_state_its_switch_is_in(self):
+        """The prose must not contradict the switch it sits beside.
+
+        `_doc` still said "This repository is private, so every job bills" and
+        "the sentinel still warns/freezes/fails at 80/90/100%" after the
+        repository became public and `enabled` became false. A reader trusts prose
+        before YAML keys, so the words are gated too: PUBLIC, standard runners
+        FREE, nothing BILLED, and the projection described as a recomputed record
+        rather than a bill. Only the prose moved -- every number is untouched.
+        """
+        check = _load_budget_checker()
+        budget = check.load_budget()
+        flat = " ".join(" ".join(str(line) for line in budget["_doc"]).split())
+
+        self.assertNotIn(
+            "This repository is private", flat,
+            "config/actions-budget.json still describes a private, billing "
+            "repository while `enforcement.enabled` is false")
+        self.assertNotIn(
+            "still warns/freezes/fails", flat,
+            "the record still claims the sentinel acts at 80/90/100% while the "
+            "switch that decides whether it acts is false")
+        for phrase in ("This repository is now PUBLIC",
+                       "standard runners are free",
+                       "no minute is billed",
+                       "still recomputed on every run"):
+            self.assertIn(
+                phrase, flat,
+                "the record does not say %r, so its prose still reads as a bill:\n%s"
+                % (phrase, flat))
+        self.assertFalse(
+            bool((budget.get("enforcement") or {}).get("enabled")),
+            "this test describes the DISARMED record; re-read it if the switch is "
+            "re-armed rather than deleting the assertion")
+
     def test_a_one_sided_enforcement_flip_is_rejected(self):
         """MUTATION PROOF: flip the switch on ONE side and the gate must catch it.
 

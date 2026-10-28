@@ -50,16 +50,20 @@ name: Actions Budget Sentinel
 # `enforcement.enabled: false`. Flipping that flag back to true re-arms BOTH the
 # Worker's refusal and the 100% level below, because both read that one switch --
 # the same rule `scripts/check_actions_budget.py` applies statically.
+# THE LEVELS. WHICH ONES ACT DEPENDS ON THE SAME SWITCH.
+# DISARMED (`enforcement.enabled: false`, the shipped state) every level is
+# REPORT-ONLY: the numbers and a `::warning::` annotation, plus a REPORT-ONLY
+# line at 100%, and NOTHING is filed, no `budget-freeze` label is applied, and
+# no dispatch is shed. A freeze flag for minutes nobody is billed for is a false
+# alarm, and a guard that cries every day is one the owner learns to ignore.
+# ARMED, unchanged:
 #   80% of the CEILING -- issue + ntfy. Information: the month is trending over.
 #   90% of the CEILING -- issue labelled `budget-freeze` + ntfy. The FLAG. This is
 #                        the level that asks for a DECISION (pause discretionary
 #                        dispatches) while there is still headroom to act in.
-#   100% of the CEILING -- ARMED: ::error::, issue, and the job FAILS, on purpose.
-#                        A budget guard that cannot go red is a report.
-#                        DISARMED: the same numbers, a REPORT-ONLY line saying
-#                        standard runners are free on a public repository, no
-#                        issue, and exit 0. A free minute cannot be "over budget".
-#   below              -- prints the numbers and exits 0.
+#   100% of the CEILING -- ::error::, issue, and the job FAILS, on purpose. A
+#                        budget guard that cannot go red is a report.
+#   below              -- prints the numbers and exits 0, armed or not.
 #
 # A BROKEN MEASUREMENT IS STILL RED IN BOTH STATES. Unreadable run data exits 2
 # and a malformed config raises, because those say the number is UNKNOWN -- which
@@ -265,18 +269,24 @@ jobs:
           }[level]
           body = "%s\n\n%s\n\n%s\n" % (lead, detail, action)
 
-          if level == 100 and not enforced:
-              # The measured figures are already printed above; this says what
-              # they MEAN, so nobody reads "100% of the ceiling" as a bill.
-              print("REPORT-ONLY: the projected month is %.0f min against a hard "
-                    "ceiling of %.0f min (%+.0f min over)."
-                    % (projected, ceiling, projected - ceiling))
+          # ONE BRANCH FOR EVERY LEVEL WHILE DISARMED. 80/90 used to fall through
+          # to the issue and the `budget-freeze` label, which on a public
+          # repository flags a freeze on minutes nobody is billed for. This says
+          # the number and stops. Nothing below this point runs, so nothing is
+          # filed, labelled, notified or shed.
+          if not enforced:
+              if level == 100:
+                  # The measured figures are already printed above; this says
+                  # what they MEAN, so nobody reads "100% of the ceiling" as a bill.
+                  print("REPORT-ONLY: the projected month is %.0f min against a "
+                        "hard ceiling of %.0f min (%+.0f min over)."
+                        % (projected, ceiling, projected - ceiling))
               print("REPORT-ONLY: INFORMATIONAL, NOT A BLOCKER -- standard runners "
                     "are free on a public repository, so no minute is billed and no "
                     "allowance is exceeded. Nothing needs to change; "
                     "`enforcement.enabled` is false, which is why this workflow "
-                    "reports instead of failing. No issue is filed and no dispatch "
-                    "is shed.")
+                    "reports instead of acting. No issue is filed, no `budget-freeze` "
+                    "label is applied, and no dispatch is shed.")
               print("::warning::%s" % lead)
               sys.exit(0)
 

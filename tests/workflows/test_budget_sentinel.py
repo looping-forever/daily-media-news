@@ -10,11 +10,13 @@ ceiling, so the same month was red in one guard and green in the other.
 
 The two states are the contract, and they pull in opposite directions:
 
-  * DISARMED, over the ceiling -> the measured figures and the ceiling are
-    printed, an unmistakable REPORT-ONLY line says standard runners are free on a
-    public repository, nothing is filed, and the exit code is 0.
-  * ARMED, over the ceiling -> the old behaviour, unchanged: ::error::, the
-    issue, exit 1.
+  * DISARMED -> REPORT-ONLY AT EVERY LEVEL. At 80%, 90% and 100% of the ceiling
+    it prints the measured figures and a `::warning::` annotation, adds the
+    REPORT-ONLY line at 100%, files nothing, applies no `budget-freeze` label and
+    sheds nothing, and exits 0. A freeze label for minutes nobody is billed for
+    is a false alarm, and the 80/90 arms used to fall through to the issue.
+  * ARMED -> the old behaviour, unchanged: an issue at 80%, an issue carrying the
+    `budget-freeze` label at 90%, and ::error:: plus the issue plus exit 1 at 100%.
 
 A BROKEN MEASUREMENT IS NOT A BUDGET BREACH. Unreadable run data and a malformed
 config stay non-zero in BOTH states, because they say the number is UNKNOWN
@@ -36,6 +38,7 @@ A batch shim was the other option and was rejected: the script passes
 stub would have failed for a reason unrelated to the thing under test.
 """
 
+import datetime
 import json
 import os
 import re
@@ -88,12 +91,26 @@ _fake.run = _run
 _sys.modules["subprocess"] = _fake
 '''
 
-#: 8 runs x 1 job x 60 min = 480 min over the 7-day window. The shipped script
-#: projects that at 480/7*30 = 2057 min against a 1800 ceiling: level 100.
-RUNS = [{"databaseId": 100 + i, "workflowName": "daily-news.yml",
-         "createdAt": "2026-10-27T00:00:00Z"} for i in range(8)]
-JOBS = {"jobs": [{"started_at": "2026-10-27T00:00:00Z",
-                  "completed_at": "2026-10-27T01:00:00Z"}]}
+#: The level is a fraction of a 1800-minute ceiling, so the fixture is chosen by
+#: arithmetic, not by picking a number:
+#:   projected = runs * job_minutes / 7 * 30        (7-day window, 30-day month)
+#:   6 x 60 = 360 min -> 1543 projected -> 86% of 1800 -> level 80
+#:   7 x 55 = 385 min -> 1650 projected -> 92% of 1800 -> level 90
+#:   8 x 60 = 480 min -> 2057 projected -> 114% of 1800 -> level 100
+def make_runs(count):
+    return [{"databaseId": 100 + i, "workflowName": "daily-news.yml",
+             "createdAt": "2026-10-27T00:00:00Z"} for i in range(count)]
+
+
+def make_jobs(minutes):
+    started = datetime.datetime(2026, 10, 27, 0, 0, 0)
+    finished = started + datetime.timedelta(minutes=minutes)
+    return {"jobs": [{"started_at": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      "completed_at": finished.strftime("%Y-%m-%dT%H:%M:%SZ")}]}
+
+
+RUNS = make_runs(8)
+JOBS = make_jobs(60)
 
 BUDGET = {
     "included_minutes": 2000,
@@ -137,7 +154,8 @@ class SentinelCeilingTest(unittest.TestCase):
         budget.update(overrides or {})
         return budget
 
-    def _run(self, budget, run_list_rc=0, config_text=None):
+    def _run(self, budget, run_list_rc=0, config_text=None, runs=8,
+             job_minutes=60):
         """Run the extracted script in a temp cwd; return (rc, stdout, gh calls)."""
         tmp = tempfile.mkdtemp(prefix="dmnews-sentinel-")
         self.addCleanup(lambda: __import__("shutil").rmtree(tmp, ignore_errors=True))
@@ -151,7 +169,7 @@ class SentinelCeilingTest(unittest.TestCase):
 
         fixture_path = os.path.join(tmp, "gh.json")
         with open(fixture_path, "w", encoding="utf-8") as handle:
-            json.dump({"runs": RUNS, "jobs": JOBS,
+            json.dump({"runs": make_runs(runs), "jobs": make_jobs(job_minutes),
                        "run_list_rc": run_list_rc}, handle)
         log_path = os.path.join(tmp, "gh-calls.log")
         open(log_path, "w").close()
@@ -203,6 +221,116 @@ class SentinelCeilingTest(unittest.TestCase):
             [line for line in calls if line.startswith("gh issue create")],
             "an issue was filed for a ceiling that is not enforced:\n%s"
             % "\n".join(calls))
+
+    def test_disarmed_at_eighty_percent_files_nothing(self):
+        """80% filed an "information" issue. Disarmed, a warning is all it is."""
+        done, calls = self._run(self._budget(False), runs=6, job_minutes=60)
+        out = done.stdout
+
+        self.assertEqual(
+            0, done.returncode,
+            "the sentinel failed at the 80%% level with enforcement OFF:\n%s\n%s"
+            % (out, done.stderr))
+        self.assertIn("80% of it", out,
+                      "the run never reached the 80%% level, so this test proved "
+                      "nothing:\n%s" % out)
+        self.assertIn("REPORT-ONLY", out,
+                      "a disarmed 80%% run did not say REPORT-ONLY:\n%s" % out)
+        self.assertIn("::warning::", out,
+                      "report-only must still warn; it must not go silent:\n%s" % out)
+        self.assertFalse(
+            [line for line in calls if line.startswith("gh issue")],
+            "a disarmed 80%% run still talked to the issue API, so it is not "
+            "report-only:\n%s" % "\n".join(calls))
+        # Checked on the CALLS, not on stdout: the REPORT-ONLY sentence names the
+        # label it is promising not to apply, so a stdout scan cannot tell
+        # "explained" from "applied".
+        joined = "\n".join(calls)
+        self.assertNotIn(
+            "--label", joined,
+            "a disarmed run must label nothing, and `--label` reaches gh only "
+            "when an issue is created:\n%s" % joined)
+        self.assertNotIn(
+            "budget-freeze", joined,
+            "a disarmed 80%% run applied a freeze label:\n%s" % joined)
+        # Notifying is an ACT too: the disarmed path must exit before it, and an
+        # unset-topic run would say so on the way past.
+        self.assertNotIn("NTFY secrets unset", out,
+                         "the disarmed path reached the notification block:\n%s"
+                         % out)
+
+    def test_disarmed_at_ninety_percent_applies_no_freeze_label(self):
+        """90% is the level that freezes. While disarmed it must not."""
+        done, calls = self._run(self._budget(False), runs=7, job_minutes=55)
+        out = done.stdout
+
+        self.assertEqual(
+            0, done.returncode,
+            "the sentinel failed at the 90%% level with enforcement OFF:\n%s\n%s"
+            % (out, done.stderr))
+        self.assertIn("90% of it", out,
+                      "the run never reached the 90%% level, so this test proved "
+                      "nothing:\n%s" % out)
+        self.assertIn("REPORT-ONLY", out, out)
+        self.assertFalse(
+            [line for line in calls if line.startswith("gh issue")],
+            "a disarmed 90%% run still filed/queried issues:\n%s" % "\n".join(calls))
+        joined = "\n".join(calls)
+        self.assertNotIn(
+            "--label", joined,
+            "a disarmed run must label nothing:\n%s" % joined)
+        self.assertNotIn(
+            "budget-freeze", joined,
+            "a disarmed 90%% run applied the freeze label, which is exactly the "
+            "freeze it is not allowed to ask for:\n%s" % joined)
+        self.assertNotIn("NTFY secrets unset", out,
+                         "the disarmed path reached the notification block:\n%s"
+                         % out)
+
+    def test_armed_at_eighty_percent_files_a_plain_issue(self):
+        """ARMED 80% is unchanged: the issue, with no freeze label on it."""
+        done, calls = self._run(self._budget(True), runs=6, job_minutes=60)
+        created = [line for line in calls if line.startswith("gh issue create")]
+        # The body carries newlines, so the stub's one-line-per-call log splits
+        # the create into several entries and `--label` is NOT on the first one.
+        # Joining is what makes the label visible at all.
+        joined = "\n".join(calls)
+
+        self.assertEqual(
+            0, done.returncode,
+            "the armed 80%% level must not fail the job:\n%s\n%s"
+            % (done.stdout, done.stderr))
+        self.assertTrue(created,
+                        "the armed 80%% run filed no issue:\n%s" % joined)
+        self.assertIn("at 80% of the hard ceiling", created[0], created[0])
+        self.assertIn("--label actions-budget", joined,
+                      "the armed 80%% issue lost its plain label:\n%s" % joined)
+        # The LABEL TOKEN, never the bare word: the 90% issue body itself says
+        # "reports this issue's `budget-freeze` label", so a word search matches
+        # prose and passes even when no label was applied.
+        self.assertNotIn(
+            "--label actions-budget,budget-freeze", joined,
+            "the freeze label leaked down to the 80%% level:\n%s" % joined)
+
+    def test_armed_at_ninety_percent_still_files_the_freeze_label(self):
+        """ARMED 90% is unchanged: the issue the Worker reads for the freeze."""
+        done, calls = self._run(self._budget(True), runs=7, job_minutes=55)
+        created = [line for line in calls if line.startswith("gh issue create")]
+        joined = "\n".join(calls)
+
+        self.assertEqual(
+            0, done.returncode,
+            "the armed 90%% level must not fail the job:\n%s\n%s"
+            % (done.stdout, done.stderr))
+        self.assertTrue(created,
+                        "the armed 90%% run filed no issue:\n%s" % joined)
+        self.assertIn("at 90% of the hard ceiling", created[0], created[0])
+        # The LABEL TOKEN, not the bare word: the body for 90% names the label
+        # too, so this can only be proved by the argument gh was handed.
+        self.assertIn(
+            "--label actions-budget,budget-freeze", joined,
+            "the armed 90%% issue lost the `budget-freeze` label the Worker reads "
+            "on ?health=1:\n%s" % joined)
 
     def test_armed_over_the_ceiling_still_fails_unchanged(self):
         """Flipping the switch back must re-arm the old red, exactly as before."""
