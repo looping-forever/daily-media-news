@@ -30,6 +30,9 @@ import contextlib
 import io
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -42,6 +45,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import model_selector as ms  # noqa: E402
+
+try:
+    from tests import workflows as W
+except ImportError:  # pragma: no cover - direct execution of this file
+    sys.path.insert(0, str(REPO_ROOT))
+    from tests import workflows as W
+
+#: `python3`, replaced by a shim: Windows ships no `python3` that Git-for-Windows
+#: bash can execute, and the step's read-back check is real Python. It must run
+#: for real -- asserting that the text mentions json.load proves nothing.
+_PY3_SHIM = r"""#!/usr/bin/env bash
+exec "${STUB_REAL_PYTHON:?}" "$@"
+"""
 
 PROVIDER = "opencode"
 #: Stands for any id the catalogue advertised and the endpoint did not serve.
@@ -372,14 +388,15 @@ class CommittedCooldownTests(unittest.TestCase):
     """The veto is worthless unless the file is IN git.
 
     WHY THIS EXISTS. The cooldown was written on the runner and published by the
-    step `Commit state changes` -- which carries no `always()`, so every run that
+    step `Commit state changes` -- which carried no `always()`, so every run that
     RECORDED a dead id also failed the walk, and the file died with the
     container. On 2026-10-27 the repository held no `state/model_cooldown.json`
     at all (`git ls-files` and `git check-ignore` both confirmed it), so the same
     three ids were discovered, ranked and tried again on every run -- three
     attempts of a twelve-attempt walk, exactly the waste the veto was built for.
-    The file is committed now, and this test keeps it honest DATA rather than a
-    file that silently stops vetoing anything.
+    The file is committed now, and it is published by `Persist model cooldowns`,
+    which runs on `always()` (see PersistedCooldownStepTests). The test below
+    keeps it honest DATA rather than a file that silently stops vetoing anything.
     """
 
     PATH = REPO_ROOT / "state" / ms.COOLDOWN_FILENAME
@@ -424,6 +441,289 @@ class CommittedCooldownTests(unittest.TestCase):
                 ms.on_hard_cooldown(doc, model, 4_102_444_800.0),  # 2100-01-01
                 "%r would still be vetoed in 2100 -- that is a blacklist, and a "
                 "blacklist never re-tests an id that came back" % (model,))
+
+
+class PersistedCooldownStepTests(unittest.TestCase):
+    """The cooldown has to outlive the FAILURE that created it.
+
+    WHY THIS EXISTS. Run 40658585532 recorded the shared-pool refusal correctly
+    and then lost it: the only step that committed state was `Commit state
+    changes`, which carries no `always()`, so the run that recorded a cooldown --
+    usually the run that died on that cooldown -- skipped it. origin/master never
+    saw the `pool` row, and every other workflow went on burning the bucket. Run
+    40539483837 lost three `model_not_found` vetoes the same way.
+
+    So the publishing step must (a) run on `always()`, (b) be placed AFTER the
+    walk that writes the file, (c) stage that one path by explicit name, and
+    (d) never commit a file it could not read back. The last two are EXECUTED
+    against a real git repository, because both are easy to satisfy in a comment
+    and get wrong in a shell.
+    """
+
+    WORKFLOWS = ("daily-news.yml", "breaking-monitor.yml")
+    STEP = "Persist model cooldowns"
+    STATE = "state/model_cooldown.json"
+
+    # -- helpers -----------------------------------------------------------
+
+    def _step(self, wf):
+        for job, name, run, st in W.iter_run_blocks(wf):
+            if name == self.STEP:
+                return job, run, st
+        self.fail(
+            "%s has no `run:` step named %r. The walk that records a cooldown is "
+            "usually the walk that fails, and a persisting step without "
+            "`if: always()` never runs on the runs that need it."
+            % (wf, self.STEP))
+
+    def _ordered_steps(self, wf):
+        doc = W.load_workflow(wf)
+        out = []
+        for job, steps in ((doc.get("jobs") or {}).items()):
+            if not isinstance(steps, dict):
+                continue
+            for step in (steps.get("steps") or []):
+                if isinstance(step, dict):
+                    out.append(str(step.get("name") or ""))
+        return out
+
+    def _must(self, cwd, *args):
+        env = dict(os.environ)
+        env.update({"GIT_AUTHOR_NAME": "cooldown",
+                    "GIT_AUTHOR_EMAIL": "cooldown@example.invalid",
+                    "GIT_COMMITTER_NAME": "cooldown",
+                    "GIT_COMMITTER_EMAIL": "cooldown@example.invalid"})
+        proc = subprocess.run(
+            ["git", "-c", "init.defaultBranch=master"] + list(args),
+            cwd=str(cwd), capture_output=True, text=True,
+            encoding="utf-8", errors="replace", env=env, timeout=120)
+        if proc.returncode != 0:
+            self.fail("git %s failed in %s (exit %d):\n%s\n%s"
+                      % (" ".join(args), cwd, proc.returncode,
+                         proc.stdout, proc.stderr))
+        return proc
+
+    def _repo(self, name):
+        """A throwaway clone of a bare origin, seeded with a cooldown file."""
+        origin = self.tmp / (name + "-origin.git")
+        work = self.tmp / (name + "-work")
+        self._must(self.tmp, "init", "-q", "--bare", str(origin))
+        self._must(self.tmp, "clone", "-q", str(origin), str(work))
+        self._must(work, "config", "user.name", "cooldown")
+        self._must(work, "config", "user.email", "cooldown@example.invalid")
+        self._must(work, "config", "commit.gpgsign", "false")
+        (work / "state").mkdir()
+        self._write(work, {"schema_version": 1, "models": {}})
+        (work / "notes.txt").write_text("seed\n", encoding="utf-8")
+        self._must(work, "add", self.STATE, "notes.txt")
+        self._must(work, "commit", "-q", "-m", "seed")
+        self._must(work, "push", "-q", "origin", "master")
+        return origin, work
+
+    def _write(self, work, doc):
+        path = work / self.STATE
+        with open(path, "w", encoding="utf-8") as fh:
+            if isinstance(doc, str):
+                fh.write(doc)
+            else:
+                json.dump(doc, fh, indent=2)
+                fh.write("\n")
+
+    def _remote(self, origin):
+        """The cooldown as origin/master holds it, or None if it is not there."""
+        proc = self._must(origin, "show", "master:%s" % self.STATE)
+        return json.loads(proc.stdout)
+
+    def _run(self, wf, work):
+        _job, body, _st = self._step(wf)
+        env = {
+            "PATH": str(self.bin_dir) + os.pathsep + os.environ.get("PATH", ""),
+            "STUB_REAL_PYTHON": sys.executable,
+            # EMPTY, not absent: the step must take its unauthenticated branch
+            # (a local-path origin needs no credential) and say so, rather than
+            # failing on an unset variable.
+            "GITHUB_TOKEN": "",
+        }
+        return W.run_bash_script(body, env_overrides=env, cwd=str(work),
+                                 bash=self.bash, timeout=120)
+
+    def setUp(self):
+        self.bash = W.bash_executable()
+        if self.bash is None:
+            self.fail(
+                "bash was not found on PATH, so the cooldown-persisting step "
+                "CANNOT be executed. This fails instead of skipping on purpose: "
+                "a skipped test here reports green while the one path that saves "
+                "a cooldown has still never run.")
+        self.tmp = Path(tempfile.mkdtemp(prefix="cooldown-step-"))
+        self.addCleanup(shutil.rmtree, str(self.tmp), True)
+        self.bin_dir = self.tmp / "bin"
+        W.install_stub_on_path(self.bin_dir, _PY3_SHIM, name="python3")
+
+    # -- the step, statically ----------------------------------------------
+
+    def test_the_persisting_step_runs_after_a_failed_walk(self):
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                _job, run, st = self._step(wf)
+                self.assertIn(
+                    "always()", str(st.get("if") or ""),
+                    "%s / %r must carry `if: always()`: without it the step is "
+                    "skipped exactly when a failed walk recorded a cooldown"
+                    % (wf, self.STEP))
+                self.assertEqual(
+                    "true", str(st.get("continue-on-error")).lower(),
+                    "an `always()` step that can fail a finished job is Bug B's "
+                    "shape (Check 7). Losing the file is a warning, not a red run")
+                self.assertIn(
+                    "secrets.GITHUB_TOKEN",
+                    str((st.get("env") or {}).get("GITHUB_TOKEN") or ""),
+                    "the checkout persists no credentials, so this step needs "
+                    "the token in its own env: block")
+                self.assertIn("auth=(", run,
+                              "the step must build the `git -c` auth argument")
+
+    def test_the_persisting_step_comes_after_the_walk_that_writes_it(self):
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                names = self._ordered_steps(wf)
+                self.assertIn(
+                    self.STEP, names,
+                    "%s has no step named %r" % (wf, self.STEP))
+                persist = names.index(self.STEP)
+                writers = [i for i, name in enumerate(names)
+                           if name in ("Run OpenCode agent",
+                                       "Run breaking news monitor")]
+                self.assertTrue(
+                    writers,
+                    "%s: no walk step found, so this ordering check is blind" % wf)
+                self.assertLess(
+                    max(writers), persist,
+                    "%s: %r is before the walk that writes the cooldown, so it "
+                    "would commit the previous run's file"
+                    % (wf, self.STEP))
+
+    def test_staging_is_by_explicit_name_only(self):
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                _job, run, _st = self._step(wf)
+                # Commands only: a comment that NAMES the forbidden form (this
+                # one warns against it) is not a command.
+                commands = "\n".join(
+                    line for line in run.splitlines()
+                    if line.strip() and not line.strip().startswith("#"))
+                adds = [line.strip() for line in commands.splitlines()
+                        if re.match(r"git add\b", line.strip())]
+                self.assertEqual(
+                    1, len(adds),
+                    "expected exactly one `git add`, found %r. Staging is by "
+                    "explicit name or it is a sweep." % (adds,))
+                self.assertEqual(
+                    'git add -- "$MODEL_STATE"', adds[0],
+                    "the single staging command must name the cooldown path")
+                self.assertIn(
+                    "MODEL_STATE=%s" % self.STATE, commands,
+                    "the step must name the one tracked model-state file")
+                for forbidden in ("git add -A", "git add --all", "git add -u",
+                                  "git add .", "git add state/",
+                                  "git add state ", "git commit -a",
+                                  "git commit -am"):
+                    self.assertNotIn(
+                        forbidden, commands,
+                        "%s: %r would sweep in whatever the workspace holds "
+                        "(including state/email.html), not just the cooldown"
+                        % (wf, forbidden))
+
+    # -- the step, executed ------------------------------------------------
+
+    def test_a_cooldown_written_by_a_failed_run_is_still_committed(self):
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                origin, work = self._repo(wf.replace(".yml", ""))
+                # The shape run 40658585532 recorded: a live shared-pool wall.
+                self._write(work, {
+                    "schema_version": 1,
+                    "models": {},
+                    "pool": {"until": "2026-10-28T08:56:56+00:00",
+                             "reason": "quota_or_rate_limited",
+                             "last_hit": "2026-10-28T08:41:56+00:00"},
+                })
+                proc = self._run(wf, work)
+                self.assertEqual(
+                    0, proc.returncode,
+                    "%s: the persisting step exited %d\n%s\n%s"
+                    % (wf, proc.returncode, proc.stdout, proc.stderr))
+                pushed = self._remote(origin)
+                self.assertIn(
+                    "pool", pushed,
+                    "%s: the pool row never reached origin/master -- this is "
+                    "the defect the step exists to remove" % wf)
+                self.assertEqual(
+                    "quota_or_rate_limited", pushed["pool"].get("reason"))
+                tip = self._must(origin, "log", "-1", "--format=%s", "master")
+                self.assertIn("persist model cooldown state", tip.stdout,
+                              "%s: the cooldown was not pushed as its own "
+                              "commit (tip: %r)" % (wf, tip.stdout.strip()))
+
+    def test_a_corrupt_cooldown_is_never_committed(self):
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                origin, work = self._repo(wf.replace(".yml", "") + "-corrupt")
+                before = self._must(origin, "rev-parse", "master").stdout.strip()
+                self._write(work, '{"models": ')
+                proc = self._run(wf, work)
+                self.assertEqual(
+                    0, proc.returncode,
+                    "%s: a corrupt file must not red the run\n%s\n%s"
+                    % (wf, proc.stdout, proc.stderr))
+                self.assertIn(
+                    "did not read back as a cooldown document", proc.stdout,
+                    "%s: the refusal must be LOUD, not a silent skip" % wf)
+                after = self._must(origin, "rev-parse", "master").stdout.strip()
+                self.assertEqual(
+                    before, after,
+                    "%s: a corrupt file was committed over a good one, which "
+                    "un-arms every veto it held" % wf)
+
+    def test_a_lost_rebase_race_logs_and_does_not_red_the_step(self):
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                origin, work = self._repo(wf.replace(".yml", "") + "-race")
+                other = self.tmp / (wf.replace(".yml", "") + "-other")
+                self._must(self.tmp, "clone", "-q", str(origin), str(other))
+                self._must(other, "config", "user.name", "cooldown")
+                self._must(other, "config", "user.email",
+                           "cooldown@example.invalid")
+                (other / "concurrent.txt").write_text("other writer\n",
+                                                     encoding="utf-8")
+                self._must(other, "add", "concurrent.txt")
+                self._must(other, "commit", "-q", "-m", "concurrent push")
+                self._must(other, "push", "-q", "origin", "master")
+                seed = self._remote(origin)
+
+                self._write(work, {
+                    "schema_version": 1, "models": {},
+                    "pool": {"until": "2026-10-28T08:56:56+00:00",
+                             "reason": "quota_or_rate_limited"},
+                })
+                # A dirty tracked file is what makes the rebase itself refuse;
+                # the remote commit above is the race it is refusing over.
+                with open(work / "notes.txt", "a", encoding="utf-8") as fh:
+                    fh.write("touched by an earlier step\n")
+
+                proc = self._run(wf, work)
+                self.assertEqual(
+                    0, proc.returncode,
+                    "%s: losing a race must be neutral, not a red run (exit %d)"
+                    "\n%s\n%s" % (wf, proc.returncode, proc.stdout, proc.stderr))
+                self.assertIn(
+                    "LOST THE COOLDOWN REBASE RACE", proc.stdout,
+                    "%s: the loss must be VISIBLE in the log; a silent loss is "
+                    "the defect this step exists to remove" % wf)
+                self.assertEqual(
+                    seed, self._remote(origin),
+                    "%s: the refused cooldown must not appear on origin/master "
+                    "by accident" % wf)
 
 
 class SharedPoolTests(unittest.TestCase):

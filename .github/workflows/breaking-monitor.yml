@@ -240,13 +240,11 @@ jobs:
           else
             echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
           fi
-          # state/model_cooldown.json IS STAGED because the pool wall is shared
-          # state, not this run's private note. The runner is ephemeral, so a
-          # cooldown written and not committed is re-learned on the next hourly
-          # run -- and the provider's Retry-After lands on UTC midnight, which is
-          # hours of hourly runs. daily-news.yml already commits this file; this
-          # is the other writer, which is why the rebase below resolves it.
-          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json state/model_cooldown.json; do
+          # state/model_cooldown.json is NOT staged here: the pool wall is shared
+          # state, so it is owned by "Persist model cooldowns" below, which runs
+          # on `always()` -- this step is skipped whenever the sweep itself
+          # fails, which is exactly the run that records a refusal.
+          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json; do
             if [ -f "$f" ]; then
               git add "$f"
             fi
@@ -259,16 +257,77 @@ jobs:
             if ! git "${auth[@]}" pull --ff-only; then
               echo "Fast-forward pull failed, attempting rebase..."
               # -X theirs for the same reason daily-news.yml uses it: the state
-              # files are deterministic and TWO workflows now write
-              # state/model_cooldown.json, so a concurrent digest commit can
-              # leave a one-key conflict that a plain rebase stalls on. The
-              # remote's copy wins; the next refusal rewrites the row.
+              # files here are deterministic generated records, so a concurrent
+              # digest commit touching the same paths leaves a conflict that a
+              # plain rebase stalls on and this step would then push nothing.
+              # The remote's copy wins; the next sweep rewrites its own rows.
               if ! git "${auth[@]}" pull --rebase -X theirs; then
                 echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
               fi
             fi
             git "${auth[@]}" push
           fi
+
+      - name: Persist model cooldowns
+        # THE COOLDOWN HAS TO OUTLIVE THE FAILURE THAT CREATED IT. Same defect as
+        # daily-news.yml's: the shared-pool refusal is recorded by the sweep, and
+        # `Commit breaking state` above is skipped when that sweep fails, so the
+        # one file built to stop the next hourly run from burning the same bucket
+        # died with the container. Runs on `always()`, and is the only writer of
+        # the cooldown file in this workflow.
+        #
+        # `continue-on-error: true` keeps Check 7's rule honest: losing the file
+        # costs one re-learned refusal, while failing the job after the real work
+        # is done costs the owner the signal about what actually broke.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          # THE ONLY TRACKED MODEL-STATE FILE. state/model_health.json and
+          # state/model_cache.json sit beside it, but both are gitignored runtime
+          # caches and are never force-added. Staging is by explicit name --
+          # `git add -A` or `git add state/` would sweep in every preview file
+          # this workspace holds.
+          MODEL_STATE=state/model_cooldown.json
+          if [ ! -f "$MODEL_STATE" ]; then
+            echo "no $MODEL_STATE was written this run"
+            exit 0
+          fi
+          # READ IT BACK AND CHECK ITS SHAPE BEFORE STAGING: a torn or empty file
+          # committed over a good one un-arms every veto it held, silently.
+          if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); assert isinstance(d,dict) and isinstance(d.get("models",{}),dict) and isinstance(d.get("pool",{}),dict)' "$MODEL_STATE"; then
+            echo "::warning::$MODEL_STATE did not read back as a cooldown document -- not committing it"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          auth=()
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
+          else
+            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
+          fi
+          git add -- "$MODEL_STATE"
+          if git diff --staged --quiet -- "$MODEL_STATE"; then
+            echo "$MODEL_STATE unchanged; nothing to persist"
+            exit 0
+          fi
+          git commit -m "chore: persist model cooldown state [skip ci]" -- "$MODEL_STATE"
+          if ! git "${auth[@]}" pull --ff-only; then
+            echo "Fast-forward pull failed, attempting rebase (theirs wins on the shared cooldown file)..."
+            if ! git "${auth[@]}" pull --rebase -X theirs; then
+              git rebase --abort >/dev/null 2>&1 || true
+              echo "::warning::LOST THE COOLDOWN REBASE RACE: the rebase failed, so this run's cooldown was NOT pushed -- the next run re-learns it"
+              exit 0
+            fi
+          fi
+          if ! git "${auth[@]}" push; then
+            echo "::warning::LOST THE COOLDOWN PUSH RACE: the push was rejected, so this run's cooldown was NOT pushed -- the next run re-learns it"
+            exit 0
+          fi
+          echo "model cooldown state pushed"
 
       - name: Summarize run outcome
         # Reads the last row the script appended to state/breaking_log.json:
