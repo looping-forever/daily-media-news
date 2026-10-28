@@ -76,6 +76,27 @@ on:
           - full
           - prebuild
         default: full
+      simulate_pool_refusal:
+        # MANUAL ONLY, AND THE DECLARATION IS THE MECHANISM. This input lives
+        # under `workflow_dispatch.inputs`, so `schedule` cannot carry it at
+        # all: `github.event.inputs` is empty on a cron event, and the model
+        # step's script additionally refuses to honour it unless
+        # `github.event_name` is `workflow_dispatch`. Two independent reasons a
+        # scheduled run can never simulate a refusal.
+        #
+        # WHAT IT IS FOR. The unsummarised edition is the one path that only
+        # ever runs when the free pool is refusing, so it could not be exercised
+        # at all while the pool was answering. This makes it deterministic, and
+        # costs ZERO model calls: the model step stops before the ladder is even
+        # resolved, so no discovery request and no `opencode run` is made. It
+        # fails with the SAME shape a real pool wall produces (an attempt row
+        # classified `quota_or_rate_limited` and a non-zero exit), which is what
+        # makes the derive step fire through its REAL condition rather than a
+        # special case written for the test.
+        description: 'SIMULATION: fail the model walk as a shared-pool refusal (zero model calls). Manual dispatch only.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -1063,8 +1084,42 @@ jobs:
           DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
           TZ: Asia/Kathmandu
           CANDIDATES_PATH: ${{ github.workspace }}/state/candidates.json
+          # The simulation switch, read from `github.event.inputs` -- which only
+          # a workflow_dispatch populates -- and the event name beside it, so
+          # the script can refuse the flag on any other event. A cron run gets
+          # '' here and walks the models exactly as before.
+          SIMULATE_POOL_REFUSAL: ${{ github.event.inputs.simulate_pool_refusal }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -eo pipefail
+          # ---- SIMULATED POOL REFUSAL: MANUAL DISPATCH ONLY -------------------
+          # Stops BEFORE `resolve_ladder`, which is the first thing in this step
+          # that would reach the network (the selector discovers the live pool)
+          # and before any `opencode run`. Zero model calls, by construction:
+          # nothing below this block executes.
+          #
+          # The failure shape is the real one, not a test-only one. A genuine
+          # shared-pool wall leaves an attempt row classified
+          # `quota_or_rate_limited` in state/agent-attempts.log and exits 1; this
+          # writes the same row and exits 1 for the same reason. The derive step
+          # decides from the ABSENCE of state/stories.json, so it fires through
+          # its real condition -- no branch anywhere knows this is a simulation
+          # except the two lines that say so.
+          if [ "${SIMULATE_POOL_REFUSAL:-false}" = "true" ]; then
+            if [ "${EVENT_NAME:-}" != "workflow_dispatch" ]; then
+              echo "::error::simulate_pool_refusal=true arrived on event '${EVENT_NAME:-unknown}', which cannot carry that input. Ignoring it and walking the models normally; a scheduled run must never simulate a refusal."
+            else
+              echo "================================================================"
+              echo "SIMULATED pool refusal — no model was contacted"
+              echo "================================================================"
+              echo "The model walk stops here on purpose. No ladder was resolved, no discovery request was made and no agent was invoked. A REAL pool wall leaves exactly the row below and the same non-zero exit."
+              mkdir -p state
+              printf '%s attempt=1 model=simulated kind=quota_or_rate_limited rc=1 allow=0\n' \
+                "$(date -u +%FT%TZ)" >> state/agent-attempts.log
+              echo "Digest not built: 0 attempt(s) over 1 cycle(s) in 0 min. The walk stopped on the SHARED POOL's contention wall (last error: quota_or_rate_limited on simulated (shared pool)): simulated, so no id was tried and no cooldown was recorded. The derive step below builds the unsummarised edition from the collected candidates."
+              exit 1
+            fi
+          fi
           START=$(date +%s)
           ok=0
           # Each attempt is externally bounded with GNU timeout, because
@@ -1567,6 +1622,9 @@ jobs:
 
       - name: Build email
         if: env.FALLBACK_NOOP != 'true'
+        env:
+          DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
+          TODAY: ${{ env.TODAY }}
         run: |
           set -eo pipefail
           START=$(date +%s)
@@ -1579,6 +1637,32 @@ jobs:
           STAGE_KEY=build STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
           test -s state/email.html || { echo "FATAL: state/email.html missing or empty"; exit 1; }
           test -s state/email.txt || { echo "FATAL: state/email.txt missing or empty"; exit 1; }
+          # THE SUBJECT IS COMPOSED HERE, ONCE, AND PRINTED.
+          #
+          # It used to exist only inside the Gmail step, which fires only when a
+          # primary channel FAILED. On a healthy run -- the ordinary case -- the
+          # owner's lock-screen line was therefore composed nowhere and printed
+          # nowhere, and an edition label that went missing from it could only
+          # be discovered by reading the code. The send step now READS this file
+          # instead of composing its own copy, so there is still exactly one
+          # place the subject is built.
+          python3 - <<'PY'
+          import json, os
+          kind = os.environ['DIGEST_TIME'].strip().lower()
+          today = os.environ['TODAY'].strip()
+          tag = ''
+          try:
+              with open('state/stories.validated.json', encoding='utf-8') as fh:
+                  if json.load(fh).get('edition_kind') == 'unsummarised':
+                      tag = ' - unsummarised edition (no AI today)'
+          except Exception as exc:
+              print('WARNING: could not read edition_kind for the subject: %s' % exc)
+          subject = 'Daily Media News - %s - %s%s' % (kind, today, tag)
+          with open('state/email_subject.txt', 'w', encoding='utf-8') as fh:
+              fh.write(subject)
+          print('EMAIL SUBJECT: %s' % subject)
+          PY
+          test -s state/email_subject.txt || { echo "FATAL: state/email_subject.txt missing or empty"; exit 1; }
 
       - name: Render digest HTML
         if: env.FALLBACK_NOOP != 'true'
@@ -1921,6 +2005,10 @@ jobs:
           # The Pages origin for the push's click link. Not committed: the public
           # repository must not carry the real host.
           CF_ARCHIVE_ORIGIN: ${{ vars.CF_ARCHIVE_ORIGIN }}
+          # A SIMULATED build still pushes a REAL notification, so the push has
+          # to say so in the two fields the owner actually reads. Bound from the
+          # dispatch input, so a cron run leaves it empty.
+          SIMULATE_POOL_REFUSAL: ${{ github.event.inputs.simulate_pool_refusal }}
         run: |
           set -eo pipefail
           # Rich, self-contained notification: full digest markdown, image,
@@ -1930,6 +2018,13 @@ jobs:
           import datetime, json, os, re, urllib.request
 
           FLAG_PATH = 'state/.ntfy_ok'
+
+          # A simulated build pushes a real notification, so the phone must be
+          # able to tell it from a digest the owner was meant to receive. This
+          # is the ONLY thing the flag changes here: the title and body it
+          # prefixes are the same ones a genuine refusal produces.
+          simulate = ((os.environ.get('SIMULATE_POOL_REFUSAL') or '').strip().lower()
+                      == 'true')
 
           # THE ONE PLACE THE PUSH'S HUMAN-FACING WORD IS DECIDED.
           #
@@ -3718,6 +3813,20 @@ jobs:
                   if 'arrows_counterclockwise' not in empty_tags_extra:
                       empty_tags_extra.append('arrows_counterclockwise')
 
+              # --- TEST marking, LAST so nothing below can drop it -----------
+              # Applied AFTER the title has been assembled from the edition, so
+              # the marker cannot be lost to the length checks above, and to the
+              # BODY as well as the title so a pass through the shade or a
+              # collapsed notification still cannot hide it. `TEST · ` rather
+              # than `[TEST] ` because the unsummarised title is already 35
+              # characters of label on a 72-character shade, and the marker must
+              # not be the thing that pushes it over.
+              if simulate:
+                  title = 'TEST \u00b7 ' + title
+                  message = ('**TEST \u2014 simulated pool refusal.** No model was '
+                             'contacted. This is the unsummarised edition, pushed to '
+                             'prove the no-AI path.\n\n') + message
+
               # --- Attach: top story image URL, if any ---
               attach = None
               if ordered:
@@ -4005,16 +4114,25 @@ jobs:
                   raise SystemExit(1)
 
               msg = MIMEMultipart('alternative')
-              # The subject is the lock-screen line for this channel; an
-              # unsummarised edition must never arrive looking like a normal one.
-              edition_tag = ''
+              # READ, NEVER RE-COMPOSED. The subject -- including the
+              # "unsummarised edition (no AI today)" tag, which is the
+              # lock-screen line for this channel -- is built by the "Build
+              # email" step, printed there for inspection, and handed over in
+              # this file. A second copy of the format here is what let a tag
+              # exist in one place and not the other.
               try:
-                  with open('state/stories.validated.json', encoding='utf-8') as fh:
-                      if json.load(fh).get('edition_kind') == 'unsummarised':
-                          edition_tag = ' - unsummarised edition (no AI today)'
-              except Exception as exc:
-                  print(f'WARNING: could not read edition_kind for the subject: {exc}')
-              msg['Subject'] = f'Daily Media News - {kind} - {today}{edition_tag}'
+                  with open('state/email_subject.txt', encoding='utf-8') as fh:
+                      subject = fh.read().strip()
+              except OSError as exc:
+                  subject = ''
+                  print(f'WARNING: state/email_subject.txt unreadable ({exc})')
+              if not subject:
+                  # The bare form only. It cannot claim the unsummarised tag,
+                  # which is the safe direction: an under-labelled subject is
+                  # wrong, an unlabelled unsummarised edition is worse.
+                  subject = f'Daily Media News - {kind} - {today}'
+                  print(f'WARNING: composing the bare subject here: {subject}')
+              msg['Subject'] = subject
               receiver = os.environ.get('GMAIL_RECEIVER') or os.environ['GMAIL_USER']
               msg['From'] = os.environ['GMAIL_USER']
               msg['To'] = receiver
