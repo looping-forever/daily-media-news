@@ -266,22 +266,35 @@ class PrebuildCronWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
 
 
 class DispatchTruthfulNoticeWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
-    """The three confirmed fallback-ladder notice defects, executed.
+    """The fallback-ladder notice defects, executed.
 
     DEFECT 1 the false token alarm, DEFECT 2 last-good pushed over a correct
     delivery, DEFECT 3 no dispatch telemetry. A notice that names a fault which
     did not happen is worse than no notice, because it sends someone to fix
     something that is not broken.
+
+    DEFECT 4 and DEFECT 5 were added on 2026-10-28, and the pin below moved from
+    17 to 21 with them: four new tests, no existing test removed or renamed.
+    DEFECT 4 is the same class of lie one step later in time -- run 40615951953
+    was dispatched at 01:35:27Z, FAILED, and the next fire wrote "NO build was
+    dispatched" over a slot whose build had been started and had died, so the
+    owner was told to stop waiting for something that had already been tried.
+    DEFECT 5 is the same lie in ?health=1: it reported
+    `last_good_shown: '2026-10-18'` beside `fallback_shown: false` and
+    `edition: failed`, which cannot all be true at once -- a date is only a
+    last-good date if that digest is what the owner is actually reading.
     """
 
     JS = Path(_TESTS) / "digest" / "digest_dispatch_truthful_notice.test.js"
-    TAP_PLAN = 17
+    TAP_PLAN = 21
     WORKER_OVERRIDE = "DIGEST_NOTICE_WORKER"
     WHAT_IT_GUARDS = (
         "the honesty of the fallback ladder's notice. On 2026-10-13 this Worker "
         "told the owner his GH_TOKEN had died when the real cause was the "
         "once-per-slot guard standing down correctly, and in the same cycle "
-        "pushed last-good over a fresh digest the owner had already read.")
+        "pushed last-good over a fresh digest the owner had already read. On "
+        "2026-10-28 it denied dispatching a build that had in fact been "
+        "dispatched and had failed.")
     WHAT_NODE_MISSING = (
         "dispatch truthfulness is the one thing the owner must be able to trust "
         "without checking the logs, and a skipped suite is a green run proving "
@@ -305,6 +318,10 @@ class DispatchTruthfulNoticeWorkerSuite(_WorkerJsSuiteMixin, unittest.TestCase):
         "DEFECT 3: the persisted record contains NO token and NO unredacted body",
         "DEFECT 3: an ACCEPTED dispatch writes nothing, so the steady KV budget holds",
         "the notice grew, and both ceilings still hold",
+        "DEFECT 4: the dispatch verdict has FOUR states, not two",
+        "DEFECT 4: a dispatched build that FAILED is named, not denied",
+        "DEFECT 4: the stored sentence in KV is repaired at read time, with no migration",
+        "DEFECT 5: ?health=1 cannot report last_good_shown beside fallback_shown: false",
     )
 
 

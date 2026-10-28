@@ -5141,16 +5141,35 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
             "that an exemption is honest only when failing is the step's job, "
             "so the reason has to say what the step is for." % (step_name,),
         )
-        # It must also still probe both hostnames: an `always()` guard that
-        # quietly lost an arm is the same class of defect as one that never ran.
+        # It must also still probe both arms: an `always()` guard that quietly
+        # lost an arm is the same class of defect as one that never ran -- and so
+        # is one that probes a hostname NOBODY CONFIGURED, which is the state this
+        # step was found in. The two arms are DERIVED at run time, because this
+        # file cannot carry the real host: scripts/check_public_sanitisation.py
+        # rewrites it, and `.example.pages.dev` is a placeholder Cloudflare
+        # answers with 404 -- so the probe reported "expected 401/403" on every
+        # scheduled run and measured nothing. tests/workflows/
+        # test_archive_origin_probe.py pins the resolver itself.
         run = step_dict.get("run") or ""
-        for host in ("daily-digest.example.pages.dev", "master.daily-digest.example.pages.dev"):
-            self.assertIn(
-                host, run,
-                "the origin auth canary no longer probes %s. Both hostnames are "
-                "load-bearing: the second is an unmonitored way in the day "
-                "Cloudflare Access is removed." % host,
-            )
+        self.assertIn(
+            "scripts/archive_origin.py --hosts", run,
+            "the origin auth canary no longer resolves its probe hostnames from "
+            "scripts/archive_origin.py. Every hostname written in this file is a "
+            "sanitised placeholder, so the step is back to probing a host that "
+            "hosts nothing.",
+        )
+        self.assertNotIn(
+            "example.pages.dev", run,
+            "the origin auth canary probes a placeholder hostname again. It "
+            "answers 404, the step reports 'expected 401/403', and the guard is "
+            "red every night while the real origin goes unprobed.",
+        )
+        self.assertIn(
+            "CF_ARCHIVE_ORIGIN", (step_dict.get("env") or {}),
+            "the canary step does not carry CF_ARCHIVE_ORIGIN, so the resolver "
+            "has nothing to resolve and refuses -- loudly, but the guard never "
+            "probes.",
+        )
 
     def test_a_missing_if_always_is_rejected(self):
         """REGRESSION PROOF: the rule above can actually fail.

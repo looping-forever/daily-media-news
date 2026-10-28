@@ -391,11 +391,14 @@ jobs:
         # run before it, which is worse than useless: a guard that cries wolf
         # on the correct state teaches the owner to ignore it, and the one
         # thing it exists to notice is then never noticed). The canary probes
-        # TWO hostnames and only one of them is answered by the middleware:
+        # TWO hostnames and only one of them is answered by the middleware.
+        # Both are DERIVED from the configured origin, so they are written here
+        # by ROLE -- a real hostname in this file is rewritten to a placeholder
+        # by the private sanitiser, which is the defect this step now refuses:
         #
-        #   daily-digest.example.pages.dev        -> 401 from functions/_middleware.js
-        #   master.daily-digest.example.pages.dev  -> 302 to
-        #        daily-digest.pages.cloudflareaccess.com/cdn-cgi/access/login/...
+        #   <project>.pages.dev         -> 401 from functions/_middleware.js
+        #   master.<project>.pages.dev  -> 302 to
+        #        <team>.cloudflareaccess.com/cdn-cgi/access/login/...
         #
         # Access intercepts AHEAD of the Pages Function, so on the second
         # hostname the middleware never runs and 401 is not reachable. An
@@ -466,23 +469,43 @@ jobs:
         # enough for it to be caught if the key is ever deleted again.
         #
         # TWO HOSTNAMES ON PURPOSE, AND NEITHER ARM IS DROPPED.
-        # `daily-digest.example.pages.dev` is the production hostname, and
-        # `master.daily-digest.example.pages.dev` is a SECOND public hostname serving
-        # the same Pages project from the same deployment. A guard that only
-        # checked the first would leave the second as an unmonitored way in, and
-        # the whole point here is that an unmonitored way in is how the archive
-        # stayed public for months. Both are probed — and the second arm is
-        # exactly what would notice the day that Cloudflare Access application is
-        # removed and `master.*` becomes a second PUBLIC hostname. From that day
-        # it answers 200 with the archive in the body, and the FIRST check below
-        # is whether archive content was served at all.
+        # The production hostname and `<branch>.<project>.pages.dev` are two
+        # public names for the same Pages project and the same deployment. A
+        # guard that only checked the first would leave the second as an
+        # unmonitored way in, and the whole point here is that an unmonitored way
+        # in is how the archive stayed public for months. Both are probed, and
+        # the second arm is exactly what would notice the day that Cloudflare
+        # Access application is removed and `master.*` becomes a second PUBLIC
+        # hostname. From that day it answers 200 with the archive in the body,
+        # and the FIRST check below is whether archive content was served at all.
+        #
+        # Both names are derived by `scripts/archive_origin.py` from
+        # `CF_ARCHIVE_ORIGIN` (see the `env:` block below) rather than written
+        # here: this file is published, and the sanitiser that keeps the real
+        # hostname out of it is what turned a working probe into a 404.
         #
         # This is a PUBLIC endpoint probe, so `curl -m 15` bounds it,
         # `--max-redirs 5` bounds the redirect chain, and the job's
         # timeout-minutes remains the backstop.
+        env:
+          # THE ONLY SOURCE OF THE HOSTNAMES, AND IT CANNOT BE THIS FILE.
+          # The private sanitiser rewrites the real Pages hostname in every
+          # published file, which is exactly how the literal that used to sit
+          # here became `daily-digest.example.pages.dev` -- and how this canary
+          # came to probe a hostname Cloudflare answers with 404 while the real
+          # origin was never probed once. A repository variable is the only
+          # place the value can live, and it is the same value the Worker holds
+          # as DIGEST_ARCHIVE_ORIGIN.
+          CF_ARCHIVE_ORIGIN: ${{ vars.CF_ARCHIVE_ORIGIN }}
         run: |
           set -euo pipefail
-          HOSTS="daily-digest.example.pages.dev master.daily-digest.example.pages.dev"
+          # RESOLVED, NEVER SPELLED. A missing or placeholder origin is refused
+          # here with a `::error::` line and exit 2, and `pipefail` turns that
+          # into a red step before any probe runs. That refusal is the point: a
+          # 404 from a hostname nobody configured is not a verdict about this
+          # archive, and reporting it as "expected 401/403" every night is what
+          # taught nobody anything about the origin's actual access control.
+          HOSTS="$(python3 scripts/archive_origin.py --hosts)"
           # Markers that appear in this archive's OWN html and nowhere else.
           # `Personal News Informer` is the <title>/<h1> of the index AND of
           # every digest page (scripts/render_digest.py), so it catches a single

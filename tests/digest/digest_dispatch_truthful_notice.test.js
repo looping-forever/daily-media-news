@@ -85,6 +85,9 @@ const EXPORT_NAMES = [
   "DELIVERY_EVIDENCE_UNKNOWN", "DELIVERY_KIND_STOOD_DOWN",
   "DIGEST_DISPATCH_STATUS_KEY", "KIND_UNAVAILABLE", "KIND_FALLBACK_LAST_GOOD",
   "digestSequenceId", "digestFullSequenceId", "DIGEST_LEDGER_KEY",
+  // The dispatch verdict and the ?health=1 projection, so both can be pinned
+  // directly as well as end-to-end.
+  "dispatchVerdictSuffix", "latestLedgerDelivery", "honestDeliveryReason",
 ];
 
 const loadCounter = { n: 0 };
@@ -1016,3 +1019,242 @@ test("the notice grew, and both ceilings still hold", async () => {
     "the fallback title is " + b.title.length + " characters, past the " +
     "72-character ceiling: " + b.title);
 });
+
+// ==========================================================================
+// 5. 2026-10-28 MORNING. The build WAS dispatched, ran, and FAILED — and the
+//    notice said "NO build was dispatched" about it.
+// ==========================================================================
+//
+// THE DEFECT, IN ONE LINE OF THE REAL RESPONSE.
+//
+//   digest.last_delivery: { date: 2026-10-28, slot: morning, kind:
+//     fallback_last_good, state: failed, edition: failed, reason:
+//     "absent | NO build was dispatched", ... }
+//
+// and, in the same KV entry, `actions_dispatch_at`, because the Worker really
+// had dispatched daily-news.yml at 01:35:27Z. That run (40615951953) concluded
+// `failure`. Two independent lies in one field: the build existed, and its log
+// said why it died. The cause was `status=success` on the runs query, which makes
+// a failed run invisible — the list came back empty, "not delivered" was the
+// verdict, and the tail was derived from `dispatched` (this pass) alone.
+//
+// EVERY ID BELOW IS REAL PRODUCTION DATA FOR THAT SLOT.
+
+const FAILED_RUN_ID = 40615951953;
+// The run's ID is the real one from 2026-10-28; the instants are placed inside
+// THIS fixture's slot window (the 2026-10-13 morning one), because the window is
+// what `classifyDeliveryEvidence` measures against and a run outside it is
+// correctly ignored.
+const FAILED_CREATED_AT = "2026-10-13T01:35:41Z";
+const FAILED_UPDATED_AT = "2026-10-13T01:49:10Z";
+
+/** The run that was dispatched for this slot and then failed. */
+function failedRun(over) {
+  return Object.assign(successfulRun(), {
+    id: FAILED_RUN_ID,
+    conclusion: "failure",
+    created_at: FAILED_CREATED_AT,
+    updated_at: FAILED_UPDATED_AT,
+  }, over || {});
+}
+
+test("DEFECT 4: the dispatch verdict has FOUR states, not two", async () => {
+  // Pure, so all four are pinned without a network call. The two that shipped
+  // are states 2 and 4; states 1 and 3 are the ones that could not be expressed,
+  // and state 1 is the one that lied.
+  const w = loadWorker();
+  const v = w.dispatchVerdictSuffix;
+
+  // 1. A build was dispatched AND it failed. The strongest fact, and the one
+  //    that must never be reported as "nothing was dispatched".
+  const failed = v({ dispatched: false, at: DISPATCH_AT, cause: "already_dispatched" },
+                   { id: String(FAILED_RUN_ID), conclusion: "failure" });
+  assert.match(failed, /FAILED \(failure\), run 40615951953/,
+    "a FAILED dispatched build is not named in the verdict: " + JSON.stringify(failed));
+  assert.ok(failed.indexOf("NO build was dispatched") < 0,
+    "the verdict still denies the dispatch it just described: " + JSON.stringify(failed));
+
+  // 2. THIS pass dispatched. Unchanged, and it must stay byte-identical: the
+  //    watchdog and the ledger reader match this tail.
+  assert.strictEqual(
+    v({ dispatched: true, at: DISPATCH_AT, cause: null }, null),
+    " | a late build was dispatched");
+
+  // 3. An EARLIER pass dispatched. `dispatched` is false because this pass had
+  //    nothing to do — which is not the same as nothing having been dispatched.
+  const markerOnly = v({ dispatched: false, at: DISPATCH_AT,
+                         cause: "already_dispatched" }, null);
+  assert.ok(markerOnly.indexOf("NO build was dispatched") < 0,
+    "a recorded dispatch marker still produces the denial: " + JSON.stringify(markerOnly));
+  assert.ok(markerOnly.indexOf(DISPATCH_AT) >= 0,
+    "the verdict does not name the dispatch it is talking about: " +
+    JSON.stringify(markerOnly));
+
+  // 4. Genuinely nothing: no run, no marker. The ONLY state in which the
+  //    sentence is true, and it must still be reachable or the fix has simply
+  //    replaced one lie with another.
+  assert.strictEqual(
+    v({ dispatched: false, at: null, cause: "token_missing" }, null),
+    " | NO build was dispatched");
+});
+
+test("DEFECT 4: a dispatched build that FAILED is named, not denied", async () => {
+  // The incident shape, driven end to end: the slot's marker is already set, the
+  // Actions API answers with the failed run, and the ladder pushes the
+  // last-good apology because nothing delivered.
+  const w = loadWorker();
+  const h = makeHarness({ initial: incidentStore(), runs: [failedRun()] });
+  const r = await fire(w, h, { env: { GH_TOKEN: GH } });
+  assert.strictEqual(r.thrown, null, "the re-fire threw: " + r.thrown);
+
+  // VACUITY GUARDS. The evidence must have been read (not skipped) and the
+  // marker must have stood the dispatch down, or this test is not the incident.
+  assert.strictEqual(runsGets(h.net).length, 1,
+    "the Actions run list was not read, so the failed run was never seen");
+  assert.strictEqual(dispatchPosts(h.net).length, 0,
+    "the once-per-slot marker stopped suppressing dispatches");
+  assert.strictEqual(r.outcome.delivery_evidence,
+    w.DELIVERY_EVIDENCE_NOT_DELIVERED);
+
+  const msgs = bodies(h.net);
+  assert.ok(msgs.length >= 1,
+    "the ladder pushed nothing at all, so there is no notice to inspect");
+  // The apology is the first push; a stale-edition notice may follow it.
+  const apology = msgs.filter((m) =>
+    String(m.message || "").indexOf("Why you are seeing this") >= 0)[0];
+  assert.ok(apology, "the ladder pushed no apology payload");
+  const message = apology.message;
+
+  // OWNER-FACING. Not the stand-down's "Nothing is wrong", and not the
+  // failure's "No fresh build was started" either: a build WAS started.
+  assert.ok(/started and it FAILED/.test(message),
+    "the notice does not say the build failed: " + message);
+  assert.ok(message.indexOf(String(FAILED_RUN_ID)) >= 0,
+    "the notice does not name the run the owner can open: " + message);
+  assert.ok(message.indexOf(STANDDOWN_LEAD) < 0,
+    "a FAILED build is reported with the stand-down's 'Nothing is wrong': " +
+    message);
+  assert.ok(message.indexOf(FAILURE_LEAD) < 0,
+    "a dispatched-then-failed build wears the 'nothing was started' lead-in: " +
+    message);
+
+  // MACHINE-READABLE. The ledger tail is what ?health=1 and the watchdog read.
+  const entry = slotEntry(h);
+  assert.match(entry.reject_reason, /FAILED \(failure\), run 40615951953/,
+    "the ledger still misreports the dispatch: " +
+    JSON.stringify(entry.reject_reason));
+  assert.ok(entry.reject_reason.indexOf("NO build was dispatched") < 0,
+    "the ledger still contains the 2026-10-28 sentence: " +
+    JSON.stringify(entry.reject_reason));
+  assert.strictEqual(entry.dispatch_failure_class, "failure",
+    "the failure class is not recorded, so a reader has to parse English");
+  assert.strictEqual(entry.late_build_dispatched, true,
+    "the ledger claims no build was dispatched for a slot with a failed run");
+  assert.strictEqual(entry.actions_dispatch_at, DISPATCH_AT,
+    "the stand-down erased the marker it stood down on");
+});
+
+test("DEFECT 5: ?health=1 cannot report last_good_shown beside fallback_shown: false",
+  async () => {
+    // THE LIVE CONTRADICTION. The deployed response carried, in one object:
+    //   edition: "failed", fallback_shown: false, last_good_shown: "2026-10-18"
+    // The push never landed, so nothing was shown. The stale date was written by
+    // an older build that recorded `last_good_shown` from `usable` alone.
+    const w = loadWorker();
+    const pushFailed = {
+      days: { [TODAY]: { [SLOT]: {
+        state: "failed",
+        kind: "fallback_last_good",
+        ntfy_failed: true,
+        ntfy_sent_at: null,
+        pending_at: DISPATCH_AT,
+        reject_reason: "absent | NO build was dispatched",
+        actions_dispatch_at: DISPATCH_AT,
+        last_good_shown: "2026-10-12",
+      } } },
+    };
+    const legacy = w.latestLedgerDelivery(pushFailed);
+    assert.strictEqual(legacy.edition, "failed");
+    assert.strictEqual(legacy.fallback_shown, false,
+      "a push that never landed is reported as a fallback shown");
+    assert.strictEqual(legacy.last_good_shown, null,
+      "a push that never landed still claims an edition was shown: " +
+      JSON.stringify(legacy.last_good_shown));
+
+    // AND THE OTHER DIRECTION, so this is not a blanket null. A fallback push
+    // that DID land is a fallback shown, and the date is then the point.
+    const pushed = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: {
+        state: "sent", kind: "fallback_last_good", ntfy_failed: false,
+        ntfy_sent_at: "2026-10-13T01:50:26Z", pending_at: DISPATCH_AT,
+        last_good_shown: "2026-10-12",
+      } } },
+    });
+    assert.ok(pushed, "the fixture entry was not selected as the latest delivery");
+    assert.strictEqual(pushed.fallback_shown, true);
+    assert.strictEqual(pushed.last_good_shown, "2026-10-12");
+    assert.strictEqual(pushed.edition, "fallback");
+
+    // A fresh digest is not a fallback, whatever else the entry carries.
+    const fresh = w.latestLedgerDelivery({
+      days: { [TODAY]: { [SLOT]: {
+        state: "sent", kind: "delivered", ntfy_failed: false,
+        ntfy_sent_at: "2026-10-13T01:50:26Z", pending_at: DISPATCH_AT,
+        last_good_shown: "2026-10-12",
+      } } },
+    });
+    assert.ok(fresh, "the fixture entry was not selected as the latest delivery");
+    assert.strictEqual(fresh.fallback_shown, false);
+    assert.strictEqual(fresh.last_good_shown, null,
+      "a fresh delivery reports a last_good edition was shown");
+  });
+
+test("DEFECT 4: the stored sentence in KV is repaired at read time, with no migration",
+  async () => {
+    // The entry that is in KV right now was written by the buggy build and will
+    // not be rewritten by a deploy: the morning slot is terminal. So the repair
+    // has to happen on READ, and it has to be honest about what it does not know.
+    const w = loadWorker();
+    const stored = "absent | NO build was dispatched";
+
+    // A recorded dispatch alone: the outcome is genuinely unrecorded, and the
+    // repaired sentence must say that rather than invent a verdict.
+    const markerOnly = w.honestDeliveryReason({
+      reject_reason: stored, actions_dispatch_at: DISPATCH_AT });
+    assert.ok(markerOnly.indexOf("NO build was dispatched") < 0,
+      "a marker still yields the denial: " + JSON.stringify(markerOnly));
+    assert.match(markerOnly, /outcome was not recorded/,
+      "the repair invented an outcome it does not have: " + JSON.stringify(markerOnly));
+
+    // With a class, it names the class.
+    const withClass = w.honestDeliveryReason({
+      reject_reason: stored, actions_dispatch_at: DISPATCH_AT,
+      dispatch_failure_class: "failure" });
+    assert.match(withClass, /FAILED \(failure\)/,
+      "a recorded failure class is not named: " + JSON.stringify(withClass));
+
+    // No evidence of a dispatch: the sentence is TRUE and must survive.
+    assert.strictEqual(w.honestDeliveryReason({ reject_reason: stored }), stored,
+      "a slot nothing was dispatched for had its true sentence rewritten");
+
+    // A reason that already tells the truth is not rewritten, and a sentence
+    // that merely MENTIONS the phrase mid-string is left alone (the match is
+    // anchored to the tail on purpose).
+    assert.strictEqual(
+      w.honestDeliveryReason({ reject_reason: "absent | a late build was dispatched",
+                               actions_dispatch_at: DISPATCH_AT }),
+      "absent | a late build was dispatched");
+    assert.strictEqual(
+      w.honestDeliveryReason({
+        reject_reason: "absent | NO build was dispatched | recovered later",
+        actions_dispatch_at: DISPATCH_AT }),
+      "absent | NO build was dispatched | recovered later");
+
+    // And the read-through: the incident entry, as ?health=1 sees it.
+    const ledger = JSON.parse(incidentLedger());
+    ledger.days[TODAY][SLOT].pending_at = DISPATCH_AT;
+    const seen = w.latestLedgerDelivery(ledger);
+    assert.ok(seen.reason.indexOf("NO build was dispatched") < 0,
+      "the live ?health=1 reason still denies the dispatch: " +
+      JSON.stringify(seen.reason));
+  });

@@ -2797,37 +2797,68 @@ test("a full simulated day of dispatcher ticks stays far under the free KV write
 });
 
 // ==========================================================================
-// 16. The archive origin has exactly one place to be corrected
+// 16. The archive origin has ONE value, in two stores
 // ==========================================================================
 //
-// THE LITERAL IS GONE, and that is what makes this test possible to state
-// honestly. The Worker used to carry its own copy of the archive host; the two
-// could drift, and the placeholder copy is exactly what refused every real
-// digest. The host now lives in the DIGEST_ARCHIVE_ORIGIN secret, and the ONE
-// committed record of it is drift-canary.yml's HOSTS list -- which the canary
-// probes unauthenticated, so a wrong value there is visible within minutes.
-// What is asserted here is that the Worker carries no host of its own to drift
-// from the canary, and that it returns precisely the host it is given.
+// THE LITERAL IS GONE FROM BOTH SIDES, and that is what makes this test
+// possible to state honestly. The Worker used to carry its own copy of the
+// archive host, and drift-canary.yml carried a second copy in its HOSTS list.
+// The canary's copy was the SANITISED PLACEHOLDER, so the probe that exists to
+// prove the archive is publicly readable spent nine days proving that
+// `daily-digest.example.pages.dev` -- a host that is not the archive -- was not
+// readable. A canary that goes green or red about the wrong host is worse than
+// no canary: it is a confident answer to a question nobody asked.
+//
+// WHAT IS ASSERTED NOW. The value lives in exactly two stores: the Worker's
+// DIGEST_ARCHIVE_ORIGIN secret, and the repo's CF_ARCHIVE_ORIGIN variable.
+// The canary holds no host -- it RESOLVES one at run time through
+// scripts/archive_origin.py, which accepts both names. So the canary provably
+// probes the same value the Worker publishes to, and the only way they can
+// disagree again is if someone sets the two stores differently -- which the
+// resolver names in its own error message.
 
-test("the archive origin is the host the drift canary already probes, and the Worker keeps no copy of it", async () => {
+test("the archive origin is resolved from one value, and neither side carries a host literal", async () => {
   const w = loadWorker();
   const canary = fs.readFileSync(path.join(REPO_ROOT, ".github", "workflows",
                                            "drift-canary.yml"), "utf8");
-  const hosts = /HOSTS="([^"]+)"/.exec(canary);
-  assert.ok(hosts, "drift-canary.yml no longer declares its origin HOSTS list");
-  const archiveHost = hosts[1].split(/\s+/)[0];
 
+  // The Worker returns exactly the host it is given, so the secret is the source.
   assert.strictEqual(w.digestArchiveHost(ARCHIVE_ENV), ARCHIVE_HOST,
     "the Worker did not return the origin it was given, so the secret is not " +
     "the single source of the archive host");
   assert.strictEqual(w.digestArchiveIndexUrl(ARCHIVE_ENV),
     "https://" + ARCHIVE_HOST + "/");
 
-  // The canary's first host is the sanitised name in this tree, so the fixture
-  // and the canary must agree -- a divergence means one of them is stale.
-  assert.strictEqual(ARCHIVE_HOST, archiveHost,
-    "the fixture host (" + ARCHIVE_HOST + ") is not the host the origin canary " +
-    "probes first (" + archiveHost + ")");
+  // The canary RESOLVES its hosts; it no longer declares them. A literal here
+  // is the exact drift class that caused the nine-day outage, so its absence is
+  // asserted rather than assumed.
+  assert.ok(/HOSTS="\$\(python3 scripts\/archive_origin\.py --hosts\)"/.test(canary),
+    "drift-canary.yml no longer resolves its probe hosts at run time, so it is " +
+    "back to carrying a host of its own that can drift from the Worker's");
+  const declared = /HOSTS="(?!\$)[^"]*"/.exec(canary);
+  assert.strictEqual(declared, null,
+    "drift-canary.yml declares its probe hosts literally: " +
+    (declared && declared[1]));
+
+  // Only comments may mention a Pages hostname; no executable line may.
+  const executable = canary.split(/\r?\n/)
+    .filter((line) => !/^\s*#/.test(line)).join("\n");
+  assert.ok(executable.indexOf(".pages.dev") < 0,
+    "drift-canary.yml still names a pages.dev host on an executable line; the " +
+    "host must come from CF_ARCHIVE_ORIGIN at run time, because the committed " +
+    "tree is sanitised and a sanitised host is not the archive");
+
+  // One value, two stores: the canary passes the repo variable, and the
+  // resolver reads that name as well as the Worker's.
+  assert.ok(/CF_ARCHIVE_ORIGIN:\s*\$\{\{\s*vars\.CF_ARCHIVE_ORIGIN\s*\}\}/.test(canary),
+    "the canary step does not pass vars.CF_ARCHIVE_ORIGIN, so the resolver has " +
+    "nothing to resolve and the probe would fail for the wrong reason");
+  const resolver = fs.readFileSync(path.join(REPO_ROOT, "scripts",
+                                             "archive_origin.py"), "utf8");
+  assert.ok(resolver.indexOf("CF_ARCHIVE_ORIGIN") >= 0
+    && resolver.indexOf("DIGEST_ARCHIVE_ORIGIN") >= 0,
+    "the resolver does not accept both stores, so the canary and the Worker " +
+    "cannot be shown to read the same value");
 
   // And the Worker source itself must contain no pages.dev literal at all: a
   // host in the source is a second place to correct, which is the drift class

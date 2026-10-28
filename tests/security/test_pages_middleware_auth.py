@@ -86,12 +86,24 @@ CANARY_STEP_NAME = "Digest archive is not publicly readable (origin auth canary)
 # ---------------------------------------------------------------------------
 
 #: The production origin. `functions/_middleware.js` answers it.
-PROD_HOST = "daily-digest.example.pages.dev"
+#:
+#: DELIBERATELY NOT `daily-digest.example.pages.dev`. Two reasons, and the first
+#: is the defect this whole control exists to end: the committed tree is
+#: sanitised, so the `example` host is a PLACEHOLDER and not the archive, and a
+#: canary that probed it was green-or-red about a host nobody publishes to. The
+#: canary now resolves its host from `CF_ARCHIVE_ORIGIN` at run time and REFUSES
+#: a placeholder (that refusal has its own test), so a fixture that used the
+#: placeholder name would be testing the resolver's refusal path instead of the
+#: gate. These names are synthetic on purpose: they must be acceptable to the
+#: resolver and must NOT be the real archive host.
+PROD_HOST = "digest-archive-canary.pages.dev"
 
 #: A SECOND public hostname serving the same Pages project from the same
 #: deployment. If the Access application ever goes away this becomes a second
-#: way in, which is the whole reason the arm is probed at all.
-PREVIEW_HOST = "master.daily-digest.example.pages.dev"
+#: way in, which is the whole reason the arm is probed at all. The resolver
+#: derives it from `PROD_HOST` rather than reading it from anywhere, so its
+#: presence here is a claim about the resolver's output, not a second setting.
+PREVIEW_HOST = "master.digest-archive-canary.pages.dev"
 
 #: Where Cloudflare Access sends the `PREVIEW_HOST` arm (measured 2026-10-03:
 #: a 302 to this host, which serves the Access login and no digest content).
@@ -515,15 +527,19 @@ class WorkflowGuardTests(unittest.TestCase):
             "CI can observe that the deployed Pages origin stopped refusing "
             "unauthenticated requests — which is exactly how the archive stayed "
             "public while this repository described itself as protected.")
-        # BOTH public hostnames. `master.daily-digest.example.pages.dev` is a
-        # second hostname serving the same project; a canary that probed only
-        # the production one would leave an unmonitored way in.
-        for host in (PROD_HOST, PREVIEW_HOST):
-            self.assertIn(host, text,
-                          "drift-canary.yml does not probe %s. Both hostnames "
-                          "serve the same Pages project from the same "
-                          "deployment, so probing only one leaves the other as "
-                          "an unmonitored way into the archive." % host)
+        # BOTH public hostnames must still be probed, but the step no longer
+        # names either one: it resolves them at run time, because the committed
+        # tree is sanitised and the placeholder name is not the archive. What is
+        # asserted here is that the resolution is wired; the two arms are proven
+        # BEHAVIOURALLY below, where "only the master preview is exposed" is a
+        # failing world and a world where both refuse is a passing one.
+        self.assertIn(
+            'HOSTS="$(python3 scripts/archive_origin.py --hosts)"', text,
+            "drift-canary.yml does not resolve its probe hosts through "
+            "scripts/archive_origin.py. A host written into the workflow is a "
+            "second copy of a value that lives in CF_ARCHIVE_ORIGIN, and the "
+            "sanitised copy is the one that made this canary authoritative "
+            "about the wrong host for nine days.")
         self.assertIn("401|403", text,
                       "the canary must still accept 401/403 as 'protected'. "
                       "Accepting any other status as a bare refusal is how a "
@@ -816,6 +832,21 @@ class WorkflowGuardTests(unittest.TestCase):
             # backslash path containing a space is one more thing that can fail
             # for a reason that has nothing to do with the control under test.
             env["RUNNER_TEMP"] = tmpdir.as_posix()
+            # The step RESOLVES its probe hosts at run time through
+            # scripts/archive_origin.py, so the sandbox needs that script at the
+            # same relative path the workflow uses -- which is itself evidence
+            # that the workflow's path is right. The origin comes from the repo
+            # variable in CI; here it is the fixture host, the same value the
+            # stub table is keyed by.
+            (tmpdir / "scripts").mkdir()
+            shutil.copyfile(REPO_ROOT / "scripts" / "archive_origin.py",
+                            tmpdir / "scripts" / "archive_origin.py")
+            env.pop("DIGEST_ARCHIVE_ORIGIN", None)  # the Worker's name wins if set
+            # The stored value is an absolute https URL, not a bare host:
+            # scripts/set-private-config.ps1 refuses anything else when it writes
+            # the variable, and the resolver refuses it again at read time. So
+            # the fixture passes what CI actually holds.
+            env["CF_ARCHIVE_ORIGIN"] = "https://" + PROD_HOST
             for host, resp in world.items():
                 key = "STUB_" + _stub_key(host)
                 env[key + "_STATUS"] = str(resp.get("status", "200"))

@@ -3728,8 +3728,17 @@ async function pushUnrecorded(env, outcome, label, opts) {
 //
 // THE SERVER-SIDE `created` FILTER IS NOT TRUSTED. The window is applied to the
 // runs HERE, so an engine-side filter that quietly narrows the set cannot turn a
-// delivery into a miss. Only `status=success` is asked of the API, and it is
-// re-checked per run rather than taken on trust.
+// delivery into a miss.
+//
+// `status=completed`, NOT `status=success`, AND THAT IS THE FIX FOR A NOTICE
+// THAT LIED. Asking only for successes made a FAILED build invisible: the query
+// came back with no runs at all, the verdict was "not delivered", and the notice
+// then said "NO build was dispatched" about a slot whose build had been
+// dispatched, run and failed (2026-10-28 morning, run 40615951953). The
+// conclusion is still re-checked per run rather than taken on trust, so widening
+// the query cannot turn a failure into a delivery -- it only makes the failure
+// nameable, which is the difference between a notice the owner can act on and
+// one that sends him looking for a bug that is not there.
 const DELIVERY_EVIDENCE_DELIVERED = "delivered";
 const DELIVERY_EVIDENCE_NOT_DELIVERED = "not_delivered";
 const DELIVERY_EVIDENCE_UNKNOWN = "unknown";
@@ -3751,6 +3760,9 @@ function classifyDeliveryEvidence(runs, dispatchAtIso, nowMs) {
              reason: "this slot has no usable dispatch timestamp to measure from" };
   }
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : from;
+  // The first COMPLETED, NON-SUCCESS run inside the window. Kept rather than
+  // returned immediately, because a later success in the same window still wins.
+  let failedRun = null;
   for (const run of runs) {
     if (!run || typeof run !== "object" || Array.isArray(run)) {
       return { state: DELIVERY_EVIDENCE_UNKNOWN,
@@ -3764,30 +3776,61 @@ function classifyDeliveryEvidence(runs, dispatchAtIso, nowMs) {
                reason: "a run in the list has no parseable created_at" };
     }
     if (String(run.event) !== "workflow_dispatch") continue;
+    // THE WINDOW IS APPLIED BEFORE ANY VERDICT. It used to be checked only on
+    // the way to "delivered", so a failed run from another dispatcher could be
+    // blamed on this slot. This slot's window is the only one whose runs may
+    // either deliver it or be convicted for it.
+    if (startedAt < from || startedAt > now) continue;
     // BOTH terms, not one. GitHub sets `conclusion: null` while a run is in
     // progress, so `conclusion === "success"` alone would be a complete proof
     // of delivery — and a run that has not finished has not delivered. The
     // second term costs nothing and removes a shape a future run-record change
     // could turn into a silent stand-down on a slot nobody delivered.
     if (String(run.status) !== "completed") continue;
-    if (String(run.conclusion) !== "success") continue;
-    if (startedAt < from || startedAt > now) continue;
-    return {
-      state: DELIVERY_EVIDENCE_DELIVERED,
-      run: {
+    if (String(run.conclusion) === "success") {
+      return {
+        state: DELIVERY_EVIDENCE_DELIVERED,
+        run: {
+          id: String(run.id == null ? "" : run.id),
+          url: String(run.html_url || ""),
+          created_at: String(run.created_at),
+          completed_at: String(run.updated_at || ""),
+        },
+        failed_run: null,
+        reason: "a successful workflow_dispatch run of daily-news.yml exists " +
+          "inside this slot's own dispatch window",
+      };
+    }
+    // NOT `continue`. A build that ran and FAILED is the most useful fact this
+    // query can return, and dropping it is what made the notice claim nothing
+    // had been dispatched. The FIRST one is kept: it is the build this slot's
+    // own dispatch marker produced.
+    if (!failedRun) {
+      failedRun = {
         id: String(run.id == null ? "" : run.id),
         url: String(run.html_url || ""),
+        conclusion: String(run.conclusion || "unknown"),
         created_at: String(run.created_at),
-        completed_at: String(run.updated_at || ""),
-      },
-      reason: "a successful workflow_dispatch run of daily-news.yml exists " +
-        "inside this slot's own dispatch window",
+      };
+    }
+  }
+  if (failedRun) {
+    return {
+      state: DELIVERY_EVIDENCE_NOT_DELIVERED,
+      run: null,
+      failed_run: failedRun,
+      reason: "the workflow_dispatch run of daily-news.yml inside this slot's " +
+        "own dispatch window ran and concluded " + failedRun.conclusion +
+        (failedRun.id ? " (run " + failedRun.id + ")" : "") +
+        ", and no later run in the window succeeded",
     };
   }
   return {
     state: DELIVERY_EVIDENCE_NOT_DELIVERED,
+    run: null,
+    failed_run: null,
     reason: "no successful workflow_dispatch run of daily-news.yml inside this " +
-      "slot's dispatch window",
+      "slot's dispatch window, and no failed one either",
   };
 }
 
@@ -3800,7 +3843,8 @@ async function checkSlotDeliveredByWorkerRun(env, slotName, today, nowMs, opts) 
         "digest the owner may already have, and the 07:50 GitHub fallback and " +
         "the watchdog both still own this slot."
     );
-    return { state: DELIVERY_EVIDENCE_UNKNOWN, reason: why, run: null };
+    return { state: DELIVERY_EVIDENCE_UNKNOWN, reason: why, run: null,
+             failed_run: null };
   };
 
   // MARKER FIRST, THEN TOKEN, and the order is load-bearing.
@@ -3814,6 +3858,7 @@ async function checkSlotDeliveredByWorkerRun(env, slotName, today, nowMs, opts) 
   const markerAt = opts && opts.dispatch_at ? String(opts.dispatch_at) : "";
   if (!markerAt) {
     return { state: DELIVERY_EVIDENCE_NOT_DELIVERED, run: null,
+             failed_run: null,
              reason: "this Worker never dispatched a build for this slot, so " +
                "there is no dispatch window and no run to find" };
   }
@@ -3824,7 +3869,7 @@ async function checkSlotDeliveredByWorkerRun(env, slotName, today, nowMs, opts) 
   let res;
   try {
     res = await fetch(
-      digestRunsUrl() + "?event=workflow_dispatch&status=success&per_page=20",
+      digestRunsUrl() + "?event=workflow_dispatch&status=completed&per_page=20",
       {
         headers: {
           Authorization: "Bearer " + env.GH_TOKEN,
@@ -3859,13 +3904,16 @@ async function checkSlotDeliveredByWorkerRun(env, slotName, today, nowMs, opts) 
     console.error(label + ": " + DELIVERY_EVIDENCE_UNKNOWN.toUpperCase() +
       " — " + verdict.reason);
     return { state: DELIVERY_EVIDENCE_UNKNOWN,
-             reason: verdict.reason, run: null };
+             reason: verdict.reason, run: null, failed_run: null };
   }
+  const failed = verdict.failed_run || null;
   console.log(
     label + ": " + verdict.state.toUpperCase() + " — " + verdict.reason +
-      (verdict.run && verdict.run.id ? " (run " + verdict.run.id + ")" : "")
+      (verdict.run && verdict.run.id ? " (run " + verdict.run.id + ")" : "") +
+      (failed && failed.id ? " (failed run " + failed.id + ")" : "")
   );
-  return verdict;
+  return { state: verdict.state, reason: verdict.reason,
+           run: verdict.run || null, failed_run: failed };
 }
 
 async function escalateToActions(env, slotName, today, reason, nowMs) {
@@ -4015,6 +4063,39 @@ async function announceStaleEditionOnce(env, writer, date, slot, lastGoodShown,
     alerted: !!(res && res.ok),
     reason: res && res.ok ? "" : String((res && res.error) || "send failed"),
   };
+}
+
+// THE ONE PLACE THE DISPATCH VERDICT IS DECIDED.
+//
+// Four states, not two, and the order below is the order of strength:
+//
+//   a run that FAILED   -- strongest. A build was dispatched AND it finished
+//                          badly. Saying "nothing was dispatched" here is the
+//                          2026-10-28 defect.
+//   this pass dispatched-- a build is on its way.
+//   a marker exists     -- a build for this slot WAS dispatched, by an earlier
+//                          pass. "NO build was dispatched" is still false.
+//   neither             -- the only state in which that sentence is true.
+//
+// Pure, so a test can pin all four without a network call.
+function dispatchVerdictSuffix(escalation, failedRun) {
+  const at = (escalation && escalation.at) || null;
+  const cause = escalation && escalation.cause ? String(escalation.cause) : "";
+  if (failedRun) {
+    return " | the build dispatched for this slot FAILED (" +
+      String(failedRun.conclusion || "unknown") + ")" +
+      (failedRun.id ? ", run " + String(failedRun.id) : "") +
+      " and no later build was dispatched for it";
+  }
+  if (escalation && escalation.dispatched) {
+    return " | a late build was dispatched";
+  }
+  if (at || cause === "already_dispatched") {
+    return " | a build for this slot was dispatched at " +
+      String(at || "an earlier pass") +
+      ", and nothing was dispatched by this pass";
+  }
+  return " | NO build was dispatched";
 }
 
 async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
@@ -4182,6 +4263,15 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
   // new one on every pass.
   const escalation = await escalateToActions(env, slotName, today, reason, startedAt);
   const dispatched = escalation.dispatched;
+  // "DID THIS PASS DISPATCH?" AND "IS A BUILD ON ITS WAY?" ARE TWO QUESTIONS,
+  // AND CONFLATING THEM IS THE DEFECT THIS BLOCK FIXES. `dispatched` answers the
+  // first, truthfully. The marker answers the second, and a recorded failed run
+  // answers it the other way round: the build is not on its way, it already
+  // came and it died. Everything below derives from these three locals so the
+  // notice, the ledger field and ?health=1 cannot disagree.
+  const failedRun = (evidence && evidence.failed_run) || null;
+  const dispatchedForSlot = dispatched || !!escalation.at;
+  const buildOnItsWay = dispatched || (!failedRun && dispatchedForSlot);
   // NO LLM CONTROL OVER THIS STRING, AND NO CAUSE THIS CODE DID NOT ESTABLISH.
   // Derived only from `escalation.cause`, which githubWorkflowDispatch sets from
   // the HTTP status it actually received or from the marker it actually read.
@@ -4202,7 +4292,20 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
   // loses its "a build is on its way" line is the exact dishonesty this fix
   // exists to prevent. Near the top it survives clipping, and it is also the
   // part the owner reads first on a phone.
-  const dispatchNote = dispatched
+  const dispatchNote = failedRun
+    // THE STRONGEST FACT WINS, AND IT IS OWNER-FACING. Before this branch the
+    // "already dispatched" case below answered for a build that had already
+    // failed, telling the owner "Nothing is wrong — this slot is already being
+    // handled" about a run that had concluded `failure` (2026-10-28 morning,
+    // run 40615951953). A calm sentence about a build that is not coming is the
+    // most expensive kind of wrong: it stops him looking.
+    ? "\n\n**The build for this slot was started and it FAILED.** It was " +
+      "dispatched from here at " + String(escalation.at || "an earlier pass") +
+      " and concluded " + String(failedRun.conclusion || "unknown") +
+      (failedRun.id ? " (run " + String(failedRun.id) + ")" : "") +
+      ". No later build has been started for this slot, so this notice is the " +
+      "whole of what it produced."
+    : dispatched
     ? "\n\n**A fresh build is on its way.** Nothing was sealed in time for " +
       "this slot, so one was dispatched from here and will arrive late."
     : escalation.cause === "already_dispatched"
@@ -4239,13 +4342,19 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
                   "credential fault either.") +
         " Nothing was dispatched, so this notice is the whole of what this " +
         "slot produced.";
-  // UNCHANGED, DELIBERATELY. `reject_reason` is an anchored two-value contract
-  // (tests/digest/digest_delivery.test.js pins it with $) read by the watchdog
-  // and the ledger reader, so the cause does NOT go here. It goes to
-  // `actions_dispatch_reason` / `actions_dispatch_cause` below, which are the
-  // fields that exist to be specific.
-  reason = (reason || "") +
-    (dispatched ? " | a late build was dispatched" : " | NO build was dispatched");
+  // THE DISPATCH VERDICT, AND IT MAY NOT CONTRADICT THE RUN LOG. This used to be
+  // `dispatched ? A : B` -- two answers for what is really one of four states --
+  // so the third state, a build this Worker DID dispatch which then ran and
+  // FAILED, fell into "NO build was dispatched". On 2026-10-28 morning the
+  // owner was told nothing had been dispatched about run 40615951953, which had
+  // been dispatched at 01:35:27Z and concluded `failure`: the notice pointed him
+  // at a missing build when the build existed and its log said why it died.
+  //
+  // `reject_reason` stays the anchored contract the watchdog and the ledger
+  // reader read (tests/digest/digest_delivery.test.js pins its tail with $), so
+  // the cause still does NOT go here. The suffix stays a one-line tail for the
+  // same reason: it is appended to a stable prefix, not rewritten.
+  reason = (reason || "") + dispatchVerdictSuffix(escalation, failedRun);
   console.log(
     label + ": no artifact for " + today + " " + slotName + " — " +
       (dispatched
@@ -4309,13 +4418,32 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
         build: workerBuild(env),
         // NEVER the last_good slot: a fallback must not become tomorrow's
         // fallback, or one bad day feeds itself for ever.
-        last_good_shown: usable ? String(lastGood.date) : null,
+        //
+        // AND NULL WHEN THE PUSH DID NOT LAND. `last_good_shown` is a claim about
+        // what the owner was SHOWN, so it is true only if a push succeeded. It
+        // used to be written from `usable` alone, so a failed fallback recorded
+        // "you were shown the 2026-10-18 edition" while `ntfy_sent_at` was null
+        // and nothing had been sent -- and ?health=1 then reported
+        // `fallback_shown: false` beside a non-null `last_good_shown`, two fields
+        // contradicting each other on the same response.
+        last_good_shown: published.ok && usable ? String(lastGood.date) : null,
+        // What the failure WAS, when there was one. Three fields for three
+        // questions that used to be answered by one prose string: whether a build
+        // was dispatched (the marker), whether this pass dispatched it
+        // (`late_build_dispatched`), and how the dispatched build ended
+        // (this). A reader that wants the class must not have to parse English.
+        dispatch_failure_class: failedRun ? String(failedRun.conclusion || "unknown") : null,
         // Was a late build actually dispatched for this slot? The watchdog and
         // the ledger reader both need this to tell "the build is coming" from
         // "nothing is building and only this apology exists", and guessing it
         // from the absence of a failure would be exactly the dishonesty the
         // dispatch note above refuses.
-        late_build_dispatched: dispatched,
+        //
+        // `dispatched` ALONE WAS THAT DISHONESTY. It answers "did THIS pass
+        // dispatch", so every re-fire after a real dispatch wrote `false` over a
+        // slot that had a build. `dispatchedForSlot` is the question the field
+        // is named after: the marker proves an earlier pass dispatched it.
+        late_build_dispatched: dispatchedForSlot,
         // The once-per-slot dispatch marker, on this rung too. Without it here,
         // the quota escalation added to the real-digest path would re-dispatch
         // on every re-fire of a slot this ladder already dispatched.
@@ -4347,16 +4475,17 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
   // and `announceStaleEditionOnce` refuses to burn it without a writer.
   const staleAlert = published.ok && usable
     ? await announceStaleEditionOnce(
-        env, writer, today, slotName, String(lastGood.date), reason, dispatched,
-        startedAt)
+        env, writer, today, slotName, String(lastGood.date), reason,
+        buildOnItsWay, startedAt)
     : { alerted: false, reason: published.ok ? "no last good edition" : "push failed" };
   console.log(
     label + ": " + JSON.stringify({
       kind: kind, reject_reason: reason, pushed: published.ok,
       attempts: published.attempts, http_status: published.http_status,
       sequence_id: sequenceId,
-      late_build_dispatched: dispatched,
-      last_good_shown: usable ? String(lastGood.date) : null,
+      late_build_dispatched: dispatchedForSlot,
+      last_good_shown: published.ok && usable ? String(lastGood.date) : null,
+      dispatch_failure_class: failedRun ? String(failedRun.conclusion || "unknown") : null,
       stale_alert: staleAlert.alerted,
       stale_alert_reason: staleAlert.reason || null,
     })
@@ -4371,8 +4500,9 @@ async function pushFallbackLadder(env, ledger, today, slotName, reason, plain,
     http_status: published.http_status,
     sequence_id: sequenceId,
     reject_reason: reason,
-late_build_dispatched: dispatched,
-      last_good_shown: usable ? String(lastGood.date) : null,
+    late_build_dispatched: dispatchedForSlot,
+    last_good_shown: published.ok && usable ? String(lastGood.date) : null,
+    dispatch_failure_class: failedRun ? String(failedRun.conclusion || "unknown") : null,
       stale_alert: staleAlert.alerted,
       stale_alert_reason: staleAlert.reason || null,
       // Carried on the pushed path too, so `delivery_evidence` is a field every
@@ -4802,9 +4932,19 @@ function latestLedgerDelivery(ledger) {
     // ladder and scripts/delivery_ledger.py both depend on.
     edition: edition,
     fresh_edition: edition === "fresh",
-    fallback_shown: edition === "fallback",
-    last_good_shown: best.last_good_shown || null,
-    reason: best.reject_reason || null,
+    // THE THREE FIELDS BELOW ARE ONE FACT, SO THEY COME FROM ONE FACT.
+    // `fallback_shown` and `last_good_shown` are claims about what the owner was
+    // SHOWN, so they are true only if a push actually landed -- and `edition`
+    // already folds the push result in ("failed" when it did not). A stored
+    // `last_good_shown` on a failed push was written by an older build, so it is
+    // nulled HERE rather than trusted: ?health=1 reported `fallback_shown: false`
+    // beside a non-null `last_good_shown` on the same response, which is two
+    // answers to one question, and the wrong one was the reassuring one.
+    fallback_shown: !!best.ntfy_sent_at && edition === "fallback",
+    last_good_shown: !!best.ntfy_sent_at && edition === "fallback"
+      ? (best.last_good_shown || null)
+      : null,
+    reason: honestDeliveryReason(best),
     sequence_id: best.sequence_id || null,
     ntfy_sent_at: best.ntfy_sent_at || null,
     delta_s: delta,
@@ -4812,6 +4952,38 @@ function latestLedgerDelivery(ledger) {
     // scripts/delivery_ledger.py: negative is early, never on time.
     on_time: delta !== null && delta >= 0 && delta <= DELIVERY_ON_TIME_S,
   };
+}
+
+// WHAT THE LEDGER'S OWN `reject_reason` IS ALLOWED TO SAY THROUGH ?health=1.
+//
+// `reject_reason` is written by whichever pass LAST touched the slot, and a
+// re-fire can record a WEAKER claim than an earlier pass already proved. The
+// 2026-10-28 morning entry is exactly that: it carries `actions_dispatch_at`, so
+// a build was dispatched at 01:35:27Z, and it ends "NO build was dispatched",
+// because the tail was derived from `dispatched` (this pass) alone. The ledger
+// read-back then repeats that sentence to whoever asks how the slot went.
+//
+// So a recorded dispatch DOWNGRADES the claim at read time, which also repairs
+// entries already in KV without a migration. It does not invent a verdict: with
+// no recorded failure class it says the outcome was not recorded, which is the
+// truth for a legacy entry.
+function honestDeliveryReason(entry) {
+  const stored = String((entry && entry.reject_reason) || "");
+  if (!stored) return null;
+  const dispatched = !!(entry && entry.actions_dispatch_at) ||
+    (entry && entry.late_build_dispatched === true);
+  if (!dispatched) return stored;
+  // Anchored, because the sentence is the TAIL of the stored string and a
+  // mid-string match would mangle a reason that merely mentions it.
+  const noBuild = /\s*\|\s*NO build was dispatched\s*$/;
+  if (!noBuild.test(stored)) return stored;
+  const failureClass = entry.dispatch_failure_class
+    ? String(entry.dispatch_failure_class)
+    : "";
+  const truth = failureClass
+    ? "| the build dispatched for this slot FAILED (" + failureClass + ")"
+    : "| a build was dispatched for this slot and its outcome was not recorded";
+  return stored.replace(noBuild, " " + truth);
 }
 
 // --- main pass ----------------------------------------------------------------
