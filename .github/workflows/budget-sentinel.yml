@@ -45,17 +45,25 @@ name: Actions Budget Sentinel
 # still exits 0. Refusing at 1,400 would stop work with 600 minutes of allowance
 # still unspent. The HARD CEILING (`hard_ceiling_minutes`, 1,800 = allowance
 # 2,000 - a 200 reserve) is the number every level below is a fraction OF. Since
-# 2026-10-25 it is REPORTED here but no longer refused on by the Worker: this
-# repository is public, standard runners are free, and
-# `config/actions-budget.json` carries `enforcement.enabled: false`. Flipping that
-# flag back to true re-arms the refusal; nothing in THIS job changes either way.
+# 2026-10-25 it is REPORTED instead of refused: this repository is public,
+# standard runners are free, and `config/actions-budget.json` carries
+# `enforcement.enabled: false`. Flipping that flag back to true re-arms BOTH the
+# Worker's refusal and the 100% level below, because both read that one switch --
+# the same rule `scripts/check_actions_budget.py` applies statically.
 #   80% of the CEILING -- issue + ntfy. Information: the month is trending over.
 #   90% of the CEILING -- issue labelled `budget-freeze` + ntfy. The FLAG. This is
 #                        the level that asks for a DECISION (pause discretionary
 #                        dispatches) while there is still headroom to act in.
-#   100% of the CEILING -- ::error::, issue, and the job FAILS, on purpose. A
-#                        budget guard that cannot go red is a report.
+#   100% of the CEILING -- ARMED: ::error::, issue, and the job FAILS, on purpose.
+#                        A budget guard that cannot go red is a report.
+#                        DISARMED: the same numbers, a REPORT-ONLY line saying
+#                        standard runners are free on a public repository, no
+#                        issue, and exit 0. A free minute cannot be "over budget".
 #   below              -- prints the numbers and exits 0.
+#
+# A BROKEN MEASUREMENT IS STILL RED IN BOTH STATES. Unreadable run data exits 2
+# and a malformed config raises, because those say the number is UNKNOWN -- which
+# is not the same claim as "the number is high and it does not matter".
 #
 # WHY THE FREEZE FLAG IS A LABEL, AND WHO READS IT. The flag is the presence of
 # an OPEN issue labelled `budget-freeze` -- one switch, two readers: a human sees
@@ -146,6 +154,10 @@ jobs:
           warn_ratio = float(budget.get("warn_ratio", 0.8))
           freeze_ratio = float(budget.get("freeze_ratio", 0.9))
           days_in_month = int(budget["days_per_month"])
+          #: One switch, read from the file and nowhere else -- the same one the
+          #: Worker and the static check obey. While it is false the standard
+          #: runners are free, so the ceiling cannot justify a red run.
+          enforced = bool((budget.get("enforcement") or {}).get("enabled"))
 
           started = time.time()
           now = datetime.datetime.now(datetime.timezone.utc)
@@ -252,6 +264,21 @@ jobs:
                    "runner-assignment, which is a hard stop with no bill to pay.",
           }[level]
           body = "%s\n\n%s\n\n%s\n" % (lead, detail, action)
+
+          if level == 100 and not enforced:
+              # The measured figures are already printed above; this says what
+              # they MEAN, so nobody reads "100% of the ceiling" as a bill.
+              print("REPORT-ONLY: the projected month is %.0f min against a hard "
+                    "ceiling of %.0f min (%+.0f min over)."
+                    % (projected, ceiling, projected - ceiling))
+              print("REPORT-ONLY: INFORMATIONAL, NOT A BLOCKER -- standard runners "
+                    "are free on a public repository, so no minute is billed and no "
+                    "allowance is exceeded. Nothing needs to change; "
+                    "`enforcement.enabled` is false, which is why this workflow "
+                    "reports instead of failing. No issue is filed and no dispatch "
+                    "is shed.")
+              print("::warning::%s" % lead)
+              sys.exit(0)
 
           print("::warning::%s" % lead)
           if level == 100:
