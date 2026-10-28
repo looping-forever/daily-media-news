@@ -1322,6 +1322,19 @@ test("the reason agrees with the state it sits beside", async () => {
   assert.ok(failed.indexOf("NO build was dispatched") < 0,
     "a failed row still denies the dispatch: " + JSON.stringify(failed));
 
+  // FAILED with a token other than `absent`: the 2026-10-28 evening row records
+  // `state: failed` beside `title | a late build was dispatched`, and `title` is
+  // the ARTIFACT's token — it says why the artifact was refused, not whether
+  // anything reached the phone. The state leads, the token survives as detail.
+  const failedTitle = w.honestDeliveryReason({
+    state: "failed", reject_reason: "title | a late build was dispatched" });
+  assert.match(failedTitle, /^failed \|/,
+    "a failed row opened with the artifact's token: " +
+    JSON.stringify(failedTitle));
+  assert.ok(failedTitle.indexOf("title | a late build was dispatched") > 0,
+    "the artifact's token was dropped instead of kept as detail: " +
+    JSON.stringify(failedTitle));
+
   // ABSENT: no evidence of a dispatch, so the true sentence survives untouched.
   assert.strictEqual(w.honestDeliveryReason({ reject_reason: stored }), stored,
     "a slot nothing was dispatched for had its true sentence rewritten");
