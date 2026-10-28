@@ -1050,6 +1050,11 @@ jobs:
       - name: Run OpenCode agent
         if: env.FALLBACK_NOOP != 'true'
         timeout-minutes: 35
+        # A DEAD WALK NO LONGER COSTS THE SLOT. This step used to exit 1 on "no
+        # digest", which failed the job before the unsummarised fallback below
+        # could run. The fallback decides from the FILE, not from this outcome,
+        # so a crashed or timed-out step is handled the same way as a clean miss.
+        continue-on-error: true
         # The agent writes state/stories.json itself; stdout is only logged to
         # state/agent-log.txt for debugging and is never parsed for success.
         env:
@@ -1454,6 +1459,44 @@ jobs:
             tail -n 50 state/agent-log.txt || true
             exit 1
           fi
+
+      - name: Derive the unsummarised edition
+        if: env.FALLBACK_NOOP != 'true'
+        # NO MODEL IN THIS STEP. When the walk above produced no usable
+        # state/stories.json, the collector's own candidates are the edition:
+        # headlines, links and hosts, with no summary written by anything. The
+        # page, email and push all say so, so an unlabelled empty summary can
+        # never be read as a real one. It is skipped whenever the agent DID
+        # write stories, so a normal run is unchanged.
+        env:
+          TODAY: ${{ env.TODAY }}
+          DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
+        run: |
+          set -eo pipefail
+          HAVE=0
+          if [ -f state/stories.json ] && python3 -c "import json,sys; d=json.load(open('state/stories.json')); sys.exit(0 if isinstance(d.get('stories'), list) and d['stories'] else 1)" 2>/dev/null; then
+            HAVE=1
+          fi
+          if [ "$HAVE" = "1" ]; then
+            echo "A model-written digest exists; the unsummarised fallback is not used."
+            exit 0
+          fi
+          if [ ! -s state/candidates.json ]; then
+            echo "::warning::No collected candidates to derive from -- the empty-outcome path owns this run."
+            exit 0
+          fi
+          # Below the floor the deriver writes NOTHING and exits 0 on purpose:
+          # the existing empty-digest classification is the owner of that case.
+          echo "::warning::No digest from the model walk -- deriving the unsummarised edition from the collected candidates (no AI)."
+          echo "### Unsummarised edition (no AI today)" >> "$GITHUB_STEP_SUMMARY"
+          START=$(date +%s)
+          python3 scripts/derive_unsummarised.py \
+            --candidates state/candidates.json \
+            --out state/stories.json \
+            --today "$TODAY" \
+            --slot "$DIGEST_TIME"
+          END=$(date +%s)
+          STAGE_KEY=derive STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
 
       - name: Validate stories
         if: env.FALLBACK_NOOP != 'true'
@@ -2595,6 +2638,10 @@ jobs:
               except Exception as exc:
                   print('WARNING: could not read state/stories.validated.json: %s' % exc)
 
+              # The fallback edition declares itself in the payload; the push is
+              # the surface a reader sees first, so the title says it in words.
+              unsummarised = str(data.get('edition_kind') or '') == 'unsummarised'
+
               # --- Weather verdicts (scripts/weather_advice.py) ---
               # The engine writes a top-level `weather_advice` list into
               # state/candidates.json; the validated payload may also carry
@@ -3610,8 +3657,15 @@ jobs:
               # title, and `N item`/`N items` is the owner's own wording.
               if not ordered:
                   title = empty_title
+              elif unsummarised:
+                  # THE COUNT MAKES ROOM FOR THE LABEL, not the other way round.
+                  # "unsummarised edition (no AI today)" is 35 characters and the
+                  # title has 72; keeping `N items` as well pushes the one fact
+                  # that changes how the whole push must be read off the shade.
+                  title = '%s %s \u00b7 %s \u00b7 unsummarised edition (no AI today)' % (
+                      emoji, send_label, today)
               else:
-                  title = '%s %s · %s · %d %s' % (
+                  title = '%s %s \u00b7 %s \u00b7 %d %s' % (
                       emoji, send_label, today, len(ordered),
                       'item' if len(ordered) == 1 else 'items')
 
@@ -3924,7 +3978,7 @@ jobs:
             exit 0
           fi
           python3 - <<'PY'
-          import os, smtplib
+          import os, smtplib, json
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
 
@@ -3950,7 +4004,16 @@ jobs:
                   raise SystemExit(1)
 
               msg = MIMEMultipart('alternative')
-              msg['Subject'] = f'Daily Media News - {kind} - {today}'
+              # The subject is the lock-screen line for this channel; an
+              # unsummarised edition must never arrive looking like a normal one.
+              edition_tag = ''
+              try:
+                  with open('state/stories.validated.json', encoding='utf-8') as fh:
+                      if json.load(fh).get('edition_kind') == 'unsummarised':
+                          edition_tag = ' - unsummarised edition (no AI today)'
+              except Exception as exc:
+                  print(f'WARNING: could not read edition_kind for the subject: {exc}')
+              msg['Subject'] = f'Daily Media News - {kind} - {today}{edition_tag}'
               receiver = os.environ.get('GMAIL_RECEIVER') or os.environ['GMAIL_USER']
               msg['From'] = os.environ['GMAIL_USER']
               msg['To'] = receiver

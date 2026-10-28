@@ -1384,8 +1384,13 @@ class TestNtfyTitle(unittest.TestCase):
             "title's variable has been renamed back to the shadowable name"
             % (owners,))
 
-    def test_the_heredoc_uses_send_label_in_all_three_title_shapes(self):
-        """One word in, three titles out -- and none of them re-derives it."""
+    def test_the_heredoc_uses_send_label_in_all_title_shapes(self):
+        """One word in, four titles out -- and none of them re-derives it.
+
+        The fourth shape is the unsummarised fallback (2026-10-28): it names the
+        edition kind instead of the item count, so the count can never push the
+        one fact that changes how the push must be read off the shade.
+        """
         code = ntfy_source()
         self.assertIn("send_label = '%s Digest · %s' % (label_word, label_clock)",
                       code)
@@ -1397,8 +1402,8 @@ class TestNtfyTitle(unittest.TestCase):
         names = [n.id for n in ast.walk(tree)
                  if isinstance(n, ast.Name) and n.id == "send_label"]
         self.assertEqual(
-            len(names), 4,
-            "expected the one assignment plus its three title uses, found %d "
+            len(names), 5,
+            "expected the one assignment plus its four title uses, found %d "
             "references: %r -- a title shape was left building its own label"
             % (len(names), names))
         self.assertNotIn("emoji, label,", code)

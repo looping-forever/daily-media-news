@@ -1773,6 +1773,11 @@ def main(argv=None):
         "filtered_count": len(filter_log),
         "filter_log": filter_log[:MAX_FILTER_LOG],
     }
+    # Passthrough, not validation: the edition KIND is the producer's claim (the
+    # no-AI fallback), and the renderer needs it to label the page. Absent on a
+    # model-written run, so the payload keeps its old shape there.
+    if data.get("edition_kind"):
+        payload["edition_kind"] = str(data["edition_kind"])
     out_dir = os.path.dirname(os.path.abspath(args.out_path))
     if out_dir and not os.path.isdir(out_dir):
         os.makedirs(out_dir, exist_ok=True)

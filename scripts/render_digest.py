@@ -195,6 +195,10 @@ HEALTH_BANNER = {
     "unknown": "⚠️ Source check unavailable — this digest may be missing items.",
 }
 
+# The no-AI fallback's page label. ONE literal, so the page, the email subject
+# and the push cannot drift into three different descriptions of one edition.
+UNSUMMARISED_LABEL = "Unsummarised edition (no AI today)"
+
 # Freshness line (FROZEN CONTRACT C). `unknown` DROPS the timestamp entirely:
 # if no source was confirmed reachable, claiming "checked through T" is the
 # exact lie this renderer exists to remove. `empty` KEEPS the timestamp -- the
@@ -1852,13 +1856,18 @@ def render_sections(grouped, source_health=None):
     return "\n".join(blocks)
 
 
-def render_health_block(source_health, notes="", delivery_line=""):
+def render_health_block(source_health, notes="", delivery_line="", edition_line=""):
     """Banner + 'Down:' line + research note + delivery line (website variant).
 
     `delivery_line` is OPTIONAL and defaults to empty, which renders nothing at
     all -- no line, no placeholder, no gap. That is the whole contract while
     the ledger ships dark: a caller that does not pass one gets byte-identical
     output to a caller that predates the feature.
+
+    `edition_line` follows the SAME contract, for the same reason: the
+    unsummarised fallback must not change one byte of a normal digest. It says
+    what KIND of edition this is, so it is not folded into the research note and
+    it does not borrow the alarm colour -- an edition with no AI is not a fault.
 
     When it IS passed, the line lands HERE, in the hero health block, and not in
     the footer. The footer is the bare one-liner the archive index shares its
@@ -1868,8 +1877,10 @@ def render_health_block(source_health, notes="", delivery_line=""):
     lines = [health_banner(source_health), down_line(source_health),
              capped_note(notes), delivery_line]
     lines = [ln for ln in lines if ln]
+    edition_html = ('<p class="health-edition">%s</p>' % esc(edition_line)
+                    if edition_line else "")
     if not lines:
-        return ""
+        return edition_html
     parts = []
     for ln in lines:
         if ln.startswith(NOTE_LABEL):
@@ -1892,7 +1903,7 @@ def render_health_block(source_health, notes="", delivery_line=""):
             parts.append('<p class="%s">%s</p>'
                          % ("health-down" if ln.startswith("Down:") else
                             "health-line", esc(ln)))
-    return '<div class="health-banner">%s</div>' % "".join(parts)
+    return '<div class="health-banner">%s%s</div>' % (edition_html, "".join(parts))
 
 
 def render_topbar(digest_time, date_val, story_count, label=None):
@@ -1946,7 +1957,7 @@ def render_topbar(digest_time, date_val, story_count, label=None):
 
 
 def render_hero(meta, digest_time, date_val, story_count, source_health=None,
-                notes="", stories=None, delivery_line=""):
+                notes="", stories=None, delivery_line="", edition_line=""):
     """The pre-sections block: honesty, Your day, weather, freshness.
 
     THE HONESTY BANNER COMES FIRST WHEN IT HAS ANYTHING TO SAY. Its first line
@@ -1998,7 +2009,8 @@ def render_hero(meta, digest_time, date_val, story_count, source_health=None,
             if health_state(source_health) == "unknown" else "hero-cutoff"
         cutoff_html = '<p class="%s">%s</p>' % (cls, esc(line))
 
-    banner_html = render_health_block(source_health, notes, delivery_line)
+    banner_html = render_health_block(source_health, notes, delivery_line,
+                                      edition_line)
 
     return ('<section class="hero">'
             '%s%s%s%s'
@@ -2104,6 +2116,13 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     build" path can be exercised for real -- a path that does not resolve to
     this slot -- rather than being argued about in a comment.
     """
+    # The fallback says what it is, on the page itself. Read from the validated
+    # payload rather than passed by the caller, so no caller can render an
+    # unsummarised edition that forgets to admit it.
+    edition_line = ""
+    if (meta or {}).get("edition_kind") == "unsummarised":
+        edition_line = UNSUMMARISED_LABEL
+
     grouped = {}
     for s in stories:
         grouped.setdefault(s.get("category", ""), []).append(s)
@@ -2121,7 +2140,7 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     hero_html = render_hero(meta, digest_time, date_val, len(stories),
                             (meta or {}).get("source_health"),
                             (meta or {}).get("notes"), stories,
-                            delivery_line)
+                            delivery_line, edition_line)
 
     # WHAT THIS PAGE CLAIMS ABOUT ITS OWN TIME, STATED PLAINLY.
     #
@@ -2325,6 +2344,14 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
       text-align: left;
     }
     .health-line { color: #fbbf24; font-size: 12px; font-weight: 700; }
+    /* The unsummarised fallback. An edition KIND, not a fault: it is not folded
+       away like the research note and it never borrows the alarm colour. */
+    .health-edition {
+      color: #f5f5f5;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
     .health-down {
       color: #fca5a5;
       font-size: 11px;
