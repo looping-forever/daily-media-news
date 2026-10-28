@@ -1131,10 +1131,12 @@ class TestNtfyGlanceBlock(unittest.TestCase):
         reaches the branch by finding the longest real reason and proving the
         guard, using the source's own arithmetic rather than a fake date.
         """
-        self.assertIn("if len(title) + len(reason) + 3 <= TITLE_MAX_CHARS:",
+        self.assertIn("if len(title) + len(reason) + 3 <= title_budget:",
                       ntfy_source(),
                       "the whole-title-fits guard is gone; a clause can now be "
-                      "appended past the budget and clipped by the phone")
+                      "appended past the budget and clipped by the phone. The "
+                      "bound is `title_budget`, not `TITLE_MAX_CHARS`: the TEST "
+                      "marker is reserved off the top, so the two differ.")
 
     # -- weather must not be duplicated by the new layer -----------------
 

@@ -696,20 +696,26 @@ class FallbackLedgerTests(unittest.TestCase):
             "is a stale instant from an earlier attempt being read as this "
             "slot's delivery:\n%s" % out)
 
-    def test_a_stamp_before_the_slots_scheduled_instant_does_not_arm(self):
+    def test_a_stamp_long_before_the_slots_scheduled_instant_does_not_arm(self):
         """Same gate, from `scheduled_instant` alone — no `pending_at` needed.
 
         The instant is the one fact the Worker and this step can both read, so
         the check must not depend on the write-ahead record being present.
+
+        45 MINUTES EARLY, NOT 15, BECAUSE THE SLACK IS 30. A real send sits
+        9m55s early in this ledger, so anything inside half an hour IS this
+        slot's delivery and must stand the ladder down (the test above pins
+        that). This one pins the other side: a stamp from another time of day
+        is not evidence and must let the ladder run.
         """
-        impossible = entry(ntfy_sent_at="2026-10-09T01:20:00Z",
+        impossible = entry(ntfy_sent_at="2026-10-09T00:50:00Z",
                            first_ntfy_sent_at=None,
                            scheduled_instant="2026-10-09T01:35:00Z")
         code, out = self._run(kv_body=ledger_raw(impossible),
                               marker_obj=marker(delivered=False))
         self.assertEqual(0, code, out)
         self.assertFalse(self._armed(),
-                         "a send 15 minutes before the slot was due stood the "
+                         "a send 45 minutes before the slot was due stood the "
                          "ladder down:\n%s" % out)
 
     def test_an_unreadable_instant_is_not_evidence_of_a_send(self):
@@ -737,7 +743,7 @@ class FallbackLedgerTests(unittest.TestCase):
         self.assertEqual(0, code, out)
         self.assertTrue(self._armed(),
                         "a send 30s before its scheduled instant — inside the "
-                        "60s slack this repository already allows a cron — was "
+                        "early slack this repository already allows a send — was "
                         "rejected, so the owner would be sent the digest "
                         "twice:\n%s" % out)
 

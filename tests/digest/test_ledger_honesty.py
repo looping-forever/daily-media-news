@@ -547,18 +547,23 @@ class LedgerMislabelTests(unittest.TestCase):
         self.assertEqual("", self.mislabel(dict(sent), "2026-10-12", "midnight"))
         self.assertEqual("", self.mislabel(dict(sent), "not-a-date", "evening"))
 
-    def test_the_early_slack_is_one_minute_and_needs_no_more(self):
-        """Clock skew between the Worker and the runner is tolerated; a lie is not.
+    def test_the_early_slack_is_thirty_minutes_and_needs_no_more(self):
+        """A send slightly before its slot is tolerated; a send from the wrong slot is not.
 
-        The same 60 seconds scripts/delivery_ledger.py already calls on time.
+        HALF AN HOUR, NOT 60 SECONDS, AND THAT IS EVIDENCE-DRIVEN. The ladder
+        recorded 2026-10-13T13:25:05Z for the 13:35Z evening slot — 9m55s early,
+        a real delivery the owner's phone really received. A 60s slack reported
+        that row as a lie, which trains everyone to ignore the honesty scan. The
+        thing this rule exists to catch is a send from a DIFFERENT slot: hours,
+        not minutes, away.
         """
         # The morning slot is due 01:35:00Z.
-        self.assertEqual("", self.mislabel({"ntfy_sent_at": "2026-10-12T01:34:30Z"},
+        self.assertEqual("", self.mislabel({"ntfy_sent_at": "2026-10-12T01:05:30Z"},
                                            "2026-10-12", "morning"),
-                         "a 30s-skewed record is not a mislabel")
-        self.assertNotEqual("", self.mislabel({"ntfy_sent_at": "2026-10-12T01:33:30Z"},
+                         "29m30s early is inside the slack, not a mislabel")
+        self.assertNotEqual("", self.mislabel({"ntfy_sent_at": "2026-10-12T01:03:30Z"},
                                               "2026-10-12", "morning"),
-                            "a 90s-early record is a mislabel")
+                            "31m30s early is a mislabel")
 
     def test_a_stored_lie_is_SEEN_while_reading_the_ledger(self):
         """The arm must find a lie that is already in KV, not only prevent one.

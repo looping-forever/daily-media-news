@@ -262,9 +262,9 @@ class TheSimulatedPushAndSubjectAreLabelledTests(unittest.TestCase):
                       str((sd.get("env") or {}).get("SIMULATE_POOL_REFUSAL")),
                       "the ntfy step no longer receives the flag, so the "
                       "TESTS-ONLY push it makes cannot be marked")
-        self.assertIn("title = 'TEST", run,
-                      "the push title is no longer marked TEST, so a simulated "
-                      "run's notification reaches the owner looking real")
+        self.assertIn("test_prefix = TEST_TITLE_PREFIX if simulate else ''", run,
+                      "the push title no longer reserves the TEST marker, so a "
+                      "simulated run's notification reaches the owner looking real")
         self.assertIn("**TEST", run,
                       "the push BODY is no longer marked TEST. The title is "
                       "truncated in the shade and the body is what is read "

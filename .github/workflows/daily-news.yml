@@ -501,9 +501,16 @@ jobs:
           KV_NAMESPACE_ENV = 'CF_KV_NAMESPACE_ID'
           KV_PLACEHOLDER = 'abcdefabcdefabcdefabcdefabcdefab'
           KIND_UNAVAILABLE = 'unavailable'
-          # The 60s of early slack the archive steps already allow a cron that
-          # fires marginally before its own scheduled minute.
-          SLOT_EARLY_SLACK_S = 60
+          # The early slack the archive steps allow a send that lands before its
+          # slot's due minute. 30 minutes, because a REAL delivery sits 9m55s
+          # early in this ledger; the proof row this must reject is 10h51m early.
+          SLOT_EARLY_SLACK_S = 30 * 60
+          # WHEN EACH SLOT IS DUE, in UTC. The Worker's delivery moments: 07:20
+          # and 19:20 NPT with no DST, so 01:35 and 13:35 UTC. The second copy
+          # of this table is in the ntfy step and the third in
+          # deploy/cloudflare-worker.js (SCHED_DIGEST_SLOTS); tests pin all three
+          # against each other rather than leaving them to agree by luck.
+          SLOT_DUE_UTC = {'morning': (1, 35), 'evening': (13, 35)}
           # The same literal digest-prebuild.yml's seal lists in its
           # SUPERSEDED_KINDS -- the kinds a complete digest may replace, now four
           # with the no-AI `unsummarised` edition -- and the copy
@@ -626,6 +633,25 @@ jobs:
                   return None
               return moment.astimezone(datetime.timezone.utc)
 
+          def slot_due_instant(date, slot):
+              """The UTC instant `slot` on `date` is due, or None if unknowable.
+
+              Read off the table rather than off the row, which is the whole
+              point: a row written before `scheduled_instant` was stamped there
+              still has a due instant, and the drift rule needs one the row
+              cannot omit.
+              """
+              hour_minute = SLOT_DUE_UTC.get(slot)
+              if hour_minute is None:
+                  return None
+              try:
+                  day = datetime.date.fromisoformat(str(date))
+              except (TypeError, ValueError):
+                  return None
+              return datetime.datetime(day.year, day.month, day.day,
+                                       hour_minute[0], hour_minute[1],
+                                       tzinfo=datetime.timezone.utc)
+
           def send_instant_fits_slot(entry, when_text):
               """False when the recorded send provably cannot belong to this slot.
 
@@ -638,13 +664,19 @@ jobs:
 
                 * a send cannot precede the write-ahead `pending_at` that this
                   same run wrote before the first byte went to ntfy;
-                * a send cannot precede the slot's own `scheduled_instant` by
-                  more than the 60s early slack the archive steps allow.
+                * a send cannot precede the slot's own due instant by more than
+                  the 60s early slack the archive steps allow.
 
               A stamp that fails either test is not evidence, so this gate does
               not stand the ladder down on it. An unreadable stamp is not
               evidence either. A record with neither instant carries no timing
               claim at all and keeps the pre-existing behaviour.
+
+              THE DUE INSTANT IS THE ROW'S OWN, WHEN IT HAS ONE, AND THE TABLE'S
+              OTHERWISE. It used to be the row's own only, and 2026-10-29 exposed
+              why that is not enough: a proof run wrote 14:44Z into tomorrow's
+              morning bucket before `scheduled_instant` was ever stamped there,
+              so the one comparison that would have caught it had nothing to read.
               """
               sent = instant_or_none(when_text)
               if sent is None:
@@ -652,7 +684,8 @@ jobs:
               pending = instant_or_none(entry.get('pending_at'))
               if pending is not None and sent < pending:
                   return False
-              due = instant_or_none(entry.get('scheduled_instant'))
+              due = (instant_or_none(entry.get('scheduled_instant'))
+                     or slot_due_instant(today, slot))
               if due is not None and sent < due - datetime.timedelta(
                       seconds=SLOT_EARLY_SLACK_S):
                   return False
@@ -736,6 +769,16 @@ jobs:
                   return NO_ARM
               if str(entry.get('kind') or '') == KIND_UNAVAILABLE:
                   return NO_ARM
+              # A SIMULATED ROW IS NOT A DELIVERY, AND IT IS NOT A FAILURE. It
+              # is evidence about the code path, written by a run that pushed a
+              # notification marked TEST on purpose. On 2026-10-28 one wrote
+              # `state: sent` into tomorrow's 07:20 bucket, and without this term
+              # the 07:50 ladder would have stood down on it -- so the one
+              # recovery arm left would have declared a slot delivered that had
+              # never been built. `unknown` is the honest answer: nothing is
+              # recorded for this slot, so the file rule alone decides.
+              if entry.get('simulated') is True:
+                  return UNKNOWN
               if entry.get('ntfy_sent_at'):
                   if not send_instant_fits_slot(entry, entry.get('ntfy_sent_at')):
                       return NO_ARM
@@ -769,6 +812,10 @@ jobs:
                   LEDGER_REASON = 'entry records ntfy_failed (a verified push failure)'
               elif str(LEDGER_ENTRY.get('kind') or '') == KIND_UNAVAILABLE:
                   LEDGER_REASON = f'entry kind is {KIND_UNAVAILABLE}'
+              elif LEDGER_ENTRY.get('simulated') is True:
+                  LEDGER_REASON = ('entry is a SIMULATED proof push (simulated: '
+                                   'true) — it says nothing about whether this '
+                                   'slot was delivered')
               elif LEDGER_ENTRY.get('ntfy_sent_at'):
                   if send_instant_fits_slot(LEDGER_ENTRY, LEDGER_ENTRY.get('ntfy_sent_at')):
                       LEDGER_REASON = 'entry records ntfy_sent_at'
@@ -2009,6 +2056,10 @@ jobs:
           # to say so in the two fields the owner actually reads. Bound from the
           # dispatch input, so a cron run leaves it empty.
           SIMULATE_POOL_REFUSAL: ${{ github.event.inputs.simulate_pool_refusal }}
+          # Stamped onto the row this step writes, so a later reader can tell
+          # which arm produced it and never has to infer it from the clock.
+          # PHASE is deliberately NOT passed here: the payload must be identical
+          # at every phase, and this step must not be able to branch on one.
         run: |
           set -eo pipefail
           # Rich, self-contained notification: full digest markdown, image,
@@ -2025,6 +2076,41 @@ jobs:
           # prefixes are the same ones a genuine refusal produces.
           simulate = ((os.environ.get('SIMULATE_POOL_REFUSAL') or '').strip().lower()
                       == 'true')
+
+          def fit_title(text, limit):
+              """`text` shortened at a clause boundary to `limit` characters.
+
+              A phone clips the shade mid-word, and `... 3 deadlines due t` is
+              worse than one clause honestly missing. So nothing here is trimmed
+              mid-word and nothing is trimmed silently -- the clauses go in ONE
+              order, first to last:
+
+                1. a trailing parenthetical, whole: `unsummarised edition (no AI
+                   today)` -> `unsummarised edition`. The page and the email
+                   subject still carry the full sentence; this surface only
+                   stops repeating it inside 72 characters.
+                2. the last `\u00b7` clause, whole. The slot word, the clock and
+                   the date are what place the push; the body repeats them.
+                3. the last word of what is left, until it fits.
+
+              Same input, same output. The only way it returns something longer
+              than `limit` is a single word longer than `limit`.
+              """
+              text = str(text or '').strip()
+              if len(text) <= limit:
+                  return text
+              tail = text.rfind(' (')
+              if tail > 0 and text.endswith(')'):
+                  text = text[:tail].strip()
+                  if len(text) <= limit:
+                      return text
+              while '\u00b7' in text:
+                  text = text[:text.rindex('\u00b7')].rstrip(' \u00b7').strip()
+                  if len(text) <= limit:
+                      return text
+              while len(text) > limit and ' ' in text:
+                  text = text[:text.rindex(' ')].strip()
+              return text[:limit]
 
           # THE ONE PLACE THE PUSH'S HUMAN-FACING WORD IS DECIDED.
           #
@@ -2363,12 +2449,29 @@ jobs:
           SLOT_DUE_UTC = {'morning': (1, 35), 'evening': (13, 35)}
 
           # HOW EARLY A RECORDED SEND MAY BE before it is a mislabel rather than
-          # clock skew between the Worker and this runner. The same 60 seconds
-          # the punctuality module already calls "on time" (ON_TIME_S in
-          # scripts/delivery_ledger.py) -- reused rather than re-chosen, so the
-          # repository has one answer to "how close is close enough" instead of
-          # two that can drift apart.
-          SLOT_EARLY_SLACK_S = 60
+          # clock skew between the Worker and this runner.
+          #
+          # 30 MINUTES, NOT 60 SECONDS, AND THE NUMBER IS EVIDENCE-DRIVEN. The
+          # repository already holds a real Actions delivery recorded at
+          # 2026-10-13T13:25:05Z for the 13:35Z evening slot -- 9m55s early, on
+          # time by any reading of the owner's clock. A 60s slack called that a
+          # mislabel and would have pushed a SECOND copy of a digest already on
+          # the phone (tests/digest/test_duplicate_detector.py pins exactly that
+          # row). 30 minutes still rejects the case this rule exists for: the
+          # 2026-10-28 proof run filed 10h51m early under 2026-10-29 morning.
+          SLOT_EARLY_SLACK_S = 30 * 60
+
+          # THE MARKER A SIMULATED PUSH CARRIES AT THE FRONT OF ITS TITLE, and
+          # the same literal deploy/cloudflare-worker.js holds as
+          # TEST_TITLE_PREFIX. It is an IDENTITY, not decoration: a simulated
+          # run publishes a real notification under the slot's own sequence id,
+          # so without it every later dedupe layer reads a proof run as this
+          # slot's delivery and stands the real one down.
+          TEST_TITLE_PREFIX = 'TEST \u00b7 '
+
+          def is_test_push(title):
+              """True for a message this repository marked as a simulation."""
+              return str(title or '').strip().startswith(TEST_TITLE_PREFIX)
 
           def instant_or_none(text):
               """An ISO-8601 instant as an aware UTC datetime, or None.
@@ -2401,6 +2504,41 @@ jobs:
               return datetime.datetime(day.year, day.month, day.day,
                                        hour_minute[0], hour_minute[1],
                                        tzinfo=datetime.timezone.utc)
+
+          def slot_was_served(entry, date, slot, field='ntfy_sent_at'):
+              """Does this row PROVE the slot was delivered? Never raises.
+
+              THE ONE PREDICATE EVERY DEDUPE IN THIS FILE USES, because the
+              guard below and the honesty checker were asking different
+              questions about the same row. Four ways a row that looks like a
+              delivery is not one:
+
+                * `simulated`/`dry_run` -- a proof run. It is evidence about the
+                  CODE, not about the slot, and on 2026-10-28 a proof run for
+                  tomorrow's 07:20 wrote `sent` into 2026-10-29 morning.
+                * a push instant BEFORE the slot's own due instant by more than
+                  the 60s a cron jitter needs -- the same rule `ledger_mislabel`
+                  already flags, in the arm that decides whether to deliver.
+                * no readable instant: not evidence of anything.
+                * a row that is not a mapping at all.
+
+              `field` names which instant is trusted: `ntfy_sent_at` for a first
+              delivery, `ntfy_full_sent_at` for a supersede that already
+              replaced one.
+              """
+              if not isinstance(entry, dict):
+                  return False
+              if entry.get('simulated') is True or entry.get('dry_run') is True:
+                  return False
+              sent = instant_or_none(entry.get(field))
+              if sent is None:
+                  return False
+              due = (instant_or_none(entry.get('scheduled_instant'))
+                     or slot_due_instant(date, slot))
+              if due is not None and sent < due - datetime.timedelta(
+                      seconds=SLOT_EARLY_SLACK_S):
+                  return False
+              return True
 
           def slot_holding_instant(date, sent):
               """Which slot's window `sent` falls in, as "<date> <slot>", or ''.
@@ -2691,6 +2829,27 @@ jobs:
               except (AttributeError, TypeError, ValueError, OSError, OverflowError):
                   return None
 
+          def provenance_patch(date, slot):
+              """WHO wrote this row, WHEN the slot was due, and whether it was real.
+
+              `scheduled_instant` is written on every row because the drift rule
+              needs the due instant ON THE ROW: a row that only says when it
+              pushed cannot be checked against the slot it is filed under, and
+              that absence is what let a 14:44Z proof push sit in tomorrow's
+              07:20 bucket looking like a delivery. `simulated` is the marker
+              every reader skips the row on -- see slot_was_served.
+              """
+              due = slot_due_instant(date, slot)
+              patch = {
+                  'trigger_source': (os.environ.get('TRIGGER_SOURCE') or '').strip()
+                                    or 'unknown',
+              }
+              if due is not None:
+                  patch['scheduled_instant'] = iso_utc(due)
+              if simulate:
+                  patch['simulated'] = True
+              return patch
+
           def record_delivery(date, slot, sequence_id, sent_at, supersede,
                               inherit_stored_kind=False, pushed_kind=None):
               """THE ONE RECORD A CONFIRMED DELIVERY WRITES. Both arms call it.
@@ -2722,6 +2881,11 @@ jobs:
                         'sequence_id read-back above is the only thing '
                         'standing between this slot and a double push.')
                   return False
+              # `simulated` is cleared ONLY by a real push. `kv_record_delivery`
+              # pops every `clear` key AFTER merging the patch, so clearing it
+              # unconditionally deleted the marker the patch had just set and a
+              # proof run wrote a row nothing could recognise as a proof run.
+              stale_simulated = () if simulate else ('simulated',)
               if supersede:
                   # `ntfy_sent_at` is deliberately NOT set here. The Worker's
                   # ledger guard suppresses on it, and the degraded push this
@@ -2740,7 +2904,9 @@ jobs:
                       'full_sequence_id': sequence_id,
                       'state': 'sent',
                       'kind': pushed_kind or KIND_DELIVERED,
-                  }, preserve_stored_kind_as='superseded_kind')
+                      **provenance_patch(date, slot),
+                  }, clear=stale_simulated,
+                     preserve_stored_kind_as='superseded_kind')
               patch = {
                   'sequence_id': sequence_id,
                   'state': 'sent',
@@ -2748,13 +2914,20 @@ jobs:
                   # default for a caller that measured nothing.
                   'kind': pushed_kind or KIND_DELIVERED,
               }
+              patch.update(provenance_patch(date, slot))
               if sent_at:
                   patch['ntfy_sent_at'] = sent_at
               # The failure markers of every earlier attempt at this slot go:
               # with ntfy_failed still true, enforce_ledger_honesty downgrades
               # this record and deletes the ntfy_sent_at it just wrote.
+              #
+              # `simulated` goes too, and it is NOT a cosmetic clear: a real push
+              # that inherits `simulated: true` from a proof run's row is a row
+              # every dedupe layer would skip, so the real delivery would look
+              # like it never happened.
               return kv_record_delivery(
-                  date, slot, patch, clear=('ntfy_failed', 'http_status'),
+                  date, slot, patch,
+                  clear=('ntfy_failed', 'http_status') + stale_simulated,
                   inherit_stored_kind=inherit_stored_kind)
 
           def main():
@@ -3838,11 +4011,10 @@ jobs:
               if not ordered:
                   title = empty_title
               elif unsummarised:
-                  # THE COUNT MAKES ROOM FOR THE LABEL, not the other way round.
-                  # "unsummarised edition (no AI today)" is 35 characters and the
-                  # title has 72; keeping `N items` as well pushes the one fact
-                  # that changes how the whole push must be read off the shade.
-                  title = '%s %s \u00b7 %s \u00b7 unsummarised edition (no AI today)' % (
+                  # THE LABEL MAKES ROOM FOR ITSELF, not the other way round.
+                  # `N items` is dropped here so the one fact that changes how
+                  # the whole push must be read is not the thing that gets cut.
+                  title = '%s %s \u00b7 %s \u00b7 unsummarised edition' % (
                       emoji, send_label, today)
               else:
                   title = '%s %s \u00b7 %s \u00b7 %d %s' % (
@@ -3855,6 +4027,31 @@ jobs:
               # clause is only added while the WHOLE title still fits. Measured
               # in characters, because that is what the shade counts.
               TITLE_MAX_CHARS = 72
+              # THE MARKER IS RESERVED, NOT APPENDED. `TEST · ` used to be
+              # prepended AFTER every length check below, so a simulated push was
+              # the one title nothing could measure: on 2026-10-28 the proof run
+              # sent 82 characters, 10 of them past the limit the row itself then
+              # rejected. Reserving it here means every check below measures what
+              # is left of the shade once the marker has taken its 7 characters.
+              test_prefix = TEST_TITLE_PREFIX if simulate else ''
+              title_budget = TITLE_MAX_CHARS - len(test_prefix)
+
+              # THE PARENTHETICAL IS THE FIRST THING TO GO when the shade is
+              # full. `unsummarised edition` already says the edition was not
+              # summarised; `(no AI today)` explains why, and the page and the
+              # email subject carry that sentence in full. Assembled then
+              # measured, never assumed: the unsummarised title without it is 61
+              # characters against a 72-character shade, so the assembled form
+              # (75) could not have fitted even with no marker and no reason.
+              if unsummarised:
+                  suffix = ' (no AI today)'
+                  if len(title) + len(suffix) <= title_budget:
+                      title += suffix
+                  else:
+                      print('title: dropped %r -- %d characters with it, and only '
+                            '%d are left for the title'
+                            % (suffix, len(title) + len(suffix), title_budget))
+
               if high:
                   # What actually earned the escalation, in the owner's own
                   # vocabulary: an obligation with a date beats a raw priority
@@ -3871,7 +4068,7 @@ jobs:
                   # empty digest, so the title honestly reads `0 items` and
                   # says nothing false about urgency. The glance block carries
                   # the "this is empty, not quiet" line instead.
-                  if len(title) + len(reason) + 3 <= TITLE_MAX_CHARS:
+                  if len(title) + len(reason) + 3 <= title_budget:
                       title = '%s \u00b7 %s' % (title, reason)
 
               # THE SUPERSEDE IS LABELLED, IN WORDS, ON THE PHONE.
@@ -3892,24 +4089,37 @@ jobs:
               # and the owner's phone still shows two same-shaped evening digests.
               if is_supersede:
                   reason_full = 'full digest'
-                  if len(title) + len(reason_full) + 3 <= TITLE_MAX_CHARS:
+                  if len(title) + len(reason_full) + 3 <= title_budget:
                       title = '%s \u00b7 %s' % (title, reason_full)
                   if 'arrows_counterclockwise' not in empty_tags_extra:
                       empty_tags_extra.append('arrows_counterclockwise')
 
-              # --- TEST marking, LAST so nothing below can drop it -----------
-              # Applied AFTER the title has been assembled from the edition, so
-              # the marker cannot be lost to the length checks above, and to the
-              # BODY as well as the title so a pass through the shade or a
-              # collapsed notification still cannot hide it. `TEST · ` rather
-              # than `[TEST] ` because the unsummarised title is already 35
-              # characters of label on a 72-character shade, and the marker must
-              # not be the thing that pushes it over.
+              # --- TEST marking, and the marker leads ---------------------------
+              # The title AND the body, because a pass through the shade or a
+              # collapsed notification must not be able to hide it. `TEST · `
+              # rather than `[TEST] ` for the same reason the budget above
+              # reserves it: 7 characters, not 9, on a 72-character shade.
+              #
+              # THE LAST GUARANTEE IS ARITHMETIC, NOT A CHECK SOMEBODY REMEMBERS.
+              # Every clause above is added only while it fits, and `fit_title`
+              # shortens at a clause boundary in one stated order, so this title
+              # cannot exceed the limit however a future word or clause is
+              # spelled. The prefix is applied BEFORE that final shortening so
+              # the marker itself is never the thing that gets cut, and it is
+              # re-checked after, because a clamp is only worth having if it
+              # holds at the end.
               if simulate:
-                  title = 'TEST \u00b7 ' + title
                   message = ('**TEST \u2014 simulated pool refusal.** No model was '
                              'contacted. This is the unsummarised edition, pushed to '
                              'prove the no-AI path.\n\n') + message
+              title = fit_title(test_prefix + fit_title(title, title_budget),
+                                TITLE_MAX_CHARS)
+              if len(title) > TITLE_MAX_CHARS:                   # pragma: no cover
+                  # Unreachable for every shape this file can produce; kept so a
+                  # future single word longer than the shade cannot pass silently.
+                  print('::error::the title is %d characters, past the %d-character '
+                        'limit: %r' % (len(title), TITLE_MAX_CHARS, title))
+                  title = title[:TITLE_MAX_CHARS]
 
               # --- Attach: top story image URL, if any ---
               attach = None
@@ -4031,12 +4241,27 @@ jobs:
                   previous = kv_slot_entry(ledger, today, kind) if ledger else None
                   guard_field = 'ntfy_full_sent_at' if is_supersede else 'ntfy_sent_at'
                   if previous and previous.get(guard_field):
-                      print('KV %s already records %s for %s %s (sequence_id %s) - '
-                            'NOT publishing a second copy'
-                            % (guard_field, previous.get('kind', 'a push'),
-                               today, kind, previous.get('sequence_id', push_seq)))
-                      write_flag(True)
-                      return
+                      if not slot_was_served(previous, today, kind, guard_field):
+                          # A ROW THAT CANNOT BE THIS SLOT'S PUSH IS NOT A REASON
+                          # TO WITHHOLD IT. The 2026-10-29 case: a simulated run
+                          # wrote tomorrow's morning slot at 14:44Z the day
+                          # before, and suppressing on it would deliver NOTHING
+                          # at 07:20 on the day. Printed as an error, because a
+                          # row failing this test is still a wrong record.
+                          print('::warning::KV records %s=%s for %s %s, and that '
+                                'instant cannot belong to this slot (simulated=%r, '
+                                'scheduled_instant=%r) - NOT treating it as a '
+                                'delivery, so this run still publishes'
+                                % (guard_field, previous.get(guard_field), today,
+                                   kind, previous.get('simulated'),
+                                   previous.get('scheduled_instant')))
+                      else:
+                          print('KV %s already records %s for %s %s (sequence_id %s) - '
+                                'NOT publishing a second copy'
+                                % (guard_field, previous.get('kind', 'a push'),
+                                   today, kind, previous.get('sequence_id', push_seq)))
+                          write_flag(True)
+                          return
               try:
                   readback_raw = urllib.request.urlopen(urllib.request.Request(
                       server.rstrip('/') + '/' + topic + '/json?poll=1&since=all'),
@@ -4075,6 +4300,19 @@ jobs:
               if isinstance(readback, list):
                   seen = [m for m in readback
                           if isinstance(m, dict) and m.get('sequence_id') == push_seq]
+                  # A MESSAGE THIS REPOSITORY MARKED AS A TEST IS NOT THIS SLOT'S
+                  # DIGEST. The title is the only field ntfy stores that a later
+                  # read-back can still see, which is why a simulated push must
+                  # carry the marker there -- dropping it is a dedupe defect, not
+                  # a cosmetic one. Without this filter tomorrow's real 07:20 push
+                  # would stand down on the previous day's proof run.
+                  tests_only = [m for m in seen if is_test_push(m.get('title'))]
+                  seen = [m for m in seen if not is_test_push(m.get('title'))]
+                  if tests_only and not seen:
+                      print('the read-back found %d TEST message(s) under %s and no '
+                            'real one - a simulated push is not this slot\'s '
+                            'delivery, so this run publishes' % (len(tests_only),
+                                                                 push_seq))
                   if seen:
                       # ---- A MESSAGE ON THE TOPIC IS A DELIVERY, AND IT IS
                       # ---- RECORDED HERE, FROM THE MESSAGE'S OWN CLOCK.
@@ -4114,6 +4352,20 @@ jobs:
                       result = json.loads(resp.read().decode('utf-8', errors='replace'))
                   if isinstance(result, dict) and result.get('id'):
                       print('ntfy notification sent to topic %r (id=%s)' % (topic, result['id']))
+                      # WHAT THE PHONE ACTUALLY GOT, PRINTED. On a real send the
+                      # payload is never written to disk (only the dry branch
+                      # writes state/ntfy_payload.json), so without this line the
+                      # only surviving record of a push's own title is the
+                      # ledger's reject_reason -- which is how a 75-character
+                      # title reached the phone on 2026-10-28 with every check in
+                      # this file green. Title first, because the shade is where a
+                      # clip is visible; the body length proves the marker is in
+                      # it without dumping a digest into the log.
+                      print('ntfy title (%d chars, limit %d): %r'
+                            % (len(title), TITLE_MAX_CHARS, title))
+                      print('ntfy body: %d bytes (limit %d), TEST marker present: %s'
+                            % (len(message.encode('utf-8')), MAX_BYTES,
+                               'yes' if simulate else 'no'))
                       # GUARD 2. This is the write the two arms needed. Until
                       # 2026-10-13 an Actions push left NO trace in KV, so the
                       # Worker's duplicate guard could not see it: at 19:25 NPT

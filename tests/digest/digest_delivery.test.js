@@ -107,6 +107,11 @@ const EXPORT_NAMES = [
   // once-per-slot recovery alert that names what was actually shown.
   "deliveryEdition", "announceStaleEditionOnce",
   "STALE_EDITION_ALERT_KEY_PREFIX",
+  // §15. The simulated-proof-run guards: what a ledger row must prove before it
+  // may withhold a slot, and the title marker that makes a test push ignorable
+  // by every later read-back.
+  "slotWasServed", "slotDueMs", "isTestPushTitle", "TEST_TITLE_PREFIX",
+  "SLOT_EARLY_SLACK_MS",
 ];
 
 const loadCounter = { n: 0 };
@@ -1911,6 +1916,180 @@ test("a ledger entry that CLAIMS sent without ntfy_sent_at does not suppress any
   assert.strictEqual(postCalls(r.net).length, 1,
     "an entry with state:'sent' and no ntfy_sent_at suppressed the push. The " +
     "guard keys on a RECORDED INSTANT, never on a word describing one.");
+});
+
+// ==========================================================================
+// 11b. A row that cannot be this slot's push must never withhold it.
+//
+// MEASURED, 2026-10-28. A PROOF run was dispatched against slot_date=2026-10-29
+// so it could not touch the day it ran on. It wrote:
+//
+//     state: sent   ntfy_sent_at: 2026-10-28T14:44:00Z   on_time: false
+//
+// 2026-10-29's morning slot is due 01:35Z. The recorded instant is TEN HOURS
+// FIFTY-ONE MINUTES EARLY, which is not a late digest but proof the push never
+// served that slot. With the old guard the row was still a `sent` row, so at
+// 07:20 on the 29th the ladder would have found "already sent" and delivered
+// NOTHING: an outage created by the test that was meant to prove reliability.
+//
+// Two independent defences, because the row above carries NEITHER the
+// `simulated` flag (it predates it) NOR a trustworthy `scheduled_instant`:
+//   * the writer now stamps `simulated: true` and the slot's own
+//     `scheduled_instant` on any proof push, and a simulated row never counts;
+//   * the reader compares the recorded push instant with the SLOT'S due instant
+//     (recorded, else the schedule table), so the already-written row is inert
+//     without rewriting production KV.
+// ==========================================================================
+
+test("a SIMULATED ledger row does not suppress the slot's real push", async () => {
+  const w = loadWorker();
+  const r = await deliver(w, { initial: {
+    [artifactKey()]: artifact(),
+    "digest:ledger": ledgerWith({
+      state: "sent",
+      kind: "delivered",
+      simulated: true,
+      sequence_id: "dmn-" + TODAY + "-" + SLOT,
+      ntfy_sent_at: new Date(T0 - 30 * 1000).toISOString(),
+      scheduled_instant: "2026-10-09T01:35:00Z",
+    }),
+  } });
+  assert.strictEqual(r.thrown, null);
+  assert.strictEqual(postCalls(r.net).length, 1,
+    "a row flagged `simulated: true` suppressed the real delivery. A proof run " +
+    "is evidence about the CODE, never about the slot: suppressing on it is a " +
+    "missed digest caused by the test that was supposed to prove reliability.");
+  assert.notStrictEqual(r.outcome.kind, w.KIND_DUPLICATE_SUPPRESSED);
+  assert.ok(/simulated/.test(r.logs.text()),
+    "the referee must SAY why the row was not trusted: " + r.logs.text());
+  const entry = ledgerOf(r.kv).days[TODAY][SLOT];
+  assert.strictEqual(entry.state, w.STATE_SENT);
+  assert.strictEqual(entry.simulated, undefined,
+    "the real delivery must CLEAR the simulated flag, or the next fire reads " +
+    "an honest slot as a proof run and pushes a second copy");
+});
+
+test("a row whose push instant precedes the slot by more than the slack does not suppress", async () => {
+  const w = loadWorker();
+  // Byte for byte the shape the 2026-10-29 proof row has: a sent instant, no
+  // `simulated` flag, and no `scheduled_instant` to contradict it. Only the
+  // schedule table can tell that this cannot be the slot's own push.
+  const r = await deliver(w, { initial: {
+    [artifactKey()]: artifact(),
+    "digest:ledger": ledgerWith({
+      state: "sent",
+      kind: "delivered",
+      sequence_id: "dmn-" + TODAY + "-" + SLOT,
+      ntfy_sent_at: "2026-10-08T14:44:00Z",
+    }),
+  } });
+  assert.strictEqual(r.thrown, null);
+  assert.strictEqual(postCalls(r.net).length, 1,
+    "a push instant recorded 10h51m before the slot's due instant suppressed " +
+    "the slot. The row cannot be this slot's delivery, so withholding on it " +
+    "turns tomorrow's 07:20 into a silent missed day.");
+  assert.ok(/cannot belong to it/.test(r.logs.text()),
+    "the unreconciled row must be reported, not silently ignored: " +
+    r.logs.text());
+});
+
+test("slotWasServed is the one predicate, and it fails in every direction that matters", () => {
+  const w = loadWorker();
+  const due = "2026-10-09T01:35:00Z";
+  const good = { ntfy_sent_at: new Date(T0).toISOString(), scheduled_instant: due };
+  assert.strictEqual(w.slotWasServed(good, TODAY, SLOT), true,
+    "an on-time push with its own scheduled instant is a delivery");
+  assert.strictEqual(
+    w.slotWasServed(Object.assign({}, good, { simulated: true }), TODAY, SLOT),
+    false, "`simulated: true` is never a delivery");
+  assert.strictEqual(
+    w.slotWasServed(Object.assign({}, good, { dry_run: true }), TODAY, SLOT),
+    false, "`dry_run: true` is never a delivery either");
+  assert.strictEqual(
+    w.slotWasServed({ ntfy_sent_at: "2026-10-08T14:44:00Z" }, TODAY, SLOT),
+    false, "with no recorded scheduled instant the DUE TABLE decides, and an " +
+    "instant 10h51m early fails it");
+  assert.strictEqual(
+    w.slotWasServed({ ntfy_sent_at: "2026-10-09T01:34:30Z" }, TODAY, SLOT),
+    true, "30s before the due minute is inside the slack a cron firing early " +
+    "needs, so it must still suppress");
+  assert.strictEqual(
+    w.slotWasServed({ ntfy_sent_at: "2026-10-09T01:25:05Z" }, TODAY, SLOT),
+    true, "9m55s early is the measured REAL delivery (2026-10-13T13:25:05Z for " +
+    "its 13:35Z slot), and calling it a mislabel pushes a second copy");
+  assert.strictEqual(
+    w.slotWasServed({ ntfy_sent_at: "2026-10-09T01:04:00Z" }, TODAY, SLOT),
+    false, "31 minutes early is outside the slack, so it is a drift");
+  assert.strictEqual(
+    w.slotWasServed({ scheduled_instant: due }, TODAY, SLOT),
+    false, "a row with no push instant is evidence of nothing");
+  assert.strictEqual(
+    w.slotWasServed(good, TODAY, SLOT, "ntfy_full_sent_at"),
+    false, "the field argument must be honoured: a supersede asks about the " +
+    "FULL push, and this row has none");
+  assert.strictEqual(
+    w.slotWasServed(good, TODAY, "nonexistent-slot"),
+    true, "a slot the table does not know cannot be checked, and refusing to " +
+    "suppress on it would be a NEW double-push path, not a fixed one");
+  assert.strictEqual(w.slotWasServed(null, TODAY, SLOT), false);
+  assert.strictEqual(
+    w.slotWasServed({ ntfy_sent_at: "not a date", scheduled_instant: due },
+      TODAY, SLOT),
+    false, "an unparseable instant is not a delivery");
+});
+
+test("slotDueMs dates the slot from the schedule table, and never from the clock", () => {
+  const w = loadWorker();
+  assert.strictEqual(w.slotDueMs("2026-10-09", "morning"), Date.parse("2026-10-09T01:35:00Z"));
+  assert.strictEqual(w.slotDueMs("2026-10-09", "evening"), Date.parse("2026-10-09T13:35:00Z"));
+  assert.ok(Number.isNaN(w.slotDueMs("2026-10-09", "afternoon")),
+    "an unknown slot has no due instant; returning one would make every check " +
+    "against it meaningless");
+  assert.ok(Number.isNaN(w.slotDueMs("", "morning")),
+    "an absent date has no due instant either");
+});
+
+test("the sequence_id read-back IGNORES a push whose title carries the TEST marker", async () => {
+  const w = loadWorker();
+  const seq = "dmn-" + TODAY + "-" + SLOT;
+  const r = await deliver(w, {
+    initial: { [artifactKey()]: artifact() },
+    cache: [{ id: "aaa", time: (T0 - 60 * 1000) / 1000, sequence_id: seq,
+              title: "TEST · " + "Morning Digest · 2026-10-09 · 12 items" }],
+  });
+  assert.strictEqual(r.thrown, null);
+  assert.strictEqual(postCalls(r.net).length, 1,
+    "a TEST push was counted as this slot's delivery, so the proof run " +
+    "suppressed the real digest. The title is the only ntfy field a later " +
+    "read-back can still see, which is why the marker belongs there.");
+  assert.ok(/SIMULATED/.test(r.logs.text()), r.logs.text());
+});
+
+test("the read-back still suppresses on the SAME message once the marker is gone", async () => {
+  const w = loadWorker();
+  // The control for the test above: the only difference is the prefix, so a
+  // read-back that never suppressed anything cannot pass both.
+  const seq = "dmn-" + TODAY + "-" + SLOT;
+  const r = await deliver(w, {
+    initial: { [artifactKey()]: artifact() },
+    cache: [{ id: "aaa", time: (T0 - 60 * 1000) / 1000, sequence_id: seq,
+              title: "Morning Digest · 2026-10-09 · 12 items" }],
+  });
+  assert.strictEqual(postCalls(r.net).length, 0);
+  assert.strictEqual(r.outcome.deduped, true);
+});
+
+test("isTestPushTitle matches the marker and nothing else", () => {
+  const w = loadWorker();
+  assert.strictEqual(w.isTestPushTitle("TEST · Morning Digest"), true);
+  assert.strictEqual(w.isTestPushTitle("  TEST · Morning Digest"), true,
+    "leading whitespace is not a different marker");
+  assert.strictEqual(w.isTestPushTitle("Morning Digest · TEST"), false,
+    "the marker is a PREFIX identity, not a word somewhere in the title");
+  assert.strictEqual(w.isTestPushTitle("TESTING the relay"), false);
+  assert.strictEqual(w.isTestPushTitle(""), false);
+  assert.strictEqual(w.isTestPushTitle(null), false);
+  assert.strictEqual(w.TEST_TITLE_PREFIX, "TEST \u00b7 ");
 });
 
 // ==========================================================================

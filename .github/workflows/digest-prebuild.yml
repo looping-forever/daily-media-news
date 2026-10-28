@@ -1221,6 +1221,15 @@ jobs:
           # prune the Worker applies or a rewrite here would resurrect days the
           # Worker has already dropped.
           RETENTION_DAYS = 7
+          # WHEN EACH SLOT IS DUE, in UTC — 07:20 and 19:20 NPT, no DST, so
+          # 01:35 and 13:35 UTC. The same table daily-news.yml and
+          # deploy/cloudflare-worker.js hold, and the tests pin all three.
+          SLOT_DUE_UTC = {'morning': (1, 35), 'evening': (13, 35)}
+          # The same early slack the delivery arms allow a send that lands before
+          # its own slot's due minute. 30 minutes, because a REAL delivery sits
+          # 9m55s early in this repository; the proof row this rule must reject
+          # is 10h51m early.
+          SLOT_EARLY_SLACK_S = 30 * 60
           # The three pushes that reached the owner and were not a digest.
           # `delivered` and `duplicate_suppressed` are deliberately absent: the
           # first is what a healthy slot looks like and the second is a second
@@ -1248,6 +1257,60 @@ jobs:
               than left agreeing by luck.
               """
               return 'dmn-%s-%s-full' % (date, slot_name)
+
+          def instant_or_none(text):
+              """An ISO-8601 instant as an aware UTC datetime, or None."""
+              raw = str(text or '').strip()
+              if not raw:
+                  return None
+              if raw.endswith('Z') or raw.endswith('z'):
+                  raw = raw[:-1] + '+00:00'
+              try:
+                  moment = datetime.datetime.fromisoformat(raw)
+              except ValueError:
+                  return None
+              if moment.tzinfo is None:
+                  return None
+              return moment.astimezone(datetime.timezone.utc)
+
+          def slot_due_instant(date, slot):
+              """The UTC instant `slot` on `date` is due, or None if unknowable."""
+              hour_minute = SLOT_DUE_UTC.get(slot)
+              if hour_minute is None:
+                  return None
+              try:
+                  day = datetime.date.fromisoformat(str(date))
+              except (TypeError, ValueError):
+                  return None
+              return datetime.datetime(day.year, day.month, day.day,
+                                       hour_minute[0], hour_minute[1],
+                                       tzinfo=datetime.timezone.utc)
+
+          def push_belongs_to_slot(entry, date, slot):
+              """False when the recorded push provably cannot be this slot's.
+
+              THE 2026-10-29 CASE, AND IT HAPPENED BEFORE THIS GUARD EXISTED. A
+              simulated proof run wrote `kind: unsummarised` for tomorrow's
+              morning slot at 14:44Z, 10h51m before that slot's own 01:35Z due
+              instant. `SUPERSEDED_KINDS` matched the kind and this job would
+              have dispatched a supersede for a slot that had not run yet. A send
+              cannot precede the slot it is filed under by more than the slack a
+              cron jitter needs, so an instant that does is not a delivery and
+              there is nothing here to repair.
+
+              Fail-open on an absent or unreadable instant: this proves a
+              contradiction between two instants, and a value it cannot read is
+              not that proof.
+              """
+              sent = (instant_or_none(entry.get('ntfy_sent_at'))
+                      or instant_or_none(entry.get('first_ntfy_sent_at')))
+              if sent is None:
+                  return True
+              due = (instant_or_none(entry.get('scheduled_instant'))
+                     or slot_due_instant(date, slot))
+              if due is None:
+                  return True
+              return sent >= due - datetime.timedelta(seconds=SLOT_EARLY_SLACK_S)
 
           def decide(decision, reason):
               with open(decision_file, 'w', encoding='utf-8') as fh:
@@ -1407,6 +1470,27 @@ jobs:
               skip('full_artifact_available_at is already set for this slot (%s) — '
                    'the supersede has already been dispatched'
                    % entry.get('full_artifact_available_at'))
+          # A SIMULATED ROW IS NOT A PUSH TO REPAIR, AND THIS GUARD COMES BEFORE
+          # THE KIND TERM ON PURPOSE. A proof run writes the same `unsummarised`
+          # kind a real no-AI outage writes, so `SUPERSEDED_KINDS` below would
+          # have matched it and this job would have dispatched a supersede for a
+          # slot that had not been delivered yet — the 2026-10-29 case, where a
+          # simulated run for tomorrow's 07:20 would have been repaired before it
+          # ever ran. Nothing to supersede means nothing to dispatch.
+          if entry.get('simulated') is True:
+              skip('the row for this slot is a SIMULATED proof push '
+                   '(simulated: true), so it is not a degraded delivery to repair')
+          # AND A PUSH THAT CANNOT BE THIS SLOT'S IS NOT A PUSH TO REPAIR EITHER.
+          # This is the drift arm, and it is what makes the ALREADY-WRITTEN
+          # 2026-10-29 row inert without rewriting KV: that row carries no
+          # `simulated` flag, but its instant is 10h51m early, and an instant
+          # that early is proof it never served this slot.
+          if not push_belongs_to_slot(entry, today, slot):
+              skip('the recorded push (%s) precedes this slot\'s due instant by '
+                   'more than the %ds of cron slack, so it cannot be this '
+                   'slot\'s delivery — there is nothing to supersede'
+                   % (entry.get('ntfy_sent_at') or entry.get('first_ntfy_sent_at'),
+                      SLOT_EARLY_SLACK_S))
           # THE `kind` TERM. Only the pushes the owner cannot read are
           # eligible; anything else here would be a duplicate.
           if str(entry.get('kind') or '') not in SUPERSEDED_KINDS:

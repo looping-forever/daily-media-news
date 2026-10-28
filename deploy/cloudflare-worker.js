@@ -421,6 +421,15 @@ const SCHED_DIGEST_SLOTS = {
   morning: { hour: 1, minute: 35 },
   evening: { hour: 13, minute: 35 },
 };
+// WHEN a slot on a date is DUE, as epoch ms, or NaN when either is unknowable.
+// The Worker's own copy of daily-news.yml's SLOT_DUE_UTC, taken from the table
+// above rather than written a second time.
+function slotDueMs(date, slot) {
+  const s = SCHED_DIGEST_SLOTS[slot];
+  const day = Date.parse(String(date || "") + "T00:00:00Z");
+  if (!s || !Number.isFinite(day)) return NaN;
+  return day + (s.hour * 60 + s.minute) * 60 * 1000;
+}
 // THE RE-FIRE, AS A BOUNDED WINDOW RATHER THAN ONE EXTRA CRON. Cloudflare cron
 // START JITTER is unbounded from the inside: the 01:35 tick can genuinely begin
 // at 01:47, and nothing in this file can prevent it. The window re-attempts every
@@ -2701,6 +2710,63 @@ function ledgerSlotEntry(ledger, date, slot) {
     : null;
 }
 
+// THE MARKER A SIMULATED PUSH CARRIES AT THE FRONT OF ITS TITLE, byte-identical
+// to daily-news.yml's TEST_TITLE_PREFIX. IT IS AN IDENTITY, NOT DECORATION.
+//
+// A simulated build pushes a REAL notification under the slot's OWN sequence id,
+// which is the whole point of the exercise and also the whole hazard: every
+// dedupe layer below keys on that id, so without a marker the run made to prove
+// the code path reads, to every later reader, as this slot's delivery. On
+// 2026-10-28 a proof run for 2026-10-29 07:20 left a message on the topic that
+// tomorrow's real push would have stood down on. The marker is what lets the
+// read-back tell "a test" from "the digest".
+const TEST_TITLE_PREFIX = "TEST \u00b7 ";
+
+function isTestPushTitle(title) {
+  return String(title == null ? "" : title).trim().indexOf(TEST_TITLE_PREFIX) === 0;
+}
+
+// The early slack a recorded send may have before it stops being evidence --
+// the same number daily-news.yml calls SLOT_EARLY_SLACK_S, reused rather than
+// re-chosen so the repository has one answer to "how close is close enough".
+//
+// 30 MINUTES BECAUSE A REAL DELIVERY WAS 9m55s EARLY. The repository holds
+// 2026-10-13T13:25:05Z recorded for the 13:35Z evening slot; a 60s slack called
+// that row a mislabel and would have pushed a second copy of a digest already on
+// the phone. The case this rule exists for is 10h51m early, so 30 minutes still
+// rejects it with room to spare.
+const SLOT_EARLY_SLACK_MS = 30 * 60 * 1000;
+
+// DOES THIS ROW PROVE THE SLOT WAS SERVED? THE ONE PREDICATE EVERY DEDUPE USES.
+//
+// Three ways a row that looks like a delivery is not one, each measured:
+//
+//   * `simulated`/`dry_run` -- a proof run. Evidence about the CODE, not the
+//     slot.
+//   * a push instant BEFORE the slot's own due instant by more than the slack.
+//     On 2026-10-28 a proof run wrote 14:44Z into 2026-10-29 morning, which is
+//     due 01:35Z: 10h51m early, and the temporal honesty checker flagged it
+//     while this guard still stood tomorrow's real delivery down.
+//   * no readable instant at all, which is not evidence of anything.
+//
+// `field` names which instant is being trusted: `ntfy_sent_at` for a first
+// delivery, `ntfy_full_sent_at` for a supersede that already replaced one.
+function slotWasServed(entry, date, slot, field) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+  if (entry.simulated === true || entry.dry_run === true) return false;
+  const key = field || "ntfy_sent_at";
+  const sent = Date.parse(String(entry[key] == null ? "" : entry[key]));
+  if (!Number.isFinite(sent)) return false;
+  const recorded = Date.parse(String(entry.scheduled_instant == null
+    ? "" : entry.scheduled_instant));
+  const due = Number.isFinite(recorded) ? recorded : slotDueMs(date, slot);
+  // NO DUE INSTANT TO CONTRADICT: the old behaviour, kept on purpose. A slot the
+  // table does not know cannot be checked, and refusing to suppress on it would
+  // be a new silent double-push path rather than a fixed one.
+  if (!Number.isFinite(due)) return true;
+  return sent >= due - SLOT_EARLY_SLACK_MS;
+}
+
 // The date the retention window closes on. Mirrors `prune` in
 // scripts/delivery_ledger.py: anchored on today, never on the wall clock, so the
 // same ledger and the same argument always produce the same result.
@@ -2848,6 +2914,15 @@ async function commitDigestLedger(env, update, nowMs) {
   const day = ledger.days[date] = ledger.days[date] || {};
   const merged = Object.assign(
     {}, day[String(update.slot)] || {}, update.patch || {});
+  const patch = update.patch || {};
+  // A REAL WRITE RETIRES AN INHERITED PROOF-RUN FLAG. The merge above carries
+  // every field of the row it replaces, so a real push landing over a simulated
+  // row would keep `simulated: true` -- and every dedupe layer skips a simulated
+  // row, so the next fire would push a SECOND copy of a digest the owner already
+  // has. The test is on the PATCH, not on `merged`: merged always inherits the
+  // flag, so asking it could never answer "is this write a simulation?".
+  if (patch.simulated !== true) delete merged.simulated;
+  if (patch.dry_run !== true) delete merged.dry_run;
   day[String(update.slot)] = enforceLedgerHonesty(merged, update);
   if (update.last_good) ledger.last_good = update.last_good;
   ledger.schema_version = DIGEST_SCHEMA_VERSION;
@@ -2988,15 +3063,29 @@ async function findDeliveredBySequenceId(env, sequenceId) {
     return { found: false, unknown: true, reason: "read-back failed" };
   }
   for (const message of messages) {
-    if (message && String(message.sequence_id || "") === String(sequenceId)) {
-      return {
-        found: true,
-        unknown: false,
-        id: String(message.id || ""),
-        time: Number(message.time) || 0,
-        cached: messages.length,
-      };
+    if (!message || String(message.sequence_id || "") !== String(sequenceId)) {
+      continue;
     }
+    // A MESSAGE THIS REPOSITORY MARKED AS A TEST IS NOT THIS SLOT'S DIGEST.
+    // The marker is on the title because the title is the one field ntfy stores
+    // that a later read-back can still see -- which is why a simulated run must
+    // carry it on every surface, and why dropping it is a dedupe defect rather
+    // than a cosmetic one.
+    if (isTestPushTitle(message.title)) {
+      console.error(
+        "digest sequence_id read-back found a SIMULATED push for " +
+          String(sequenceId) + " (title begins with the TEST marker) — not " +
+          "counting it as this slot's delivery"
+      );
+      continue;
+    }
+    return {
+      found: true,
+      unknown: false,
+      id: String(message.id || ""),
+      time: Number(message.time) || 0,
+      cached: messages.length,
+    };
   }
   return { found: false, unknown: false, cached: messages.length };
 }
@@ -3301,17 +3390,32 @@ async function deliverDigestPlan(env, slot, writer, options) {
   //    push in this ledger's own history.
   const previous = ledgerSlotEntry(ledger, today, slotName);
   if (previous && previous.ntfy_sent_at) {
-    console.log(
-      label + ": " + KIND_DUPLICATE_SUPPRESSED + " — the ledger already records " +
-        String(previous.kind || "a push") + " sent at " +
-        String(previous.ntfy_sent_at) + " (sequence_id " +
-        String(previous.sequence_id || sequenceId) + ")"
-    );
-    return {
-      ok: true, kind: KIND_DUPLICATE_SUPPRESSED, date: today, slot: slotName,
-      pushed: false, sequence_id: String(previous.sequence_id || sequenceId),
-      ledger_patch: null, reason: "ledger already records a push",
-    };
+    if (!slotWasServed(previous, today, slotName, "ntfy_sent_at")) {
+      // A ROW THAT CANNOT BE THIS SLOT'S PUSH IS NOT A REASON TO WITHHOLD IT.
+      // This is the 2026-10-29 case: a simulated proof run wrote tomorrow's
+      // morning slot at 14:44Z the day before, and suppressing on it would have
+      // delivered NOTHING at 07:20 on the day. Recorded, loudly, because a row
+      // that fails this test is still a wrong record somebody must retire.
+      console.error(
+        label + ": the ledger records ntfy_sent_at=" +
+          String(previous.ntfy_sent_at) + " for this slot, and that instant " +
+          "cannot belong to it (simulated=" + JSON.stringify(previous.simulated) +
+          ", scheduled_instant=" + String(previous.scheduled_instant || "(none)") +
+          ") — NOT treating it as a delivery, so this slot still gets its push"
+      );
+    } else {
+      console.log(
+        label + ": " + KIND_DUPLICATE_SUPPRESSED + " — the ledger already records " +
+          String(previous.kind || "a push") + " sent at " +
+          String(previous.ntfy_sent_at) + " (sequence_id " +
+          String(previous.sequence_id || sequenceId) + ")"
+      );
+      return {
+        ok: true, kind: KIND_DUPLICATE_SUPPRESSED, date: today, slot: slotName,
+        pushed: false, sequence_id: String(previous.sequence_id || sequenceId),
+        ledger_patch: null, reason: "ledger already records a push",
+      };
+    }
   }
 
   // 2b. THE QUOTA GUARD, AND IT IS THE SECOND HALF OF THE 2026-10-12/13/14
