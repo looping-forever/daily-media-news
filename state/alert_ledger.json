@@ -1,4 +1,15 @@
 {
-  "conditions": {},
+  "conditions": {
+    "breaking.honesty_gate||": {
+      "alerted_at": "2026-10-28T06:36:25Z",
+      "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/glm-5.3-flash-free,opencode/flint-40b-free source=live; opencode",
+      "first_seen": "2026-10-28T06:36:25Z",
+      "last_seen": "2026-10-28T06:36:25Z",
+      "runs": 1,
+      "window_first": "",
+      "window_last": "",
+      "window_runs": 0
+    }
+  },
   "schema_version": 1
 }
