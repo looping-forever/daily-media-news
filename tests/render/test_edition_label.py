@@ -19,8 +19,10 @@ edited.
 """
 
 import os
+import re
 import sys
 import unittest
+from pathlib import Path
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
@@ -89,6 +91,53 @@ class RenderPage(unittest.TestCase):
     def test_only_the_exact_kind_is_labelled(self):
         for kind in ("", "partial", "UNSUMMARISED", "unsummarised-ish"):
             self.assertNotIn(LABEL, self.page({"edition_kind": kind}))
+
+
+class TheWordsAreTheSameOnAllThreeSurfaces(unittest.TestCase):
+    """ONE EDITION, THREE SURFACES, ONE SENTENCE.
+
+    The page, the email subject and the push title are written in two different
+    files by two different mechanisms, and nothing makes them agree. Reword one
+    and an edition arrives on the phone described differently from the page it
+    links to -- which is the class of defect that produced the label in the first
+    place: a claim and the evidence disagreeing.
+
+    The emails and the push are read out of the workflow as TEXT, deliberately:
+    the alternative is a test that imports the thing it is checking, which
+    cannot notice the thing being edited.
+    """
+
+    PHRASE = "unsummarised edition (no ai today)"
+
+    def setUp(self):
+        self.workflow = (Path(__file__).resolve().parents[2] / ".github" /
+                         "workflows" / "daily-news.yml").read_text(encoding="utf-8")
+
+    def test_the_page_uses_the_agreed_words(self):
+        self.assertEqual(LABEL.lower(), self.PHRASE,
+                         "the page's label changed. Every other surface is "
+                         "pinned to these words.")
+
+    def test_the_email_subject_and_the_push_title_use_them_too(self):
+        for surface, pattern in (
+                ("the email subject tag",
+                 r"edition_tag = ' - " + re.escape(self.PHRASE) + r"'"),
+                ("the push title", re.escape(self.PHRASE))):
+            self.assertRegex(self.workflow, re.compile(pattern, re.IGNORECASE),
+                             "%s no longer carries %r" % (surface, self.PHRASE))
+
+    def test_no_surface_has_silently_reworded_it(self):
+        variants = {m.lower() for m in
+                    re.findall(r"unsummarised edition \(no AI [^)]*\)",
+                               self.workflow, re.IGNORECASE)}
+        self.assertEqual({self.PHRASE}, variants,
+                         "the workflow describes the fallback in more than one "
+                         "way: %r. One edition, one sentence." % (variants,))
+        self.assertGreaterEqual(
+            len(re.findall(re.escape(self.PHRASE), self.workflow, re.IGNORECASE)),
+            2,
+            "only one place in the workflow names the edition, so either the "
+            "email or the push lost its label")
 
 
 if __name__ == "__main__":
