@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-10-28T11:51:16Z",
+  "as_of": "2026-10-28T12:56:46Z",
   "days": {
     "2026-10-22": {
       "evening": {
@@ -264,6 +264,11 @@
       }
     },
     "2026-10-28": {
+      "evening": {
+        "built_at": "2026-10-28T12:56:39Z",
+        "source_health_state": "ok",
+        "story_count": 15
+      },
       "morning": {
         "actions_dispatch_at": "2026-10-28T01:35:25Z",
         "actions_dispatch_cause": "already_dispatched",
@@ -271,7 +276,6 @@
         "actions_dispatch_reason": "already dispatched this slot",
         "attempts": 1,
         "build": "adcdc21",
-        "built_at": "2026-10-28T11:51:10Z",
         "edition": "failed",
         "first_ntfy_sent_at": null,
         "kind": "delivered",
@@ -283,9 +287,7 @@
         "reject_reason": "absent | NO build was dispatched",
         "scheduled_instant": "2026-10-28T01:35:00Z",
         "sequence_id": "dmn-2026-10-28-morning",
-        "source_health_state": "ok",
-        "state": "sent",
-        "story_count": 15
+        "state": "sent"
       }
     }
   },
