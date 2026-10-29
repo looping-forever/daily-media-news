@@ -4,11 +4,11 @@
       "alerted_at": "2026-10-29T16:51:15Z",
       "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/glm-5.3-flash-free,opencode/flint-40b-free source=live; opencode",
       "first_seen": "2026-10-29T04:06:26Z",
-      "last_seen": "2026-10-29T16:51:15Z",
-      "runs": 20,
-      "window_first": "",
-      "window_last": "",
-      "window_runs": 0
+      "last_seen": "2026-10-29T19:09:29Z",
+      "runs": 21,
+      "window_first": "2026-10-29T19:09:29Z",
+      "window_last": "2026-10-29T19:09:29Z",
+      "window_runs": 1
     }
   },
   "schema_version": 1
