@@ -2,13 +2,13 @@
   "conditions": {
     "breaking.honesty_gate||": {
       "alerted_at": "2026-10-29T00:45:24Z",
-      "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/glm-5.3-flash-free,opencode/flint-40b-free source=live; opencode",
+      "cause": "ai_fail_safe: pool_cooldown: pool cooldown: the shared pool refused quota_or_rate_limited and is refused until 2026-10-29T01:11:12.423371+00:00 (257s remaining)",
       "first_seen": "2026-10-28T17:48:31Z",
-      "last_seen": "2026-10-29T00:57:25Z",
-      "runs": 7,
+      "last_seen": "2026-10-29T01:06:55Z",
+      "runs": 8,
       "window_first": "2026-10-29T00:57:25Z",
-      "window_last": "2026-10-29T00:57:25Z",
-      "window_runs": 1
+      "window_last": "2026-10-29T01:06:55Z",
+      "window_runs": 2
     }
   },
   "schema_version": 1
