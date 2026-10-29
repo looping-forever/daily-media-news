@@ -1,12 +1,12 @@
 {
   "models": {},
   "pool": {
-    "observed_at": "2026-10-29T12:56:02.336396+00:00",
+    "observed_at": "2026-10-29T13:36:16.597892+00:00",
     "reason": "quota_or_rate_limited",
     "retry_after_sec": null,
     "seconds": 900,
     "source": "",
-    "until": "2026-10-29T13:11:02.336396+00:00"
+    "until": "2026-10-29T13:51:16.597892+00:00"
   },
   "schema_version": 1
 }
