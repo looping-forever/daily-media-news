@@ -4036,6 +4036,36 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-29T06:41:12+05:45"
+    },
+    {
+      "event_id": "evt-d9b5377a096e",
+      "event_key": null,
+      "canonical_title": "113 Deaths in Nepal Due to Snakebites in Last 6 Months - Ratopati",
+      "category": "local_city",
+      "first_seen": "2026-10-29",
+      "last_seen": "2026-10-29",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmivgfbvv95cuxnt3zmmhm5edbjbfl0umhurthtefbhqkxea001ytnycjbbqjhdx1jitm5ju3gyv0oyd25mts1qceh5dezkwezdskrmvy03oetemwtknkllvvj3a01beg1qem1zuzlanuhfsmvlmk4ywk9zvtllswjitgvnrk5vdnpss3b1dfzkz0zydkd1uuuzznnmq0dhd1dhzknvvna5zdvonhkwa1o5q1hwy05wdzzxtjddzhr5thdvek83skp3"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-10-29T07:12:55+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-29T07:12:55+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []

@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-10-28T15:37:05Z",
+    "at": "2026-10-29T01:27:55Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
+    "title": "🚨 CRITICAL: 113 Deaths in Nepal Due to Snakebites in Last 6 Months - Ratopati — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-10-28T15:37:05Z",
+    "at": "2026-10-29T01:27:55Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
+    "title": "🚨 CRITICAL: 113 Deaths in Nepal Due to Snakebites in Last 6 Months - Ratopati — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-10-29T01:27:55Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: 113 Deaths in Nepal Due to Snakebites in Last 6 Months - Ratopati — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-10-28T15:37:05Z",
       "ok": true,
