@@ -2,13 +2,13 @@
   "conditions": {
     "breaking.honesty_gate||": {
       "alerted_at": "2026-10-29T10:09:27Z",
-      "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/glm-5.3-flash-free,opencode/flint-40b-free source=live; opencode",
+      "cause": "ai_fail_safe: pool_cooldown: pool cooldown 2026-10-29T13:51:16.597892+00:00, AND the digest slot window is open until 2026-10-29T14:35:00+00:00: yielding the pool to the digest, which is the reservation -- a non-di",
       "first_seen": "2026-10-29T04:06:26Z",
-      "last_seen": "2026-10-29T13:15:26Z",
-      "runs": 17,
+      "last_seen": "2026-10-29T13:45:53Z",
+      "runs": 18,
       "window_first": "2026-10-29T10:48:26Z",
-      "window_last": "2026-10-29T13:15:26Z",
-      "window_runs": 4
+      "window_last": "2026-10-29T13:45:53Z",
+      "window_runs": 5
     }
   },
   "schema_version": 1
