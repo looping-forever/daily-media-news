@@ -270,9 +270,9 @@
         "kind": "unsummarised",
         "ntfy_sent_at": "2026-10-28T14:44:00Z",
         "sequence_id": "dmn-2026-10-29-morning",
-        "source_health_state": "ok",
+        "source_health_state": "unknown",
         "state": "sent",
-        "story_count": 15
+        "story_count": 0
       }
     }
   },
