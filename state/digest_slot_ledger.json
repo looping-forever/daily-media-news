@@ -267,12 +267,15 @@
     },
     "2026-10-29": {
       "morning": {
+        "built_at": "",
         "edition": "unsummarised",
         "first_ntfy_sent_at": "2026-10-28T14:44:00Z",
         "kind": "unsummarised",
         "ntfy_sent_at": "2026-10-28T14:44:00Z",
         "sequence_id": "dmn-2026-10-29-morning",
-        "state": "sent"
+        "source_health_state": "unknown",
+        "state": "sent",
+        "story_count": 0
       }
     }
   },
