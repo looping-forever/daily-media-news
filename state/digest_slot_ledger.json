@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-10-28T17:02:02Z",
+  "as_of": "2026-10-29T00:56:55Z",
   "days": {
     "2026-10-23": {
       "evening": {
@@ -248,7 +248,6 @@
         "actions_dispatch_reason": "already dispatched this slot",
         "attempts": 1,
         "build": "adcdc21",
-        "built_at": "2026-10-28T17:01:56Z",
         "edition": "failed",
         "first_ntfy_sent_at": null,
         "kind": "delivered",
@@ -260,22 +259,20 @@
         "reject_reason": "absent | NO build was dispatched",
         "scheduled_instant": "2026-10-28T01:35:00Z",
         "sequence_id": "dmn-2026-10-28-morning",
-        "source_health_state": "ok",
-        "state": "sent",
-        "story_count": 15
+        "state": "sent"
       }
     },
     "2026-10-29": {
       "morning": {
-        "built_at": "",
+        "built_at": "2026-10-29T00:56:47Z",
         "edition": "unsummarised",
         "first_ntfy_sent_at": "2026-10-28T14:44:00Z",
         "kind": "unsummarised",
         "ntfy_sent_at": "2026-10-28T14:44:00Z",
         "sequence_id": "dmn-2026-10-29-morning",
-        "source_health_state": "unknown",
+        "source_health_state": "ok",
         "state": "sent",
-        "story_count": 0
+        "story_count": 15
       }
     }
   },
