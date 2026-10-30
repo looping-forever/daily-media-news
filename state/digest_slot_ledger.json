@@ -1,50 +1,6 @@
 {
-  "as_of": "2026-10-29T12:56:37Z",
+  "as_of": "2026-10-30T00:57:06Z",
   "days": {
-    "2026-10-23": {
-      "evening": {
-        "actions_dispatch_at": "2026-10-23T13:35:26Z",
-        "actions_dispatch_cause": "already_dispatched",
-        "actions_dispatch_http_status": 0,
-        "actions_dispatch_reason": "already dispatched this slot",
-        "attempts": 1,
-        "build": "045b838cb58551875637a55a78daacb9457a827c",
-        "first_ntfy_sent_at": null,
-        "http_status": 429,
-        "kind": "fallback_last_good",
-        "last_good_shown": "2026-10-18",
-        "late_build_dispatched": false,
-        "ntfy_failed": true,
-        "ntfy_sent_at": null,
-        "pending_at": "2026-10-23T13:55:26Z",
-        "reject_plain": "no digest was built for evening 2026-10-23.",
-        "reject_reason": "absent | NO build was dispatched",
-        "scheduled_instant": "2026-10-23T13:35:00Z",
-        "sequence_id": "dmn-2026-10-23-evening-full",
-        "state": "failed"
-      },
-      "morning": {
-        "actions_dispatch_at": "2026-10-23T01:35:25Z",
-        "actions_dispatch_cause": null,
-        "actions_dispatch_http_status": null,
-        "actions_dispatch_reason": null,
-        "attempts": 1,
-        "build": "045b838cb58551875637a55a78daacb9457a827c",
-        "first_ntfy_sent_at": "2026-10-23T01:35:35Z",
-        "http_status": 200,
-        "kind": "fallback_last_good",
-        "last_good_shown": "2026-10-18",
-        "late_build_dispatched": true,
-        "ntfy_failed": false,
-        "ntfy_sent_at": "2026-10-23T01:35:35Z",
-        "pending_at": "2026-10-23T01:35:25Z",
-        "reject_plain": "no digest was built for morning 2026-10-23.",
-        "reject_reason": "absent | a late build was dispatched",
-        "scheduled_instant": "2026-10-23T01:35:00Z",
-        "sequence_id": "dmn-2026-10-23-morning-full",
-        "state": "sent"
-      }
-    },
     "2026-10-24": {
       "evening": {
         "actions_dispatch_at": "2026-10-24T13:35:26Z",
@@ -264,9 +220,20 @@
     },
     "2026-10-29": {
       "evening": {
-        "built_at": "2026-10-29T12:56:31Z",
-        "source_health_state": "unknown",
-        "story_count": 0
+        "actions_dispatch_at": "2026-10-29T13:35:27Z",
+        "actions_dispatch_reason": null,
+        "attempts": 1,
+        "build": "723ebbf",
+        "deduped_via": null,
+        "edition": "unsummarised",
+        "first_ntfy_sent_at": "2026-10-29T13:36:37Z",
+        "kind": "unsummarised",
+        "ntfy_sent_at": "2026-10-29T13:36:37Z",
+        "pending_at": "2026-10-29T13:35:26Z",
+        "scheduled_instant": "2026-10-29T13:35:00Z",
+        "sequence_id": "dmn-2026-10-29-evening",
+        "state": "sent",
+        "trigger_source": "worker"
       },
       "morning": {
         "actions_dispatch_at": "2026-10-29T01:35:59Z",
@@ -283,6 +250,13 @@
         "sequence_id": "dmn-2026-10-29-morning",
         "state": "sent",
         "trigger_source": "worker"
+      }
+    },
+    "2026-10-30": {
+      "morning": {
+        "built_at": "2026-10-30T00:57:00Z",
+        "source_health_state": "ok",
+        "story_count": 15
       }
     }
   },
