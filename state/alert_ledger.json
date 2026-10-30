@@ -1,14 +1,14 @@
 {
   "conditions": {
     "breaking.honesty_gate||": {
-      "alerted_at": "2026-10-30T17:09:26Z",
+      "alerted_at": "2026-10-30T23:12:23Z",
       "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/glm-5.3-flash-free,opencode/flint-40b-free source=live; opencode",
       "first_seen": "2026-10-29T04:06:26Z",
-      "last_seen": "2026-10-30T20:06:30Z",
-      "runs": 52,
-      "window_first": "2026-10-30T18:45:25Z",
-      "window_last": "2026-10-30T20:06:30Z",
-      "window_runs": 2
+      "last_seen": "2026-10-30T23:12:23Z",
+      "runs": 53,
+      "window_first": "",
+      "window_last": "",
+      "window_runs": 0
     }
   },
   "schema_version": 1
