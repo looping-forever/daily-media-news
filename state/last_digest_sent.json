@@ -5,12 +5,12 @@
   "empty_digest": false,
   "empty_kind": null,
   "channels": {
-    "website": false,
-    "ntfy": false,
+    "website": true,
+    "ntfy": true,
     "gmail": false,
     "telegram": false
   },
-  "delivered": false,
+  "delivered": true,
   "dry_run": false,
-  "phase": "prebuild"
+  "phase": "full"
 }

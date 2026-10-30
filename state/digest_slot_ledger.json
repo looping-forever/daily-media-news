@@ -255,8 +255,8 @@
     "2026-10-30": {
       "evening": {
         "built_at": "2026-10-30T12:56:41Z",
-        "source_health_state": "ok",
-        "story_count": 15
+        "source_health_state": "unknown",
+        "story_count": 0
       },
       "morning": {
         "attempts": 1,
