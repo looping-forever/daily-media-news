@@ -1,8 +1,10 @@
 """derive_unsummarised.py -- the no-AI fallback edition.
 
 The collector's candidates ARE the edition when no model is available: title,
-link, host and time, with `summary` empty and `for_you` absent. Nothing here
-invents a sentence: an unsummarised edition is labelled as one on every surface.
+link, host and time, plus the PUBLISHER'S OWN description when the feed carried
+one (trimmed to one paragraph). Nothing here invents a sentence and nothing is
+summarised: the text under a fallback headline is quoted feed text, and the
+edition is labelled as unsummarised on every surface.
 
 Priority is capped at 7 because daily-news.yml treats `priority >= 8` as "needs
 the owner" and escalates the push; a fallback must never page like a real one.
@@ -27,6 +29,13 @@ from breaking_monitor import is_tier1_domain  # noqa: E402
 # something that is certain to be thrown away, so the floor could pass here and
 # the page still ship fewer stories than this file claimed.
 from validate_stories import VALID_CATEGORIES  # noqa: E402
+# And the SAME three text gates the validator will re-run on this file's output.
+# Quoting a publisher's description adds words that never used to reach them, so
+# the fallback applies them FIRST: a story whose description would be vetoed
+# keeps its bare headline (the old behaviour) instead of being dropped as a
+# whole and shrinking an edition that already has no model behind it.
+from validate_stories import (crime_violation, load_excluded_keywords,  # noqa: E402
+                              spoiler_violation)
 
 MIN_STORIES = 5
 PER_CATEGORY = 3
@@ -34,9 +43,17 @@ MAX_PRIORITY = 7
 NEAR_DUP = 0.5
 MIN_TITLE_CHARS = 30
 FRESH_HOURS = 12
+#: A description shorter than this says nothing, and longer than this needs
+#: cutting: the fallback is a headline with a lead-in, not an article.
+SUMMARY_MIN_CHARS = 24
+SUMMARY_MAX_CHARS = 240
 
-NOTE = ("Unsummarised edition: no AI was available for this build, so these are "
-        "collected headlines with no summary.")
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))), "config")
+
+NOTE = ("Unsummarised edition: no AI was available for this build, so the text "
+        "under each headline is the publisher's own description, not a summary "
+        "written for you.")
 
 
 def title_tokens(title):
@@ -77,6 +94,42 @@ def priority_for(host, published, now):
     return min(priority, MAX_PRIORITY)
 
 
+#: Loaded once, lowercased, exactly as validate_stories will match it.
+EXCLUDED_KEYWORDS = tuple(
+    k.lower() for k in load_excluded_keywords(CONFIG_DIR) if str(k).strip())
+
+
+def lead_text(snippet, title, category):
+    """The publisher's own description, trimmed; "" when it adds nothing.
+
+    VERBATIM, never rewritten -- this file still writes no prose of its own.
+    Three rules, each of which returns "" rather than a weaker string:
+
+      * shorter than SUMMARY_MIN_CHARS says nothing a headline does not;
+      * a description that opens by repeating the headline is dead weight, so
+        the repeat is removed and the remainder judged again;
+      * text the validator would VETO is dropped here first. Quoting a
+        description adds words that never used to reach those gates, and the
+        floor must not lose a story to text it added itself.
+    """
+    text = re.sub(r"\s+", " ", str(snippet or "")).strip()
+    title_text = re.sub(r"\s+", " ", str(title or "")).strip()
+    if title_text and text.lower().startswith(title_text.lower()):
+        text = text[len(title_text):].lstrip(" -\u2013\u2014:.")
+    if len(text) < SUMMARY_MIN_CHARS:
+        return ""
+    if len(text) > SUMMARY_MAX_CHARS:
+        cut = text.rfind(" ", 0, SUMMARY_MAX_CHARS)
+        text = text[:cut if cut > SUMMARY_MIN_CHARS else SUMMARY_MAX_CHARS]
+        text = text.rstrip(" ,;:-") + "\u2026"
+    low = text.lower()
+    if any(k in low for k in EXCLUDED_KEYWORDS):
+        return ""
+    if spoiler_violation(category, "none", text) or crime_violation(text):
+        return ""
+    return text
+
+
 def derive(candidates, now=None):
     """(stories, per-category counts, skipped-category counts).
 
@@ -108,7 +161,7 @@ def derive(candidates, now=None):
         published = cand.get("published")
         story = {
             "title": title,
-            "summary": "",
+            "summary": lead_text(cand.get("snippet"), title, category),
             "source_name": host,
             "source_url": url,
             "published_at": published if isinstance(published, str) and published.strip() else None,

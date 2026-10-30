@@ -29,17 +29,22 @@ import datetime
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
 SCRIPTS = os.path.join(REPO_ROOT, "scripts")
 if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
 import alert_dedupe as A  # noqa: E402
+from tests import workflows as W  # noqa: E402
 
 UTC = datetime.timezone.utc
 
@@ -263,6 +268,207 @@ class WiringTests(unittest.TestCase):
             self.assertIn("state/alert_ledger.json", text,
                           "%s never stages the ledger, so the dedupe state dies "
                           "with the run and every run re-alerts" % name)
+
+
+class AlertLedgerCommitRaceTests(unittest.TestCase):
+    """D3 — a concurrent push must not turn a published alert into a red run.
+
+    EXECUTED against real git, because this defect lives in the shell: measured
+    2026-10-30, this step committed `[master 01682f4] chore: update alert
+    ledger [skip ci]` and then died with exit 128 when master moved underneath
+    it. The alert had already gone out, so the only thing the red run bought was
+    a second signal for a condition that was not a failure.
+    """
+
+    WORKFLOW = "digest-watchdog.yml"
+    JOB = "watchdog"
+    STEP = "Commit the alert ledger"
+    STATE = "state/alert_ledger.json"
+
+    def setUp(self):
+        self.bash = W.bash_executable()
+        if self.bash is None:
+            self.fail(
+                "bash was not found on PATH, so the alert-ledger commit step "
+                "CANNOT be executed. This fails instead of skipping on purpose: "
+                "a skipped test reports green while the one path that persists "
+                "the dedupe window has never run.")
+        self.tmp = Path(tempfile.mkdtemp(prefix="alert-ledger-race-"))
+        self.addCleanup(shutil.rmtree, str(self.tmp), True)
+        self.body = None
+        for job, name, run, _st in W.iter_run_blocks(self.WORKFLOW):
+            if job == self.JOB and name == self.STEP:
+                self.body = run
+                break
+        if self.body is None:
+            self.fail("%s / job %r has no %r step"
+                      % (self.WORKFLOW, self.JOB, self.STEP))
+
+    # -- helpers -----------------------------------------------------------
+
+    def _must(self, cwd, *args):
+        env = dict(os.environ)
+        env.update({"GIT_AUTHOR_NAME": "ledger",
+                    "GIT_AUTHOR_EMAIL": "ledger@example.invalid",
+                    "GIT_COMMITTER_NAME": "ledger",
+                    "GIT_COMMITTER_EMAIL": "ledger@example.invalid"})
+        proc = subprocess.run(
+            ["git", "-c", "init.defaultBranch=master"] + list(args),
+            cwd=str(cwd), capture_output=True, text=True,
+            encoding="utf-8", errors="replace", env=env, timeout=120)
+        if proc.returncode != 0:
+            self.fail("git %s failed in %s (exit %d):\n%s\n%s"
+                      % (" ".join(args), cwd, proc.returncode,
+                         proc.stdout, proc.stderr))
+        return proc
+
+    def _write(self, work, doc):
+        path = work / self.STATE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(doc, fh, indent=2)
+            fh.write("\n")
+
+    def _repo(self):
+        """A bare origin plus a clone that already holds a committed ledger."""
+        origin = self.tmp / "origin.git"
+        work = self.tmp / "work"
+        self._must(self.tmp, "init", "-q", "--bare", str(origin))
+        self._must(self.tmp, "clone", "-q", str(origin), str(work))
+        for key, value in (("user.name", "ledger"),
+                           ("user.email", "ledger@example.invalid"),
+                           ("commit.gpgsign", "false")):
+            self._must(work, "config", key, value)
+        self._write(work, {"schema_version": 1, "alerts": {}})
+        (work / "note.txt").write_text("seed\n", encoding="utf-8")
+        self._must(work, "add", self.STATE, "note.txt")
+        self._must(work, "commit", "-q", "-m", "seed")
+        self._must(work, "push", "-q", "-u", "origin", "master")
+        return origin, work
+
+    def _run(self, work):
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            # EMPTY, not absent: a local-path origin needs no credential, and
+            # the step must take its unauthenticated branch and say so.
+            "GITHUB_TOKEN": "",
+        }
+        return W.run_bash_script(self.body, env_overrides=env, cwd=str(work),
+                                 bash=self.bash, timeout=180)
+
+    def _remote_ledger(self, origin):
+        proc = self._must(origin, "show", "master:%s" % self.STATE)
+        return json.loads(proc.stdout)
+
+    # -- the race ----------------------------------------------------------
+
+    def test_a_ledger_race_is_merged_and_still_published(self):
+        """THE INCIDENT'S SHAPE: another run pushed while this one worked."""
+        origin, work = self._repo()
+
+        rival = self.tmp / "rival"
+        self._must(self.tmp, "clone", "-q", str(origin), str(rival))
+        for key, value in (("user.name", "rival"),
+                           ("user.email", "rival@example.invalid")):
+            self._must(rival, "config", key, value)
+        self._write(rival, {"schema_version": 1,
+                            "alerts": {"rival:key": "2026-10-30T01:00:00Z"}})
+        self._must(rival, "add", self.STATE)
+        self._must(rival, "commit", "-q", "-m", "rival ledger")
+        self._must(rival, "push", "-q", "origin", "master")
+
+        # This run's own ledger is written but NOT committed, exactly as the
+        # alerting step leaves it.
+        self._write(work, {"schema_version": 1,
+                           "alerts": {"ours:key": "2026-10-30T02:00:00Z"}})
+
+        proc = self._run(work)
+        self.assertEqual(
+            0, proc.returncode,
+            "the commit step failed on a concurrent push again (exit %d):\n"
+            "stdout:\n%s\nstderr:\n%s"
+            % (proc.returncode, proc.stdout, proc.stderr))
+        self.assertIn("alert ledger pushed", proc.stdout,
+                      "the step reported success without publishing:\n"
+                      + proc.stdout)
+
+        # Nothing half-merged may survive: a wedged merge would make every
+        # later attempt in this job fail for a new reason.
+        stalled = subprocess.run(
+            ["git", "rev-parse", "-q", "--verify", "MERGE_HEAD"],
+            cwd=str(work), capture_output=True, text=True, timeout=60)
+        self.assertNotEqual(0, stalled.returncode,
+                            "the step left an unfinished merge behind")
+        status = self._must(work, "status", "--porcelain")
+        self.assertEqual("", status.stdout.strip(),
+                         "the step left the checkout dirty:\n" + status.stdout)
+
+        # The remote holds a valid ledger -- whichever side won the hunk.
+        remote = self._remote_ledger(origin)
+        self.assertIn("alerts", remote)
+        self.assertIsInstance(remote["alerts"], dict)
+
+    def test_a_conflict_that_cannot_be_auto_resolved_warns_instead_of_failing(self):
+        """THE SHAPE THAT PRODUCED EXIT 128, and it must end at 0.
+
+        The rival run DELETED the ledger while this run rewrote it. A
+        modify/delete conflict is one `-X theirs` cannot resolve, so no amount
+        of retrying publishes it; the point is that the run says so ONCE and
+        returns, instead of leaving a wedged rebase and a red job behind.
+        """
+        origin, work = self._repo()
+
+        rival = self.tmp / "rival"
+        self._must(self.tmp, "clone", "-q", str(origin), str(rival))
+        for key, value in (("user.name", "rival"),
+                           ("user.email", "rival@example.invalid")):
+            self._must(rival, "config", key, value)
+        self._must(rival, "rm", "-q", self.STATE)
+        self._must(rival, "commit", "-q", "-m", "drop the ledger")
+        self._must(rival, "push", "-q", "origin", "master")
+
+        self._write(work, {"schema_version": 1,
+                           "alerts": {"ours:key": "2026-10-30T02:00:00Z"}})
+        proc = self._run(work)
+        self.assertEqual(
+            0, proc.returncode,
+            "an unresolvable merge still failed the run (exit %d):\n"
+            "stdout:\n%s\nstderr:\n%s"
+            % (proc.returncode, proc.stdout, proc.stderr))
+        self.assertIn("COULD NOT PUBLISH THE ALERT LEDGER", proc.stdout,
+                      "the step gave up silently:\n" + proc.stdout)
+        stalled = subprocess.run(
+            ["git", "rev-parse", "-q", "--verify", "MERGE_HEAD"],
+            cwd=str(work), capture_output=True, text=True, timeout=60)
+        self.assertNotEqual(0, stalled.returncode,
+                            "the step left an unfinished merge behind")
+        rebasing = subprocess.run(
+            ["git", "rev-parse", "-q", "--verify", "REBASE_HEAD"],
+            cwd=str(work), capture_output=True, text=True, timeout=60)
+        self.assertNotEqual(0, rebasing.returncode,
+                            "the step left an unfinished rebase behind")
+
+    def test_the_normal_path_still_publishes_the_ledger(self):
+        origin, work = self._repo()
+        self._write(work, {"schema_version": 1,
+                           "alerts": {"ours:key": "2026-10-30T02:00:00Z"}})
+        proc = self._run(work)
+        self.assertEqual(0, proc.returncode, proc.stdout + proc.stderr)
+        self.assertEqual({"ours:key": "2026-10-30T02:00:00Z"},
+                         self._remote_ledger(origin)["alerts"],
+                         "the ledger never reached origin/master")
+        log = self._must(origin, "log", "--format=%s", "-n", "5", "master")
+        self.assertIn("chore: update alert ledger [skip ci]", log.stdout)
+
+    def test_the_retry_is_bounded_and_never_rebases(self):
+        """A retry loop without a bound is a hang, and a rebase rewrites history."""
+        body = "\n".join(line for line in self.body.splitlines()
+                         if line.strip() and not line.strip().startswith("#"))
+        self.assertIn('while [ "$attempt" -le 3 ]', body,
+                      "the sync/commit/push retry must be bounded to three tries")
+        self.assertNotIn("--rebase", body)
+        self.assertNotIn("--force", body)
+        self.assertNotIn("push -f", body)
 
 
 if __name__ == "__main__":

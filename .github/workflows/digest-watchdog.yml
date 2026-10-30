@@ -424,11 +424,32 @@ jobs:
             exit 0
           fi
           git commit -m "chore: retire exhausted empty-digest retry ladder [skip ci]"
-          if ! git "${auth[@]}" pull --ff-only origin master; then
-            git "${auth[@]}" pull --rebase -X theirs origin master || \
-              echo "Fast-forward and rebase both failed — proceeding without pulling"
+          # THE SAME RACE AS THE ALERT LEDGER (D3): a push that loses master
+          # must not turn "the ladder was retired" into a red run, because the
+          # escalation alert for the final attempt has already gone out.
+          # Bounded to three tries, and merge only -- never rebase, reset or
+          # force.
+          published=false
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if ! git "${auth[@]}" fetch --quiet origin master; then
+              echo "::warning::retire ladder: fetch failed (attempt $attempt/3)"
+            elif ! git merge --ff-only FETCH_HEAD >/dev/null 2>&1; then
+              git merge -X theirs --no-edit FETCH_HEAD >/dev/null 2>&1 || \
+                git merge --abort >/dev/null 2>&1 || true
+            fi
+            if git "${auth[@]}" push --quiet origin HEAD:master; then
+              published=true
+              break
+            fi
+            echo "::warning::retire ladder push lost the master race (attempt $attempt/3)"
+            attempt=$((attempt + 1))
+            sleep 3
+          done
+          if [ "$published" != "true" ]; then
+            echo "::warning::could not publish the retired ladder after 3 attempts -- master kept moving, and the next exhausted run will try again."
+            exit 0
           fi
-          git "${auth[@]}" push
 
       - name: Commit the alert ledger
         # The 6h window only exists if it outlives the run. Same commit mechanism
@@ -453,17 +474,52 @@ jobs:
           else
             echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
           fi
-          git add -- state/alert_ledger.json
-          if git diff --staged --quiet; then
-            echo "alert ledger unchanged"
+          # A CONCURRENT PUSH IS NOT A JOB FAILURE (D3). Measured 2026-10-30:
+          # this step committed `[master 01682f4] chore: update alert ledger
+          # [skip ci]` and then died with exit 128 because master had moved
+          # underneath it, so a published alert turned into a red watchdog.
+          # Sync, commit and push are retried a BOUNDED three times, and the
+          # only way this moves the branch is a merge -- never a rebase, a
+          # reset or a force.
+          published=false
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            # COMMIT FIRST, THEN SYNC. The alerting step has already written
+            # this file, so a checkout carrying that modification cannot be
+            # fast-forwarded until it is committed. A commit on a stale master
+            # is harmless; the merge below rewrites nothing that was published.
+            git add -- state/alert_ledger.json
+            if ! git diff --staged --quiet; then
+              git commit -m "chore: update alert ledger [skip ci]" -- state/alert_ledger.json
+            fi
+            if ! git "${auth[@]}" fetch --quiet origin master; then
+              echo "::warning::alert ledger: fetch failed (attempt $attempt/3)"
+            elif ! git merge --ff-only FETCH_HEAD >/dev/null 2>&1; then
+              # `-X theirs` keeps the REMOTE ledger on a conflicting hunk, the
+              # same bias `pull --rebase -X theirs` had. A merge is used
+              # instead of a rebase because a rebase rewrites commits this run
+              # may already have pushed.
+              if ! git merge -X theirs --no-edit FETCH_HEAD >/dev/null 2>&1; then
+                # A half-finished merge would wedge every later attempt, so it
+                # is undone before retrying. This is `merge --abort`, not a
+                # reset of anything that reached origin.
+                git merge --abort >/dev/null 2>&1 || true
+                echo "::warning::alert ledger: could not merge origin/master (attempt $attempt/3)"
+              fi
+            fi
+            if git "${auth[@]}" push --quiet origin HEAD:master; then
+              published=true
+              break
+            fi
+            echo "::warning::alert ledger push lost the master race (attempt $attempt/3)"
+            attempt=$((attempt + 1))
+            sleep 3
+          done
+          if [ "$published" != "true" ]; then
+            echo "::warning::COULD NOT PUBLISH THE ALERT LEDGER after 3 attempts -- master kept moving. The 6h de-duplication window is not persisted, so one repeated alert is possible. The digest verdict is unaffected."
             exit 0
           fi
-          git commit -m "chore: update alert ledger [skip ci]"
-          if ! git "${auth[@]}" pull --ff-only origin master; then
-            git "${auth[@]}" pull --rebase -X theirs origin master || \
-              echo "Fast-forward and rebase both failed — proceeding without pulling"
-          fi
-          git "${auth[@]}" push
+          echo "alert ledger pushed"
 
   watchdog:
     # GATED ON ITS OWN SCHEDULE, deliberately, because this job now shares a
@@ -1195,7 +1251,50 @@ jobs:
                     'could not be consulted)' % (source, date))
               return mirror_entry, 'the git mirror'
 
-          # -- 4c. THE DISPLACED SLOT (U8). THE RESIDUAL THIS CLOSES. ------
+          # -- 4c. THIS RUN'S OWN SLOT, ALSO PROVED BY THE LEDGER (D1) ------
+          #
+          # THE DEFECT THIS CLOSES. `state/last_digest_sent.json` is written by
+          # the PREBUILD with `delivered: false, phase: "prebuild"`, and nothing
+          # ever updates it when the Worker pushes, so a verdict read from the
+          # marker alone called a digest MISSING that had demonstrably arrived:
+          # measured 2026-10-30 01:35:34Z, sequence_id `dmn-2026-10-30-morning`,
+          # Worker /health `on_time: true`, and 8 of 12 watchdog runs paged the
+          # owner for it. The ledger was already the authority for the DISPLACED
+          # slot; it is the same authority for the slot this run owns.
+          #
+          # THE DIRECTION IS DELIBERATE, AND IT IS THE SAFE ONE. A send recorded
+          # against this exact (date, slot) is the Worker's own evidence, so it
+          # wins over a prebuild marker. An ABSENT entry changes NOTHING: `ok`
+          # keeps whatever the marker said, so a slot that really was never
+          # pushed still reaches the alerting step. This closes a false alarm; it
+          # cannot open a new way to swallow a miss.
+          # Pinned by PrimarySlotLedgerProofTests in
+          # tests/digest/test_slot_ledger_mirror.py.
+          primary_entry, primary_origin = reconcile(
+              npt_date.isoformat(), expected,
+              slot_entry(kv_days, npt_date.isoformat(), expected)
+              if kv_days is not None else None,
+              slot_entry(mirror_days, npt_date.isoformat(), expected),
+              'this run\'s own slot')
+          primary_proof = 'marker' if ok else ''
+          if delivered(primary_entry):
+              if not ok:
+                  proven = ('Watchdog (primary slot): %s digest for %s NPT — '
+                            'DELIVERED (%s records a send at %s; the marker holds '
+                            'delivered=%r phase=%r and is a prebuild note, not a '
+                            'delivery record, so the ledger decides)'
+                            % (expected, npt_date, primary_origin,
+                               primary_entry.get('ntfy_sent_at'),
+                               marker.get('delivered') if isinstance(marker, dict)
+                               else None,
+                               marker.get('phase') if isinstance(marker, dict)
+                               else None))
+                  print(proven)
+                  note(proven)
+              ok = True
+              primary_proof = primary_origin
+
+          # -- 4d. THE DISPLACED SLOT (U8). THE RESIDUAL THIS CLOSES. ------
           #
           # Judged from the LEDGER, never from `last_digest_sent.json`. The
           # marker holds ONE slot and is overwritten by the next run, so on a
@@ -1361,10 +1460,19 @@ jobs:
                         % (expected, npt_date,
                            due_utc.strftime('%Y-%m-%d %H:%M UTC'),
                            remaining // 60, remaining % 60, delayed))
+          elif ok and primary_proof and primary_proof != 'marker':
+              # The marker is a prebuild note, so say WHICH record proved the
+              # delivery instead of claiming a marker that does not say so.
+              reason = ('delivered, proved by %s rather than the marker'
+                        % primary_proof)
           elif ok:
               reason = 'delivered'
           else:
               reason = 'no delivered marker'
+              if primary_entry is not None:
+                  reason = ('no delivered marker and %s holds no send for this '
+                            'slot (kind=%r)' % (primary_origin,
+                                                primary_entry.get('kind')))
 
           # Three words, not two: a slot that is not due yet is NOT "delivered", and
           # printing DELIVERED for a digest that does not exist yet is the same
@@ -1409,11 +1517,16 @@ jobs:
         #      missed digest" gate below;
         #   2. continue-on-error keeps a violation from failing the job, so the
         #      digest verdict below is unaffected;
-        #   3. it reads state/academic_state.json + state/exam_selfcheck.json,
-        #      which the digest marker step never touches.
+        #   3. it reads state/academic_state.json, state/academic_last_run.json
+        #      and state/exam_selfcheck.json, which the digest marker step never
+        #      touches.
         #
-        # Asserts: schema_version == 2, last_poll_time within 24h, no host in
-        # hosts_down for more than 6h, and a successful exam-source self-check
+        # Asserts: the last academic run recorded exit 0 (or there is no record
+        # yet, which is soft) and completed within 24h; schema_version == 2,
+        # last_poll_time within 24h and no host in hosts_down for more than 6h
+        # WHEN the state file is present -- and its ABSENCE is a note, never a
+        # problem, because that file is gitignored and restored from KV inside
+        # academic-result.yml (D2); and a successful exam-source self-check
         # within 7 days. This is what makes a dead result monitor impossible to
         # mistake for a quiet week.
         id: academic
@@ -1444,12 +1557,40 @@ jobs:
 
           # --- 1) academic state: schema + poll recency + host outages ------
           state = {}
+          state_seen = False
           try:
               with open('state/academic_state.json', encoding='utf-8') as fh:
                   state = json.load(fh)
+              state_seen = True
+          except FileNotFoundError:
+              # ABSENT IS NOT BROKEN (D2). This file carries the owner's ROLL
+              # NUMBER, so it is gitignored and can never be committed: it is
+              # restored from the KV key `academic:state` INSIDE
+              # academic-result.yml, so every fresh watchdog checkout is
+              # guaranteed to arrive here without it. Reporting that as a hard
+              # problem made this step post `::error::` on a monitor that had
+              # not run in this workspace at all -- a permanent false alarm.
+              # It is still reported, loudly, and the failure signals below
+              # (last run exit code, last run staleness, self-check recency)
+              # are what actually judge health.
+              notes.append('state/academic_state.json is not in this checkout '
+                           '(gitignored; restored from KV inside '
+                           'academic-result.yml, never committed) - this says '
+                           'nothing about the monitor, which is judged from '
+                           'state/academic_last_run.json and the exam-source '
+                           'self-check')
           except (OSError, ValueError) as exc:
+              # PRESENT BUT UNREADABLE IS STILL A FAILURE. A torn or malformed
+              # state file is not "has not run yet", and treating it as such
+              # would silence a real break.
               state = {}
-              problems.append('state/academic_state.json unreadable: %s' % exc)
+              problems.append('state/academic_state.json is present but '
+                              'unreadable: %s' % exc)
+
+          if state_seen and not (isinstance(state, dict) and state):
+              problems.append('state/academic_state.json is not a usable state '
+                              'document (expected a non-empty JSON object with '
+                              'schema_version)')
 
           if isinstance(state, dict) and state:
               version = state.get('schema_version')
@@ -1514,9 +1655,52 @@ jobs:
                                '(this is the no-burn invariant holding, not a '
                                'failure): %s'
                                % (len(deferred), ', '.join(deferred[:10])))
-          elif not problems:
-              problems.append('no academic state file - the result monitor has '
-                              'never run')
+          # --- 1b) THE MONITOR'S LAST RUN: did it fire, and did it fail? -----
+          # The state file above is normally absent here by design, so "fired
+          # and failed" needs its own witness. This one IS committed after every
+          # academic-result run and carries that run's exit code and timestamp,
+          # which is what tells "never ran" (soft) from "ran and broke" (hard)
+          # and from "nobody has run it for a day" (hard).
+          last_run = None
+          try:
+              with open('state/academic_last_run.json', encoding='utf-8') as fh:
+                  last_run = json.load(fh)
+          except FileNotFoundError:
+              notes.append('no academic run is on record yet '
+                           '(state/academic_last_run.json is absent)')
+          except (OSError, ValueError) as exc:
+              problems.append('state/academic_last_run.json unreadable: %s' % exc)
+
+          if isinstance(last_run, dict) and last_run:
+              exit_code = str(last_run.get('exit_code', '')).strip()
+              if exit_code and exit_code != '0':
+                  # THE SIGNAL THIS REPLACES THE STATE-FILE CHECK WITH, and it
+                  # is the stronger one: a run that fired and failed may have
+                  # left a published result UNSEEN, which is exactly the
+                  # "blind monitor" this step exists to catch.
+                  problems.append('the last academic monitor run FAILED '
+                                  '(exit %s at %s) - a result may be UNSEEN, '
+                                  'not absent'
+                                  % (exit_code,
+                                     last_run.get('checked_at') or 'unknown'))
+              checked = str(last_run.get('checked_at') or '')
+              age_h = None
+              try:
+                  moment = datetime.datetime.fromisoformat(
+                      checked.replace('Z', '+00:00'))
+                  if moment.tzinfo is None:
+                      moment = moment.replace(tzinfo=datetime.timezone.utc)
+                  age_h = (now - moment).total_seconds() / 3600.0
+              except ValueError:
+                  problems.append('state/academic_last_run.json has an '
+                                  'unreadable checked_at %r' % checked)
+              if age_h is not None and age_h > 24:
+                  problems.append('the result monitor has not completed a run '
+                                  'for ~%.0fh (last checked_at %s) - a result '
+                                  'can be published with nobody watching'
+                                  % (age_h, checked))
+          elif last_run is not None and not isinstance(last_run, dict):
+              problems.append('state/academic_last_run.json is not a JSON object')
 
           # --- 2) exam-source self-check recency ---------------------------
           last_ok = None
@@ -2752,14 +2936,49 @@ jobs:
           else
             echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
           fi
-          git add -- state/alert_ledger.json
-          if git diff --staged --quiet; then
-            echo "alert ledger unchanged"
+          # A CONCURRENT PUSH IS NOT A JOB FAILURE (D3). Measured 2026-10-30:
+          # this step committed `[master 01682f4] chore: update alert ledger
+          # [skip ci]` and then died with exit 128 because master had moved
+          # underneath it, so a published alert turned into a red watchdog.
+          # Sync, commit and push are retried a BOUNDED three times, and the
+          # only way this moves the branch is a merge -- never a rebase, a
+          # reset or a force.
+          published=false
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            # COMMIT FIRST, THEN SYNC. The alerting step has already written
+            # this file, so a checkout carrying that modification cannot be
+            # fast-forwarded until it is committed. A commit on a stale master
+            # is harmless; the merge below rewrites nothing that was published.
+            git add -- state/alert_ledger.json
+            if ! git diff --staged --quiet; then
+              git commit -m "chore: update alert ledger [skip ci]" -- state/alert_ledger.json
+            fi
+            if ! git "${auth[@]}" fetch --quiet origin master; then
+              echo "::warning::alert ledger: fetch failed (attempt $attempt/3)"
+            elif ! git merge --ff-only FETCH_HEAD >/dev/null 2>&1; then
+              # `-X theirs` keeps the REMOTE ledger on a conflicting hunk, the
+              # same bias `pull --rebase -X theirs` had. A merge is used
+              # instead of a rebase because a rebase rewrites commits this run
+              # may already have pushed.
+              if ! git merge -X theirs --no-edit FETCH_HEAD >/dev/null 2>&1; then
+                # A half-finished merge would wedge every later attempt, so it
+                # is undone before retrying. This is `merge --abort`, not a
+                # reset of anything that reached origin.
+                git merge --abort >/dev/null 2>&1 || true
+                echo "::warning::alert ledger: could not merge origin/master (attempt $attempt/3)"
+              fi
+            fi
+            if git "${auth[@]}" push --quiet origin HEAD:master; then
+              published=true
+              break
+            fi
+            echo "::warning::alert ledger push lost the master race (attempt $attempt/3)"
+            attempt=$((attempt + 1))
+            sleep 3
+          done
+          if [ "$published" != "true" ]; then
+            echo "::warning::COULD NOT PUBLISH THE ALERT LEDGER after 3 attempts -- master kept moving. The 6h de-duplication window is not persisted, so one repeated alert is possible. The digest verdict is unaffected."
             exit 0
           fi
-          git commit -m "chore: update alert ledger [skip ci]"
-          if ! git "${auth[@]}" pull --ff-only origin master; then
-            git "${auth[@]}" pull --rebase -X theirs origin master || \
-              echo "Fast-forward and rebase both failed — proceeding without pulling"
-          fi
-          git "${auth[@]}" push
+          echo "alert ledger pushed"

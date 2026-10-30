@@ -116,6 +116,13 @@ def agent_step_run_block():
 #: are asserted.
 _STUB_OPENCODE = r"""#!/usr/bin/env bash
 set -u
+if [ "${1:-}" = "models" ]; then
+  # THE PREFLIGHT CALL. The real CLI lists every id it can serve across every
+  # configured provider; this prints what $STUB_OPENCODE_MODELS names, and an
+  # empty value is the "provider did not resolve" case the step must survive.
+  printf '%s\n' ${STUB_OPENCODE_MODELS:-}
+  exit 0
+fi
 cat >/dev/null                      # drain the prompt on stdin
 model=""
 prev=""
@@ -162,6 +169,11 @@ case "$outcome" in
   unknown) printf 'UnknownError: Unexpected server error\n' >&2 ; exit 1 ;;
   quota)   printf '429 Too Many Requests (Retry-After: 30)\n' >&2 ; exit 1 ;;
   auth)    printf '401 Unauthorized: invalid api key\n' >&2 ; exit 1 ;;
+  planrefused)
+    # The plan, not the id: this sentence ALSO carries "usage limit", which is
+    # why it must classify as payment_required before quota is considered.
+    printf 'AI_APICallError: Free usage limit reached. To keep going, subscribe to OpenCode Go.\n' >&2
+    exit 1 ;;
   authstamp)
     # VERBATIM 2026-10-27 16:18:47Z. The fatal line is an outage; the ONLY
     # "401" in the log is the clock's millisecond field. Classified `auth`, it
@@ -408,6 +420,12 @@ class AgentWalkHarness(unittest.TestCase):
                 text = text.replace("${{ steps.digest_time.outputs.time }}",
                                     resolved["DIGEST_TIME"])
                 text = text.replace("${{ github.workspace }}", str(self.tmp))
+                # The provider secret. A real run gets the owner's key from the
+                # organization secret; here a non-empty placeholder is enough,
+                # because what the step does with it is the CLI's business and
+                # the stub never reads it. NEVER a real credential.
+                text = text.replace("${{ secrets.GEMINI_API_KEY }}",
+                                    "test-gemini-key")
                 # The simulation switch. Empty and `workflow_dispatch` are what
                 # every ORDINARY run sees: the input is unset on a real dispatch
                 # and the event name is the manual one here because the harness
@@ -454,6 +472,12 @@ class AgentWalkHarness(unittest.TestCase):
             "STUB_REAL_PYTHON": sys.executable,
             "STUB_POOL": " ".join(pool),
             "STUB_OPENCODE_PLAN": plan,
+            # What `opencode models` reports to the C9 preflight. The default is
+            # the healthy case (the Gemini provider resolved); a test that wants
+            # the missing-provider path passes STUB_OPENCODE_MODELS="" through
+            # extra_env, which is also how a real run sees it.
+            "STUB_OPENCODE_MODELS": "gemini/gemini-3.5-flash-lite "
+                                    "gemini/gemini-3.1-flash-lite",
             "STUB_OPENCODE_LOG": str(log),
             "STUB_TIMEOUT_LOG": str(timeout_log),
             "STUB_SLEEP_LOG": str(sleep_log),
@@ -761,12 +785,17 @@ class AuthIsPerModelTests(AgentWalkHarness):
             ["opencode/a", "opencode/b"], art["models"],
             "the walk must stop at the SECOND refusal -- `opencode/c` exists "
             "only to prove it was never tried. Invoked: %r" % (art["models"],))
+        # The count is PER PROVIDER since 2026-10-30: two refusals from
+        # `opencode` say the opencode key is dead, and that must skip the rest
+        # of the opencode rungs without silencing a DIFFERENT provider's key
+        # further down the ladder.
         self.assertIn(
-            "Circuit breaker: opencode/b -> auth (2 models refused the "
-            "credential). That is the shared key, not one model; stopping the "
-            "walk.", proc.stdout)
-        self.assertIn("(last error: auth: 2 models rejected the credential, "
-                      "walk aborted)", proc.stdout)
+            "Circuit breaker: opencode/b -> auth (2 rungs of the 'opencode' "
+            "provider rejected the credential). That is that provider's key, "
+            "not one model: its remaining rungs are skipped and the walk "
+            "continues with the next provider.", proc.stdout)
+        self.assertIn("(last error: auth: 2 rungs of 'opencode' rejected the "
+                      "credential)", proc.stdout)
 
     def test_the_measured_timestamp_line_is_an_outage_not_an_auth(self):
         """The exact log that caused the abort, end to end through the step.

@@ -540,6 +540,7 @@ HEALTH_KIND_OF = {
     "slow_or_stalled": "timeout",
     "other": "transport",
     "auth": "transport",
+    "payment_required": "transport",
 }
 
 
@@ -1002,10 +1003,48 @@ def load_cooldown(path):
     return doc
 
 
+def _has_content(doc):
+    """True when this document still holds something that can refuse a model.
+
+    WHY THIS EXISTS. Every row in here expires: a model veto lasts at most a day
+    (`COOLDOWN_SEC`), a pool wall at most `POOL_MAX_SEC`, and the record and
+    select paths both PRUNE before they save. So the steady state of a healthy
+    repository is a document with nothing left in it -- and writing that out
+    produced `{"schema_version": 1, "models": {}}`: a committed stub that refuses
+    nothing, was stale the moment it was written, and failed `workflow_lint` on
+    five days out of five. The rule that replaces it is one sentence: the
+    committed file exists only while it can still veto something.
+    """
+    models = doc.get("models") if isinstance(doc, dict) else None
+    if isinstance(models, dict) and models:
+        return True
+    return bool(pool_row(doc))
+
+
 def save_cooldown(path, doc):
-    """Atomic, best-effort write. Returns True when the file was written."""
+    """Atomic, best-effort write -- or REMOVAL when there is nothing left to say.
+
+    Returns True when the file on disk now reflects `doc`: written, removed, or
+    already absent.
+    """
     if not path:
         return False
+    if not _has_content(doc):
+        # DELETE, NEVER WRITE AN EMPTY STUB.
+        #
+        # This is the D4 fix, and it is here rather than in the test on purpose:
+        # the document that reaches this point has already been pruned, so "no
+        # rows left" is a fact about the walk, not a guess. Removing the file is
+        # what makes the next `git add` see a deletion and what keeps a dead
+        # veto list out of the tree. A failed removal is not fatal: the commit
+        # step warns and the next run tries again.
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        return True
     try:
         parent = os.path.dirname(os.path.abspath(path))
         if parent and not os.path.isdir(parent):
@@ -1232,6 +1271,7 @@ WATCHDOG_MARKER = "__WATCHDOG_NO_OUTPUT__"
 #: class is a deliberate change, not a fallback string.
 FAILURE_CLASSES = (
     "model_not_found",
+    "payment_required",
     "quota_or_rate_limited",
     "auth",
     "provider_outage",
@@ -1252,6 +1292,16 @@ _QUOTA_MARKERS = ("rate limit", "rate_limit", "ratelimit", "quota", "usage limit
                   "too many requests", "retry-after", "retry after")
 _AUTH_MARKERS = ("unauthorized", "invalid api key", "invalid_api_key",
                  "authentication failed", "invalid token", "forbidden")
+#: The PLAN refused the call, and the model id is innocent. Measured wording on
+#: the OpenCode free plan: "Free usage limit reached ... subscribe to OpenCode
+#: Go". That sentence also carries a quota marker, so this class is tested
+#: BEFORE quota -- otherwise a plan refusal reads as transient throttling and
+#: the whole ladder gets walked, rung by rung, to hear the same refusal.
+#: Deliberately narrow: the classifier reads the WHOLE attempt log, assistant
+#: prose included, so a loose "upgrade" would misclassify a digest about
+#: software pricing.
+_PAYMENT_MARKERS = ("subscribe to opencode", "upgrade to opencode go",
+                    "payment required")
 _OUTAGE_MARKERS = ("unknownerror", "unexpected server error",
                    "internal server error", "bad gateway",
                    "service unavailable", "gateway timeout",
@@ -1275,7 +1325,7 @@ _OUTAGE_MARKERS = ("unknownerror", "unexpected server error",
 #: and `(?<!\d)` saw the `.` as a boundary. `47.401` is a millisecond field, not
 #: a status. The same hole let `.429Z`, `.500Z` and `.503Z` fake quota and
 #: outage classes too, so this is one fix for a whole family of misreads.
-_HTTP_RE = re.compile(r"(?<![\d.])(401|403|429|500|502|503|504)(?!\d)")
+_HTTP_RE = re.compile(r"(?<![\d.])(401|402|403|429|500|502|503|504)(?!\d)")
 
 
 def classify_failure(text, returncode=0):
@@ -1290,11 +1340,15 @@ def classify_failure(text, returncode=0):
       2. auth -- 401/403 and its wording. Terminal for the whole walk: retrying
          another model with a bad credential only wastes the budget and hides
          the cause;
-      3. quota_or_rate_limited -- 429/quota/Retry-After;
-      4. slow_or_stalled -- the watchdog marker, or rc 124 (what `timeout`
-         reports for its own kill);
-      5. provider_outage -- 5xx and `UnknownError` with NO not-found marker;
-      6. other -- everything else, including an exit 1 with no output.
+      3. payment_required -- 402, or the plan saying "subscribe to OpenCode
+          Go". BEFORE quota on purpose: that refusal sentence also carries
+          "usage limit", and reading it as throttle walks the whole ladder to
+         hear the same refusal from every rung;
+      4. quota_or_rate_limited -- 429/quota/Retry-After;
+      5. slow_or_stalled -- the watchdog marker, or rc 124 (what `timeout`
+          reports for its own kill);
+      6. provider_outage -- 5xx and `UnknownError` with NO not-found marker;
+      7. other -- everything else, including an exit 1 with no output.
     """
     low = (text or "").lower()
 
@@ -1304,6 +1358,8 @@ def classify_failure(text, returncode=0):
     codes = {int(c) for c in _HTTP_RE.findall(low)}
     if codes & {401, 403} or any(m in low for m in _AUTH_MARKERS):
         return "auth"
+    if codes & {402} or any(m in low for m in _PAYMENT_MARKERS):
+        return "payment_required"
     if codes & {429} or any(m in low for m in _QUOTA_MARKERS):
         return "quota_or_rate_limited"
     if WATCHDOG_MARKER.lower() in low or int(returncode or 0) == 124:
@@ -1379,7 +1435,10 @@ FAST_FAIL_SEC = 2
 #: Classes that end the attempt the moment they appear on the stream. A
 #: provider_outage is NOT here: the CLI may recover from a 5xx by itself, so it
 #: keeps the silence window instead of being cut at once.
-DECISIVE_CLASSES = ("model_not_found", "quota_or_rate_limited", "auth")
+#: payment_required is here because a plan refusal is instant and permanent for
+#: that provider: waiting the silence window out buys nothing but wall clock.
+DECISIVE_CLASSES = ("model_not_found", "quota_or_rate_limited", "auth",
+                    "payment_required")
 
 #: THE REPEAT BREAKER -- the compensating rule for the line above, and NOT a
 #: marker bludgeon.
@@ -1413,7 +1472,8 @@ _ERROR_SHAPED = ("apicallerror", "providermodelnotfounderror", "unknownerror",
 #: HTTP reason phrase, because a digest sentence may legitimately contain a
 #: number: "The 429 passengers were rescued" must never kill an attempt.
 _STATUS_LINE = re.compile(r"^\s*(?:http[/ ]?\d(?:\.\d)?\s*)?(\d{3})\b")
-_REASON_PHRASES = ("too many requests", "unauthorized", "forbidden", "not found",
+_REASON_PHRASES = ("too many requests", "payment required", "unauthorized",
+                   "forbidden", "not found",
                    "bad gateway", "service unavailable", "gateway timeout",
                    "internal server error", "bad request", "rate limited")
 

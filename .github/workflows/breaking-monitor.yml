@@ -291,15 +291,24 @@ jobs:
           # `git add -A` or `git add state/` would sweep in every preview file
           # this workspace holds.
           MODEL_STATE=state/model_cooldown.json
-          if [ ! -f "$MODEL_STATE" ]; then
-            echo "no $MODEL_STATE was written this run"
+          # ABSENCE IS THE STEADY STATE. The writer DELETES this file when its
+          # pruned map is empty -- nothing left in it can refuse a model -- so a
+          # missing file here means "nothing is cooling", not "the write was
+          # lost". A tracked deletion must still be committed, though, or the
+          # dead stub stays on master for ever and fails workflow_lint daily.
+          if [ ! -f "$MODEL_STATE" ] && ! git ls-files --error-unmatch -- "$MODEL_STATE" >/dev/null 2>&1; then
+            echo "no $MODEL_STATE was written this run and none is committed"
             exit 0
           fi
-          # READ IT BACK AND CHECK ITS SHAPE BEFORE STAGING: a torn or empty file
-          # committed over a good one un-arms every veto it held, silently.
-          if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); assert isinstance(d,dict) and isinstance(d.get("models",{}),dict) and isinstance(d.get("pool",{}),dict)' "$MODEL_STATE"; then
-            echo "::warning::$MODEL_STATE did not read back as a cooldown document -- not committing it"
-            exit 0
+          if [ -f "$MODEL_STATE" ]; then
+            # READ IT BACK AND CHECK ITS SHAPE BEFORE STAGING: a torn or empty
+            # file committed over a good one un-arms every veto it held, silently.
+            if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); assert isinstance(d,dict) and isinstance(d.get("models",{}),dict) and isinstance(d.get("pool",{}),dict)' "$MODEL_STATE"; then
+              echo "::warning::$MODEL_STATE did not read back as a cooldown document -- not committing it"
+              exit 0
+            fi
+          else
+            echo "$MODEL_STATE holds no live entry any more -- committing its deletion"
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

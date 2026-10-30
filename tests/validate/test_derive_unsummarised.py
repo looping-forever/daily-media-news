@@ -18,7 +18,9 @@ when no model wrote anything:
   * fewer than 5 stories writes NOTHING, so the existing empty/degraded path
     still owns that case;
   * the written payload carries `edition_kind: unsummarised`, a note that says
-    no AI was available, an EMPTY summary and no `for_you`.
+    no AI was available, the PUBLISHER'S OWN description as `summary` when the
+    feed carried one (CHANGED 2026-10-30: a bare title was the floor, a title
+    with a lead-in is the floor that can be read), and no `for_you`.
 
 The derived story is also fed through `validate_stories.validate_story`, because
 the agreed design keeps the validator unchanged: a story the validator drops is
@@ -176,6 +178,72 @@ class DerivedStorySurvivesTheValidator(unittest.TestCase):
         self.assertEqual(story["source_name"], "kathmandupost.com")
         ok, reason = vs.validate_story(story, 0)
         self.assertTrue(ok, "the unchanged validator must accept it: %s" % reason)
+
+
+class TheFloorCarriesText(unittest.TestCase):
+    """C8: an all-models-fail day must ship more than a headline.
+
+    The text is QUOTED, never written: it is the feed's own description, so the
+    edition is still honestly labelled unsummarised. Every rule below returns ""
+    (the old bare-headline behaviour) rather than a weaker or invented string.
+    """
+
+    DESCRIPTION = ("The ministry said the new schedule starts next month and "
+                   "covers every district office in the valley.")
+
+    def test_a_story_with_a_description_ships_it(self):
+        stories, _, _ = dut.derive([
+            cand(long_title("described"), "https://kathmandupost.com/d",
+                 category="nepal", published=FRESH,
+                 snippet=self.DESCRIPTION),
+        ], now=NOW)
+        story = stories[0]
+        self.assertEqual(self.DESCRIPTION, story["summary"],
+                         "the publisher's own description must be used verbatim")
+        ok, reason = vs.validate_story(story, 0)
+        self.assertTrue(ok, "the validator must still accept it: %s" % reason)
+
+    def test_a_description_shorter_than_the_floor_is_dropped(self):
+        stories, _, _ = dut.derive([
+            cand(long_title("stub"), "https://kathmandupost.com/s",
+                 category="nepal", snippet="Read more."),
+        ], now=NOW)
+        self.assertEqual("", stories[0]["summary"])
+
+    def test_a_description_that_repeats_the_headline_is_dropped(self):
+        title = long_title("repeat")
+        stories, _, _ = dut.derive([
+            cand(title, "https://kathmandupost.com/r", category="nepal",
+                 snippet=title),
+        ], now=NOW)
+        self.assertEqual("", stories[0]["summary"],
+                         "a repeat of the headline adds nothing to a headline")
+
+    def test_a_long_description_is_cut_on_a_word_boundary(self):
+        stories, _, _ = dut.derive([
+            cand(long_title("long"), "https://kathmandupost.com/l",
+                 category="nepal", snippet="word " * 200),
+        ], now=NOW)
+        summary = stories[0]["summary"]
+        self.assertTrue(summary.endswith("\u2026"), summary)
+        self.assertLessEqual(len(summary), dut.SUMMARY_MAX_CHARS + 1)
+        self.assertNotIn("wor\u2026", summary, "cut mid-word: %r" % summary[-20:])
+
+    def test_a_description_the_validator_would_veto_keeps_the_bare_headline(self):
+        """Quoting adds words to the gates the validator re-runs. Dropping the
+        whole story would shrink an edition that has no model behind it, so the
+        TEXT goes and the story stays."""
+        if not dut.EXCLUDED_KEYWORDS:
+            self.skipTest("no excluded keyword configured to test with")
+        keyword = dut.EXCLUDED_KEYWORDS[0]
+        stories, _, _ = dut.derive([
+            cand(long_title("veto"), "https://kathmandupost.com/v",
+                 category="nepal",
+                 snippet="A report mentioning %s in passing, at length."
+                         % keyword.upper()),
+        ], now=NOW)
+        self.assertEqual("", stories[0]["summary"])
+        self.assertEqual(1, len(stories), "the story itself must survive")
 
 
 class FloorAndPayload(unittest.TestCase):

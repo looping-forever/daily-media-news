@@ -508,6 +508,123 @@ class DisplacedSlotJudgedTests(Harness):
         self.assertIn("Watchdog: evening digest for 2026-10-09 NPT — DELIVERED", out)
 
 
+class PrimarySlotLedgerProofTests(Harness):
+    """D1 — the slot this run OWNS is also judged from the ledger.
+
+    THE DEFECT THIS PINS. `state/last_digest_sent.json` is written by the
+    PREBUILD as `{"delivered": false, "phase": "prebuild"}` and nothing updates
+    it when the Worker pushes, so a verdict taken from the marker alone called a
+    digest MISSING that had arrived. Measured 2026-10-30 01:35:34Z,
+    sequence_id `dmn-2026-10-30-morning`, Worker /health `on_time: true`: eight
+    of twelve watchdog runs paged the owner for a delivery that had happened.
+
+    THE DIRECTION IS PART OF THE CONTRACT, and the last two tests here are the
+    ones that keep this from becoming a way to HIDE a miss: the ledger may only
+    turn a MISS into a DELIVERED when it records a send for that exact slot.
+    """
+
+    NOW = "2026-10-09T16:01:00Z"
+
+    def _run(self, mirror, kv=None):
+        self.write_mirror(mirror)
+        body = first_body(WATCHDOG, MARKER_STEP)
+        env = {
+            "GITHUB_OUTPUT": str(self.outputs),
+            "GITHUB_STEP_SUMMARY": str(self.summary),
+            "GITHUB_WORKSPACE": str(self.tmp),
+            "WATCHDOG_NOW_UTC": self.NOW,
+            "EVENT_NAME": "schedule",
+            "EVENT_SCHEDULE": "0 4,16 * * *",
+            "TZ": "UTC",
+        }
+        if kv is None:
+            env.update({"CF_LEDGER_TOKEN": "", "CF_ACCOUNT_ID": ""})
+            return exec_body(body, env, self.tmp)
+        env.update({"CF_LEDGER_TOKEN": TOKEN, "CF_ACCOUNT_ID": ACCOUNT_ID,
+                    "CF_KV_NAMESPACE_ID": NAMESPACE_ID})
+        return exec_body(body, env, self.tmp,
+                         urlopen=fixed_urlopen(json.dumps(kv)))
+
+    def test_a_prebuild_marker_does_not_outvote_a_recorded_send(self):
+        """THE PRODUCTION SHAPE, replayed end to end."""
+        self.write_marker(date="2026-10-09", time="evening",
+                          delivered=False, phase="prebuild")
+        mirror = mirror_doc(as_of="2026-10-09T14:10:00Z", days={
+            "2026-10-09": {
+                "morning": entry("2026-10-09", "morning"),
+                "evening": entry("2026-10-09", "evening",
+                                 sent_at="2026-10-09T13:35:34Z"),
+            },
+        })
+        code, out = self._run(mirror)
+        self.assertEqual(0, code, out)
+        got = outputs_of(self.outputs)
+        self.assertEqual("false", got["miss"],
+                         "the watchdog paged again for a delivered digest:\n" + out)
+        self.assertEqual("evening", got["judged_slot"])
+        self.assertIn("Watchdog (primary slot): evening digest for 2026-10-09 "
+                      "NPT — DELIVERED", out)
+        self.assertIn("proved by the git mirror rather than the marker", out)
+        self.assertIn("delivered=False phase='prebuild'", out)
+
+    def test_live_kv_proves_the_slot_through_a_lagging_mirror(self):
+        """KV is the authority, so a mirror that predates the push cannot hide it."""
+        self.write_marker(date="2026-10-09", time="evening",
+                          delivered=False, phase="prebuild")
+        mirror = mirror_doc(as_of="2026-10-09T01:00:00Z", days={})
+        kv = {"schema_version": 1, "days": {"2026-10-09": {
+            "morning": entry("2026-10-09", "morning"),
+            "evening": entry("2026-10-09", "evening",
+                             sent_at="2026-10-09T13:35:34Z"),
+        }}}
+        code, out = self._run(mirror, kv=kv)
+        self.assertEqual(0, code, out)
+        got = outputs_of(self.outputs)
+        self.assertEqual("false", got["miss"], out)
+        self.assertIn("proved by KV rather than the marker", out)
+
+    def test_no_record_of_a_send_is_still_a_miss(self):
+        """THE HALF THAT MUST NOT REGRESS: silence proves nothing.
+
+        Nobody records a send for the slot this run owns, so the marker's
+        `delivered: false` stands and the alert still fires.
+        """
+        self.write_marker(date="2026-10-09", time="evening",
+                          delivered=False, phase="prebuild")
+        mirror = mirror_doc(as_of="2026-10-09T14:10:00Z", days={
+            "2026-10-09": {"morning": entry("2026-10-09", "morning")},
+        })
+        code, out = self._run(mirror)
+        self.assertEqual(0, code, out)
+        got = outputs_of(self.outputs)
+        self.assertEqual("true", got["miss"],
+                         "an undelivered slot stopped alerting:\n" + out)
+        self.assertEqual("evening", got["slot"])
+        self.assertIn("no delivered marker", out)
+
+    def test_a_build_half_entry_is_not_a_send(self):
+        """The mirror's own prebuild half must never be read as delivery.
+
+        The mirror step writes an entry for the slot it is sealing BEFORE the
+        push, carrying no `ntfy_sent_at`. Treating that as proof would swallow
+        every real miss, which is worse than the false alarm this fixes.
+        """
+        self.write_marker(date="2026-10-09", time="evening",
+                          delivered=False, phase="prebuild")
+        half = entry("2026-10-09", "evening")
+        half["ntfy_sent_at"] = None
+        half["first_ntfy_sent_at"] = None
+        mirror = mirror_doc(as_of="2026-10-09T14:10:00Z", days={
+            "2026-10-09": {"morning": entry("2026-10-09", "morning"),
+                           "evening": half},
+        })
+        code, out = self._run(mirror)
+        self.assertEqual(0, code, out)
+        got = outputs_of(self.outputs)
+        self.assertEqual("true", got["miss"],
+                         "a build half was read as a delivery:\n" + out)
+
+
 # =====================================================================
 # Claim 2 — the mirror is copied from KV, never hand-merged
 # =====================================================================

@@ -66,6 +66,19 @@ def _config_path():
     return os.path.join(_repo_root(), "config", "opencode.json")
 
 
+def _api_prefix():
+    """`<provider>/` -- the prefix THIS module's endpoint can route.
+
+    Derived from the config's own `provider` field, never written down as a
+    model list. It exists because the ladder is now shared with the CLI walk:
+    the walk resolves a second provider (Gemini, via config/opencode-cli.json)
+    that api.opencode.ai does not serve, and a `gemini/...` id posted here is a
+    guaranteed 404 that would burn one of the four race slots.
+    """
+    provider = model_selector.load_config(_config_path()).get("provider")
+    return "%s/" % provider if isinstance(provider, str) and provider else ""
+
+
 def _load_ladder():
     """Model ladder from config/opencode.json (single source of truth).
 
@@ -75,10 +88,16 @@ def _load_ladder():
     that was no longer served at all. An unreadable config now yields an
     empty seed, and resolve_providers() falls back through the live
     catalogue to that empty seed rather than inventing an answer.
+
+    FILTERED to the ids this endpoint serves (see _api_prefix), so a rung that
+    only exists for the CLI walk cannot reach the race.
     """
-    ladder = model_selector.load_config(_config_path()).get("ladder")
+    cfg = model_selector.load_config(_config_path())
+    ladder = cfg.get("ladder")
+    prefix = _api_prefix()
     if isinstance(ladder, list):
-        return tuple(m for m in ladder if isinstance(m, str) and m)
+        return tuple(m for m in ladder
+                     if isinstance(m, str) and m and m.startswith(prefix))
     return ()
 
 
@@ -126,17 +145,27 @@ def resolve_providers(force=False):
     cfg = model_selector.load_config(_config_path())
     state_dir = os.path.join(_repo_root(), "state")
     try:
+        # Seed with the SERVABLE ladder only, and over-fetch by one slot per
+        # unservable rung: the selector caps what it returns, so a `gemini/...`
+        # seed left in place would spend a race slot on an id this endpoint
+        # answers 404 for. The slice below re-applies the real cap.
+        seed_only = dict(cfg, ladder=list(LADDER))
         models, _info = model_selector.select(
-            cfg,
+            seed_only,
             model_selector.load_health(
                 os.path.join(state_dir, "model_health.json")),
             cache_path=os.path.join(state_dir, "model_cache.json"),
-            max_models=MAX_RACE_PROVIDERS)
+            max_models=MAX_RACE_PROVIDERS + 2)
     except Exception as exc:  # selection must never end a digest build
         # Never degrade silently: a discovery regression must be visible.
         log.warning("ai_classifier: model selection failed (%s); using "
                     "config seed of %d models", exc, len(LADDER))
         models = list(LADDER)
+    # Selection appends everything the CLI catalogue lists, INCLUDING providers
+    # this module's endpoint does not serve. Same filter as the seed.
+    prefix = _api_prefix()
+    models = [m for m in models
+              if isinstance(m, str) and m.startswith(prefix)][:MAX_RACE_PROVIDERS]
     _RESOLVED = [_provider_entry(i, m) for i, m in enumerate(models)]
     return _RESOLVED
 

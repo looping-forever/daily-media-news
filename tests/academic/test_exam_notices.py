@@ -630,14 +630,23 @@ class P3WatchdogFirstRunTest(unittest.TestCase):
         assert "gh issue create" not in cls.script, \
             "extraction leaked into the step's shell half"
 
-    def _check(self, state, selfcheck_lines=None):
+    def _check(self, state, selfcheck_lines=None, raw_state=None,
+               last_run=None):
         import subprocess
         with tempfile.TemporaryDirectory() as d:
             os.makedirs(os.path.join(d, "state"))
-            if state is not None:
+            if raw_state is not None:
+                with open(os.path.join(d, "state", "academic_state.json"),
+                          "w", encoding="utf-8") as fh:
+                    fh.write(raw_state)
+            elif state is not None:
                 with open(os.path.join(d, "state", "academic_state.json"),
                           "w", encoding="utf-8") as fh:
                     json.dump(state, fh)
+            if last_run is not None:
+                with open(os.path.join(d, "state", "academic_last_run.json"),
+                          "w", encoding="utf-8") as fh:
+                    json.dump(last_run, fh)
             if selfcheck_lines is not None:
                 with open(os.path.join(d, "state", "exam_selfcheck.json"),
                           "w", encoding="utf-8") as fh:
@@ -661,6 +670,12 @@ class P3WatchdogFirstRunTest(unittest.TestCase):
     def _today(self):
         import datetime
         return datetime.date.today().isoformat()
+
+    def _stamp(self, hours_ago=0):
+        import datetime
+        moment = (datetime.datetime.now(datetime.timezone.utc)
+                  - datetime.timedelta(hours=hours_ago))
+        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def test_first_run_against_the_real_tracked_state_does_not_false_alarm(self):
         """schema 1 + a fresh last_poll + no self-check record = HEALTHY."""
@@ -710,10 +725,66 @@ class P3WatchdogFirstRunTest(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("nobody watching", summary)
 
-    def test_a_missing_state_file_is_still_a_hard_problem(self):
+    def test_a_missing_state_file_is_a_note_not_a_failure(self):
+        """D2. An absent state file is the NORMAL case, not a broken monitor.
+
+        `state/academic_state.json` carries the owner's roll number, so it is
+        gitignored and can never be committed; it is restored from KV inside
+        academic-result.yml. Every fresh watchdog checkout therefore arrives
+        without it, and treating that as a hard problem posted
+        `::error::academic monitor: state/academic_state.json unreadable` on a
+        monitor that had not run in that workspace at all.
+        """
         rc, problems, out, summary = self._check(None)
+        self.assertEqual(problems, 0,
+                         "an absent, gitignored state file was still counted as "
+                         "a failure (output: %s)" % out[-800:])
+        self.assertEqual(rc, 0)
+        self.assertIn("not in this checkout", summary)
+
+    def test_a_missing_state_file_still_alarms_when_the_last_run_failed(self):
+        """The signal that replaces it is STRONGER, not weaker.
+
+        Nobody can read the state, so "did the monitor fire, and did it work?"
+        comes from state/academic_last_run.json -- which IS committed after
+        every academic-result run. A failed run may have left a published result
+        UNSEEN, and that must still page.
+        """
+        rc, problems, out, summary = self._check(
+            None, last_run={"exit_code": 1,
+                            "checked_at": self._stamp(hours_ago=1)})
         self.assertGreaterEqual(problems, 1)
         self.assertEqual(rc, 1)
+        self.assertIn("FAILED", summary)
+
+    def test_a_corrupt_state_file_is_still_hard(self):
+        """PRESENT but unreadable is a real break and stays a hard problem."""
+        rc, problems, out, summary = self._check(None, raw_state="{not json")
+        self.assertGreaterEqual(problems, 1)
+        self.assertEqual(rc, 1)
+        self.assertIn("present but unreadable", summary)
+
+    def test_a_state_file_that_is_not_a_state_document_is_hard(self):
+        rc, problems, out, summary = self._check(None, raw_state="{}")
+        self.assertGreaterEqual(problems, 1)
+        self.assertEqual(rc, 1)
+        self.assertIn("not a usable state document", summary)
+
+    def test_a_last_run_that_has_gone_stale_is_hard(self):
+        """A monitor that stopped firing looks exactly like a quiet week."""
+        rc, problems, out, summary = self._check(
+            None, last_run={"exit_code": 0,
+                            "checked_at": self._stamp(hours_ago=30)})
+        self.assertGreaterEqual(problems, 1)
+        self.assertEqual(rc, 1)
+        self.assertIn("has not completed a run", summary)
+
+    def test_a_fresh_successful_last_run_is_clean(self):
+        rc, problems, out, summary = self._check(
+            None, last_run={"exit_code": 0,
+                            "checked_at": self._stamp(hours_ago=2)})
+        self.assertEqual(problems, 0, out[-800:])
+        self.assertEqual(rc, 0)
 
     def test_a_stale_selfcheck_record_is_hard(self):
         import datetime

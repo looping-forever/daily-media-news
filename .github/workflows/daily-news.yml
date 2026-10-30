@@ -1137,6 +1137,13 @@ jobs:
           # '' here and walks the models exactly as before.
           SIMULATE_POOL_REFUSAL: ${{ github.event.inputs.simulate_pool_refusal }}
           EVENT_NAME: ${{ github.event_name }}
+          # THE CLI'S OWN CONFIG, and it is a SEPARATE FILE on purpose: the
+          # repo's config/opencode.json carries `provider` as a string (the
+          # selector's bookkeeping) and the CLI schema rejects that shape. This
+          # variable is the only thing that makes the gemini provider visible --
+          # without it every gemini rung fails as "model not found".
+          OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -eo pipefail
           # ---- SIMULATED POOL REFUSAL: MANUAL DISPATCH ONLY -------------------
@@ -1163,8 +1170,31 @@ jobs:
               mkdir -p state
               printf '%s attempt=1 model=simulated kind=quota_or_rate_limited rc=1 allow=0\n' \
                 "$(date -u +%FT%TZ)" >> state/agent-attempts.log
-              echo "Digest not built: 0 attempt(s) over 1 cycle(s) in 0 min. The walk stopped on the SHARED POOL's contention wall (last error: quota_or_rate_limited on simulated (shared pool)): simulated, so no id was tried and no cooldown was recorded. The derive step below builds the unsummarised edition from the collected candidates."
+              echo "Digest not built: 0 attempt(s) over 1 cycle(s) in 0 min. The walk stopped on a quota wall (last error: quota_or_rate_limited on simulated (shared pool)): simulated, so no id was tried and no cooldown was recorded. The derive step below builds the unsummarised edition from the collected candidates."
               exit 1
+            fi
+          fi
+          # ---- PROVIDER PREFLIGHT -------------------------------------------
+          # The leading rungs are a second provider, and that provider exists
+          # for the CLI ONLY when OPENCODE_CONFIG resolves and the secret reached
+          # the environment. A wrong shape fails exactly like a dead model, so
+          # without this check two attempts would be spent learning the same
+          # thing on every run, and the log would blame the ladder. Ask once:
+          # if no gemini id resolves, walk the opencode pool instead. Missing
+          # Gemini is a fallback, never a failure.
+          LADDER_CONFIG=config/opencode.json
+          GEMINI_PREFIX="gemini/"
+          if opencode models 2>/dev/null | grep -q "^${GEMINI_PREFIX}"; then
+            echo "Provider preflight: a ${GEMINI_PREFIX}* model resolves; the free Gemini rungs are live."
+          else
+            echo "::warning::Provider preflight FAILED: no ${GEMINI_PREFIX}* model resolves, so OPENCODE_CONFIG, the provider block in config/opencode-cli.json or GEMINI_API_KEY is not reaching the CLI. Skipping the Gemini rungs and walking the opencode pool, rather than spending two attempts per run to learn it."
+            POOL_DIR="${RUNNER_TEMP:-state}"
+            mkdir -p "$POOL_DIR"
+            if [ -f "$LADDER_CONFIG" ] && python3 -c "import json,sys;d=json.load(open(sys.argv[1]));d['ladder']=[m for m in (d.get('ladder') or []) if not str(m).startswith(sys.argv[2])];json.dump(d,open(sys.argv[3],'w'))" "$LADDER_CONFIG" "$GEMINI_PREFIX" "$POOL_DIR/opencode.pool.json" 2>/dev/null; then
+              LADDER_CONFIG="$POOL_DIR/opencode.pool.json"
+              echo "Provider preflight: seed ladder re-resolved without the Gemini rungs ($LADDER_CONFIG)."
+            else
+              echo "::warning::Provider preflight: could not write a pool-only ladder; keeping $LADDER_CONFIG (the Gemini rungs may still be tried and will fail fast)."
             fi
           fi
           START=$(date +%s)
@@ -1206,7 +1236,7 @@ jobs:
             # workflow yields to it instead.
             mapfile -t models < <(python3 scripts/model_selector.py --select \
               --role digest \
-              --config config/opencode.json --health state/model_health.json \
+              --config "$LADDER_CONFIG" --health state/model_health.json \
               --cache state/model_cache.json --info-out state/digest_model_select.json \
               --all "${NO_WORK_ARGS[@]}")
             # AN EMPTY LIST HAS THREE VERY DIFFERENT CAUSES and the step must name
@@ -1337,7 +1367,24 @@ jobs:
             cycle_quota=0
             cycle_other=0
             cycle_auth=0
+            # Consecutive refusals from ONE provider prefix. Two of them is the
+            # plan (or that provider's credential), not the id: see the
+            # payment_required and auth arms below. A provider found dead is
+            # added to `dead_providers` and its remaining rungs are skipped --
+            # the WALK then continues with the next provider, because a dead
+            # plan on the first provider must not cost the fallback pool.
+            refused_prefix=""
+            refused_same=0
+            auth_prefix=""
+            auth_same=0
+            dead_providers=" "
             for model in "${models[@]}"; do
+              # A PROVIDER PROVEN DEAD IS SKIPPED, NOT RE-TESTED. Stated once,
+              # here, so both arms below only have to add a name to the list.
+              model_provider="${model%%/*}"
+              case " $dead_providers " in
+                *" $model_provider "*) continue ;;
+              esac
               remaining=$(( deadline - $(date +%s) ))
               allow=$(( remaining < PER ? remaining : PER ))
               if [ "$allow" -lt "$MIN" ]; then
@@ -1391,7 +1438,7 @@ jobs:
               kind=$(python3 scripts/model_selector.py --classify \
                 --log state/agent-log.txt --rc "$run_rc" 2>/dev/null || echo other)
               case "$kind" in
-                model_not_found|quota_or_rate_limited|auth|provider_outage|slow_or_stalled|other) ;;
+                model_not_found|payment_required|quota_or_rate_limited|auth|provider_outage|slow_or_stalled|other) ;;
                 *) kind="other" ;;
               esac
               printf '%s attempt=%d model=%s kind=%s rc=%s allow=%s\n' \
@@ -1415,6 +1462,18 @@ jobs:
                 # deliberately NOT cooled down per model, because the whole free
                 # pool shares that limit.
                 python3 scripts/model_selector.py --record "$model" "$kind" || true
+                if [ "$kind" = "quota_or_rate_limited" ] \
+                  && [ "${model%%/*}" != "opencode" ]; then
+                  # A PROVIDER'S OWN ALLOWANCE IS NOT THE SHARED POOL. The pool
+                  # row models the bucket every opencode id shares; a 429 from a
+                  # DIFFERENT provider says nothing about that bucket, and
+                  # writing the row here would silence the fallback pool for the
+                  # whole grace window on nothing more than one provider's
+                  # daily allowance. Recorded per model, then the next rung.
+                  echo "Circuit breaker: $model -> $kind. That is the '${model%%/*}' provider's own free allowance, not the opencode bucket, so no shared-pool row is written; trying the next rung."
+                  last_err="$kind on $model"
+                  continue
+                fi
                 if [ "$kind" = "quota_or_rate_limited" ]; then
                   # THE WALK ENDS HERE, AND THE REASON IS MEASURED. The provider
                   # refuses BEFORE generation (312ms after `message=stream`, with
@@ -1448,22 +1507,64 @@ jobs:
                 # the walk -- which is still fast, still names the cause, and no
                 # longer costs the slot.
                 cycle_auth=$((cycle_auth+1))
+                # PER PROVIDER, not per walk: the Gemini key and the opencode
+                # credential are different secrets, so two refusals on two
+                # providers are two bad keys, not one. Counting them together is
+                # what would abort the fallback pool on the new provider's key
+                # alone.
+                if [ "$model_provider" = "$auth_prefix" ]; then
+                  auth_same=$((auth_same+1))
+                else
+                  auth_prefix="$model_provider"
+                  auth_same=1
+                fi
                 # Recorded as `auth`, not `transport`: the selector cools down
                 # nothing for it (quota and auth share that rule -- cooling
                 # would remove the pool), but health memory should carry what
                 # actually happened.
                 python3 scripts/model_selector.py --record "$model" auth || true
-                if [ "$cycle_auth" -ge "$AUTH_GLOBAL_MODELS" ]; then
-                  echo "Circuit breaker: $model -> auth ($cycle_auth models refused the credential). That is the shared key, not one model; stopping the walk."
-                  last_err="auth: $cycle_auth models rejected the credential, walk aborted"
+                if [ "$auth_same" -ge "$AUTH_GLOBAL_MODELS" ]; then
+                  dead_providers="$dead_providers$model_provider "
+                  echo "Circuit breaker: $model -> auth ($auth_same rungs of the '$model_provider' provider rejected the credential). That is that provider's key, not one model: its remaining rungs are skipped and the walk continues with the next provider."
+                  last_err="auth: $auth_same rungs of '$model_provider' rejected the credential"
                   cycle_other=$((cycle_other+1))
-                  break
+                  continue
                 fi
                 echo "Circuit breaker: $model -> auth. One model only, so the credential is not the problem; trying the next model."
                 last_err="auth on $model"
                 # NOT into cycle_other: one model's refusal is not evidence the
                 # pool is unusable, and counting it here would end a run whose
                 # other ten refusals were quota -- the exact waste this fixes.
+                continue
+              fi
+              if [ "$kind" = "payment_required" ]; then
+                # THE PLAN REFUSED, AND THE MODEL ID IS INNOCENT. Measured
+                # wording: "Free usage limit reached ... subscribe to OpenCode
+                # Go", refused BEFORE generation and identically for every id on
+                # that provider. So: record it against the model (health memory
+                # reorders it; NO hard cooldown exists for this class, because
+                # COOLDOWN_SEC has no row for it), and NEVER touch the shared
+                # pool row -- the plan is a fact about the account, not about a
+                # bucket one bad second can empty. Only the SECOND refusal from
+                # the SAME provider prefix proves the plan, which is when the
+                # walk stops; one refusal may simply be that id's allowance.
+                provider_prefix="${model%%/*}"
+                python3 scripts/model_selector.py --record "$model" payment_required || true
+                if [ "$provider_prefix" = "$refused_prefix" ]; then
+                  refused_same=$((refused_same+1))
+                else
+                  refused_prefix="$provider_prefix"
+                  refused_same=1
+                fi
+                if [ "$refused_same" -ge 2 ]; then
+                  dead_providers="$dead_providers$provider_prefix "
+                  echo "Circuit breaker: $model -> payment_required ($refused_same refusals from the '$provider_prefix' provider). That is the plan, not one model: its remaining rungs are skipped and the walk continues with the next provider."
+                  last_err="payment_required: $refused_same models from '$provider_prefix' were refused by the plan"
+                  cycle_other=$((cycle_other+1))
+                  continue
+                fi
+                echo "Circuit breaker: $model -> payment_required. The plan refuses the '$provider_prefix' provider, not this id, so the next rung is tried and the shared pool row is NOT written."
+                last_err="payment_required on $model"
                 continue
               fi
               cycle_other=$((cycle_other+1))
@@ -1549,13 +1650,13 @@ jobs:
               # happened is that the shared free pool refused BEFORE generation,
               # which is why the walk stopped instead of paying one allowance per
               # rung to hear it again.
-              echo "Digest not built: ${tried} attempt(s) over ${cycle} cycle(s) in $(( (END-START+59) / 60 )) min. The walk stopped on the SHARED POOL's contention wall (last error: ${last_err}): the free pool refuses before generation, so every remaining rung would have heard the same refusal and spent an attempt doing it. A shared cooldown was recorded; the refire slot retries this edition with a fresh budget. This is transient throttling of the shared anonymous pool this egress sits behind -- not the account's own allowance and not broken model ids."
+              echo "Digest not built: ${tried} attempt(s) over ${cycle} cycle(s) in $(( (END-START+59) / 60 )) min. The walk stopped on a quota wall (last error: ${last_err}): that provider refused before generation, so every remaining rung on the same bucket would have heard the same refusal and spent an attempt doing it. A shared cooldown was recorded for it; the refire slot retries this edition with a fresh budget. This is a free allowance being spent, not a broken model id."
             elif [ "$contention_only" = "1" ]; then
               # ONE LINE, AND IT NAMES THE RIGHT CAUSE. "Models are broken" would
               # be false: the ids are advertised and answer minutes later. What
               # ran out is the walk's bound, against a per-IP throttle that this
               # runner shares with every other Azure egress address.
-              echo "Digest not built: ${tried} attempt(s) over ${cycle} cycle(s) in $(( (END-START+59) / 60 )) min. Every model was refused by the free pool's CONTENTION wall (quota_or_rate_limited, last error: ${last_err}) and the walk's ${BUDGET}s bound ran out before the throttle cleared. This is transient throttling of the shared anonymous pool this egress sits behind -- not the account's own allowance and not broken model ids. The next scheduled run will retry."
+              echo "Digest not built: ${tried} attempt(s) over ${cycle} cycle(s) in $(( (END-START+59) / 60 )) min. Every rung answered quota_or_rate_limited (last error: ${last_err}) and the walk's ${BUDGET}s bound ran out before that allowance came back. This is a free tier's own per-minute allowance being spent, not a broken model id. The next scheduled run will retry."
             else
               echo "Digest not built: ${tried} of ${#models[@]} free models tried in $(( (END-START+59) / 60 )) min, none produced a digest (last error: ${last_err}). The next scheduled run will retry."
             fi
@@ -5243,16 +5344,25 @@ jobs:
           # `git add state/` would sweep in state/email.html and anything else
           # the workspace happens to hold.
           MODEL_STATE=state/model_cooldown.json
-          if [ ! -f "$MODEL_STATE" ]; then
-            echo "no $MODEL_STATE was written this run"
+          # ABSENCE IS THE STEADY STATE. The writer DELETES this file when its
+          # pruned map is empty -- nothing left in it can refuse a model -- so a
+          # missing file here means "nothing is cooling", not "the write was
+          # lost". A tracked deletion must still be committed, though, or the
+          # dead stub stays on master for ever and fails workflow_lint daily.
+          if [ ! -f "$MODEL_STATE" ] && ! git ls-files --error-unmatch -- "$MODEL_STATE" >/dev/null 2>&1; then
+            echo "no $MODEL_STATE was written this run and none is committed"
             exit 0
           fi
-          # READ IT BACK AND CHECK ITS SHAPE BEFORE STAGING. A torn write or an
-          # empty file committed over a good one would un-arm every veto it held
-          # and be invisible until the same engines were tried again.
-          if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); assert isinstance(d,dict) and isinstance(d.get("models",{}),dict) and isinstance(d.get("pool",{}),dict)' "$MODEL_STATE"; then
-            echo "::warning::$MODEL_STATE did not read back as a cooldown document -- not committing it"
-            exit 0
+          if [ -f "$MODEL_STATE" ]; then
+            # READ IT BACK AND CHECK ITS SHAPE BEFORE STAGING. A torn write or an
+            # empty file committed over a good one would un-arm every veto it held
+            # and be invisible until the same engines were tried again.
+            if ! python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding="utf-8")); assert isinstance(d,dict) and isinstance(d.get("models",{}),dict) and isinstance(d.get("pool",{}),dict)' "$MODEL_STATE"; then
+              echo "::warning::$MODEL_STATE did not read back as a cooldown document -- not committing it"
+              exit 0
+            fi
+          else
+            echo "$MODEL_STATE holds no live entry any more -- committing its deletion"
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

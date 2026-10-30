@@ -216,8 +216,12 @@ class ClassifierTests(unittest.TestCase):
             with self.subTest(prose=prose[:40]):
                 self.assertIsNone(ms.classify_stream_line(prose), prose)
 
-    def test_only_three_classes_are_decisive(self):
-        self.assertEqual(("model_not_found", "quota_or_rate_limited", "auth"),
+    def test_only_four_classes_are_decisive(self):
+        # payment_required joined on 2026-10-30: a plan refusal is instant and
+        # permanent for that provider, so waiting the silence window out buys
+        # nothing but wall clock.
+        self.assertEqual(("model_not_found", "quota_or_rate_limited", "auth",
+                          "payment_required"),
                          ms.DECISIVE_CLASSES)
         for kind in ("provider_outage", "slow_or_stalled", "other"):
             self.assertNotIn(kind, ms.DECISIVE_CLASSES)
@@ -239,6 +243,32 @@ class ClassifierTests(unittest.TestCase):
         self.assertIsNone(ms.classify_stream_line(REAL_ENDPOINT_GONE),
                           "an outage must not be decisive: one 5xx is not death")
         self.assertEqual(3, ms.REPEAT_OUTAGE_LIMIT)
+
+    def test_a_plan_refusal_is_its_own_class_and_earns_no_cooldown(self):
+        """ADDED 2026-10-30 with the second provider.
+
+        The wording is the plan's own, and it OVERLAPS quota ("usage limit").
+        If quota won, the refusal would read as transient throttling and the
+        ladder would be walked rung by rung to hear it again.
+        """
+        refusal = ("AI_APICallError: Free usage limit reached. To keep going, "
+                   "subscribe to OpenCode Go.")
+        self.assertEqual("payment_required", ms.classify_failure(refusal, 1))
+        self.assertEqual("payment_required", ms.classify_stream_line(refusal),
+                         "a hanging CLI must be killed on this line, not waited "
+                         "on for the whole silence window")
+        self.assertNotIn("payment_required", ms.COOLDOWN_SEC,
+                         "a hard cooldown would remove a provider the walk "
+                         "needs; the plan is recorded, never cooled")
+        self.assertEqual("transport", ms.HEALTH_KIND_OF["payment_required"],
+                         "health memory must map it without inventing a kind")
+        self.assertEqual("payment_required",
+                         ms.classify_failure("402 Payment Required", 1))
+        self.assertEqual("payment_required",
+                         ms.classify_stream_line("402 Payment Required"))
+        # NARROWNESS, PINNED: the ordinary free-tier limit keeps its own class.
+        self.assertEqual("quota_or_rate_limited",
+                         ms.classify_failure("Free usage limit reached", 1))
 
 
 class DiscoveryGateTests(unittest.TestCase):
@@ -676,58 +706,63 @@ class WatchdogTests(unittest.TestCase):
 
 class AllFailBoundTests(unittest.TestCase):
     def test_the_arithmetic_of_a_silent_all_fail_walk(self):
-        """THE 540s BOUND, COMPUTED FROM THE TABLE.
+        """THE SILENCE BOUND, COMPUTED FROM THE TABLE.
 
+            gemini x2 60 + 60            <- unmeasured rungs, default window
             deepseek 60 + beam 240 + mimo 60 + nemotron 60 + glm 60 + flint 60
-                = 540s = 9 min
+                = 660s = 11 min
 
         Before the per-model table every rung cost one global window; before
-        the watchdog a dead rung cost its full 360s cap (6 x 360 = 2,160s).
-        The point of computing it FROM the table is that adding, removing or
-        re-measuring a model moves this number without anyone editing a test.
+        the watchdog a dead rung cost its full cap. The point of computing it
+        FROM the table is that adding, removing or re-measuring a model moves
+        this number without anyone editing a test -- which is exactly what
+        happened on 2026-10-30 when two rungs joined carrying no measurement.
         """
         ladder = ms.ladder_model_ids()
-        self.assertEqual(6, len(ladder), ladder)
-        self.assertEqual(540, ms.worst_case_all_fail_sec(ladder))
-        self.assertEqual(540, ms.worst_case_all_fail_sec(),
+        self.assertEqual(8, len(ladder), ladder)
+        self.assertEqual(660, ms.worst_case_all_fail_sec(ladder))
+        self.assertEqual(660, ms.worst_case_all_fail_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(570, ms.worst_case_all_fail_sec(ladder,
+        self.assertEqual(690, ms.worst_case_all_fail_sec(ladder,
                                                         overhead_sec=30))
-        # A seventh, unmeasured rung costs only the default window.
-        self.assertEqual(600, ms.worst_case_all_fail_sec(
+        # A ninth, unmeasured rung costs only the default window.
+        self.assertEqual(720, ms.worst_case_all_fail_sec(
             ladder + ["opencode/some-new-free"]))
-        self.assertLessEqual(540, 9 * 60)
-        self.assertLess(540, 6 * ms.WALK_PER_ATTEMPT_SEC)
+        self.assertLess(660, 1800,
+                        "the all-silent bound must stay inside the walk budget")
+        self.assertLess(660, 8 * ms.WALK_PER_ATTEMPT_SEC)
 
     def test_a_ladder_without_beam_is_cheaper_which_proves_the_table_is_read(self):
         """If the table were ignored, dropping beam would change nothing."""
         ladder = [m for m in ms.ladder_model_ids()
                   if m != "opencode/beam-free"]
-        self.assertEqual(300, ms.worst_case_all_fail_sec(ladder))
-        self.assertLess(ms.worst_case_all_fail_sec(ladder), 540)
+        # beam's 240s window is the only measured one above the default, so
+        # removing it must take exactly 240s off the 660s total.
+        self.assertEqual(420, ms.worst_case_all_fail_sec(ladder))
+        self.assertLess(ms.worst_case_all_fail_sec(ladder), 660)
 
     def test_the_arithmetic_of_an_emit_then_stall_walk(self):
-        """THE OTHER WORST CASE, and a different number from the 540s bound.
+        """THE OTHER WORST CASE, and a different number from the silence bound.
 
         An attempt that never opens the model call costs its FIRST-OUTPUT window
-        (540s over the six rungs). An attempt that opens the call and then goes
+        (660s over the eight rungs). An attempt that opens the call and then goes
         quiet is measured from its last LOG line, so it costs
         first-output + INTER_TOKEN, truncated by the per-attempt cap:
 
             deepseek   min( 60 + 420, 480) = 480
             beam       min(240 + 420, 480) = 480   <- the cap is binding
-            other four                     = 480 each
-            = 2880s
+            the other six                  = 480 each
+            = 3840s
 
-        2880s is longer than the 1800s walk budget, which is the honest reading:
-        in this mode the budget and the cap bound the run, not the windows.
+        Longer than the 1800s walk budget, which is the honest reading: in this
+        mode the budget and the cap bound the run, not the windows.
         """
         ladder = ms.ladder_model_ids()
-        self.assertEqual(6, len(ladder), ladder)
-        self.assertEqual(2880, ms.worst_case_emit_then_stall_sec(ladder))
-        self.assertEqual(2880, ms.worst_case_emit_then_stall_sec(),
+        self.assertEqual(8, len(ladder), ladder)
+        self.assertEqual(3840, ms.worst_case_emit_then_stall_sec(ladder))
+        self.assertEqual(3840, ms.worst_case_emit_then_stall_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(2910, ms.worst_case_emit_then_stall_sec(
+        self.assertEqual(3870, ms.worst_case_emit_then_stall_sec(
             ladder, overhead_sec=30))
         self.assertEqual(
             480,
@@ -738,7 +773,7 @@ class AllFailBoundTests(unittest.TestCase):
                            ms.worst_case_all_fail_sec(ladder),
                            "emitting then stalling must cost MORE than silence")
         self.assertLessEqual(ms.worst_case_emit_then_stall_sec(ladder),
-                             6 * ms.WALK_PER_ATTEMPT_SEC)
+                             8 * ms.WALK_PER_ATTEMPT_SEC)
 
     def test_the_arithmetic_of_a_rejected_all_fail_walk(self):
         """THE OBSERVED 2026-10-25 MODE: every model rejected at ~1s.
@@ -839,8 +874,106 @@ class ShippedWalkTests(AgentWalkHarness):
         self.assertEqual(["opencode/a", "opencode/b"], art["models"],
                          "two refusals must stop the walk: %r"
                          % (art["models"],))
-        self.assertIn("stopping the walk", proc.stdout)
+        # REWORDED 2026-10-30: the refusal now abandons the PROVIDER, so the
+        # message says what actually happens. Here every rung is the same
+        # provider, which is why the walk still ends.
+        self.assertIn("skipped and the walk continues with the next provider",
+                      proc.stdout)
         self.assertIn("auth:", proc.stdout)
+
+    def test_two_auth_refusals_on_two_providers_do_not_abort_the_walk(self):
+        """THE CLASS FIX for the second provider (2026-10-30).
+
+        A credential belongs to a PROVIDER. Counting auth across providers is
+        how a bad Gemini key alone would have aborted the opencode fallback --
+        two refusals that say nothing about each other.
+        """
+        proc, art = self.run_step(
+            pool=["gemini/a", "gemini/b", "opencode/c"],
+            plan="gemini/a:auth gemini/b:auth opencode/c:ok")
+        self.assertGreen(proc, "two providers, one bad key")
+        self.assertEqual(["gemini/a", "gemini/b", "opencode/c"], art["models"],
+                         "the fallback provider must still be tried: %r"
+                         % (art["models"],))
+
+    def test_a_plan_refusal_is_recorded_and_never_poisons_the_pool(self):
+        """C5/C6, PROVEN END TO END.
+
+        The measured plan string classifies as payment_required, the walk goes
+        on, TWO refusals retire that provider (not the walk), the fallback
+        provider answers, and no shared-pool row is written -- a pool row is
+        what used to silence every rung for the whole grace window.
+        """
+        proc, art = self.run_step(
+            pool=["gemini/a", "gemini/b", "opencode/c"],
+            plan="gemini/a:planrefused gemini/b:planrefused opencode/c:ok")
+        self.assertGreen(proc, "plan refusal then fallback")
+        self.assertEqual(["gemini/a", "gemini/b", "opencode/c"], art["models"])
+        self.assertIn(["gemini/a", "payment_required"], art["records"])
+        self.assertIn(["gemini/b", "payment_required"], art["records"])
+        calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
+        self.assertNotIn("--pool-refused", calls,
+                         "a plan refusal says nothing about the shared bucket, "
+                         "so it may never write that row: %s" % calls)
+        log = "\n".join(self.attempt_log())
+        self.assertIn("kind=payment_required", log)
+        self.assertNotIn("kind=quota_or_rate_limited", log,
+                         "the plan string also says 'usage limit'; misclassifying"
+                         " it as quota is the defect this class exists for")
+        self.assertIn("skipped and the walk continues with the next provider",
+                      proc.stdout)
+
+    def test_one_plan_refusal_keeps_the_provider_alive(self):
+        """One refusal may be that id's own allowance, so the next rung runs."""
+        proc, art = self.run_step(
+            pool=["gemini/a", "gemini/b"],
+            plan="gemini/a:planrefused gemini/b:ok")
+        self.assertGreen(proc, "one plan refusal")
+        self.assertEqual(["gemini/a", "gemini/b"], art["models"])
+        self.assertNotIn("skipped and the walk continues", proc.stdout)
+
+    def test_a_second_providers_quota_writes_no_pool_row(self):
+        """C5's companion rule, proven: the pool row gates EVERY later walk, so
+        one provider's own 429 must not write it."""
+        proc, art = self.run_step(
+            pool=["gemini/a", "opencode/c"],
+            plan="gemini/a:quota opencode/c:ok")
+        self.assertGreen(proc, "second provider quota")
+        self.assertEqual(["gemini/a", "opencode/c"], art["models"])
+        calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
+        self.assertNotIn("--pool-refused", calls, calls)
+
+    def test_a_pool_quota_still_writes_the_row_it_always_did(self):
+        """The rule is scoped to OTHER providers, not removed."""
+        proc, _art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:quota opencode/b:ok")
+        self.assertEqual(1, proc.returncode)
+        calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
+        self.assertIn("--pool-refused", calls, calls)
+
+    def test_the_preflight_warns_and_the_pool_still_runs(self):
+        """C9: a provider that never resolved is a WARNING, not a failure.
+
+        Without OPENCODE_CONFIG (or with a wrong config shape) the Gemini rungs
+        fail exactly like dead models. The step must discover that BEFORE the
+        walk, say so, and use the pool.
+        """
+        proc, art = self.run_step(
+            pool=["opencode/a"], plan="opencode/a:ok",
+            extra_env={"STUB_OPENCODE_MODELS": ""})
+        self.assertGreen(proc, "no gemini provider")
+        self.assertIn("::warning::Provider preflight FAILED", proc.stdout)
+        self.assertEqual(["opencode/a"], art["models"],
+                         "the walk must still run on the pool: %r"
+                         % (art["models"],))
+
+    def test_the_preflight_is_silent_when_the_provider_resolves(self):
+        proc, art = self.run_step(pool=["opencode/a"], plan="opencode/a:ok")
+        self.assertGreen(proc, "provider resolved")
+        self.assertNotIn("Provider preflight FAILED", proc.stdout)
+        self.assertIn("the free Gemini rungs are live", proc.stdout)
+        self.assertEqual(["opencode/a"], art["models"])
 
     def test_unknown_error_does_not_stop_the_walk(self):
         """The ambiguous string continues the walk as an outage -- it may not
@@ -890,7 +1023,11 @@ class ShippedWalkTests(AgentWalkHarness):
 class LadderPurityTests(unittest.TestCase):
     """The seed is config, and it must name only models the catalogue serves."""
 
+    # CHANGED 2026-10-30: the two free Gemini rungs lead, because they are a
+    # SEPARATE free bucket that is not the shared pool the opencode rungs share.
     EXPECTED = [
+        "gemini/gemini-3.5-flash-lite",
+        "gemini/gemini-3.1-flash-lite",
         "opencode/deepseek-v4.1-flash-free",
         "opencode/beam-free",
         "opencode/mimo-v2.6-flash-free",
@@ -899,7 +1036,7 @@ class LadderPurityTests(unittest.TestCase):
         "opencode/flint-40b-free",
     ]
 
-    def test_the_config_ladder_is_the_six_live_models(self):
+    def test_the_config_ladder_is_the_live_models(self):
         cfg = ms.load_config(str(REPO_ROOT / "config" / "opencode.json"))
         self.assertEqual(self.EXPECTED, cfg.get("ladder"))
         self.assertEqual(len(set(self.EXPECTED)), len(self.EXPECTED),
@@ -910,8 +1047,13 @@ class LadderPurityTests(unittest.TestCase):
         hard failure is the LAST rung and is not deleted."""
         cfg = ms.load_config(str(REPO_ROOT / "config" / "opencode.json"))
         ladder = cfg.get("ladder") or []
+        agreed = [m for m in ladder if m.startswith("opencode/")]
         self.assertEqual(["opencode/deepseek-v4.1-flash-free",
-                          "opencode/beam-free"], ladder[:2])
+                          "opencode/beam-free"], agreed[:2])
+        self.assertEqual(["gemini/gemini-3.5-flash-lite",
+                          "gemini/gemini-3.1-flash-lite"], ladder[:2],
+                         "the free Gemini bucket is tried before the shared "
+                         "pool it does not share a wall with")
         self.assertEqual("opencode/flint-40b-free", ladder[-1])
         self.assertEqual(1, ladder.count("opencode/flint-40b-free"))
         self.assertEqual(ladder, ms.ladder_model_ids(),
@@ -933,7 +1075,14 @@ class LadderPurityTests(unittest.TestCase):
         self.assertGreaterEqual(bm.AI_MAX_MODELS, len(self.EXPECTED),
                                 "AI_MAX_MODELS (%d) < ladder (%d)"
                                 % (bm.AI_MAX_MODELS, len(self.EXPECTED)))
-        self.assertEqual(self.EXPECTED, list(bm.AI_MODELS))
+        # The breaking walk CANNOT resolve a provider whose config it was never
+        # handed (OPENCODE_CONFIG is unset here, as it is in the canary), so its
+        # seed is the reachable subset -- and an unreachable rung would earn a
+        # 24h cooldown in the file the digest walk reads. See
+        # breaking_monitor._reachable_prefixes.
+        self.assertEqual([m for m in self.EXPECTED
+                          if m.startswith("opencode/")],
+                         list(bm.AI_MODELS))
 
     def test_one_attempt_may_never_exceed_its_whole_walk(self):
         """--no-work states a 300s walk; the per-attempt cap must be clamped to

@@ -90,10 +90,13 @@ class StopOnPoolWallTests(AgentWalkHarness):
             1, len(lines),
             "the walk must produce exactly ONE failure line. stdout:\n%s"
             % proc.stdout)
-        self.assertIn("SHARED POOL's contention wall", lines[0])
+        # REWORDED 2026-10-30 with the Gemini rungs: "the shared anonymous pool
+        # this egress sits behind" stopped being true the moment a SECOND
+        # provider joined the ladder, so the line now names a quota wall and a
+        # spent free allowance. What must survive is the cause and the retry.
+        self.assertIn("stopped on a quota wall", lines[0])
         self.assertIn("refire slot retries this edition", lines[0])
-        self.assertIn("not the account's own allowance and not broken model "
-                      "ids", lines[0])
+        self.assertIn("not a broken model id", lines[0])
 
     def test_a_successful_run_writes_no_pool_row(self):
         """The cooldown may only ever be earned by a refusal.
@@ -190,9 +193,9 @@ class NonTransientTests(AgentWalkHarness):
         self.assertIn("2 attempt(s) over 1 cycle(s)", proc.stdout,
                       "the line must count what was actually tried. stdout:\n%s"
                       % proc.stdout)
-        self.assertIn("SHARED POOL's contention wall", proc.stdout)
-        self.assertNotIn("Every model was refused", proc.stdout,
-                         "one of the two was a not-found, so 'every model' "
+        self.assertIn("stopped on a quota wall", proc.stdout)
+        self.assertNotIn("Every rung answered", proc.stdout,
+                         "one of the two was a not-found, so 'every rung' "
                          "would be false. stdout:\n%s" % proc.stdout)
 
 

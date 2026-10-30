@@ -161,6 +161,12 @@ ALLOWED_SECRETS = frozenset({
     # fail-closed on its side and is why the seal step says so plainly rather
     # than reporting a successful seal.
     "DIGEST_INGEST_TOKEN",
+    # C1, 2026-10-30. The free Google AI Studio key behind the two `gemini/*`
+    # rungs that lead the model ladder. It is an ORG secret the owner set
+    # explicitly, so it resolves for a public repo. Absence degrades cleanly:
+    # the C9 preflight warns and the walk runs the `opencode/*` pool alone, so
+    # a repository without it still produces a digest.
+    "GEMINI_API_KEY",
     "GITHUB_TOKEN",
     "GMAIL_APP_PASSWORD",
     "GMAIL_RECEIVER",

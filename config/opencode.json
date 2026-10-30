@@ -3,6 +3,8 @@
   "min_version": "1.17.0",
   "provider": "opencode",
   "ladder": [
+    "gemini/gemini-3.5-flash-lite",
+    "gemini/gemini-3.1-flash-lite",
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",
     "opencode/mimo-v2.6-flash-free",

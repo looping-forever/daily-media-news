@@ -200,6 +200,34 @@ def _opencode_config():
     return model_selector.load_config(OPENCODE_CONFIG_PATH)
 
 
+def _reachable_prefixes():
+    """`<provider>/` prefixes THIS process's `opencode` CLI can resolve.
+
+    Added 2026-10-30 with the second provider. The config ladder is shared by
+    every caller, and a provider only exists for the CLI when its own config
+    file was loaded -- `OPENCODE_CONFIG` (config/opencode-cli.json) for Gemini.
+    A rung the CLI cannot resolve fails as `model_not_found`, which earns a 24h
+    HARD cooldown in the state file the digest walk also reads: two such runs
+    would silence the digest's best rung for a day. So the seed is filtered to
+    what is reachable here, and nothing is written about what is not.
+    """
+    prefixes = set()
+    provider = _opencode_config().get("provider")
+    if isinstance(provider, str) and provider:
+        prefixes.add("%s/" % provider)
+    cli_path = os.environ.get("OPENCODE_CONFIG") or ""
+    if cli_path and os.path.isfile(cli_path):
+        try:
+            with open(cli_path, encoding="utf-8") as fh:
+                cli = json.load(fh)
+        except (OSError, ValueError):
+            cli = {}
+        for name in (cli.get("provider") or {}):
+            if isinstance(name, str) and name:
+                prefixes.add("%s/" % name)
+    return prefixes
+
+
 def _load_ladder():
     """The owner's seed/preference ladder, from config/opencode.json ONLY.
 
@@ -207,15 +235,39 @@ def _load_ladder():
     second copy of the model list, in code, which the 2026-10-13 incident
     proved can be silently stale (it named a model Zen had discontinued). A
     total config failure now yields an empty seed, which discovery and the
-    existing fail-safe already handle — loudly.
+    existing fail-safe already handle -- loudly.
     """
     ladder = _opencode_config().get("ladder")
-    if isinstance(ladder, list):
-        return tuple(m for m in ladder if isinstance(m, str) and m)
-    return ()
+    if not isinstance(ladder, list):
+        return ()
+    prefixes = _reachable_prefixes()
+    seeds = tuple(m for m in ladder if isinstance(m, str) and m)
+    return tuple(m for m in seeds if m.startswith(tuple(prefixes)))
 
 
 AI_MODELS = _load_ladder()
+
+
+def _reachable_only(models):
+    """Drop rungs whose provider THIS process's CLI cannot resolve.
+
+    The selector ranks the whole shared config ladder; only this module knows
+    which providers were actually loaded into the CLI (`_reachable_prefixes`).
+    Without this the seeded walk still ATTEMPTS an unresolvable rung -- and
+    that attempt is what earns the 24h `model_not_found` cooldown the digest
+    walk also reads. Never empties a walk that had something: an empty result
+    means the filter is wrong, not that the pool is gone.
+    """
+    prefixes = _reachable_prefixes()
+    kept = [m for m in models if m.startswith(tuple(prefixes))]
+    if not prefixes or not kept:
+        return list(models)
+    if len(kept) != len(models):
+        print("ai_classify: skipping %d rung(s) this CLI has no config for: %r"
+              % (len(models) - len(kept),
+                 [m for m in models if m not in kept]))
+    return kept
+
 
 #: Unchanged at 60s: a working model's allowance is never shortened to make
 #: a bad day look better.
@@ -230,12 +282,11 @@ AI_TOTAL_BUDGET_SEC = 150
 #: Depth cap. A dead ladder costs its share of the budget, not a fixed 60s
 #: each, so depth is bounded as well as time.
 #:
-#: RAISED 4 -> 6 on 2026-10-25 WITH the ladder, deliberately: the seed has six
-#: rungs, and a cap below the seed means the last two are configured but can
-#: never be reached -- a model that is silently never tried. The cap must track
-#: the ladder; the budget still trims the tail (150s / 6 = 25s each is only hit
-#: on an all-silent day).
-AI_MAX_MODELS = 6
+#: RAISED 4 -> 6 on 2026-10-25, and 6 -> 8 on 2026-10-30, WITH the ladder each
+#: time: the cap must track the seed, because a cap below it means the tail
+#: rungs are configured and can never be reached -- a model that is silently
+#: never tried. The budget still trims the tail.
+AI_MAX_MODELS = 8
 
 # Deterministic pre-gate (contract regex — do not reword casually;
 # groups are non-capturing so findall() returns whole-match strings).
@@ -1356,6 +1407,7 @@ def ai_classify(pending_path, runner=None, models=None,
                                        collect_news.clean_ws(str(exc))[:120])}
             print("ai_classify: SELECTOR FAILED (%s) -- falling back to the "
                   "config seed %r" % (info["select_error"], selected))
+        selected = _reachable_only(selected)
     else:
         selected, info = list(models), {"source": "explicit"}
     # Read by tests and by the log row: which models this run ACTUALLY tried.
@@ -1376,7 +1428,19 @@ def ai_classify(pending_path, runner=None, models=None,
              if info.get("select_error") else "")]
     out_of_time = False
     pool_walled = False
+    refused_prefix = ""
+    refused_same = 0
+    dead_providers = set()
+    #: The provider whose ids share the ONE pool row: the config's own field.
+    pool_provider = _opencode_config().get("provider") or ""
     for model in selected:
+        provider_prefix = model.split("/", 1)[0]
+        if provider_prefix in dead_providers:
+            # A provider whose plan refused twice is skipped for the rest of
+            # this walk -- but only THIS provider. The next one is a different
+            # account and a different allowance, and ending the walk on the
+            # first provider's refusal is how a fallback gets wasted.
+            continue
         for attempt in range(1, max(1, attempts_per_model) + 1):
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -1420,6 +1484,44 @@ def ai_classify(pending_path, runner=None, models=None,
             # and stop.
             failure = model_selector.classify_failure(
                 "%s\n%s" % (out or "", err or ""), rc)
+            if failure == "payment_required":
+                # A PLAN REFUSAL BELONGS TO THE PROVIDER, NOT TO THIS MODEL.
+                # Before this arm existed it fell through to the unparseable
+                # branch below and was remembered as `garbage` -- a lie about the
+                # model, and one wasted rung per later run. The shared POOL row
+                # is deliberately NOT written: the plan says nothing about the
+                # free bucket every provider id shares.
+                refused_same = (refused_same + 1
+                                if provider_prefix == refused_prefix else 1)
+                refused_prefix = provider_prefix
+                model_selector.record_failure(health, model, "payment_required",
+                                              at=time.time())
+                errors.append("%s: payment_required -- the plan refuses the %r "
+                              "provider" % (model, provider_prefix))
+                print("ai_classify: %s -> payment_required. The plan refuses the "
+                      "'%s' provider, not this model id, so re-asking it is "
+                      "pointless; trying the next rung."
+                      % (model, provider_prefix))
+                break
+            if failure == "quota_or_rate_limited" \
+                    and provider_prefix != pool_provider:
+                # SOMEONE ELSE'S ALLOWANCE IS NOT THIS POOL'S WALL. record_
+                # pool_refusal writes the row that gates EVERY subsequent walk,
+                # and a second provider's own 429 (its daily allowance, not this
+                # bucket) must never write it: that would silence the fallback
+                # pool on one provider's spent quota. Recorded per model, and
+                # the walk moves on.
+                model_selector.record_failure(health, model,
+                                              "quota_or_rate_limited",
+                                              at=time.time())
+                errors.append("%s: quota_or_rate_limited -- the '%s' provider's "
+                              "own allowance, not the shared pool; no pool row "
+                              "written" % (model, provider_prefix))
+                print("ai_classify: %s -> quota_or_rate_limited on the '%s' "
+                      "provider's own allowance, so the shared pool row is NOT "
+                      "written; trying the next rung."
+                      % (model, provider_prefix))
+                break
             if failure == "quota_or_rate_limited":
                 row = model_selector.record_pool_refusal(
                     cool, retry_after=model_selector.retry_after_from_text(
@@ -1449,6 +1551,14 @@ def ai_classify(pending_path, runner=None, models=None,
             break
         if pool_walled:
             break
+        if refused_same >= 2 and provider_prefix not in dead_providers:
+            dead_providers.add(provider_prefix)
+            errors.append("payment_required: the '%s' provider refused the plan "
+                          "%d times; its remaining rungs are skipped"
+                          % (provider_prefix, refused_same))
+            print("ai_classify: the '%s' provider refused the plan on %d models, "
+                  "so its remaining rungs are skipped; the walk continues with "
+                  "the next provider." % (provider_prefix, refused_same))
         if out_of_time:
             errors.append("ai_budget_exhausted after %ds"
                           % AI_TOTAL_BUDGET_SEC)

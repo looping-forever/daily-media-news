@@ -356,8 +356,12 @@ class FileTests(unittest.TestCase):
                 self.assertEqual(0, ms._main([
                     "--record", DEAD, "ok", "--health", health]))
 
-            with open(path, encoding="utf-8") as fh:
-                self.assertEqual({}, json.load(fh)["models"])
+            # CLEARED MEANS GONE, not a `{"models": {}}` stub left on master:
+            # nothing in the document can refuse a model any more, so the
+            # recorder deletes it (D4, 2026-10-30).
+            self.assertFalse(
+                os.path.exists(path),
+                "a success must remove the cooldown file, not empty it")
 
 
 class VocabularyTests(unittest.TestCase):
@@ -385,7 +389,7 @@ class VocabularyTests(unittest.TestCase):
 
 
 class CommittedCooldownTests(unittest.TestCase):
-    """The veto is worthless unless the file is IN git.
+    """The veto is worthless unless the file is IN git -- and worthless as a stub.
 
     WHY THIS EXISTS. The cooldown was written on the runner and published by the
     step `Commit state changes` -- which carried no `always()`, so every run that
@@ -395,52 +399,169 @@ class CommittedCooldownTests(unittest.TestCase):
     three ids were discovered, ranked and tried again on every run -- three
     attempts of a twelve-attempt walk, exactly the waste the veto was built for.
     The file is committed now, and it is published by `Persist model cooldowns`,
-    which runs on `always()` (see PersistedCooldownStepTests). The test below
-    keeps it honest DATA rather than a file that silently stops vetoing anything.
+    which runs on `always()` (see PersistedCooldownStepTests).
+
+    WHY ABSENCE IS ALSO A PASS (D4, 2026-10-30). Every row in the file expires --
+    a model veto within a day, a pool wall within POOL_MAX_SEC -- and the writer
+    prunes before it saves, so the honest steady state of a healthy repository is
+    NO FILE. What it used to write instead was `{"schema_version": 1,
+    "models": {}}`: a committed stub that vetoes nothing and that `workflow_lint`
+    rejected on five consecutive days. The recorder now DELETES the file once
+    nothing in it can refuse a model, so the rule this suite pins is:
+
+        the committed file exists iff it can still veto something.
+
+    Both directions are checked below -- and the reject cases are checked against
+    SYNTHETIC documents, so this suite cannot go vacuous just because the file is
+    correctly absent today.
     """
 
     PATH = REPO_ROOT / "state" / ms.COOLDOWN_FILENAME
 
-    def test_the_committed_file_is_a_veto_the_selector_understands(self):
-        self.assertTrue(
-            self.PATH.is_file(),
-            "state/%s must be committed. An uncommitted cooldown is rebuilt from "
-            "nothing on every clean runner, which is the defect it exists to "
-            "remove." % ms.COOLDOWN_FILENAME)
-        doc = ms.load_cooldown(str(self.PATH))
-        self.assertEqual(ms.COOLDOWN_SCHEMA_VERSION, doc.get("schema_version"))
-        models = doc.get("models") or {}
-        self.assertTrue(
-            models,
-            "a committed cooldown with no entries is dead weight: either name "
-            "the ids that must not be tried, or delete the file and let the "
-            "recorder recreate it")
+    def _problems(self, doc):
+        """Every reason this document must not sit on master. Empty means fine.
+
+        This is the same predicate the commit step enforces by its shape check,
+        spelled out so the cases can be exercised.
+        """
+        if not isinstance(doc, dict):
+            return ["the document is not a JSON object"]
+        problems = []
+        models = doc.get("models", {})
+        if not isinstance(models, dict):
+            problems.append("`models` is %s, not an object"
+                            % type(models).__name__)
+            models = {}
+        pool = doc.get("pool")
+        if pool is not None and not isinstance(pool, dict):
+            problems.append("`pool` is %s, not an object" % type(pool).__name__)
+            pool = None
         for model, row in models.items():
-            with self.subTest(model=model):
+            if not str(model).startswith(PROVIDER + "/"):
+                problems.append("%r is not a fully-qualified model id" % (model,))
+            if not isinstance(row, dict):
+                problems.append("%r carries no row" % (model,))
+                continue
+            if row.get("reason") not in ms.COOLDOWN_SEC:
+                problems.append(
+                    "%r: reason %r is not one of the cooled classes (%r), so "
+                    "nothing says how long it lasts"
+                    % (model, row.get("reason"), sorted(ms.COOLDOWN_SEC)))
+            # `until` is ABSOLUTE. now=0 makes every real future stamp true, so
+            # an unreadable stamp fails here instead of quietly expiring.
+            elif not ms.on_hard_cooldown(doc, model, 0.0):
+                problems.append("%r carries no readable `until`: %r"
+                                % (model, row))
+        # `_epoch` returns 0.0 for a stamp it cannot read, so `<= 0` is the
+        # unreadable test: no real wall is before 1970.
+        if isinstance(pool, dict) and pool and ms._epoch(pool.get("until")) <= 0:
+            problems.append("the pool row carries no readable `until`: %r"
+                            % (pool.get("until"),))
+        if not models and not pool:
+            problems.append(
+                "nothing in it can refuse a model: an empty stub is dead weight, "
+                "and the recorder is supposed to delete the file instead")
+        return problems
+
+    def test_the_committed_file_is_a_veto_the_selector_understands(self):
+        if not self.PATH.exists():
+            # THE REMOVAL IS THE FIX, so absence passes -- but only because the
+            # reader turns a missing file into a cold start instead of raising.
+            # That is the load-bearing half, and it is asserted, not assumed.
+            doc = ms.load_cooldown(str(self.PATH))
+            self.assertEqual({}, doc.get("models"))
+            self.assertEqual([], list(doc.get("models") or {}))
+            self.assertEqual([], list(ms.prune_cooldown(doc, 0.0)))
+            return
+        with open(self.PATH, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        self.assertEqual(ms.COOLDOWN_SCHEMA_VERSION, doc.get("schema_version"))
+        self.assertEqual(
+            [], self._problems(doc),
+            "state/%s is committed but is not a usable veto set: %s"
+            % (ms.COOLDOWN_FILENAME, "; ".join(self._problems(doc))))
+
+    def test_an_empty_or_meaningless_document_is_refused(self):
+        """The positive case above must not be vacuous when the file is absent.
+
+        Every shape the old recorder used to commit, plus the malformed ones the
+        commit step warns about, has to be REFUSED by the same predicate --
+        otherwise deleting the file would quietly switch this check off.
+        """
+        future = "2100-01-01T00:00:00+00:00"
+        bad = {
+            "a bare empty map": {},
+            "the 2026-10-27 stub": {"schema_version": 1, "models": {}},
+            "an empty pool map": {"schema_version": 1, "models": {}, "pool": {}},
+            "models as a list": {"models": []},
+            "an unknown reason": {"models": {DEAD: {"reason": "because",
+                                                    "until": future}}},
+            "an unreadable until": {"models": {DEAD: {"reason": "model_not_found",
+                                                      "until": "soon"}}},
+            "a bare id": {"models": {"ling-3.0-flash": {
+                "reason": "model_not_found", "until": future}}},
+            "a pool row with no until": {"models": {}, "pool": {
+                "reason": "quota_or_rate_limited"}},
+        }
+        for label, doc in bad.items():
+            with self.subTest(shape=label):
                 self.assertTrue(
-                    model.startswith(PROVIDER + "/"),
-                    "%r is not a fully-qualified model id, so it can never match "
-                    "the catalogue" % (model,))
-                self.assertIn(
-                    row.get("reason"), ms.COOLDOWN_SEC,
-                    "the reason must be one of the cooled classes (%r), because "
-                    "that is the only thing that says how long it lasts"
-                    % (sorted(ms.COOLDOWN_SEC),))
-                # `until` is ABSOLUTE. now=0 makes every real future stamp true,
-                # so an unparseable stamp fails here instead of quietly expiring
-                # the entry and re-arming the waste.
-                self.assertTrue(
-                    ms.on_hard_cooldown(doc, model, 0.0),
-                    "%r carries no readable `until`: %r" % (model, row))
+                    self._problems(doc),
+                    "%s must be REFUSED: it either vetoes nothing or cannot be "
+                    "read back, and committing it is the D4 defect" % label)
+
+    def test_a_live_veto_document_is_accepted(self):
+        """The other direction, so the predicate cannot be a blanket refusal."""
+        future = "2100-01-01T00:00:00+00:00"
+        good = {
+            "one model veto": {"schema_version": 1,
+                               "models": {DEAD: {"reason": "model_not_found",
+                                                 "until": future}}},
+            "a live pool wall": {"schema_version": 1, "models": {}, "pool": {
+                "until": future, "reason": "quota_or_rate_limited"}},
+            "both at once": {"schema_version": 1,
+                             "models": {DEAD: {"reason": "provider_outage",
+                                               "until": future}},
+                             "pool": {"until": future,
+                                      "reason": "quota_or_rate_limited"}},
+        }
+        for label, doc in good.items():
+            with self.subTest(shape=label):
+                self.assertEqual([], self._problems(doc),
+                                 "%s must be ACCEPTED: it still refuses a model"
+                                 % label)
 
     def test_an_expired_committed_entry_stops_vetoing(self):
-        """A cooldown must decay, not become a permanent denylist."""
-        doc = ms.load_cooldown(str(self.PATH))
-        for model in list((doc.get("models") or {})):
+        """A cooldown must decay, not become a permanent denylist.
+
+        Driven by a SYNTHETIC entry rather than whatever happens to be committed:
+        the real file is usually absent now, and a decay test that iterates an
+        empty map proves nothing at all.
+        """
+        until = "2026-10-28T16:18:00+00:00"
+        expiry = ms._epoch(until)
+        doc = {"schema_version": 1, "models": {
+            DEAD: {"reason": "model_not_found", "until": until}}}
+        self.assertTrue(ms.on_hard_cooldown(doc, DEAD, expiry - 60))
+        self.assertFalse(
+            ms.on_hard_cooldown(doc, DEAD, 4_102_444_800.0),  # 2100-01-01
+            "%r would still be vetoed in 2100 -- that is a blacklist, and a "
+            "blacklist never re-tests an id that came back" % (DEAD,))
+        # AND THE WHOLE CHAIN THE WALK ACTUALLY RUNS: prune drops it, and a
+        # document with nothing left is DELETED rather than saved as `{}`.
+        self.assertEqual([DEAD], ms.prune_cooldown(doc, expiry + 60))
+        self.assertEqual({}, doc["models"])
+        with tempfile.TemporaryDirectory(prefix="cool-decay-") as sd:
+            path = os.path.join(sd, ms.COOLDOWN_FILENAME)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write('{"schema_version": 1, "models": %s}'
+                         % json.dumps({DEAD: {"reason": "model_not_found",
+                                              "until": until}}))
+            self.assertTrue(ms.save_cooldown(path, doc))
             self.assertFalse(
-                ms.on_hard_cooldown(doc, model, 4_102_444_800.0),  # 2100-01-01
-                "%r would still be vetoed in 2100 -- that is a blacklist, and a "
-                "blacklist never re-tests an id that came back" % (model,))
+                os.path.exists(path),
+                "the pruned document was still written out: an empty stub on "
+                "master is exactly what failed workflow_lint five days running")
 
 
 class PersistedCooldownStepTests(unittest.TestCase):
@@ -684,6 +805,53 @@ class PersistedCooldownStepTests(unittest.TestCase):
                     before, after,
                     "%s: a corrupt file was committed over a good one, which "
                     "un-arms every veto it held" % wf)
+
+    def test_a_deleted_cooldown_is_committed_as_a_deletion(self):
+        """The other half of D4: the writer removes the file, the step must
+        publish the REMOVAL.
+
+        WHY THIS EXISTS. Fixing only the writer would leave the dead stub
+        (`{"schema_version": 1, "models": {}}`) on master for ever, because the
+        old step exited 0 the moment the file was missing -- so "no live cooldown"
+        and "the write was lost" were indistinguishable, and the file that failed
+        `workflow_lint` five days running could never be deleted by any run.
+        """
+        for wf in self.WORKFLOWS:
+            with self.subTest(workflow=wf):
+                origin, work = self._repo(wf.replace(".yml", "") + "-delete")
+                self.assertTrue((work / self.STATE).exists(),
+                                "the fixture must start with a TRACKED file, "
+                                "otherwise the deletion proves nothing")
+                os.remove(work / self.STATE)
+                proc = self._run(wf, work)
+                self.assertEqual(
+                    0, proc.returncode,
+                    "%s: removing a dead cooldown must not red the run\n%s\n%s"
+                    % (wf, proc.stdout, proc.stderr))
+                self.assertIn(
+                    "committing its deletion", proc.stdout,
+                    "%s: the step must SAY it is publishing a removal" % wf)
+                # `_remote` fails loudly when the path is absent, which is the
+                # point here, so the negative assertion is checked directly.
+                show = subprocess.run(
+                    ["git", "show", "master:%s" % self.STATE],
+                    cwd=str(origin), capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=120)
+                self.assertNotEqual(
+                    0, show.returncode,
+                    "%s: the dead stub is STILL on origin/master (%r) -- a run "
+                    "that saw no live cooldown could never clear it"
+                    % (wf, show.stdout.strip()))
+                tip = self._must(origin, "log", "-1", "--format=%s", "master")
+                self.assertIn(
+                    "persist model cooldown state", tip.stdout,
+                    "%s: the deletion was not pushed as its own commit (tip: %r)"
+                    % (wf, tip.stdout.strip()))
+                self.assertEqual(
+                    "notes.txt",
+                    self._must(origin, "ls-tree", "--name-only", "master").stdout
+                    .split()[0],
+                    "%s: the step must touch nothing but the cooldown path" % wf)
 
     def test_a_lost_rebase_race_logs_and_does_not_red_the_step(self):
         for wf in self.WORKFLOWS:

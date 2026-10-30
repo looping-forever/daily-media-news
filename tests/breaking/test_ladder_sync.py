@@ -60,7 +60,16 @@ EXPECTED_PROVIDER = "opencode"
 # 1 and 2 -- the order a walk actually hits them in a bad week. flint is LAST,
 # deliberately NOT removed: it is a known hard failure, but it costs one silence
 # window when it fails, and dropping it would lose a rung if it recovers.
+# GEMINI LED 2026-10-30, deliberately, and for a reason the earlier ordering
+# cannot supply: Google AI Studio serves ~15 RPM / 500 RPD per project and per
+# model with no billing account, while the opencode free pool refuses whole
+# walks at once. So the two independent free buckets are tried in the order
+# most likely to answer, and the opencode pool stays as the fallback -- the
+# same six rungs, unchanged and still in their measured order. Seeds lead;
+# discovery only appends (see model_selector.select).
 EXPECTED_LADDER = [
+    "gemini/gemini-3.5-flash-lite",
+    "gemini/gemini-3.1-flash-lite",
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",
     "opencode/mimo-v2.6-flash-free",
@@ -311,25 +320,47 @@ def test_breaking_workflow_reads_config():
 
 
 def test_breaking_ladder_matches_config():
-    """breaking_monitor.AI_MODELS == config ladder (single source)."""
+    """breaking_monitor.AI_MODELS == the ladder its CLI can RESOLVE.
+
+    CHANGED 2026-10-30 with the second provider. The breaking walk runs the
+    same `opencode` CLI, and a provider only exists for it when its own config
+    was loaded. A rung that cannot resolve fails as `model_not_found` and earns
+    a 24h hard cooldown in the state file the DIGEST walk also reads, so an
+    unreachable rung is worse than no rung: the module drops it instead.
+    EXPERT here runs with OPENCODE_CONFIG unset, i.e. the digest-pool-only case.
+    """
     import breaking_monitor as bm  # noqa: E402
 
     cfg = _load_config()
-    assert tuple(bm.AI_MODELS) == tuple(cfg["ladder"]), \
-        "AI_MODELS %r != config ladder %r" % (bm.AI_MODELS, cfg["ladder"])
-    assert tuple(bm.AI_MODELS) == tuple(EXPECTED_LADDER)
+    reachable = [m for m in cfg["ladder"] if m.startswith(cfg["provider"] + "/")]
+    assert tuple(bm.AI_MODELS) == tuple(reachable), \
+        "AI_MODELS %r != the reachable ladder %r" % (bm.AI_MODELS, reachable)
+    assert tuple(bm.AI_MODELS) == tuple(
+        m for m in EXPECTED_LADDER if m.startswith("opencode/"))
     print("  PASS: test_breaking_ladder_matches_config")
 
 
 def test_classifier_ladder_matches_config():
-    """ai_classifier PROVIDERS resolve to exactly the config ladder."""
+    """ai_classifier PROVIDERS resolve to the config ladder it can SERVE.
+
+    CHANGED 2026-10-30 with the second provider. The classifier posts to one
+    endpoint (api.opencode.ai, i.e. the config's own `provider` field), while
+    the ladder is shared with the CLI walk, which now leads with a Gemini
+    provider that endpoint does not route. A gemini id posted there is a
+    guaranteed 404 that would burn one of the four race slots, so the module
+    filters by the config's `provider` prefix -- and this pin follows it.
+    """
     import ai_classifier as ac  # noqa: E402
 
     cfg = _load_config()
+    servable = [m for m in cfg["ladder"] if m.startswith(cfg["provider"] + "/")]
     models = [p["model"] for p in ac.PROVIDERS]
-    assert models == list(cfg["ladder"]), \
-        "PROVIDERS %r != config ladder %r" % (models, cfg["ladder"])
-    assert models == EXPECTED_LADDER
+    assert models == servable, \
+        "PROVIDERS %r != the servable ladder %r" % (models, servable)
+    assert models == [m for m in EXPECTED_LADDER if m.startswith("opencode/")]
+    assert not [m for m in models if not m.startswith("opencode/")], (
+        "the classifier must never carry a rung its endpoint cannot route: %r"
+        % (models,))
     names = [p["name"] for p in ac.PROVIDERS]
     assert len(set(names)) == len(names) and all(names), \
         "provider names must be unique and non-empty: %r" % (names,)
@@ -391,10 +422,16 @@ def test_the_measured_working_models_lead_and_the_known_failure_is_last():
     recovers. This test fails if someone tidies flint away or promotes it.
     """
     ladder = _load_config().get("ladder") or []
-    assert ladder[:2] == ["opencode/deepseek-v4.1-flash-free",
-                          "opencode/beam-free"], (
-        "the two models that have produced a digest must be tried first, in "
-        "measured order: %r" % (ladder[:2],))
+    opencode = [m for m in ladder if m.startswith("opencode/")]
+    assert opencode[:2] == ["opencode/deepseek-v4.1-flash-free",
+                            "opencode/beam-free"], (
+        "the two opencode models that have produced a digest must lead the "
+        "POOL, in measured order: %r" % (opencode[:2],))
+    assert ladder[:2] == ["gemini/gemini-3.5-flash-lite",
+                          "gemini/gemini-3.1-flash-lite"], (
+        "the free Gemini rungs lead the whole ladder (2026-10-30): a separate "
+        "free bucket that is not the shared pool is worth trying first: %r"
+        % (ladder[:2],))
     assert ladder[-1] == "opencode/flint-40b-free", (
         "the known hard failure must be the LAST rung, not removed and not "
         "promoted: %r" % (ladder[-1] if ladder else None,))
