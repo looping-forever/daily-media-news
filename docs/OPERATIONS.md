@@ -25,8 +25,8 @@ else is a fallback.**
 
 1. **ntfy** — a push notification to your phone carrying the digest as markdown
    with a click-through to the page.
-2. **The Cloudflare Pages site** — the rendered HTML digest. This is the
-   auth-gated personal archive; it is where a digest is actually *read*.
+2. **The Cloudflare Pages site** — the rendered HTML digest. It is **public by
+   design** (no login, no password); it is where a digest is actually *read*.
 3. **Gmail** — fires **only if ntfy failed**.
 4. **Telegram** — fires **only if both ntfy and the website failed**.
 
@@ -190,57 +190,48 @@ directory that is missing `docs/index.html` or the `digests/` folder, those
 paths stop existing — there is no merge with what was there before.
 
 **Trap 2 — run it from the repository root, or `functions/_middleware.js` is
-silently omitted.** This is the dangerous one. The Basic-auth middleware lives
-at the repository root. A Pages deploy from a subdirectory does not include it,
-**the archive goes live completely unprotected**, and **every job stays green**
-— there is no error, because the deploy genuinely succeeded.
+silently omitted.** The middleware lives at the repository root and is a
+pass-through (the archive is public by design). A deploy from a subdirectory does
+not include `functions/`, so the checked-in deploy contract drifts even though the
+site still opens — and the next person has to work out why the file exists.
+Deploy from the root.
 
 ```powershell
 # CORRECT — from the repository root
 & wrangler.cmd pages deploy docs --project-name daily-digest
 
-# WRONG — from docs/ : middleware omitted, archive public
+# WRONG — from docs/ : the functions/ directory is omitted
 cd docs; & wrangler.cmd pages deploy . --project-name daily-digest
 ```
 
 The workflow stages only `docs/digests/`, `docs/index.html` and `_routes.json`.
 `_routes.json` must stay committed with `include: ["/*"], exclude: []` — an
-auto-generated `exclude` of static routes beats `include` and exempts the whole
-archive while looking healthy.
+auto-generated `exclude` of static routes beats `include` and bypasses the
+middleware while looking healthy.
 
-### Always verify a 401 afterwards, on several paths
+### Verify the site is public afterwards
 
-A successful deploy tells you nothing about protection. Probe it:
+A successful deploy tells you nothing about what a browser gets. Probe it **with
+no credentials**:
 
 ```powershell
 $base = 'https://daily-digest.example.pages.dev'
-foreach ($p in @('/','/HEAD','/digests/2026-10-09-morning.html','/no-such-page.html')) { ... }
+foreach ($p in @('/','/digests/2026-10-09-morning.html')) { ... }
 ```
 
-Check **all** of these, and treat anything other than 401 as a breach:
+Expected, and anything else is a regression:
 
 | Probe | Expected |
 |---|---|
-| `GET /` | 401 + `WWW-Authenticate` |
-| `HEAD /` | 401 + headers, zero-byte body |
-| a real digest page | 401 **directly** (no redirect hop to follow) |
-| a range request | 401, never 206 |
-| **an invented path** | 401 — the catch-all must be closed |
+| `GET /` | **200** with the archive index, **no** `WWW-Authenticate` header |
+| `GET` a real digest page | **200** with the digest, **no** `WWW-Authenticate` header |
+| `HEAD /` | **200**, no challenge |
+| any redirect to `cloudflareaccess.com` | **failure** — a login page is the old defect |
 
-The invented-path probe is the one people skip, and it is the one that catches a
-catch-all that has been left open. `drift-canary.yml` runs this probe twice a
-day against both live hostnames and fails if archive content is ever served to an
-anonymous client — so a silent regression should not survive to the next
-morning. Do not rely on that to catch it immediately.
-
-One carve-out, stated rather than smoothed over:
-`/.well-known/cloudflare-access-protected-resource` returns Pages' own 404 with
-0 bytes rather than 401. No content leaks.
-
-**Unverified:** that a *correct-credential* login works. Every probe above is
-made without sending credentials, deliberately — the question being measured is
-what an anonymous client receives. So this proves unauthenticated requests are
-refused, **not** that you can log in. You confirm that in your browser.
+`drift-canary.yml` runs this probe twice a day against both live hostnames and
+fails unless **both** answer an anonymous request with HTTP 2xx carrying archive
+markup. A `401`/`403`, an Access gate, a non-2xx, a 404 or an unreachable host all
+fail. Do not rely on the schedule to catch a regression immediately.
 
 ## 5. Adding a source
 
@@ -275,8 +266,7 @@ prints a value, so no value was read or written. Timestamps below are the
 | `NTFY_SERVER` | Actions secret `2026-08-27T07:17:54Z`; on the Worker a **plaintext `[vars]` entry** (`https://ntfy.sh`), **not** a secret | An address, not a credential. The Worker side changes in `deploy/wrangler.toml` and needs a redeploy |
 | `GH_TOKEN` | Worker secret only — **no Actions copy exists** | Dashboard → worker → Variables and Secrets → edit → **Deploy** |
 | `CF_PAGES_API_TOKEN`, `CF_ACCOUNT_ID` | Repo Actions secrets only. `2026-08-27T16:07:43Z` / `2026-08-27T16:08:08Z` | Both needed together; also needs KV **read** scope for U8 |
-| `DIGEST_PASSWORD` | Pages project `daily-digest` → **production** environment only. **No Actions copy** | The one lock on the archive; see §4 and the approved-not-added note below |
-| `DIGEST_USERNAME` | Pages project `daily-digest` → **production** environment. **No Actions copy** (`digest-prebuild.yml` reads it when present) | The Basic-auth username that goes with `DIGEST_PASSWORD`. Changing it is a Pages setting, not a code change — there is no committed fallback: unset, the middleware fails closed (401 on every route) and logs `DIGEST_AUTH_MISCONFIGURED` |
+| `DIGEST_PASSWORD`, `DIGEST_USERNAME` | **REMOVED 2026-10-30.** They configured the Basic-auth gate on the Pages site; the site is public by design and nothing reads them any more | Delete any leftover Pages secret of either name in every environment |
 | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_RECEIVER`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Repo Actions secrets only | Untouched in practice — these paths have never fired |
 | `OPENCODE_API_KEY` | Repo Actions secret `2026-08-24T10:50:14Z` | Present in the store, but the string `OPENCODE_API_KEY` appears in **no** workflow file. `scripts/ai_classifier.py` reads it from the process environment. Treat as unwired, not as a live credential |
 
@@ -336,23 +326,20 @@ dispatch failures in the Worker log and a breaking alert that never arrives.
 **Put the expiry in a real calendar.** After rotating, force a pass with
 `?run=1` and confirm no dispatch failure.
 
-### `DIGEST_PASSWORD` — Pages only; the Actions copy is approved but NOT yet added
+### `DIGEST_PASSWORD` / `DIGEST_USERNAME` — retired 2026-10-30
 
-Verified present on the Pages project `daily-digest`, **production** environment
-only. There is **no** Actions copy, and `gh secret list` confirms it.
+They configured the HTTP Basic gate on the Pages site. The gate is gone: the
+archive is **public by design**, so no workflow reads either name and no prompt
+appears. The Actions copy that was once "approved but not added" will never be
+added.
 
-Adding it as an Actions secret has been **approved and not yet performed**.
-That is precisely why `digest-prebuild.yml`'s "Verify the digest page is live"
-step takes its fallback path today:
+If either secret still exists on the Pages project, delete it. Leaving it there
+changes nothing at runtime and invites the belief that access is still controlled.
 
-- **With** the secret — an authenticated `GET`, asserting HTTP 200 **and** the
-  `<h2 class="section-header">` markup. This is the strong check.
-- **Without** it — a `::warning::` naming exactly what was skipped, then three
-  indirect checks (path agreement, not-inherited, production deployment
-  identity), passing only if at least two of the three actually ran.
-
-So prebuild page-liveness is currently **indirect**. It does not prove that the
-exact page the artifact points at is what the owner's browser will load.
+The reason the gate went is recorded in `docs/PKB.md` §38 and, for operators,
+`docs/DEPLOYMENT.md` §4a: the owner could not open the site from a phone's
+in-app browser, and the repository is public anyway, so the password protected
+nothing.
 
 ### PROPOSED, NOT IMPLEMENTED — a `DIGEST_INGEST_TOKEN` drift check
 
@@ -461,8 +448,8 @@ Each of these has cost time. They are here so the next person does not pay again
 | `python` on Windows | Microsoft Store shim, exits 9009 | `py -3` |
 | `pytest` | Not installed | `py -3 -m unittest` |
 | `py -3 -m unittest discover -s tests -t .` | Aborts — there is no `tests/__init__.py` | Discover **per subdirectory** |
-| Pages deploy from a subdirectory | `functions/_middleware.js` silently omitted, archive public, every job green | Deploy from the repo root; verify 401 on several paths |
-| Reading a green run as "the site is fine" | The Pages deploy step carries `continue-on-error` | Verify the 401 yourself |
+| Pages deploy from a subdirectory | `functions/_middleware.js` silently omitted, so the deploy contract drifts (access is unaffected — the site is public) | Deploy from the repo root |
+| Reading a green run as "the site is fine" | The Pages deploy step carries `continue-on-error` | Verify the anonymous 200 yourself |
 
 ## 10. The delivery ledger and its git mirror
 

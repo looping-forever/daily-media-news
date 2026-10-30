@@ -1926,44 +1926,30 @@ class SealJobTests(unittest.TestCase):
                       "an unset ingest credential must be named as the cause, "
                       "not reported as a sealed artifact.")
 
-    def test_the_page_liveness_check_degrades_when_the_password_is_absent(self):
+    def test_the_page_liveness_check_is_anonymous(self):
         step = step_named(PREBUILD_WORKFLOW, "seal",
                           "Verify the digest page is live before sealing")
         run = step["run"]
-        self.assertIn("DIGEST_PASSWORD", run)
-        self.assertIn("::warning::", run,
-                      "the fallback path must say out loud that the stronger "
-                      "check was skipped. Silently doing a weaker check is how a "
-                      "reader comes to trust it.")
-        # The strong path must be a real check, not a warning: 200 AND markup.
-        #
-        # Both halves of the credential, and NEITHER hardcoded: the middleware
-        # accepts one username, taken from the Pages secret, so a literal here
-        # sent the right password under the wrong name and produced a 401 that
-        # read as a dead page.
-        self.assertIn('-u "${DIGEST_USERNAME}:${DIGEST_PASSWORD}"', run,
-                      "the authenticated GET must use the configured username as "
-                      "well as the configured password. A hardcoded username is "
-                      "refused by functions/_middleware.js whatever the password.")
-        self.assertNotIn('-u "digest:', run,
-                         "a hardcoded Basic-auth username is still present in the "
-                         "liveness check")
-        self.assertIn('secrets.DIGEST_USERNAME', json.dumps(step.get("env") or {}),
-                      "the username secret must be wired into the step env, or "
-                      "the strong check degrades on every run")
-        self.assertIn("!= \"200\"", run)
-        self.assertIn("section-header", run)
-        # And the three fallback checks the owner approved.
-        for needle, why in (
-                ("path agreement", "path agreement between page_url and the staged file"),
-                ("not inherited", "proof the HTML was built by this run"),
-                ("production deployment identity", "newest Pages deployment via the API")):
-            self.assertIn(needle, run,
-                          "the fallback liveness path is missing the %s check."
-                          % why)
-        self.assertIn("api.cloudflare.com", run,
-                      "the deployment-identity fallback must actually call the "
-                      "Pages API, or it asserts nothing.")
+        # The site is public by design (2026-10-30). No credential may be sent,
+        # and a non-200 is the defect this check exists to catch.
+        self.assertNotIn("DIGEST_PASSWORD", run)
+        self.assertNotIn("DIGEST_USERNAME", run)
+        self.assertNotIn(
+            "secrets.", json.dumps(step.get("env") or {}),
+            "the liveness check must not be wired to any secret: an anonymous "
+            "GET is the measurement.")
+        self.assertNotIn("-u ", run,
+                         "an authenticated GET reappeared in the liveness check")
+        self.assertIn("curl --disable", run,
+                      "the anonymous GET must ignore any runner .curlrc, so no "
+                      "ambient config can quietly attach credentials.")
+        self.assertIn('!= "200"', run)
+        self.assertIn("section-header", run,
+                      "a 200 is only meaningful when the body is the digest; the "
+                      "page must carry <h2 class=\"section-header\">.")
+        self.assertNotIn("api.cloudflare.com", run,
+                         "the Pages-API fallback was removed with the credential "
+                         "gate; an anonymous 200 is now the whole check.")
 
 
 # ==========================================================================
@@ -2811,99 +2797,46 @@ class SealStepExecutionTests(TempDirCase):
     # -- graceful degradation, which is the requirement most easily asserted
     #    into existence and not actually implemented.
 
-    def test_the_liveness_check_survives_a_missing_digest_password(self):
-        """THE OWNER-APPROVED REQUIREMENT, EXECUTED.
-
-        `DIGEST_PASSWORD` almost certainly does not exist yet. If the workflow
-        cannot run without it, it ships nothing -- and it would be discovered
-        at 06:50 NPT, which is the worst possible time.
-        """
-        self._write_artifact()
-        code, out = self.run_seal_step(
-            "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "", "SLOT": "morning", "TODAY": "2026-10-09",
-             "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
-             "STUB_CURL_CODE": "200",
-             "STUB_CURL_BODY": '{"result": [{"id": "dep-1"}]}'})
-        self.assertEqual(
-            0, code,
-            "the workflow BRICKED without DIGEST_PASSWORD. The owner approved "
-            "adding that secret and it has probably not been added yet, so this "
-            "step must degrade, not fail. Output:\n%s" % out)
-        self.assertIn("::warning::", out,
-                      "the fallback path must say out loud that the stronger "
-                      "check was skipped. Output:\n%s" % out)
-        self.assertIn("DIGEST_PASSWORD", out)
-        self.assertIn("path agreement", out)
-        self.assertIn("not inherited", out)
-        self.assertIn("FALLBACK check passed", out)
-        self.assertIn("(2/3 indirect checks ran)", out,
-                      "the step must say how much of the fallback it actually "
-                      "ran, so a partly-skipped check is never reported as a "
-                      "whole one. Output:\n%s" % out)
-
-    def test_the_liveness_check_uses_the_pages_api_when_it_has_credentials(self):
-        self._write_artifact()
-        code, out = self.run_seal_step(
-            "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "", "SLOT": "morning", "TODAY": "2026-10-09",
-             "CF_PAGES_API_TOKEN": "tok", "CF_ACCOUNT_ID": "acct",
-             "STUB_CURL_CODE": "200",
-             "STUB_CURL_BODY": '{"result": [{"id": "dep-1", '
-                               '"created_on": "2026-10-09T01:30:00Z"}]}'})
-        self.assertEqual(0, code, out)
-        self.assertIn("production deployment identity", out)
-        self.assertIn("dep-1", out)
-
-    def test_a_missing_production_deployment_is_red_even_without_the_password(self):
-        """The fallback is weaker, not optional. If all three indirect checks
-        pass vacuously the step would be reporting health it never measured."""
-        self._write_artifact()
-        code, out = self.run_seal_step(
-            "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "", "SLOT": "morning", "TODAY": "2026-10-09",
-             "CF_PAGES_API_TOKEN": "tok", "CF_ACCOUNT_ID": "acct",
-             "STUB_CURL_CODE": "200", "STUB_CURL_BODY": '{"result": []}'})
-        self.assertNotEqual(0, code,
-                            "the Pages project reported NO production deployment "
-                            "and the fallback still passed. A blank must never "
-                            "read like good news.\n%s" % out)
-        self.assertIn("::error::", out)
-
-    def test_the_strong_check_is_used_when_the_password_is_present(self):
+    def test_the_liveness_check_is_an_anonymous_get(self):
+        """The site is public by design: no credential, no secret, no fallback."""
         self._write_artifact()
         args_log = self.tmp / "curl_args.txt"
         code, out = self.run_seal_step(
             "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "hunter2", "DIGEST_USERNAME": "owner@example.invalid",
-             "SLOT": "morning",
-             "TODAY": "2026-10-09", "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
              "STUB_CURL_ARGS_LOG": str(args_log),
              "STUB_CURL_CODE": "200",
              "STUB_CURL_BODY": '<h2 class="section-header" style="--dot:red;">X</h2>'})
         self.assertEqual(0, code, out)
-        self.assertIn("STRONG check passed", out)
-        self.assertNotIn("FALLBACK check passed", out)
-        # THE CREDENTIAL THAT REACHED curl, not the one typed in the YAML: the
-        # middleware accepts exactly one username, configured on the Pages
-        # project. A literal here is a 401 whatever the password is.
+        self.assertIn("page liveness: anonymous 200", out)
+        self.assertNotIn("::error::", out)
         args = args_log.read_text(encoding="utf-8") if args_log.exists() else ""
-        self.assertIn("owner@example.invalid:hunter2", args,
-                      "the strong check did not authenticate as the CONFIGURED "
-                      "user. curl was called with:\n%s" % args)
-        self.assertNotIn("digest:hunter2", args,
-                         "the strong check authenticated with a hardcoded "
-                         "username:\n%s" % args)
+        self.assertTrue(args, "the liveness check did not call curl at all")
+        self.assertNotIn(" -u ", args,
+                         "the liveness check sent credentials. The site is public "
+                         "by design and the measurement is anonymous. curl was "
+                         "called with:\n%s" % args)
+        self.assertNotIn("Authorization", args, args)
 
-    def test_the_strong_check_is_red_when_the_page_does_not_serve_the_digest(self):
-        """With the password present, a 200 that is not the digest IS a real
-        defect and must go red -- that is what the strong check is for."""
+    def test_the_liveness_check_is_red_on_a_401(self):
+        """A credential prompt is the defect now, not the protection."""
         self._write_artifact()
         code, out = self.run_seal_step(
             "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "hunter2", "DIGEST_USERNAME": "owner@example.invalid",
-             "SLOT": "morning",
-             "TODAY": "2026-10-09", "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "401",
+             "STUB_CURL_BODY": "401 Unauthorized"})
+        self.assertNotEqual(0, code,
+                            "the page required authentication and the seal still "
+                            "passed. The owner's link would open a login prompt.\n%s"
+                            % out)
+        self.assertIn("::error::", out)
+
+    def test_the_liveness_check_is_red_when_the_page_is_not_the_digest(self):
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
              "STUB_CURL_CODE": "200", "STUB_CURL_BODY": "<html>maintenance</html>"})
         self.assertNotEqual(0, code,
                             "production served something that is not the digest "
@@ -2911,13 +2844,14 @@ class SealStepExecutionTests(TempDirCase):
                             "it.\n%s" % out)
         self.assertIn("::error::", out)
 
+    def test_the_liveness_check_is_red_on_a_404(self):
+        self._write_artifact()
         code, out = self.run_seal_step(
             "Verify the digest page is live before sealing",
-            {"DIGEST_PASSWORD": "hunter2", "DIGEST_USERNAME": "owner@example.invalid",
-             "SLOT": "morning",
-             "TODAY": "2026-10-09", "CF_PAGES_API_TOKEN": "", "CF_ACCOUNT_ID": "",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
              "STUB_CURL_CODE": "404", "STUB_CURL_BODY": ""})
         self.assertNotEqual(0, code, out)
+        self.assertIn("::error::", out)
 
 
 class ArtifactContractTests(unittest.TestCase):

@@ -100,219 +100,76 @@ Deployment is **manual by design** (no wrangler CI yet):
 (A `wrangler.toml` + auto-deploy from Actions is possible later if the manual
 copy-paste becomes a burden.)
 
-## 4a. Digest Pages site access control
+## 4a. Digest Pages site: public by design
 
-### ⚠️ The origin is the archive, and it is now the only lock
+The published digest archive is **public**. Anyone with the link can open it; there
+is no username, no password and no prompt. That is a deliberate decision taken on
+2026-10-30, not an oversight:
 
-**For the entire life of this project the published digest archive was readable by
-anyone, and this guide described the `digest-auth` Worker as the protection. It
-never was.** Measured 2026-10-02 and again 2026-10-03, with real HTTP status
-codes and no credentials sent:
+- the owner could not open the site from a phone's in-app browser, which suppresses
+  the native HTTP-auth login dialog, so the ntfy click-through dead-ended;
+- the repository is public, so every digest HTML was already readable anonymously
+  from GitHub — the password protected nothing that was not already public.
 
-| Probe (unauthenticated) | Result |
-|---|---|
-| `GET https://daily-digest.example.pages.dev/` | **HTTP 200, 38,021 bytes** |
-| `GET …/zzz-not-a-real-page.html` | **HTTP 200** — the same full 38 KB index |
-| `GET …/totally/fake/path/` | **HTTP 200** — the same full index |
-| the index itself | linked **72** digest pages |
-| any request carrying `Range:` | ignored — 200 with the full body, no `Content-Range`, no `Accept-Ranges` |
-| any request | **no `WWW-Authenticate` header**, ever |
+`functions/_middleware.js` still exists at the repository root, because wrangler
+discovers `./functions` relative to the directory `wrangler pages deploy` runs in
+and the checked-in deploy contract expects it. It is now a pass-through:
 
-**Why it was wrong.** A `digest-auth` Worker (`deploy/digest-auth-worker.js`, since
-deleted) did return HTTP 401 — but it only **PROXIED** to
-`https://daily-digest.example.pages.dev`. That origin is separately reachable on its own
-hostname, so the Worker was bypassable by construction: a lock on a door with a
-second, unguarded entrance. The Pages catch-all made the blast radius site-wide
-rather than a fixed set of pages, and range requests being ignored means a partial
-fetch leaked the same bytes a full one would.
+```js
+export async function onRequest(context) {
+  return await context.next();
+}
+```
 
-**The Worker also broke the owner's own access, which is why it was deleted rather
-than left as a "convenience path".** It demanded username `digest` before the origin
-asked for the owner's email address — **two prompts, two identities**. The owner
-therefore could not log in from the ntfy notification link at all, and typing the
-right password did not help, because the two prompts wanted different usernames. A
-proxy in front of the origin can never add protection the origin does not already
-have; it can only add a second identity prompt. It was removed from both the
-repository and Cloudflare on 2026-10-03. **Do not recreate it.**
+It sends no `WWW-Authenticate` header, reads no secret, and answers no request
+itself. `master.daily-digest.example.pages.dev` is a second hostname for the same
+project; it must also answer anonymously. If a Cloudflare Access application still
+covers either hostname, **remove it** — with the credential gate gone, Access can
+only present the owner with a login page, which is the defect this change removed.
 
-**What the control is now.** `functions/_middleware.js`, at the repository root —
-a Cloudflare Pages Function enforcing HTTP Basic auth **at the origin, in front of
-every static asset**. That is the only shape that covers static HTML; Cloudflare's
-own guidance is that to run middleware in front of static files you must create
-`functions/_middleware.js`, because a `_worker.js` or a routing Function does not
-cover them. It shipped in commit `9627e79` and was deployed 2026-10-03 — Pages
-deployment `7c1508f1-4dbc-4009-9571-a749705a25c8`, source commit `9627e79`.
+The old gate (commit `9627e79`, 2026-10-03) and the exposure that preceded it are
+recorded as history in **[PKB.md §38](PKB.md)**. Do not restore them by copying
+that record back into the code.
 
-Verified after-state, **22 unauthenticated probes, no credentials sent**:
+### How it is kept open, and how a regression is caught
 
-| Probe (unauthenticated) | Result |
-|---|---|
-| `GET /` | **401**, `WWW-Authenticate: Basic realm="Daily Digest (private archive)"`, `Cache-Control: no-store` |
-| `HEAD /` | **401** with those headers and a **zero-byte** body (RFC 9110) |
-| `GET /digests/2026-10-02-evening.html` | **401 directly** — the middleware runs *before* Pages' static handler, so the extensionless redirect never fires for an anonymous client and **no hop can be followed** |
-| `Range: bytes=0-99`, and an absurd range | **401** — never 206, never a partial body |
-| any invented path | **401** — the catch-all is closed |
-| `/.well-known/cloudflare-access-protected-resource` | Pages' own **404, 0 bytes** |
+1. **`daily-news.yml` refuses to deploy a credential prompt.** Before the deploy it
+   asserts `functions/_middleware.js` exists, and it greps the file for
+   `WWW-Authenticate` — **finding it is fatal**. The deploy step carries
+   `continue-on-error: true` by design, so the assertion is what makes a missing or
+   re-gated middleware loud instead of silent. After the deploy it also fetches the
+   origin anonymously and fails on any status other than 200.
+2. **`_routes.json` is written explicitly** as
+   `{"version":1,"include":["/*"],"exclude":[]}` rather than left to wrangler's
+   generator, so every route reaches the middleware and the deploy contract stays
+   reviewable. The file is asserted non-empty.
+3. **`drift-canary.yml` probes both public hostnames and fails unless the archive is
+   served anonymously.** It sends no credentials (and `--disable` so no runner
+   `.curlrc` can attach any). A pass requires **HTTP 2xx AND this archive's own
+   markup** on both hostnames, with no Cloudflare Access gate in the redirect chain.
+   A login page, an Access gate, a `401`/`403`, a `404`, any other non-2xx, an
+   unreachable host or a looped redirect all fail: each means the owner's link does
+   not open.
 
-Read that last row honestly: **no content leaks through it**, and it is the
-standard carve-out so Cloudflare Access can serve resource metadata — but
-"every route answers 401" is therefore **not literally true**. Every route except
-that one endpoint does.
+### Owner setup
 
-The `GET /` body was **230 bytes** when measured on 2026-10-03, and it printed the
-username in force. Since 2026-10-28 it is a **139-byte** generic message that
-names no username and no secret — see "Username" below for why that changed.
+Nothing is required to open the site. Two clean-ups are worth doing:
 
-`master.daily-digest.example.pages.dev` is a **second hostname** serving the same
-project from the same deployment. It is already behind **Cloudflare Access**
-(a **302** to the Access login, serving no digest content), so the apex was the
-only public hostname.
+1. **Delete the leftover Pages secrets** `DIGEST_PASSWORD` and `DIGEST_USERNAME` on
+   the `daily-digest` project (*Settings → Environment variables and secrets*), in
+   every environment. Nothing reads them any more; leaving them invites the
+   mistaken belief that a control still exists.
+2. **Remove any Cloudflare Access application** covering the archive hostnames, for
+   the reason above.
 
-**Username.** The accepted Basic-auth username is the `DIGEST_USERNAME` secret on
-the Pages project, and that secret is the **only** source: `functions/_middleware.js`
-carries no committed default and no placeholder. If it is unset or empty, every
-request is refused — **fail-closed** — and the middleware logs
-`DIGEST_AUTH_MISCONFIGURED`, naming the secret, server-side.
-
-The 401 body is a fixed generic message that names **no** username and **no**
-secret. It used to print the username in force, which was self-diagnosing, but the
-fallback it printed was a placeholder address that was not the owner's — so the
-browser prompt asked for a value that could never work and a correct password was
-refused. A published default username is also a credential anybody can read. The
-username in force is now logged on every rejection (`DIGEST_AUTH_REJECTED`), so a
-mismatch is still diagnosable — from the Pages log rather than from the browser.
+*Settings → Runtime → Fail open/closed* no longer affects access: the middleware
+performs no access decision. It can stay as it is.
 
 ### What is NOT verified
 
-- **Correct-credential login has not been verified.** Every probe above was made
-  **without sending credentials**, on purpose: the question being measured is
-  what an anonymous client receives. What is proven is that unauthenticated
-  requests are refused — **not** that the owner can log in with the configured
-  secret. That is confirmed by the owner in their browser.
-- **The fail-closed runtime setting below is unverified** and rests entirely on
-  the owner's dashboard confirmation.
-- **Cloudflare Access / Zero Trust is not in use.** It was investigated and
-  rejected — it requires a payment method on file even on the $0 plan, which the
-  owner cannot provide. Do not expect an Access policy to be part of this setup.
-
-### Owner setup — both steps are required
-
-1. **Pages secret `DIGEST_PASSWORD` on the `daily-digest` project.** Cloudflare
-   dashboard → *Workers & Pages* → `daily-digest` → *Settings* →
-   *Environment variables and secrets* → Add → type **Secret**, name exactly
-   `DIGEST_PASSWORD`, environment **Production** (preview deployments do not get
-   it), and it is now the **only** place the password lives — the
-   `digest-auth` Worker that held a second copy was deleted 2026-10-03, and
-   secrets are per-project, so do not go looking for a Worker secret. A
-   middleware with no secret refuses every request — fail-closed 401, never an
-   open door. **A 401 does not prove this step is done**: an anonymous probe gets
-   401 whether the secret is set or not, so confirm by actually authenticating.
-2. **Settings → Runtime → Fail open/closed = Fail closed.** This is the one
-   control the code cannot enforce: on fail-open, exhausting the daily Pages
-   Functions allowance serves the static assets directly and the middleware never
-   runs. Cloudflare exposes this setting through **no CLI and no API**, so it can
-   only be confirmed in the dashboard.
-
-### How it is kept protected
-
-Three independent guards, each with a test proven red against a deliberately
-broken variant (the project's verification standard — `docs/PKB.md` §37: a guard
-that cannot fail is decoration):
-
-1. **`daily-news.yml` asserts the middleware exists before deploying.** The
-   deploy step carries `continue-on-error: true` by design, so a deploy can go
-   wrong while the job stays green; without that assertion a missing
-   `functions/` directory would republish the whole archive unprotected with no
-   error anywhere. It also greps the file for `WWW-Authenticate`, so a stub that
-   exists but enforces nothing is refused too.
-2. **`_routes.json` is written explicitly** as
-   `{"version":1,"include":["/*"],"exclude":[]}` rather than left to wrangler's
-   generator. In that file `exclude` always takes priority over `include`, so an
-   auto-generated exclude covering static routes would exempt the entire archive
-   while the job looked healthy. The file is then asserted non-empty.
-3. **`drift-canary.yml` probes both live hostnames unauthenticated and fails
-   unless the archive is provably gated.** The assertion is inverted on purpose,
-   and so is the question behind it: the canary asks **was any digest content
-   served to an anonymous client**, not *what was the status code*. So `401`/`403`
-   passes — and so does a **Cloudflare Access gate** in the redirect chain that
-   served no digest content. The probe follows redirects (`-L`), keeps every
-   hop's response headers (`-D`) and reports the URL it actually ended up at, so
-   `master.daily-digest.example.pages.dev`'s **302** to
-   `…cloudflareaccess.com/cdn-cgi/access/login/…` is correctly read as
-   *protected* instead of as an exposure. Against that:
-   * served archive content fails **first and unconditionally**, whatever the
-     status and whatever else the chain passed through;
-   * any `2xx` that is neither a refusal nor an Access gate fails, so renaming a
-     marker in a template cannot quietly disarm the guard;
-   * an unreachable, timing-out, redirect-looping or `404` host fails — an origin
-     that refuses to be measured has not been measured, and "no verdict" is not
-     "protected".
-
-   No credentials are sent, and `--disable` also stops a stray `.curlrc` on the
-   runner from attaching any: verifying that auth *works* is the opposite of what
-   this measures. So a future deploy that drops the protection is caught by a
-   scheduled check rather than by luck.
-
-   *This arm used to fail on every scheduled run*, because it judged `master.*`
-   by status alone and treated any `3xx` as an exposure while Access was in fact
-   gating it correctly. A guard that cries wolf on the healthy state is one whose
-   real signal gets ignored, which defeats the entire point of having it. Fixed
-   2026-10-03. **The `master.*` arm is still probed** — it is exactly what would
-   notice the day that Access application is removed and `master.*` becomes a
-   second public hostname serving the whole archive.
-
-### The `digest-auth` Worker — DELETED 2026-10-03, do not recreate
-
-There used to be a second Cloudflare Worker here: `deploy/digest-auth-worker.js`,
-an HTTP Basic Auth reverse proxy in front of `https://daily-digest.example.pages.dev`,
-deployed manually like `breaking-monitor` via `deploy/digest-auth-wrangler.toml`
-(`name = "digest-auth"`, `main = "digest-auth-worker.js"`, `preview_urls = false`).
-
-**It never was the access control, and it actively broke the owner's access.**
-
-- It only **proxied**, so the origin stayed directly reachable and the proxy gated
-  nothing. See §4a for the measured proof.
-- It checked username **`digest`**, while the origin middleware checked whatever
-  `DIGEST_USERNAME` held — a committed placeholder address at the time. Following a
-  Worker URL therefore produced
-  **two Basic-auth prompts demanding two different usernames**, and the owner could
-  not get into the archive from the ntfy notification link on mobile. This is the
-  concrete reason it was removed rather than merely deprecated.
-- It held a **second copy** of the `DIGEST_PASSWORD` secret. That copy died with
-  the Worker. The **Pages** secret is the one that matters now, and it is not
-  touched by any of this — see "Owner setup" in §4a.
-
-**Removed on 2026-10-03 from both the repository and Cloudflare:**
-
-```bash
-wrangler delete --name digest-auth
-```
-
-Both `deploy/digest-auth-worker.js` and `deploy/digest-auth-wrangler.toml` were
-deleted from the repo, and the deployed Worker was deleted from the account.
-**Verifying the deletion — and reading the result correctly:** that hostname now
-returns **HTTP 404, not 401**. DNS still resolves, because Cloudflare wildcards
-`*.workers.dev`; the 404 is the wildcard answering for a subdomain that no longer
-has a Worker behind it. So on `workers.dev`, **404 means deleted** and **401 means
-still deployed** — a 401 after a delete means the delete failed. `wrangler versions
-list --name digest-auth` is the authoritative check and now returns
-`This Worker does not exist on your account. [code: 10007]`.
-
-The ntfy click-through (`click`, the `Open digest` action, and
-the `full digest:` truncation notice) and the academic result link in
-`scripts/check_academic_result.py` now point **straight at the Pages origin**, so
-exactly **one** prompt appears, asking for the one username the middleware accepts.
-`tests/workflows/test_workflow_lint.py::DeletedDigestAuthWorkerTests` fails if the
-dead host or those files ever come back.
-
-**A proxy in front of the origin is never the answer here.** It cannot add
-protection the origin does not already have, and it can only add a second identity
-prompt. If you want a memorable hostname, put it on the Pages project as a custom
-domain — do not reintroduce a Worker.
-
-The origin middleware needs **no dashboard deploy** — it ships with every Pages
-deploy of the repository, and its two guard assertions live in `daily-news.yml`
-(see "How it is kept protected" above).
+- The live origin's current status was not probed while making this change. The
+  scheduled canary and the post-deploy check verify it on every run; the owner also
+  confirms the link opens in their browser.
 
 ## 5. Manual operations cheat-sheet (`gh` CLI)
 

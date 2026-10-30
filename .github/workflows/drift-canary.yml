@@ -358,131 +358,59 @@ jobs:
           raise SystemExit(1 if problems else 0)
           PY
 
-      - name: Digest archive is not publicly readable (origin auth canary)
+      - name: Digest archive is publicly reachable (origin public-access canary)
         if: always()
-        # THE GUARD AGAINST "SOMEBODY DEPLOYED AND THE PROTECTION VANISHED".
+        # THE ARCHIVE IS PUBLIC BY DESIGN (2026-10-30). This step used to be the
+        # inverse: it PASSED on 401/403 and FAILED when digest content was served
+        # to an anonymous client. That contract is gone. The owner could not open
+        # the site from a phone's in-app browser, which suppresses the native
+        # login dialog, and because the repository is public every digest page
+        # was already readable anonymously from GitHub, so the password
+        # protected nothing. The site is now public on purpose.
         #
-        # Everything else in this repository is offline lint over committed
-        # files, which is exactly why the hole this canary exists to catch
-        # survived: no offline check can tell you what the DEPLOYED origin
-        # serves. daily-news.yml's deploy step carries `continue-on-error:
-        # true` by design (so a failed website publish still lets ntfy and the
-        # backup channels fire), which means a deploy can go wrong while the
-        # job stays green — and if `functions/_middleware.js` were ever missing
-        # or undetected, the job would republish the entire archive UNPROTECTED
-        # with no error anywhere.
+        # WHAT PASSES NOW: BOTH public hostnames answer an ANONYMOUS request
+        # with a 2xx whose body carries this archive's own markers, and no
+        # Cloudflare Access gate appears in the redirect chain. What FAILS is
+        # the opposite of before: a login page, an Access gate, a 401/403, a
+        # non-2xx, a transport failure, or a 2xx that serves something other
+        # than the archive. Each of those means the owner's link does not open,
+        # which is the defect this canary now exists to catch.
         #
-        # THE QUESTION IS "IS ARCHIVE CONTENT SERVED TO AN UNAUTHENTICATED
-        # CLIENT?", NOT "IS THE STATUS EXACTLY 401?". The natural check is
-        # "the origin returns 200 with the archive", but that cannot
-        # distinguish "correctly unprotected" from "protected and I am being
-        # redirected", and a probe that passes on an unexpected status is
-        # worse than no probe. So the ONLY passing answers are:
+        # NO CREDENTIALS ARE SENT, deliberately: the measurement is exactly what
+        # the owner's phone receives. `--disable` also ignores any `.curlrc` on
+        # the runner, so no ambient config can attach credentials to a probe
+        # whose whole point is sending none.
         #
-        #   401 / 403                      -> the guard is in place. PASS.
-        #   a Cloudflare Access gate in the redirect chain, serving no digest
-        #                                     content -> Access is gating. PASS.
-        #   the served bytes contain digest content -> FAIL, loudly, with the
-        #                                     byte count. This is the breach.
-        #   anything else, INCLUDING a 200  -> FAIL, loudly.
-        #   curl could not reach the host at all -> FAIL. Never pass.
-        #
-        # WHY Access counts as protected (this step failed on every scheduled
-        # run before it, which is worse than useless: a guard that cries wolf
-        # on the correct state teaches the owner to ignore it, and the one
-        # thing it exists to notice is then never noticed). The canary probes
-        # TWO hostnames and only one of them is answered by the middleware.
-        # Both are DERIVED from the configured origin, so they are written here
-        # by ROLE -- a real hostname in this file is rewritten to a placeholder
-        # by the private sanitiser, which is the defect this step now refuses:
-        #
-        #   <project>.pages.dev         -> 401 from functions/_middleware.js
-        #   master.<project>.pages.dev  -> 302 to
-        #        <team>.cloudflareaccess.com/cdn-cgi/access/login/...
-        #
-        # Access intercepts AHEAD of the Pages Function, so on the second
-        # hostname the middleware never runs and 401 is not reachable. An
-        # unauthenticated client that ends up on an Access login page has still
-        # been given nothing: refusing that as a failure asserts that the ONLY
-        # legitimate gate is the one this repository happens to own.
-        #
-        # WHY THE VERDICT IS TAKEN FROM WHAT WAS SERVED, NOT FROM A STATUS
-        # CODE. Two independent reasons, and the second is the load-bearing
-        # one:
-        #
-        #   1. it survives Cloudflare changing redirect behaviour. Access may
-        #      answer 302, chain on to an external identity provider, or serve
-        #      a login page with 200 at its own host. All of those leave
-        #      `cloudflareaccess.com` in the chain — in a response header, in the
-        #      final resolved URL, or both — so none of them cries wolf.
-        #   2. it means the guard cannot be disarmed by an edit. A 2xx that is
-        #      neither a refusal nor an Access gate still FAILS, so renaming a
-        #      marker in a template cannot silently turn this into a canary that
-        #      no longer recognises the archive. The markers are a second line
-        #      of defence, never the only one.
-        #
-        # NO CREDENTIALS ARE SENT. That is the measurement: this is what an
-        # anonymous client gets. Sending the owner's password would test
-        # authentication working, which is the opposite of what is being
-        # checked, and would put a credential in a CI log on a failed request.
-        # `--disable` additionally ignores any `.curlrc` on the runner, so no
-        # ambient config can quietly attach credentials to this probe.
-        #
-        # `if: always()` — ADDED 2026-10-04, AFTER THIS STEP WAS SEEN SKIPPED.
-        # This is the only line in the file that makes the step run at all,
-        # and until it existed the step had NEVER EXECUTED ONCE.
-        #
-        # GitHub Actions gives a step with no `if:` the implicit condition
-        # `success()`, so an upstream failure SKIPS it — silently, with a
-        # green-ish "skipped" badge and no warning. That is what happened:
-        # this step was skipped in BOTH Drift Canary failures on 2026-10-03/04,
-        # downstream of the worker drift canary above, and has never run since
-        # it was written. The previous version of this comment claimed
-        # "`set -euo pipefail` plus an explicit `exit 1` means the check cannot
-        # be skipped silently". THAT WAS FALSE, and it is recorded here
-        # deliberately: nothing inside a step body can prevent the skip, because
-        # on a skipped step the body never starts. `set -euo pipefail` cannot
-        # run a step, and no amount of shell strictness is a substitute for the
-        # one YAML key that schedules the step. `if: always()` is the fix.
+        # `if: always()` is load-bearing and was added 2026-10-04 AFTER THIS STEP
+        # WAS SEEN SKIPPED. GitHub Actions gives a step with no `if:` the
+        # implicit condition `success()`, so an upstream failure SKIPS it
+        # silently — and this step was skipped in BOTH Drift Canary failures on
+        # 2026-10-03/04, downstream of the worker drift canary above, so it had
+        # never executed once. It must report on every scheduled invocation,
+        # including runs where something above it is already red.
         #
         # NO `continue-on-error` HERE, and that is the load-bearing half of the
-        # pair — the two must be read together:
-        #
-        #   `if: always()` ALONE WOULD BE WORSE THAN THE DEFECT. With
-        #   `continue-on-error: true` the step would run, detect a PUBLICLY
-        #   READABLE archive, exit 1… into a GREEN job, and page nobody. A
-        #   breach that cannot turn the run red cannot be actioned, so
-        #   "runs but cannot alert" is a more dangerous state than "does not
-        #   run", not a safer one.
-        #
-        # So this step keeps the ability to fail the job, which is why it
-        # carries an entry in ALWAYS_STEP_EXEMPTIONS in
-        # tests/workflows/test_workflow_lint.py — Check 7's documented escape
-        # hatch for a step whose purpose IS to go red — instead of
+        # pair: a step that runs, finds the site gated, exits 1 into a GREEN job
+        # and pages nobody is more dangerous than a step that does not run. A
+        # reachability failure must be able to turn the run red, which is why
+        # this step carries an ALWAYS_STEP_EXEMPTIONS entry in
+        # tests/workflows/test_workflow_lint.py (Check 7's documented escape
+        # hatch for a step whose purpose IS to go red) instead of
         # `continue-on-error: true`. This comment, that table entry and Check 7
-        # are one decision in three places; change one and you must change the
-        # others, or the lint starts lying about which steps can go red.
+        # are one decision in three places.
         #
-        # Check 17 in the same file is what stops this from regressing: it
-        # requires a declared-always-run diagnostic to carry `if: always()`,
-        # and this step's own comment ("failed on every scheduled run") is
-        # enough for it to be caught if the key is ever deleted again.
-        #
-        # TWO HOSTNAMES ON PURPOSE, AND NEITHER ARM IS DROPPED.
-        # The production hostname and `<branch>.<project>.pages.dev` are two
-        # public names for the same Pages project and the same deployment. A
-        # guard that only checked the first would leave the second as an
-        # unmonitored way in, and the whole point here is that an unmonitored way
-        # in is how the archive stayed public for months. Both are probed, and
-        # the second arm is exactly what would notice the day that Cloudflare
-        # Access application is removed and `master.*` becomes a second PUBLIC
-        # hostname. From that day it answers 200 with the archive in the body,
-        # and the FIRST check below is whether archive content was served at all.
+        # TWO HOSTNAMES ON PURPOSE, AND NEITHER ARM IS DROPPED. The production
+        # hostname and `<branch>.<project>.pages.dev` are two public names for
+        # the same Pages project. Checking only the first would leave the second
+        # as an unmonitored way in — and that second arm is the one most likely
+        # to be behind a Cloudflare Access application, which is now a FAILURE
+        # rather than a pass: an anonymous client that lands on a login page has
+        # not been given the archive it was promised.
         #
         # Both names are derived by `scripts/archive_origin.py` from
-        # `CF_ARCHIVE_ORIGIN` (see the `env:` block below) rather than written
-        # here: this file is published, and the sanitiser that keeps the real
-        # hostname out of it is what turned a working probe into a 404.
+        # `CF_ARCHIVE_ORIGIN` (see `env:` below) rather than written here: this
+        # file is published, and the sanitiser that keeps the real hostname out
+        # of it is what once turned a working probe into a 404.
         #
         # This is a PUBLIC endpoint probe, so `curl -m 15` bounds it,
         # `--max-redirs 5` bounds the redirect chain, and the job's
@@ -490,31 +418,24 @@ jobs:
         env:
           # THE ONLY SOURCE OF THE HOSTNAMES, AND IT CANNOT BE THIS FILE.
           # The private sanitiser rewrites the real Pages hostname in every
-          # published file, which is exactly how the literal that used to sit
-          # here became `daily-digest.example.pages.dev` -- and how this canary
-          # came to probe a hostname Cloudflare answers with 404 while the real
-          # origin was never probed once. A repository variable is the only
-          # place the value can live, and it is the same value the Worker holds
-          # as DIGEST_ARCHIVE_ORIGIN.
+          # published file. A repository variable is the only place the value
+          # can live, and it is the same value the Worker holds as
+          # DIGEST_ARCHIVE_ORIGIN.
           CF_ARCHIVE_ORIGIN: ${{ vars.CF_ARCHIVE_ORIGIN }}
         run: |
           set -euo pipefail
           # RESOLVED, NEVER SPELLED. A missing or placeholder origin is refused
-          # here with a `::error::` line and exit 2, and `pipefail` turns that
-          # into a red step before any probe runs. That refusal is the point: a
-          # 404 from a hostname nobody configured is not a verdict about this
-          # archive, and reporting it as "expected 401/403" every night is what
-          # taught nobody anything about the origin's actual access control.
+          # here with an `::error::` line and exit 2, and `pipefail` turns that
+          # into a red step before any probe runs. A 404 from a hostname nobody
+          # configured is not a verdict about this archive.
           HOSTS="$(python3 scripts/archive_origin.py --hosts)"
           # Markers that appear in this archive's OWN html and nowhere else.
           # `Personal News Informer` is the <title>/<h1> of the index AND of
-          # every digest page (scripts/render_digest.py), so it catches a single
-          # leaked digest as well as a leaked index. Neither the middleware's
-          # 401 body nor a Cloudflare Access login page contains either string,
-          # which is what makes their absence meaningful. `LC_ALL=C` forces
-          # byte matching, so a stray non-UTF-8 byte in a served page can never
-          # turn the check into a silent no-op, and `-a` keeps it working on
-          # content curl decided was binary.
+          # every digest page (scripts/render_digest.py), so it catches a wrong
+          # page as well as a right one. A login page contains neither string,
+          # which is what makes their absence meaningful. `LC_ALL=C` forces byte
+          # matching and `-a` keeps it working on content curl decided was
+          # binary.
           ARCHIVE_MARKERS='Personal News Informer|Digest Archive'
           FAILED=""
           for host in $HOSTS; do
@@ -525,9 +446,7 @@ jobs:
             # `-L` follows the chain so the verdict is taken on the bytes an
             # anonymous client would actually end up with; `-D` keeps every
             # hop's response headers, which is how an Access gate is recognised
-            # even if the chain continues on to an identity provider;
-            # `--disable` ignores any runner `.curlrc`, so nothing ambient can
-            # attach credentials to a probe whose whole point is sending none.
+            # even if the chain continues on to an identity provider.
             code="$(curl --disable -sS -m 15 -L --max-redirs 5 \
               -o "$body" -D "$hdrs" \
               -w '%{http_code} %{num_redirects} %{url_effective}' "$url")"
@@ -540,13 +459,12 @@ jobs:
             bytes=0
             [ -f "$body" ] && bytes="$(wc -c < "$body")"
             echo "GET $url -> HTTP '$http_code' after $hops redirect hop(s), final URL '$effective', ${bytes} body bytes, curl exit $curl_rc"
-            # A transport failure is NOT a pass. Reporting "the site is
-            # protected" because we could not reach it is the exact inversion
-            # that lets a real exposure hide behind an outage. A 404 and a DNS
-            # failure are the same thing for this purpose: an origin that
-            # refuses to be measured has not been measured.
+            # A transport failure is NOT a pass: an origin that refuses to be
+            # measured has not been measured, and reporting a public site as
+            # healthy because it was unreachable is the inversion that lets a
+            # real outage hide behind a green run.
             if [ "$curl_rc" -ne 0 ]; then
-              echo "::error::digest archive origin UNREACHABLE (not a verdict): $url — curl exit $curl_rc. The guard's state is UNKNOWN, not 'protected'."
+              echo "::error::digest archive origin UNREACHABLE (not a verdict): $url — curl exit $curl_rc. Public access cannot be confirmed."
               FAILED="$FAILED $host(unreachable)"
               continue
             fi
@@ -562,40 +480,40 @@ jobs:
               *cloudflareaccess.com*) access_gate=yes ;;
             esac
             echo "  served archive content: $served_archive | Cloudflare Access gate in the chain: $access_gate"
-            # CHECKED FIRST, so no status and no redirect can excuse it. This is
-            # the breach; everything else is a detail of how it is spelled.
-            if [ "$served_archive" = yes ]; then
-              echo "::error::digest archive PUBLICLY READABLE at $url — an unauthenticated request received digest content (HTTP $http_code after $hops hop(s), ${bytes} bytes, final URL $effective). The archive is NOT protected. If functions/_middleware.js is deployed, check that _routes.json is committed with include:[\"/*\"] and exclude:[] and that the Pages project is set to Settings -> Runtime -> Fail CLOSED."
-              FAILED="$FAILED $host(archive-content-served)"
-              continue
-            fi
+            # CHECKED FIRST: an Access gate means the owner's browser gets a
+            # login page instead of the digest, whatever the final status was.
             if [ "$access_gate" = yes ]; then
-              echo "  gated by Cloudflare Access before any archive bytes were served — protected"
+              echo "::error::digest archive origin $url is gated by Cloudflare Access (HTTP $http_code, final URL $effective). The site is public by design; an anonymous client must receive the archive, not a login page."
+              FAILED="$FAILED $host(access-gate)"
               continue
             fi
             case "$http_code" in
-              401|403)
-                echo "  refused as expected — the archive is auth-gated"
-                ;;
               2*)
-                echo "::error::digest archive origin $url answered HTTP $http_code (${bytes} bytes, final URL $effective) with no refusal and no Access gate. No digest marker was matched, but a 2xx from this origin is not a proof of protection: treat it as unprotected until proven otherwise."
-                FAILED="$FAILED $host(HTTP-$http_code-not-a-refusal)"
+                echo "  HTTP $http_code to an anonymous client — public access possible, checking the body"
                 ;;
-              3*)
-                echo "::error::digest archive origin $url returned HTTP $http_code to an unauthenticated client and the redirect chain shows no Cloudflare Access gate. Only an Access login counts as a legitimate gate; any other redirect leaves the guard unconfirmed."
-                FAILED="$FAILED $host(HTTP-$http_code-redirect-not-access)"
+              401|403)
+                echo "::error::digest archive origin $url still requires authentication (HTTP $http_code). The site is public by design; remove the credential gate."
+                FAILED="$FAILED $host(HTTP-$http_code-auth-required)"
+                continue
                 ;;
               *)
-                echo "::error::digest archive origin $url returned HTTP $http_code (expected 401/403). Unexpected status from an unauthenticated probe; the guard cannot be confirmed."
+                echo "::error::digest archive origin $url returned HTTP $http_code to an anonymous client. A public archive must answer 2xx."
                 FAILED="$FAILED $host(HTTP-$http_code)"
+                continue
                 ;;
             esac
+            if [ "$served_archive" = no ]; then
+              echo "::error::digest archive origin $url answered HTTP $http_code but served no digest content (${bytes} bytes, final URL $effective). Production is serving something other than this archive, so the owner's link does not reach the digest."
+              FAILED="$FAILED $host(no-archive-content)"
+              continue
+            fi
+            echo "  archive served anonymously — public access confirmed"
           done
           if [ -n "$FAILED" ]; then
-            echo "::error::digest archive origin auth canary FAILED for:$FAILED"
+            echo "::error::digest archive public-access canary FAILED for:$FAILED"
             exit 1
           fi
-          echo "Digest archive origin canary: no hostname served archive content to an unauthenticated client."
+          echo "Digest archive public-access canary: every hostname served the archive to an anonymous client."
 
       - name: PKB verified-date staleness note
         if: always()
@@ -603,7 +521,7 @@ jobs:
         # has not been re-verified for >30 days.
         #
         # `if: always()` + `continue-on-error: true`, added 2026-10-04 in the
-        # same pass that gave the origin auth canary above its `if: always()`.
+        # same pass that gave the origin canary above its `if: always()`.
         # Same defect, lower stakes: a step with no `if:` carries the implicit
         # `success()` condition, so it is SKIPPED the moment anything above it
         # goes red. The one piece of this job that reports on the REPOSITORY
@@ -934,19 +852,13 @@ jobs:
           # decoration. Four behaviours, each with a committed mutation proof
           # against a deliberately broken Worker copy.
           run_suite "worker_heartbeat" python3 -m unittest tests.breaking.test_worker_heartbeat -v
-          # The digest archive's access control, executed for real. The Pages
-          # origin serves every static file, so `functions/_middleware.js` is the
-          # ONLY thing that can gate it — the digest-auth Worker only proxies and
-          # is bypassed by hitting the origin directly (probe 2026-10-02: HTTP
-          # 200, unauthenticated, 72 digest pages). Three of the behaviours here
-          # are invisible to code reading and would each reopen the archive
-          # without failing anything else: an internal throw escaping into
-          # Cloudflare's documented env.ASSETS.fetch() fallback, an unset
-          # DIGEST_PASSWORD failing OPEN instead of closed, and the comparison
-          # silently regressing to a timing-leaking `===`. This wrapper exists so
-          # the runner needs no node setup step and fails LOUDLY (not "skips")
-          # when node is missing — a security control that is never executed is
-          # decoration.
+          # The digest archive's public-access contract, executed for real. The
+          # archive is public by design (2026-10-30), so `functions/_middleware.js`
+          # is a pass-through and a regression would be a credential prompt coming
+          # back. The wrapper runs the JS suite through node and fails LOUDLY (not
+          # "skips") when node is missing — a contract that is never executed is
+          # decoration. It also executes the deploy-step and canary assertions, so
+          # "no `WWW-Authenticate` in the middleware" is a live check, not a comment.
           run_suite "pages_middleware_auth" python3 -m unittest tests.security.test_pages_middleware_auth -v
           # The digest DELIVERY guard, executed for real. Both of its properties
           # are invisible to code reading: that the write-ahead `pending` marker
@@ -1033,7 +945,7 @@ jobs:
         # fail after the work succeeded to carry `continue-on-error: true`,
         # require every step that declares itself an always-run diagnostic to
         # actually carry `if: always()` (which is what keeps THIS file's origin
-        # auth canary from being skipped again), require every cron to match a
+        # canary from being skipped again), require every cron to match a
         # committed Nepal Time (UTC+05:45) table, and REPORT whether a dry run
         # can mark a digest slot delivered.
         #

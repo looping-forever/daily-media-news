@@ -3,16 +3,15 @@
 
 WHY THIS FILE EXISTS
 --------------------
-`drift-canary.yml`'s "Digest archive is not publicly readable (origin auth
-canary)" step used to carry its two probe hostnames as a literal:
+`drift-canary.yml`'s "Digest archive is publicly reachable (origin
+public-access canary)" step used to carry its two probe hostnames as a literal:
 
     HOSTS="daily-digest.example.pages.dev master.daily-digest.example.pages.dev"
 
 That literal is not the archive. `example` is reserved (RFC 2606) and Cloudflare
-answers 404 for it, so the canary compared 404 against "expected 401/403" and
-went red on every scheduled run from the day the git blame last touched that
-line -- measuring a hostname that hosts nothing, while the real origin was never
-probed once.
+answers 404 for it, so the canary measured nothing and went red on every
+scheduled run from the day the git blame last touched that line -- measuring a
+hostname that hosts nothing, while the real origin was never probed once.
 
 It could not simply be corrected. `scripts/check_public_sanitisation.py` runs on
 every commit and the private sanitiser rewrites the real Pages hostname in every
@@ -25,12 +24,12 @@ repository must not carry the hostname at all.
 WHY A PLACEHOLDER IS A HARD FAILURE, NOT A PROBE
 ------------------------------------------------
 A 404 from a hostname Cloudflare hands out to anyone is not a statement about
-this archive, and a guard that reports "expected 401/403" forever teaches the
-owner to ignore it. The one thing this canary exists to notice -- a deploy that
-lost `functions/_middleware.js` and republished the whole archive unprotected --
-is exactly the thing a red-every-night canary stops being looked at for. So an
-unset or placeholder origin exits non-zero with a `::error::` line, and the step
-aborts instead of reporting a verdict it did not measure.
+this archive, and a canary that reports on a placeholder forever teaches the
+owner to ignore it. The one thing this canary exists to notice -- the public site
+becoming gated, refused or unreachable after a deploy -- is exactly the thing a
+red-every-night canary stops being looked at for. So an unset or placeholder
+origin exits non-zero with a `::error::` line, and the step aborts instead of
+reporting a verdict it did not measure.
 
 USAGE
 -----

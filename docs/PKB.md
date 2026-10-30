@@ -13,11 +13,11 @@ source code from this file; record decisions here instead.
     big-pickle model ladder.
   - `9328e80` — chore: reset delivery marker.
 - Secrets (set via `gh`): `NTFY_TOPIC` = a topic name you generate yourself;
-  `NTFY_SERVER` exists; `DIGEST_PASSWORD` (Basic Auth).
-  **Superseded 2026-10-03:** `DIGEST_PASSWORD` now lives in exactly **one**
-  place — a **Pages** secret on `daily-digest`. It briefly had to exist in two,
-  because the now-deleted `digest-auth` Worker held a second copy; that Worker is
-  gone. See §38.4.
+  `NTFY_SERVER` exists.
+  **Superseded 2026-10-30:** `DIGEST_PASSWORD` and `DIGEST_USERNAME` are retired.
+  They configured the HTTP Basic gate on the Pages site, and that gate has been
+  removed — the digest archive is **public by design**. See §38.4 and
+  `docs/DEPLOYMENT.md` §4a.
 - Current working-tree `state/last_digest_sent.json` = `{}` (post-reset).
 
 ## 2. Live verification (2026-08-30)
@@ -171,12 +171,11 @@ Actions projection does not move (1776 of 1800 min).
 
 - Subscribe to your `NTFY_TOPIC` in the ntfy app.
 - Verify the Pages origin is the notification target (the ntfy click URL is
-  `https://daily-digest.example.pages.dev/digests/...`) and that the
-  `DIGEST_PASSWORD` **Pages** secret is set. A 401 on an anonymous probe does
-  **not** prove the secret is set — the middleware fails closed either way, so
-  authenticate for real to confirm. **Superseded 2026-10-03:** this item used to
-  ask the user to verify the `digest-auth` Worker was deployed; that Worker is
-  deleted and must not be recreated.
+  `https://daily-digest.example.pages.dev/digests/...`) and that it answers an
+  anonymous request with HTTP 200. **Superseded 2026-10-30:** this item used to
+  ask the user to check that the `DIGEST_PASSWORD` Pages secret was set and to
+  authenticate for real, because the middleware failed closed. There is no gate
+  and no secret any more; the archive is public by design. See §38.4.
 - README still describes old Gmail-primary pipeline (docs update pending).
   - **SUPERSEDED (2026-09-27, see §29).** A README update is **IN FLIGHT** with
     a different agent as of this date. Do not assert either the old or the new
@@ -1056,9 +1055,14 @@ current numbers and note that `academic` is 146 (not 131).
   routine, a form deadline, or a result. Every reliability decision below exists
   for that reason, not for tidiness.
 - **Product identity — binding**: this is a **personal briefing, not a public
-  product**. He said so explicitly. The site must stay auth-gated and private.
-  Do not propose making it public, and do not add a "public version" as a
-  convenience.
+  product**. He said so explicitly. Do not propose turning it into a product and
+  do not add a "public version" as a convenience.
+  **Superseded 2026-10-30 by the owner's own decision:** the *digest archive* is
+  public by design — no login, no password — because the gate locked him out of
+  his own phone and the public repository already published the same content.
+  "Not a public product" still governs **scope** (no audience features, no
+  growth, no sharing surfaces); it no longer describes an access control. The
+  **academic result page** stays unpublished and private. See §38.9.
 - The root problem that started all of this, and the design lesson it produced,
   are in §23 and in the frozen-decision list at §24/§28. The lesson is worth
   restating because it generalises: **the honest signal must be computed in
@@ -1433,7 +1437,18 @@ is partial, unverified or unread.
 
 ## 38. Digest archive access control — origin middleware (2026-10-03)
 
-**The single most important entry in this file.** §35 recorded the defect and
+> **SUPERSEDED 2026-10-30 — read this banner before anything below it.**
+> The Basic-auth gate this section describes was **removed** and the digest
+> archive is **public by design**. `functions/_middleware.js` is now a
+> pass-through. The gate was trying to keep out an audience that already had the
+> content (the repository is public, so every digest HTML is readable
+> anonymously on GitHub), and it broke the owner's own access from a phone's
+> in-app browser, which suppresses the native login dialog. The reasoning and the
+> replacement guards are in **§38.9**; the operator version is
+> `docs/DEPLOYMENT.md` §4a. Sections 38.1–38.8 are the historical record and are
+> **not** current state. Do not restore the gate.
+
+**The single most important entry in this file — as of 2026-10-03.** §35 recorded the defect and
 §36.2 tracked it as the top open risk; this section records the fix, what was
 measured before and after, and — deliberately — what was *not* verified.
 
@@ -1614,6 +1629,69 @@ has not been sent yet, and check the deploy step actually ran.
   attributed to a probe. §35's diagnosis sat here for days while two documents
   asserted the opposite; that is the failure this section exists to prevent.
 
+### 38.9 Retired 2026-10-30 — the archive is public by design
+
+**What changed.** `functions/_middleware.js` no longer authenticates. It is a
+pass-through:
+
+```js
+export async function onRequest(context) {
+  return await context.next();
+}
+```
+
+The file stays at the repository root because wrangler discovers `./functions`
+relative to the directory `wrangler pages deploy` runs in, and the deploy contract
+checks for it. It sends no `WWW-Authenticate` header, reads no secret, and answers
+no request itself.
+
+**Why, in the owner's terms.** Two facts made the gate a net harm:
+
+1. **It locked out the only user.** The owner opens digests from the ntfy
+   notification on a phone. An in-app browser suppresses the native HTTP-auth
+   dialog, so the page never loaded and there was no field to type a password
+   into. The project exists to be read on that phone.
+2. **It protected nothing that was not already public.** The repository is
+   public. Every digest HTML — the same bytes the gate was refusing — is readable
+   anonymously from GitHub. The exposure §38.1 measured was real, but the
+   repository had already published it.
+
+**What replaced the guards.** The question inverted: instead of "does an
+anonymous client get refused", the question is now "does an anonymous client get
+**this archive**". Concretely:
+
+1. `daily-news.yml` asserts `functions/_middleware.js` exists **and greps it for
+   `WWW-Authenticate`, treating a match as fatal** — a re-gated middleware cannot
+   be deployed. After the deploy the workflow fetches the origin anonymously and
+   fails on any status other than 200.
+2. `_routes.json` stays explicit (`include: ["/*"], exclude: []`), so the
+   middleware is on every route and the deploy contract stays reviewable.
+3. `drift-canary.yml` passes only on **HTTP 2xx carrying archive markup** on both
+   hostnames, with no Cloudflare Access gate in the redirect chain. `401`/`403`,
+   a login page, a `404`, any other non-2xx, an unreachable host or a redirect
+   loop all fail.
+4. `tests/security/pages_middleware_auth.test.js` (8 tests, run under
+   `node --test`) and `tests/security/test_pages_middleware_auth.py` (10 tests)
+   pin the pass-through: no `WWW-Authenticate`, no `401`, no secret read, plus
+   the deploy-step and canary assertions above.
+
+**What was retired.** `DIGEST_PASSWORD` and `DIGEST_USERNAME` are read by
+nothing. If either still exists as a Pages secret, delete it. The
+fail-open/fail-closed runtime setting no longer affects access, because the
+middleware makes no access decision. Any Cloudflare Access application covering
+the archive hostnames must be removed: with the credential gate gone it can only
+present a login page.
+
+**What this does NOT change.** The **academic result page** stays unpublished. It
+carries the owner's roll number and was never part of the digest archive;
+`academic-result.yml` still refuses to publish it, and with no gate there is now
+nothing between a guessed path and that page. §31's "keep it private" ruling
+applies to that page and to nothing else here.
+
+**Unverified at the time of writing.** The live origin was not probed while this
+change was made. The scheduled canary and the post-deploy check are what verify
+it; the owner also confirms the link opens in their browser.
+
 ## 39. Frozen worker liveness contract (dead-man's switch, 2026-10-02)
 
 Recorded from the committed `deploy/schedule.json` and the constants in
@@ -1762,8 +1840,10 @@ resolution:
 
 So §38.6's "NOT in use" was too strong as a global claim, and its stated reason
 was right. §38.6 has been corrected to say **"NOT the archive's access
-control"** and to name the payment-method reason in full. The archive is
+control"** and to name the payment-method reason in full. At the time the archive was
 protected by `functions/_middleware.js` at the origin, and nothing else.
+**Superseded 2026-10-30:** that gate was removed; the archive is public by design
+and the middleware is a pass-through. See §38.9.
 
 ### 40.3 OPEN — the archive redesign (NOT built)
 
@@ -1774,15 +1854,15 @@ and **neither has been built**:
 1. **There is no index of the archive by anything but date.** The owner reads
    digests by scrolling a chronological list. There is no search, no category
    view, no "the digest about the exam routine" lookup.
-2. **`_middleware.js` authenticates but does not authorise.** One Basic-auth
-   identity guards every path. That is correct for a single-owner archive and is
-   also the reason it cannot grow into anything shared.
+2. ~~**`_middleware.js` authenticates but does not authorise.**~~
+   **Retired 2026-10-30:** the middleware no longer authenticates at all, so
+   there is no identity to authorise. The archive is public by design (§38.9).
 
 **Why it is not built:** a redesign touches `functions/` (which no unit may edit
 without a deliberate decision) and changes what every past digest page looks like
 to the owner. It is a product decision, not a defect, and the current archive is
-**not broken** — it is auth-gated, complete and verified (§38). Recorded here so
-it is not rediscovered as if it were new.
+**not broken** — it is public, complete and verified (§38.9, §4a of
+`docs/DEPLOYMENT.md`). Recorded here so it is not rediscovered as if it were new.
 
 ### 40.4 OPEN — the ntfy notification rework (NOT built)
 

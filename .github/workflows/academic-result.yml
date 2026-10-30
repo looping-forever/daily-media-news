@@ -989,13 +989,10 @@ jobs:
         #
         # That publishes a page titled "CSIT Sem 1 Result: PASSED" carrying
         # the owner's ROLL NUMBER, the result date and a link to the official
-        # TU result PDF, to a Pages origin that serves every unauthenticated
-# client. A `digest-auth` Worker used to sit in front and return 401, but it
-         # was only a PROXY: `daily-digest.example.pages.dev` was reachable
-         # directly and bypassed it entirely. That Worker has since been
-         # deleted, and `functions/_middleware.js` now enforces Basic auth AT
-         # this origin - so the origin refusing an unauthenticated client is
-         # now the correct signal rather than a bypass.
+        # TU result PDF, to a Pages origin that answers every anonymous client
+        # with HTTP 200. That origin has no credential gate by design (2026-10-30),
+        # so a page published there is readable by anyone who guesses the path --
+        # there is no prompt to stand in the way.
         #
         # The exposure was intermittent and that is exactly what made it
         # dangerous: `wrangler pages deploy` REPLACES the whole deployment, and

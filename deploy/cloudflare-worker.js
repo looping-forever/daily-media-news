@@ -2280,8 +2280,8 @@ const NTFY_ERROR_BODY_MAX_CHARS = 400;
 const DIGEST_NPT_OFFSET_MINUTES = 345;
 
 // The ingest credential. The NAME may appear anywhere; the VALUE never leaves
-// the comparison below. Same fail-closed rule as functions/_middleware.js:33-38 —
-// an absent secret compares against "" and therefore refuses every request.
+// the comparison below. Fail closed: an absent secret compares against "" and
+// therefore refuses every request.
 const INGEST_TOKEN_HEADER = "X-Ingest-Token";
 const INGEST_TOKEN_SECRET = "DIGEST_INGEST_TOKEN";
 
@@ -4672,9 +4672,8 @@ async function deliverDigest(env, slot, options) {
 
 // ---- ingest: POST /?ingest=1 --------------------------------------------------
 
-// Constant-time equality, mirroring functions/_middleware.js. Two SHA-256
-// digests compared without an early exit, so neither the token's value nor its
-// length leaks through timing.
+// Constant-time equality. Two SHA-256 digests compared without an early exit,
+// so neither the token's value nor its length leaks through timing.
 function constantTimeEqualBytes(left, right) {
   let difference = left.length ^ right.length;
   const length = Math.max(left.length, right.length);
@@ -4700,9 +4699,8 @@ async function constantTimeEquals(left, right) {
 // request away from being rewritten.
 //
 // Fail-closed on the credential: an ABSENT DIGEST_INGEST_TOKEN is compared
-// against "", so it refuses every request rather than accepting them. That is
-// functions/_middleware.js's rule, unchanged — an unconfigured secret means
-// "nobody gets in", never "everybody does".
+// against "", so it refuses every request rather than accepting them — an
+// unconfigured secret means "nobody gets in", never "everybody does".
 async function handleDigestIngest(request, env) {
   if (request.method !== "POST") {
     return ingestError(
@@ -4720,8 +4718,7 @@ async function handleDigestIngest(request, env) {
   // offers a token, and ACCEPT every request that offers none — which is the
   // same string on both sides. An unauthenticated `curl -X POST` would then be
   // authenticated by the absence of a credential, so the check has to be
-  // explicit. functions/_middleware.js makes the same check for the same reason
-  // and this is the same rule.
+  // explicit, rather than relying on the comparison alone.
   if (!expected) {
     console.error(
       "DIGEST_INGEST_MISCONFIGURED: the " + INGEST_TOKEN_SECRET +

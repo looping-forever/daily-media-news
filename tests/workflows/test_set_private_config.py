@@ -607,10 +607,12 @@ class StubbedProvidersTest(unittest.TestCase):
 
 #: Every script that hands a value to `gh` or `wrangler`. The argv rule is a
 #: CLASS rule, not a property of one line: it was broken in exactly one of these,
-#: and the other two were anecdote until they were parsed.
+#: and the others were anecdote until they were parsed.
+#:
+#: `scripts/set-archive-password.ps1` was removed on 2026-10-30 with the
+#: credential gate it configured (the digest archive is public by design).
 SECRET_SCRIPTS = (
     "scripts/set-private-config.ps1",
-    "scripts/set-archive-password.ps1",
     "scripts/set-delivery-secrets.ps1",
 )
 

@@ -139,22 +139,9 @@ def heredoc_bodies(run_text, tags=PYTHON_HEREDOC_TAGS):
 ALLOWED_SECRETS = frozenset({
     "CF_ACCOUNT_ID",
     "CF_PAGES_API_TOKEN",
-    # U6. `DIGEST_PASSWORD` is the Basic-auth password
-    # functions/_middleware.js protects the digest archive with; the seal job
-    # uses it to prove the page is live with an AUTHENTICATED GET. It is listed
-    # here while NOT YET CONFIGURED on purpose: the allowlist documents which
-    # names the workflows expect, and the seal job's graceful-degradation path
-    # is what happens until the owner adds it. Listing it does not assert it
-    # exists, and `digest-prebuild.yml` treats its absence as a warning rather
-    # than a failure, so the workflow is never bricked waiting on it.
-    "DIGEST_PASSWORD",
-    # U6. The Basic-auth USERNAME the same middleware compares against. It is a
-    # secret rather than a source literal because the owner's address cannot be
-    # committed here, and because a placeholder in the file meant the only way to
-    # log in was to edit public source -- a correct password under a real address
-    # was refused. Like DIGEST_PASSWORD it is listed while NOT YET CONFIGURED:
-    # `digest-prebuild.yml` treats its absence as a warning, never a failure.
-    "DIGEST_USERNAME",
+    # 2026-10-30. DIGEST_PASSWORD and DIGEST_USERNAME were REMOVED with the
+    # credential gate they configured: the digest archive is public by design,
+    # so no workflow may reference either name again.
     # U6. The Worker's `?ingest=1` credential, by NAME only. The value is read
     # from the environment into a header and is never printed or written to a
     # file. The Worker refuses every ingest when this is unset, which is
@@ -245,28 +232,28 @@ ALWAYS_STEP_EXEMPTIONS = {
 "step still has to run on `always()` to be visible when a result WAS "
             "detected."
     ),
-    # drift-canary.yml "Digest archive is not publicly readable (origin auth
-    # canary)" is the only guard in this repository that can notice the digest
-    # archive becoming publicly readable again, and it is exempted from
-    # continue-on-error for the same reason "Assert academic delivery" is: the
-    # step's purpose IS to go red. `if: always()` was added to it on 2026-10-04
-    # after real run logs showed it had been SKIPPED in both of that day's Drift
-    # Canary failures and had NEVER EXECUTED AT ALL -- a step with no `if:`
-    # carries the implicit `success()` condition, so an upstream failure skips
-    # it silently. `continue-on-error: true` here would run the check and then
-    # swallow a breach into a green job, which is WORSE than not running it: an
-    # exposure that cannot turn the run red cannot be actioned. Same rule as
-    # Check 7's own docstring -- an exemption is only honest when failing the
-    # job is what the step is for.
+    # drift-canary.yml "Digest archive is publicly reachable (origin
+    # public-access canary)" is the only guard in this repository that can
+    # notice the public digest site becoming unreachable or gated again, and it
+    # is exempted from continue-on-error for the same reason "Assert academic
+    # delivery" is: the step's purpose IS to go red. `if: always()` was added to
+    # it on 2026-10-04 after real run logs showed it had been SKIPPED in both of
+    # that day's Drift Canary failures and had NEVER EXECUTED AT ALL -- a step
+    # with no `if:` carries the implicit `success()` condition, so an upstream
+    # failure skips it silently. `continue-on-error: true` here would run the
+    # check and then swallow a dead public site into a green job, which is WORSE
+    # than not running it: a failure that cannot turn the run red cannot be
+    # actioned. Same rule as Check 7's own docstring -- an exemption is only
+    # honest when failing the job is what the step is for.
     ("drift-canary.yml", "docs-lint",
-     "Digest archive is not publicly readable (origin auth canary)"): (
-        "load-bearing by design: an unauthenticated request served digest "
-        "content, or an origin that refused to be measured, must turn the run "
-        "red so the owner is paged. `if: always()` makes it run even when an "
-        "earlier step failed; `continue-on-error: true` would make a real "
-        "breach report green, which is the exact inversion this step's own "
-        "comments describe. Do NOT 'fix' the missing continue-on-error here "
-        "without reading the step's comment block first."
+     "Digest archive is publicly reachable (origin public-access canary)"): (
+        "load-bearing by design: an anonymous request that is gated, refused, "
+        "unreachable, or served something other than the archive must turn the "
+        "run red so the owner is paged. `if: always()` makes it run even when an "
+        "earlier step failed; `continue-on-error: true` would make a dead or "
+        "gated public site report green, which is the exact inversion this "
+        "step's own comments describe. Do NOT 'fix' the missing "
+        "continue-on-error here without reading the step's comment block first."
     ),
     # U6a. The prebuild dead-man's switch. Exempted for the same reason as
     # "Assert academic delivery" above and for the OPPOSITE reason to the two
@@ -4776,7 +4763,7 @@ class DeletedDigestAuthWorkerTests(unittest.TestCase):
 
 # ==========================================================================
 # Check 17 -- a diagnostic step must actually carry `if: always()`.
-#             DEFECT 2026-10-04: the digest origin auth canary had NEVER RUN.
+#             DEFECT 2026-10-04: the digest origin canary had NEVER RUN.
 # ==========================================================================
 
 #: The phrases that DECLARE "this step must run regardless of what failed
@@ -4851,14 +4838,15 @@ JOB_HEADER_RE = re.compile(r"^ {2}[A-Za-z0-9_.-]+:\s*(#.*)?$")
 #: different questions, and this table only asks the first.
 ALWAYS_REQUIRED_STEPS = {
     ("drift-canary.yml", "docs-lint",
-     "Digest archive is not publicly readable (origin auth canary)"): (
-        "The ONLY guard that can notice the digest archive becoming publicly "
-        "readable again; the 2026-10-03 fix rests entirely on the deployed "
-        "functions/_middleware.js. It was SKIPPED in both of that day's Drift "
-        "Canary failures and had never executed once, because a step with no "
-        "`if:` carries the implicit `success()` condition. It must report on "
-        "every scheduled invocation, including the runs where the worker drift "
-        "canary above it has already gone red."
+     "Digest archive is publicly reachable (origin public-access canary)"): (
+        "The ONLY guard that can notice the public digest site becoming gated, "
+        "refused or unreachable; the public-by-design contract (2026-10-30) "
+        "rests on the deployed functions/_middleware.js staying a pass-through. "
+        "It was SKIPPED in both 2026-10-03/04 Drift Canary failures and had "
+        "never executed once, because a step with no `if:` carries the implicit "
+        "`success()` condition. It must report on every scheduled invocation, "
+        "including the runs where the worker drift canary above it has already "
+        "gone red."
     ),
     ("drift-canary.yml", "docs-lint",
      "PKB verified-date staleness note"): (
@@ -4960,7 +4948,7 @@ def missing_always_condition(wf, job, step_name, step_dict, phrases=None):
         "    GitHub Actions gives a step with no `if:` the implicit condition "
         "`success()`, so an earlier failure SKIPS it -- silently, with no "
         "warning and no red. This is not a theoretical shape: the digest origin "
-        "auth canary in drift-canary.yml was skipped in both 2026-10-04 Drift "
+        "canary in drift-canary.yml was skipped in both 2026-10-04 Drift "
         "Canary failures and had never executed once, so the repository's only "
         "guard against a publicly readable archive was reporting nothing.\n"
         "    Fix: add `if: always()` to the step. If the step can also fail, "
@@ -5010,7 +4998,7 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
 
         Check 7 only ever looked at steps that ALREADY had `if: always()`, so
         nothing in CI could complain about a diagnostic step that had none --
-        which is how the origin auth canary sat unexecuted for a day while
+        which is how the origin canary sat unexecuted for a day while
         every lint stayed green.
         """
         offenders = []
@@ -5045,10 +5033,10 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
         # And the specific one it exists for: it must be SEEN as declaring the
         # intent (which is what makes the rule general) and be running always.
         canary = ("drift-canary.yml", "docs-lint",
-                  "Digest archive is not publicly readable (origin auth canary)")
+                  "Digest archive is publicly reachable (origin public-access canary)")
         self.assertIn(
             (canary, True), declared,
-            "the origin auth canary is no longer detected as an always-run "
+            "the origin canary is no longer detected as an always-run "
             "diagnostic. Either the step was renamed, or the phrase list was "
             "trimmed past the words that declare its intent, or the raw-text "
             "scan stopped reaching it -- in any case this rule has lost the "
@@ -5094,7 +5082,7 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
         )
 
     def test_the_privacy_canary_runs_always_and_can_still_go_red(self):
-        """Pin the origin auth canary BY NAME, in both directions.
+        """Pin the origin canary BY NAME, in both directions.
 
         Two failure modes, opposite, and both real:
 
@@ -5107,7 +5095,7 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
         exempted into silence -- and that the exemption Check 7 relies on is
         documented rather than accidental.
         """
-        step_name = "Digest archive is not publicly readable (origin auth canary)"
+        step_name = "Digest archive is publicly reachable (origin public-access canary)"
         found = [
             (job, step_dict)
             for job, name, step_dict in W.iter_all_steps("drift-canary.yml")
@@ -5160,14 +5148,14 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
         run = step_dict.get("run") or ""
         self.assertIn(
             "scripts/archive_origin.py --hosts", run,
-            "the origin auth canary no longer resolves its probe hostnames from "
+            "the origin canary no longer resolves its probe hostnames from "
             "scripts/archive_origin.py. Every hostname written in this file is a "
             "sanitised placeholder, so the step is back to probing a host that "
             "hosts nothing.",
         )
         self.assertNotIn(
             "example.pages.dev", run,
-            "the origin auth canary probes a placeholder hostname again. It "
+            "the origin canary probes a placeholder hostname again. It "
             "answers 404, the step reports 'expected 401/403', and the guard is "
             "red every night while the real origin goes unprobed.",
         )
@@ -5188,7 +5176,7 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
         parsed document, where comments do not exist, and silently saw nothing.
         No workflow file is edited.
         """
-        step_name = "Digest archive is not publicly readable"
+        step_name = "Digest archive is publicly reachable"
         broken_workflow = "\n".join([
             "name: proof",
             "on:",
@@ -5205,7 +5193,7 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
             "",
         ])
         intent = raw_always_run_intent_from_text(broken_workflow)
-        fixture_key = ("docs-lint", "Digest archive is not publicly readable")
+        fixture_key = ("docs-lint", "Digest archive is publicly reachable")
         self.assertIn(
             fixture_key, intent,
             "sanity: the fixture's own comment must declare the intent, or this "
@@ -5221,7 +5209,7 @@ class DiagnosticStepAlwaysRunTests(WorkflowLintBase):
         # does not know whether the step is already wired. The `if:` filter is
         # `declares_always_run_intent`, checked here against the REAL file in
         # both states, because that split is easy to get wrong.
-        real_name = "Digest archive is not publicly readable (origin auth canary)"
+        real_name = "Digest archive is publicly reachable (origin public-access canary)"
         self.assertEqual(
             [], declares_always_run_intent(
                 "drift-canary.yml", "docs-lint", real_name, {"if": "always()"}),
@@ -6408,7 +6396,7 @@ class DigestWatchdogSlotTests(WorkflowLintBase):
         """The marker step only REPORTS; something must act on it.
 
         Pinned in both directions, for the same reason Check 17 pins the
-        origin auth canary: a `miss=true` nobody acts on is silence, and a
+        origin canary: a `miss=true` nobody acts on is silence, and a
         `continue-on-error` on the alerting step would make a real missed
         digest report green.
         """
@@ -6962,12 +6950,16 @@ class ArtifactLayoutAgreementTests(WorkflowLintBase):
         consumers = seal_consumer_paths()
         self.assertTrue(consumers, "no prebuild/ consumer paths were found in "
                                    "%s, so this check is vacuous" % SEAL_WORKFLOW)
-        self.assertTrue(
-            any("digests" in c for c in consumers),
-            "sanity: the seal job is expected to read the RENDERED PAGE from "
-            "the unpacked artifact, so one of its paths must name the digests "
-            "directory. Found %r" % (consumers,),
-        )
+        # 2026-10-30. The seal no longer READS the staged page: the site is
+        # public by design, so the liveness check takes `page_url` from
+        # artifact.json and fetches it anonymously over HTTP. What replaced the
+        # old "one path must name the digests directory" sanity is the source of
+        # that URL, which must still be the artifact the prebuild produced.
+        self.assertIn(
+            "prebuild/artifact.json",
+            W.raw_workflow_text(SEAL_WORKFLOW),
+            "sanity: the seal's liveness check is expected to take page_url from "
+            "prebuild/artifact.json. Without it the check has no page to fetch.")
 
         failures = layout_defects(entries, consumers)
         self.assertEqual(

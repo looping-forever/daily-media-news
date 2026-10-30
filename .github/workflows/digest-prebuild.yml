@@ -602,136 +602,27 @@ jobs:
       - name: Verify the digest page is live before sealing
         # Needs the artifact's own page_url, so it cannot run on a defined skip.
         if: success() && steps.fetch.outputs.skip != '1'
-        # PROVING THE PAGE IS SERVED, WITH THE STRONG CHECK WHEN IT IS
-        # AVAILABLE AND AN HONEST WEAKER ONE WHEN IT IS NOT.
-        #
-        # `DIGEST_PASSWORD` is the Basic-auth password functions/_middleware.js
-        # protects the archive with, and `DIGEST_USERNAME` is the username that
-        # goes with it. Both are needed: the middleware accepts ONE username,
-        # taken from the DIGEST_USERNAME Pages secret, and a hardcoded username
-        # here sent the correct password under the wrong name -- a 401 that
-        # looked like a broken page. With both, the page is fetched WITH auth
-        # and the assertion is the only one that answers the real question: is
-        # this exact page what the owner's browser will load? A real failure
-        # there is a real defect and goes red.
-        #
-        # The secrets almost certainly do not exist yet, and a workflow that
-        # bricks itself waiting on a secret the owner has not added is a
-        # workflow that ships nothing. So when either is absent the check
-        # degrades to three indirect checks, emits `::warning::` naming exactly
-        # what was skipped, and continues.
-        env:
-          DIGEST_PASSWORD: ${{ secrets.DIGEST_PASSWORD }}
-          DIGEST_USERNAME: ${{ secrets.DIGEST_USERNAME }}
-          SLOT: ${{ github.event.inputs.digest_time }}
-          TODAY: ${{ github.event.inputs.slot_date }}
-          CF_PAGES_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        # THE PAGE IS PUBLIC BY DESIGN, SO THIS IS AN ANONYMOUS GET. It asserts
+        # HTTP 200 AND the archive's own <h2 class="section-header"> markup:
+        # that is what proves the exact page the artifact points at is the one
+        # the owner's browser will load. No credentials are sent, and a 401 or
+        # 403 here is the defect this check exists to catch.
         run: |
           set -eo pipefail
           PAGE_URL="$(python3 -c "import json;print(json.load(open('prebuild/artifact.json'))['page_url'])")"
           echo "page under test: $PAGE_URL"
           BODY_FILE="$RUNNER_TEMP/prebuild_page.html"
-
-          if [ -n "${DIGEST_PASSWORD:-}" ] && [ -n "${DIGEST_USERNAME:-}" ]; then
-            CODE="$(curl -sS -m 20 -u "${DIGEST_USERNAME}:${DIGEST_PASSWORD}" -o "$BODY_FILE" -w '%{http_code}' "$PAGE_URL")"
-            echo "authenticated GET as the configured archive user -> HTTP $CODE"
-            if [ "$CODE" != "200" ]; then
-              echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an AUTHENTICATED request. The archive is not serving the page this artifact points at, so sealing would send the owner to a dead link."
-              exit 1
-            fi
-            if ! grep -q '<h2 class="section-header"' "$BODY_FILE"; then
-              echo "::error::the digest page answered 200 but carries no <h2 class=\"section-header\">. Production is serving something other than the digest that was just built, so the artifact's click target is wrong."
-              exit 1
-            fi
-            echo "page liveness: STRONG check passed (authenticated 200 + archive markup present)"
-            exit 0
-          fi
-
-          if [ -n "${DIGEST_PASSWORD:-}" ] && [ -z "${DIGEST_USERNAME:-}" ]; then
-            echo "::warning::DIGEST_PASSWORD is set but DIGEST_USERNAME is not, so the STRONG page-liveness check was SKIPPED: the middleware accepts only the username configured on the Pages project, so a guessed one returns 401 whatever the password is. Add DIGEST_USERNAME (the same address set on the daily-digest Pages project) to this repository's Actions secrets. Falling back to three indirect checks."
-          else
-            echo "::warning::neither DIGEST_PASSWORD nor DIGEST_USERNAME is set as an Actions secret, so the STRONG page-liveness check (authenticated GET asserting HTTP 200 and the section-header markup) was SKIPPED. Falling back to three indirect checks. To enable the strong check, add both DIGEST_USERNAME and DIGEST_PASSWORD to this repository's Actions secrets."
-          fi
-          problems=""
-          skipped=0
-
-          # (a) PATH AGREEMENT: the artifact's page_url must address the file
-          #     this job actually holds, and that file must be non-empty. It is
-          #     the unpacked WEB PAGE, at the same location the seal step read
-          #     it from. An email here would satisfy this check while describing
-          #     a different page from the one the owner is sent to, which is
-          #     the mismatch that made the sealed hash meaningless.
-          PAGE_FILE="prebuild/docs/digests/$TODAY-$SLOT.html"
-          if [ ! -s "$PAGE_FILE" ]; then
-            problems="$problems; $PAGE_FILE is missing or empty"
-          else
-            echo "(a) path agreement: page_url addresses /digests/$TODAY-$SLOT.html and the staged page is $(wc -c < "$PAGE_FILE") bytes"
-          fi
-
-          # (b) NOT INHERITED: the validated payload inside this artifact was
-          #     generated for TODAY's $SLOT slot (already asserted in the build
-          #     step). Re-read it here so this fallback check stands on its own
-          #     and not only on a step the operator may not have read.
-          CUTOFF="$(python3 -c "import json;print(json.load(open('prebuild/state/stories.validated.json')).get('generated_at_npt',''))")"
-          case "$CUTOFF" in
-            "$TODAY"*) echo "(b) not inherited: the digest in this artifact was generated at '$CUTOFF' (NPT), today" ;;
-            *) problems="$problems; the artifact's digest was generated at '$CUTOFF', not on $TODAY" ;;
-          esac
-
-          # (c) PRODUCTION IDENTITY: the newest production deployment of the
-          #     Pages project, read from the Cloudflare API. This answers "is a
-          #     production deployment actually current and healthy", which is the
-          #     question the authenticated GET was standing in for.
-          if [ -z "${CF_PAGES_API_TOKEN:-}" ] || [ -z "${CF_ACCOUNT_ID:-}" ]; then
-            # A WARNING, not a failure, and the count below is what decides.
-            # CF_PAGES_API_TOKEN and CF_ACCOUNT_ID already exist for the deploy
-            # in daily-news.yml, but a seal job that refuses to run because a
-            # credential is missing ships nothing, and the two checks that DID
-            # run are real evidence. So this is recorded as skipped, and the
-            # "at least two of three" rule below turns a wholesale loss of
-            # evidence into a failure.
-            skipped=$((skipped + 1))
-            echo "::warning::(c) production deployment identity: SKIPPED (CF_PAGES_API_TOKEN / CF_ACCOUNT_ID unset)"
-          else
-            DEPLOY_FILE="$RUNNER_TEMP/prebuild_deploy.json"
-            DCODE="$(curl -sS -m 20 -o "$DEPLOY_FILE" -w '%{http_code}' \
-              -H "Authorization: Bearer $CF_PAGES_API_TOKEN" \
-              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/daily-digest/deployments?env=production&per_page=1")"
-            if [ "$DCODE" != "200" ]; then
-              skipped=$((skipped + 1))
-              problems="$problems; the Cloudflare Pages deployment list answered HTTP $DCODE"
-            else
-              # The path goes in through the ENVIRONMENT, never interpolated into
-              # the Python source. A path containing a backslash becomes a `\U`
-              # escape inside a string literal and the read dies with a
-              # UnicodeDecodeError that reads like a corrupt file rather than a
-              # quoting mistake -- and $RUNNER_TEMP is a Windows path on a
-              # self-hosted runner.
-              DEPLOY_ID="$(DEPLOY_FILE="$DEPLOY_FILE" python3 -c "import json,os;d=json.load(open(os.environ['DEPLOY_FILE'])).get('result') or [{}];print(d[0].get('id',''))")"
-              DEPLOY_WHEN="$(DEPLOY_FILE="$DEPLOY_FILE" python3 -c "import json,os;d=json.load(open(os.environ['DEPLOY_FILE'])).get('result') or [{}];print(d[0].get('created_on',''))")"
-              if [ -z "$DEPLOY_ID" ]; then
-                problems="$problems; the Pages project reports no production deployment at all"
-              else
-                echo "(c) production deployment identity: newest production deployment $DEPLOY_ID created $DEPLOY_WHEN"
-              fi
-            fi
-          fi
-
-          # AT LEAST TWO OF THE THREE MUST ACTUALLY HAVE RUN. This is what keeps
-          # a blank from reading like good news: a fallback in which almost
-          # every check was skipped has measured nothing, and reporting that as
-          # "the page is live" is exactly the failure this whole step exists to
-          # prevent. One skipped check is tolerated and named; two is not.
-          if [ "$skipped" -ge 2 ]; then
-            problems="$problems; only $((3 - skipped)) of the 3 indirect checks could run, so the page was not meaningfully measured at all"
-          fi
-
-          if [ -n "$problems" ]; then
-            echo "::error::the digest page could not be proven live, and the strong check that would prove it was unavailable.$problems"
+          CODE="$(curl --disable -sS -m 20 -o "$BODY_FILE" -w '%{http_code}' "$PAGE_URL")"
+          echo "anonymous GET -> HTTP $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an ANONYMOUS request. The site is public by design, so a non-200 means the owner's link is gated or dead."
             exit 1
           fi
-          echo "page liveness: FALLBACK check passed ($((3 - skipped))/3 indirect checks ran). Weaker than an authenticated GET -- see the ::warning:: above."
+          if ! grep -q '<h2 class="section-header"' "$BODY_FILE"; then
+            echo "::error::the digest page answered 200 but carries no <h2 class=\"section-header\">. Production is serving something other than the digest that was just built, so the artifact's click target is wrong."
+            exit 1
+          fi
+          echo "page liveness: anonymous 200 + archive markup present"
 
       - name: Seal the artifact into the Worker
         # Seals prebuild/artifact.json. On a defined skip there is no record to

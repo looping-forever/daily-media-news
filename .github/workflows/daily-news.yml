@@ -2081,6 +2081,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run == 'true' }}
+          ARCHIVE_ORIGIN: ${{ vars.CF_ARCHIVE_ORIGIN }}
         run: |
           set -eo pipefail
           digest_file="docs/digests/${{ env.TODAY }}-${{ steps.digest_time.outputs.time }}.html"
@@ -2107,37 +2108,32 @@ jobs:
           stage_dir="$(mktemp -d)"
           cp -r docs/digests "$stage_dir/digests"
           cp docs/index.html "$stage_dir/index.html"
-          # --- THE AUTH GUARD MUST BE PRESENT, OR THIS DEPLOY IS A LEAK ----
+          # --- THE ARCHIVE IS PUBLIC BY DESIGN (2026-10-30) ----------------
           #
-          # WHY THIS IS AN ASSERTION AND NOT A COMMENT. This step carries
+          # WHY THIS IS STILL AN ASSERTION. This step carries
           # `continue-on-error: true` so that a failed website deploy still
           # lets ntfy and the backup channels fire. The cost of that decision
-          # is that a deploy can go WRONG while the job still goes GREEN. A
-          # missing or undetected functions/ directory would republish the
-          # entire 72-page archive to an origin that answers 200 to anyone —
-          # with no error anywhere. That is the exact outcome that already
-          # happened once: a now-DELETED `digest-auth` Worker was believed to
-          # gate the site, and it only proxied, so the origin was never
-          # protected at all (confirmed by probe on 2026-10-02: HTTP 200,
-          # 38 021 bytes, unauthenticated).
+          # is that a deploy can go WRONG while the job still goes GREEN. The
+          # site is public on purpose, so the failure refused here is the
+          # OPPOSITE of the old one: a credential prompt must not come back.
+          # The owner could not open the digest from a phone's in-app browser,
+          # which suppresses the native login dialog.
           #
           # Wrangler discovers `./functions` relative to the directory the
           # deploy command RUNS IN, which is the repo root here — not relative
-          # to "$stage_dir". So the middleware must exist at the repo root, and
-          # this assertion is what makes its absence loud instead of silent.
-          #
-          # NOTE this is the branch CLOUDFLARE FALLS BACK FROM, not the only
-          # guard: a broken `_routes.json` can exempt static routes, so the
-          # explicit file below is written as well rather than trusted.
+          # to "$stage_dir". So the pass-through middleware must stay at the
+          # repo root or the checked-in contract in tests/security stops
+          # describing what ships.
           if [ ! -f functions/_middleware.js ]; then
-            echo "FATAL: functions/_middleware.js is missing — this deploy would"
-            echo "       republish the whole digest archive UNAUTHENTICATED at"
-            echo "       https://daily-digest.example.pages.dev. Refusing to publish."
+            echo "FATAL: functions/_middleware.js is missing — wrangler would"
+            echo "       deploy without the functions directory this repository"
+            echo "       tests as a public pass-through."
             exit 1
           fi
-          if ! grep -q 'WWW-Authenticate' functions/_middleware.js; then
-            echo "FATAL: functions/_middleware.js exists but does not enforce Basic auth."
-            echo "       Refusing to publish an unprotected archive."
+          if grep -q 'WWW-Authenticate' functions/_middleware.js; then
+            echo "FATAL: a credential prompt was re-introduced into"
+            echo "       functions/_middleware.js. The digest site is public by"
+            echo "       design and must answer an anonymous request with 200."
             exit 1
           fi
           # _routes.json EXPLICITLY, never left to auto-generation.
@@ -2145,22 +2141,39 @@ jobs:
           # Cloudflare auto-generates a _routes.json when it detects a
           # functions directory, and in that file "exclude" ALWAYS TAKES
           # PRIORITY OVER "include". An auto-generated exclude covering static
-          # asset routes would therefore exempt the entire archive from the
-          # middleware — and look perfectly healthy while doing it. `include:
-          # ["/*"]` with an EMPTY `exclude` is the only shape that means "the
-          # middleware guards everything", so it is committed here in reviewable
-          # form instead of being inferred by whatever version of wrangler
-          # happens to run.
+          # asset routes would therefore bypass the pass-through middleware.
+          # `include: ["/*"]` with an EMPTY `exclude` is the shape that means
+          # "every route reaches the middleware", so it is committed here in
+          # reviewable form instead of being inferred by whatever version of
+          # wrangler happens to run.
           printf '{"version":1,"include":["/*"],"exclude":[]}' > "$stage_dir/_routes.json"
           if [ ! -s "$stage_dir/_routes.json" ]; then
             echo "FATAL: _routes.json was not written — static routes could be"
-            echo "       exempted from the auth middleware. Refusing to publish."
+            echo "       exempted from the pass-through middleware. Refusing to publish."
             exit 1
           fi
-          echo "auth guard present: functions/_middleware.js + _routes.json $(cat "$stage_dir/_routes.json")"
+          echo "public pass-through present: functions/_middleware.js + _routes.json $(cat "$stage_dir/_routes.json")"
           npx wrangler pages deploy "$stage_dir" \
             --project-name daily-digest \
             --branch master
+          # ANONYMOUS 200, THE WHOLE POINT OF THE CHANGE. No credentials are
+          # sent: anyone with the link must be able to open the site. When the
+          # origin variable is absent the check is skipped loudly rather than
+          # reported green.
+          if [ -n "${ARCHIVE_ORIGIN:-}" ]; then
+            CODE="$(curl --disable -sS -m 20 -o "$RUNNER_TEMP/deploy_probe.html" -w '%{http_code}' "${ARCHIVE_ORIGIN%/}/")"
+            echo "anonymous GET ${ARCHIVE_ORIGIN%/}/ -> HTTP $CODE"
+            if [ "$CODE" != "200" ]; then
+              echo "::error::the deployed digest origin answered HTTP $CODE to an"
+              echo "         anonymous request. The site is public by design; a"
+              echo "         non-200 means the archive is not reachable without"
+              echo "         credentials, which is the defect this deploy must not"
+              echo "         reintroduce."
+              exit 1
+            fi
+          else
+            echo "::warning::CF_ARCHIVE_ORIGIN is unset, so the post-deploy anonymous 200 check was skipped."
+          fi
           echo "true" > state/.website_ok
           echo "website_ok=true" >> "$GITHUB_OUTPUT"
 
@@ -3519,18 +3532,13 @@ jobs:
               }
 
               # --- Website digest URL (click target) ---
-              # The Pages ORIGIN, directly. Basic auth is enforced AT the
-              # origin by functions/_middleware.js, so the origin is itself
-              # the only host that can ask for the password - and it asks with
-              # the ONE username the middleware accepts (the owner's email).
-              #
-              # This used to point at the `digest-auth` Worker, which proxied
-              # here. That produced TWO prompts with TWO different usernames
-              # (`digest` at the Worker, the owner's email here), so the owner
-              # could not log in from the notification at all. The Worker was
-              # deleted 2026-10-03. Do NOT reintroduce a proxy in front of the
-              # origin: it cannot add protection the origin does not already
-              # have, and it can only add a second identity prompt.
+              # The Pages ORIGIN, directly. The archive is public by design
+              # (2026-10-30): `functions/_middleware.js` is a pass-through, so
+              # this URL opens in any browser with no prompt. The notification
+              # must point straight at the origin for the same reason it always
+              # did - a proxy in front of it adds a hop and can only add a
+              # prompt, never protection. The `digest-auth` Worker that used to
+              # sit here was deleted 2026-10-03 and must not come back.
               # THE ORIGIN IS NOT COMMITTED. scripts/check_public_sanitisation.py
               # forbids the real Pages host in this repository, so it comes from
               # the CF_ARCHIVE_ORIGIN repository variable. The fallback below is

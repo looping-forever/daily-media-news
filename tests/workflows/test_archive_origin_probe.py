@@ -3,7 +3,7 @@
 
 WHY THIS FILE EXISTS
 --------------------
-`drift-canary.yml`'s origin auth canary carried its two probe hostnames as a
+`drift-canary.yml`'s origin canary carried its two probe hostnames as a
 literal ending in `.example.pages.dev`. That is the placeholder the private
 sanitiser substitutes for the real Pages hostname, so the step probed a hostname
 Cloudflare answers with 404 and compared it against "expected 401/403" -- red on
@@ -43,7 +43,7 @@ except ImportError:  # pragma: no cover - direct execution of this file
 
 import archive_origin as ao  # noqa: E402
 
-STEP_NAME = "Digest archive is not publicly readable (origin auth canary)"
+STEP_NAME = "Digest archive is publicly reachable (origin public-access canary)"
 
 #: Synthetic, and deliberately not the real project: this file is published, so a
 #: real hostname here would be rewritten by the sanitiser and the assertion below
