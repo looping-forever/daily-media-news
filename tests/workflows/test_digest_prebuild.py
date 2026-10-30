@@ -1508,7 +1508,11 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
                 "INPUT_SLOT_DATE": slot_date,
             }, self.tmp, capture_stderr=True)
         printed = (text or "").strip()
-        date = printed.splitlines()[-1].strip() if printed else ""
+        # The date is the first thing the heredoc PRINTS; the NOTE a dateless
+        # dispatch emits goes to stderr and is read for its wording, never for
+        # the date (2026-10-30: reading the last line made the NOTE look like
+        # the date, which is how a wording change could have hidden a real one).
+        date = printed.splitlines()[0].strip() if printed else ""
         emitted = {"today": date} if (code == 0 and date) else {}
         return code, text, emitted
 
@@ -1628,15 +1632,21 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
             "the build's own day is not a source this branch may use.\n%s"
             % (emitted.get("today"), out))
 
-    def test_a_date_less_dispatch_is_refused_not_walked_back(self):
-        """THE COST OF A GUESS, AT THE INSTANT IT BITES.
+    def test_a_date_less_dispatch_is_nepal_today_not_walked_back(self):
+        """THE COST OF A WALK-BACK, AT THE INSTANT IT BITES.
 
         2026-10-11T02:10:00Z is 07:55 NPT on the 11th. NPT-today says the 11th;
         the named evening slot's most recent firing says the 10th; and a
         dispatch at 14:00 NPT on the 26th makes the same two answers disagree
-        the other way. There is no reading of "now" that is right for both, so
-        the step does not read the clock and does not walk back -- it refuses,
-        and the dispatcher has to say which day it means.
+        the other way.
+
+        CHANGED 2026-10-30 (run 41064520752). This used to assert a REFUSAL on
+        the argument that both answers are a guess, and that refusal made
+        `gh workflow run daily-news.yml` -- with its own defaults -- die in its
+        first step. The answer that is NOT a guess for a manual dispatch is
+        "now", i.e. today in Nepal; what must never come back is the walk-back
+        to a firing that has already passed (2026-10-10 here), which filed two
+        undated dispatches under the 25th.
         """
         body = step_named(HANDOFF_WORKFLOW, HANDOFF_JOB, DATE_STEP)["run"]
         code_only = "\n".join(line for line in body.splitlines()
@@ -1644,21 +1654,36 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
         self.assertNotIn("SLOT_CRON", code_only,
                          "the step is substituting a slot cron of its own again; "
                          "the slot times live in deploy/schedule.json and a "
-                         "dispatch that names no date must be refused, not dated "
+                         "dispatch that names no date is dated to TODAY, never "
                          "to a firing that has already happened.")
         code, out, emitted = self.resolve(
             "", "2026-10-11T02:10:00Z", event="workflow_dispatch",
             digest_time="evening")
-        self.assertNotEqual(0, code,
-                            "a date-less evening dispatch was accepted and filed "
-                            "under %r. Any day it could have picked is a guess: "
-                            "the 11th is NPT-today, the 10th is the named slot's "
-                            "last firing, and neither is what the dispatcher "
-                            "meant.\n%s" % (emitted.get("today"), out))
+        self.assertEqual(0, code,
+                         "a date-less evening dispatch still failed:\n" + out)
+        self.assertEqual(
+            "2026-10-11", emitted.get("today"),
+            "a date-less evening dispatch at 07:55 NPT was filed under %r "
+            "instead of today in Nepal (2026-10-11).\n%s"
+            % (emitted.get("today"), out))
         self.assertIn("no slot_date", out,
-                      "the run failed, but not for the reason this test is "
-                      "about -- it must say that no slot_date was named.\n%s"
-                      % out)
+                      "the run dated itself without saying which date it used "
+                      "and why.\n" + out)
+
+    def test_a_scheduled_run_never_reaches_the_nepal_today_default(self):
+        """The new default must be unreachable from a cron firing.
+
+        A schedule event with no answerable firing is still a fatal ambiguity:
+        the only date the clock could supply there is the build's own day, which
+        is defect #4 (run 38076000974).
+        """
+        code, out, emitted = self.resolve("", "2026-10-11T02:10:00Z",
+                                          event="schedule", digest_time="")
+        self.assertNotEqual(0, code,
+                            "a scheduled run with no usable firing was dated "
+                            "from the clock:\n" + out)
+        self.assertNotIn("today", emitted, "a refused date still emitted one: %r"
+                         % (emitted,))
 
     def test_a_malformed_slot_date_is_fatal(self):
         """Not a date STOPS the run; it never falls back to anything.
@@ -1679,22 +1704,26 @@ class SlotDateIsTheScheduledSlotTests(TempDirCase):
                                  "a failed slot_date still emitted a date: %r"
                                  % (emitted,))
 
-    def test_the_manual_branch_no_longer_reads_the_clock(self):
-        """The construction is DELETED, not merely bypassed.
+    def test_the_clock_is_read_only_for_a_dispatch_and_only_in_nepal(self):
+        """The SCOPE of the clock, not its absence.
 
-        `now_utc + datetime.timedelta(minutes=NPT_OFFSET_MINUTES)` was the
-        NPT-today the dispatch branch used to claim. Leaving it in the file
-        behind a branch would leave the defect reachable by the next edit, so
-        its absence is asserted rather than its behaviour.
+        CHANGED 2026-10-30 (run 41064520752). This used to assert that the
+        NPT-today construction had been DELETED, because it was how the dispatch
+        branch guessed a day. The refusal that replaced it then killed every
+        dateless manual dispatch in step one, so the construction is back --
+        for the dispatch arm only, in Nepal, and said out loud. A cron firing
+        must still never reach it.
         """
         body = self.date_body()
         self.assertIn("slot_date_from_input", body,
                       "the slot step has no slot_date handling at all, so no "
                       "dispatcher can name the slot it means")
-        self.assertNotIn(
-            "now_utc + datetime.timedelta(", body,
-            "the NPT-today construction is still in the slot step: a dispatch "
-            "would date itself off the build's own day")
+        self.assertIn("today_npt(clock)", body,
+                      "the dispatch arm no longer dates itself to today in "
+                      "Nepal, so `gh workflow run daily-news.yml` cannot run")
+        self.assertIn("elif event_name == 'workflow_dispatch':", body,
+                      "the Nepal-today default is not scoped to a manual "
+                      "dispatch, so a cron firing can reach it")
 
     def test_an_unusable_schedule_fails_closed_rather_than_using_the_clock(self):
         """The whole point of deriving the date from the firing is that there is

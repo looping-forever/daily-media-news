@@ -1229,5 +1229,130 @@ class MirrorStepShapeTests(unittest.TestCase):
         self.assertIn("12h", block)
 
 
+def run_commit_state_mirror(work, slot, today, artifact=None):
+    """Execute the commit step's mirror block in `work`. Returns (code, out).
+
+    `artifact` is the state/stories.validated.json payload, or None to model a
+    run whose witness file is not there at all.
+    """
+    (work / "state").mkdir(exist_ok=True)
+    (work / "state" / "digest_slot_ledger.json").write_text(
+        json.dumps(mirror_doc(as_of="2026-10-30T13:41:16Z", days={
+            today: {
+                "morning": entry(today, "morning"),
+                slot: entry(today, slot, sent_at="2026-10-30T13:41:16Z",
+                            story_count=15, source_health_state="ok"),
+            },
+        }), indent=2), encoding="utf-8")
+    if artifact is not None:
+        (work / "state" / "stories.validated.json").write_text(
+            json.dumps(artifact), encoding="utf-8")
+    out_file = work / "gh_output.txt"
+    out_file.write_text("", encoding="utf-8")
+    return exec_body(first_body(DAILY, COMMIT_STATE_STEP), {
+        "GITHUB_OUTPUT": str(out_file),
+        "SLOT": slot,
+        "TODAY": today,
+    }, work)
+
+
+def read_commit_entry(work, slot, today):
+    return json.loads((work / "state" / "digest_slot_ledger.json")
+                      .read_text(encoding="utf-8"))["days"][today][slot]
+
+
+class AnEmptyReadingCannotEraseADelivery(unittest.TestCase):
+    """Run 41064520752: a real 15-story evening send was rewritten as 0/unknown.
+
+    The cause was not the mirror writer's arithmetic, it was that the step
+    before it deleted the only witness to the build, so the writer read "gone"
+    and recorded it as "empty". Both halves are pinned here: the writer must
+    never make a record worse than it already is, and the witness must survive
+    until the writer has read it.
+    """
+
+    def test_a_missing_witness_leaves_a_populated_record_alone(self):
+        with tempfile.TemporaryDirectory(prefix="commit-state-") as tmp:
+            work = Path(tmp)
+            code, out = run_commit_state_mirror(work, "evening", "2026-10-30",
+                                                artifact=None)
+            self.assertEqual(0, code, out)
+            got = read_commit_entry(work, "evening", "2026-10-30")
+            self.assertEqual(15, got["story_count"],
+                             "a run with no witness zeroed a delivered slot:\n" + out)
+            self.assertEqual("ok", got["source_health_state"],
+                             "a run with no witness erased the known health state:"
+                             "\n" + out)
+            self.assertEqual("sent", got["state"])
+            self.assertEqual("2026-10-30T13:41:16Z", got["ntfy_sent_at"])
+            self.assertIn("no witness", out,
+                          "the writer changed nothing and did not say why:\n" + out)
+
+    def test_an_empty_witness_cannot_zero_a_delivered_slot(self):
+        """A readable-but-empty artifact is the clobbered artifact's shape."""
+        with tempfile.TemporaryDirectory(prefix="commit-state-") as tmp:
+            work = Path(tmp)
+            code, out = run_commit_state_mirror(
+                work, "evening", "2026-10-30",
+                artifact={"stories": [], "source_health": {}})
+            self.assertEqual(0, code, out)
+            got = read_commit_entry(work, "evening", "2026-10-30")
+            self.assertEqual(15, got["story_count"],
+                             "0 stories overwrote 15:\n" + out)
+            self.assertEqual("ok", got["source_health_state"],
+                             "`unknown` overwrote `ok`:\n" + out)
+
+    def test_a_real_witness_still_wins_over_the_previous_count(self):
+        """The anti-clobber rule must not become an anti-update rule."""
+        with tempfile.TemporaryDirectory(prefix="commit-state-") as tmp:
+            work = Path(tmp)
+            code, out = run_commit_state_mirror(
+                work, "evening", "2026-10-30",
+                artifact={"stories": [{"title": str(n)} for n in range(3)],
+                          "source_health": {"state": "degraded"}})
+            self.assertEqual(0, code, out)
+            got = read_commit_entry(work, "evening", "2026-10-30")
+            self.assertEqual(3, got["story_count"], out)
+            self.assertEqual("degraded", got["source_health_state"],
+                             "a real, worse reading must still be recorded:\n" + out)
+
+    def test_an_unreadable_witness_is_not_a_witness(self):
+        with tempfile.TemporaryDirectory(prefix="commit-state-") as tmp:
+            work = Path(tmp)
+            (work / "state").mkdir()
+            code, out = run_commit_state_mirror(work, "evening", "2026-10-30",
+                                                artifact=None)
+            self.assertEqual(0, code, out)
+            (work / "state" / "stories.validated.json").write_text(
+                "{not json", encoding="utf-8")
+            out_file = work / "gh_output.txt"
+            code, out = exec_body(first_body(DAILY, COMMIT_STATE_STEP), {
+                "GITHUB_OUTPUT": str(out_file),
+                "SLOT": "evening",
+                "TODAY": "2026-10-30",
+            }, work)
+            self.assertEqual(0, code, out)
+            got = read_commit_entry(work, "evening", "2026-10-30")
+            self.assertEqual(15, got["story_count"], out)
+            self.assertEqual("ok", got["source_health_state"], out)
+
+    def test_the_witness_survives_until_the_mirror_has_read_it(self):
+        """The ordering defect itself, asserted on the two steps that made it.
+
+        `Clean transient state files` deleted the artifact BEFORE `Commit state
+        changes` read it. A wording check cannot catch that coming back, so the
+        two paths are inspected directly.
+        """
+        clean = step_dict(DAILY, "Clean transient state files")["run"]
+        self.assertNotIn("state/stories.validated.json", clean,
+                         "the clean step deletes the mirror's only witness again")
+        run = step_dict(DAILY, COMMIT_STATE_STEP)["run"]
+        mirror_write = run.index("json.dump(mirror, fh")
+        witness_removal = run.index("rm -f state/stories.validated.json")
+        self.assertLess(mirror_write, witness_removal,
+                        "the witness is deleted before the mirror reads it")
+        self.assertNotIn("git add state/stories.validated.json", run)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -903,7 +903,8 @@ class SlotDateTests(TempCase):
             "with no date can be dated from a firing that has already happened "
             "instead of being refused.")
 
-    def _dispatch_through_shell(self, slot_date, digest_time="evening"):
+    def _dispatch_through_shell(self, slot_date, digest_time="evening",
+                                extra_env=None):
         """Run the WHOLE step the way a dispatch would, and read back its env."""
         out = self.tmp / "dispatch_env.txt"
         out.write_text("", encoding="utf-8")
@@ -913,6 +914,8 @@ class SlotDateTests(TempCase):
                "INPUT_TRIGGER_SOURCE": "worker", "INPUT_DRY_RUN": "",
                "INPUT_RETRY_SLOT": "", "INPUT_RETRY_OF": "", "INPUT_PHASE": "",
                "PATH": python3_on_path(self.tmp)}
+        if extra_env:
+            env.update(extra_env)
         if slot_date is not None:
             env["INPUT_SLOT_DATE"] = slot_date
         code, text = run_step_as_bash(
@@ -952,30 +955,32 @@ class SlotDateTests(TempCase):
             "workflow would build a digest for a day nobody named"
             % env.get("TODAY"))
 
-    def test_a_date_less_dispatch_is_refused_end_to_end(self):
-        """END TO END: no date supplied is FATAL, not a guess.
+    def test_a_date_less_dispatch_is_dated_to_today_in_nepal(self):
+        """END TO END: no date supplied means TODAY IN NEPAL, and it says so.
 
-        The clock cannot be pinned through bash, so the INSTANTS are pinned by
-        the heredoc tests above and this asserts the WIRING: a startup that
-        cannot name a date stops, and promotes no TODAY at all. The old shape of
-        this test asked for "the slot's own firing" -- and that fallback is
-        exactly what filed two undated dispatches under 2026-10-25.
+        CHANGED 2026-10-30 (run 41064520752). This used to assert a refusal, on
+        the argument that any day a date-less dispatch picks is a guess. That
+        argument was about picking a day in the PAST -- the 14:00 NPT dispatch on
+        the 26th that produced the 25th -- and the refusal it produced made the
+        documented manual entry point (`gh workflow run daily-news.yml` with its
+        own defaults) die in its first step. "Build this slot now" is not a
+        guess; it is today in Nepal, and the run now says which date it used.
+
+        The clock is injected so this is the same test at any hour: 18:20Z on
+        the 29th is 00:05 NPT on the 30th, so TODAY must be the 30th and not the
+        UTC date.
         """
-        code, text, env = self._dispatch_through_shell(None)
-        self.assertNotEqual(0, code,
-                            "a dispatch with no slot_date was accepted and "
-                            "produced TODAY=%r. Every day it could have picked "
-                            "is a guess about which slot the caller meant.\n%s"
-                            % (env.get("TODAY"), text))
+        code, text, env = self._dispatch_through_shell(
+            None, extra_env={"SLOT_DATE_NOW_UTC": "2026-10-29T18:20:00Z"})
+        self.assertEqual(0, code,
+                         "a date-less manual dispatch failed:\n" + text)
+        self.assertEqual(
+            "2026-10-30", env.get("TODAY"),
+            "a date-less dispatch was not dated to today in Asia/Kathmandu "
+            "(18:20Z on the 29th is 00:05 NPT on the 30th). env=%r\n%s"
+            % (env, text))
         self.assertIn("no slot_date", text,
-                      "the run failed, but not for the reason this test is "
-                      "about -- it must say that no slot_date was named.\n%s"
-                      % text)
-        self.assertNotIn(
-            "TODAY", env,
-            "a refused slot date still promoted TODAY=%r, so the rest of the "
-            "workflow would build a digest for a day nobody named"
-            % env.get("TODAY"))
+                      "the run dated itself without saying what it used.\n" + text)
 
     def test_the_schedule_comes_from_the_env_block_not_the_script_text(self):
         """The step must BIND `github.event.schedule` and read it from there.

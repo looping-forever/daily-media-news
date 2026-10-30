@@ -192,7 +192,7 @@ jobs:
           # digest-watchdog.yml's digest_due() already uses, and the same rule
           # digest-prebuild.yml's slot step uses for its own `today` output.
           #
-          # A DISPATCH MUST NAME ITS DATE; THERE IS NO DERIVED FALLBACK FOR IT.
+          # A DISPATCH MAY NAME ITS DATE. IF IT NAMES NONE, IT MEANS TODAY.
           # A cron only names the most recent instant it fired, so a dispatch
           # that carries no date can only ever be dated to a firing that has
           # ALREADY happened. At 14:00 NPT on the 26th the evening slot's most
@@ -208,9 +208,18 @@ jobs:
           # the wall clock and pushed it 19 hours before its slot. `slot_date`
           # travels with the dispatch, the Worker sends it on both digest
           # dispatches (deploy/cloudflare-worker.js dispatchDigest /
-          # dispatchPrebuild), and digest-watchdog.yml relays it on a retry. A
-          # caller that cannot say which day it means now FAILS rather than
-          # guessing a day in the past.
+          # dispatchPrebuild), and digest-watchdog.yml relays it on a retry.
+          #
+          # CHANGED 2026-10-30 (run 41064520752). Refusing an undated dispatch
+          # was written for the DISPATCHER, which always sends slot_date, and it
+          # made the documented manual entry point -- `gh workflow run
+          # daily-news.yml` with its own defaults -- die in its first step. A
+          # MANUAL dispatch means "build this slot now", so an undated one is
+          # dated to TODAY in Nepal (UTC+05:45): never to a past firing (how the
+          # 26th became the 25th) and never to the UTC date (how an evening
+          # dispatch at 00:01 NPT landed 19 hours early). An explicit slot_date
+          # still wins outright, and the scheduled path is untouched: it still
+          # derives its date from the firing that actually happened.
           #
           # THE SLOT TIMES LIVE IN ONE PLACE: deploy/schedule.json
           # (`dispatcher_crons.digest_slots`). This step keeps no private copy
@@ -302,28 +311,62 @@ jobs:
                                    % (text, exc))
 
 
+          def now_utc():
+              """The run's clock. SLOT_DATE_NOW_UTC pins it for the tests.
+
+              Production never sets it -- the same convention
+              digest-watchdog.yml already uses for WATCHDOG_NOW_UTC -- because a
+              test that reads this machine's clock cannot prove what happens
+              either side of Nepal midnight.
+              """
+              pinned = (os.environ.get('SLOT_DATE_NOW_UTC') or '').strip()
+              if pinned:
+                  return datetime.datetime.strptime(
+                      pinned, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=UTC)
+              return datetime.datetime.now(UTC)
+
+
+          def today_npt(now):
+              """The Nepal date the run is living on, for an undated dispatch."""
+              return (now + datetime.timedelta(
+                  minutes=NPT_OFFSET_MINUTES)).strftime('%Y-%m-%d')
+
+
           try:
               named = slot_date_from_input(os.environ.get('INPUT_SLOT_DATE'))
               # The arm that ACTUALLY FIRED. A workflow_dispatch has no
-              # `github.event.schedule`, so this is empty for one -- and an
-              # empty one is refused below rather than turned into a guess.
+              # `github.event.schedule`, so this is empty for one.
               schedule = (os.environ.get('EVENT_SCHEDULE') or '').strip()
+              event_name = (os.environ.get('EVENT_NAME') or '').strip()
+              clock = now_utc()
               if named is not None:
                   print(named)
-              elif not schedule:
-                  raise ValueError('this run names no slot_date and has no '
-                                   'scheduled firing to be dated from; a '
-                                   'dispatch must say which day its slot '
-                                   'belongs to')
+              elif schedule:
+                  print(firing_npt_date(schedule, clock))
+              elif event_name == 'workflow_dispatch':
+                  # A MANUAL DISPATCH WITH NO DATE = TODAY IN NEPAL, said out
+                  # loud. Never a past firing, never the UTC date.
+                  today = today_npt(clock)
+                  print(today)
+                  print('NOTE: no slot_date input; dating this manual dispatch to '
+                        '%s, today in Asia/Kathmandu. Pass slot_date to build any '
+                        'other day.' % today, file=sys.stderr)
               else:
-                  print(firing_npt_date(schedule, datetime.datetime.now(UTC)))
+                  # NOT a dispatch, and no firing to be dated from: the clock
+                  # is still not allowed to answer. This is the arm that keeps
+                  # the new default from reaching the scheduled path.
+                  raise ValueError(
+                      'this run is %r, not a manual dispatch, and carries no '
+                      'usable scheduled firing to be dated from'
+                      % (event_name or 'unknown'))
           except (KeyError, ValueError) as exc:
               print('FATAL: the slot date could not be established: %s. A named '
-                    'slot_date must be a real YYYY-MM-DD date; without one the '
-                    'slot is dated from its own scheduled firing. Refusing to '
-                    'walk back or to use the clock, which is how a dispatch at '
-                    '14:00 NPT on 2026-10-26 produced 2026-10-25, and how run '
-                    '38076000974 produced 2026-10-11-evening for the 10th '
+                    'slot_date must be a real YYYY-MM-DD date; without one a '
+                    'manual dispatch is dated to today in Asia/Kathmandu and a '
+                    'scheduled run to its own scheduled firing. Nothing is '
+                    'guessed: the failures this replaces are a dispatch at 14:00 '
+                    'NPT on 2026-10-26 that produced 2026-10-25, and run '
+                    '38076000974 that produced 2026-10-11-evening for the 10th '
                     'evening slot.' % exc,
                     file=sys.stderr)
               raise SystemExit(1)
@@ -5155,12 +5198,20 @@ jobs:
       - name: Clean transient state files
         if: env.FALLBACK_NOOP != 'true'
         # These were uploaded as artifacts above; they are removed here so the
-        # bot commit below never includes them (.gitignore is outside this
-        # change's scope). The bot commit stages history.json +
-        # digest-archive/ plus state/active_stories.json when it exists.
+        # bot commit below never includes them (all of them are in .gitignore,
+        # and the bot commit stages a fixed path list anyway).
+        #
+        # state/stories.validated.json IS DELIBERATELY NOT IN THIS LIST
+        # (2026-10-30, run 41064520752). It is the only witness to this run's
+        # own build -- how many stories it produced and what source_health
+        # said -- and the commit step below records those two facts into the
+        # delivery-ledger mirror. Deleting it here meant that step could only
+        # ever read "gone", which it then wrote as "0 stories / unknown",
+        # turning a real 15-story send into an empty record. It is removed
+        # immediately after the mirror is written, so nothing later sees it.
         run: |
           set -eo pipefail
-          rm -f state/stories.json state/stories.validated.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
+          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
 
       - name: Commit state changes
         # DRY_RUN guard: `git push` is an outward-facing side effect, so a dry
@@ -5215,6 +5266,14 @@ jobs:
           # IT DOES NOT DELETE ANYTHING EITHER. A day that ages out is the
           # mirror step's prune to make, against the same retention the Worker
           # applies; this block never removes a day.
+          # IT MAY NOT MAKE A RECORD WORSE THAN IT ALREADY IS. Two shape of
+          # damage, both seen at once in run 41064520752: the step above used to
+          # delete state/stories.validated.json before this block read it, so a
+          # real 15-story send was rewritten as `story_count: 0` with
+          # `source_health_state: "unknown"`. An empty reading is not evidence
+          # that the slot was empty -- it is evidence that the witness was gone.
+          # So: no witness, no write; a zero never overwrites a non-zero; and
+          # `unknown` never overwrites a state this file already knew.
           SLOT="$DIGEST_TIME" TODAY="$TODAY" python3 - <<'PY'
           import json, os
 
@@ -5222,20 +5281,18 @@ jobs:
           slot = os.environ['SLOT']
           today = os.environ['TODAY']
 
+          validated = {}
+          have_witness = False
           try:
               with open('state/stories.validated.json', encoding='utf-8') as fh:
                   validated = json.load(fh)
+              have_witness = isinstance(validated, dict)
           except (OSError, ValueError) as exc:
-              print('could not read stories.validated.json (%s) - the delivery '
-                    'ledger mirror keeps the build fields it already has' % exc)
+              print('::warning::could not read stories.validated.json (%s) - this '
+                    'run has no witness to its own build, so the delivery ledger '
+                    'mirror keeps the build fields it already has' % exc)
+          if not have_witness:
               validated = {}
-          if not isinstance(validated, dict):
-              validated = {}
-          stories = validated.get('stories')
-          count = len(stories) if isinstance(stories, list) else 0
-          health = validated.get('source_health')
-          health_state = (str(health.get('state') or '').strip().lower()
-                          if isinstance(health, dict) else 'unknown')
 
           if not os.path.isfile(MIRROR):
               print('%s does not exist yet; this run does not create it. The seal '
@@ -5261,17 +5318,54 @@ jobs:
               print('%s records no KV entry for %s %s; this run adds no build fields '
                     'to a slot it must not create' % (MIRROR, today, slot))
               raise SystemExit(0)
-          entry['built_at'] = entry.get('built_at') or str(
-              validated.get('generated_at_npt') or '')
-          entry['story_count'] = count
-          entry['source_health_state'] = health_state
+
+          previous_count = entry.get('story_count')
+          previous_health = str(entry.get('source_health_state') or '').strip().lower()
+
+          if not have_witness:
+              print('%s: build fields for %s %s left as they are (story_count=%r, '
+                    'source_health=%r) - this run produced no readable '
+                    'stories.validated.json' % (MIRROR, today, slot,
+                                                previous_count,
+                                                previous_health or 'unknown'))
+              raise SystemExit(0)
+
+          stories = validated.get('stories')
+          count = len(stories) if isinstance(stories, list) else 0
+          health = validated.get('source_health')
+          health_state = (str(health.get('state') or '').strip().lower()
+                          if isinstance(health, dict) else '')
+
+          if isinstance(previous_count, int) and previous_count > 0 and count == 0:
+              print('::warning::%s records %d stories for %s %s but this run can '
+                    'only see 0; keeping the %d it already had rather than '
+                    'erasing a delivery it did not witness'
+                    % (MIRROR, previous_count, today, slot, previous_count))
+          else:
+              entry['story_count'] = count
+              # built_at moves with the count it describes: a run whose build
+              # this record does not accept does not get to date it either.
+              entry['built_at'] = entry.get('built_at') or str(
+                  validated.get('generated_at_npt') or '')
+          if health_state in ('', 'unknown') and previous_health not in ('', 'unknown'):
+              print('::warning::%s records source_health_state=%r for %s %s but this '
+                    'run has no state to report; keeping %r'
+                    % (MIRROR, previous_health, today, slot, previous_health))
+          else:
+              entry['source_health_state'] = health_state or 'unknown'
+
           with open(MIRROR, 'w', encoding='utf-8') as fh:
               json.dump(mirror, fh, indent=2, ensure_ascii=False, sort_keys=True)
               fh.write('\n')
           print('delivery ledger mirror: build half refreshed for %s %s (%d stories, '
-                'source_health=%s); delivery half untouched' % (today, slot, count,
-                                                                health_state))
+                'source_health=%s); delivery half untouched'
+                % (today, slot, entry['story_count'],
+                   entry['source_health_state']))
           PY
+
+          # The witness is consumed: it is what this block just read, and it is
+          # gitignored, so it leaves the runner here rather than being staged.
+          rm -f state/stories.validated.json
 
           git add state/history.json state/digest-archive/ state/last_digest_sent.json docs/digests/ docs/index.html
           # The empty-digest retry ladder is committed BOTH ways on purpose:
