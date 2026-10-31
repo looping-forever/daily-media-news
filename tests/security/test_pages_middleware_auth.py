@@ -11,10 +11,13 @@ suppresses the native login dialog, and because this repository is public — ev
 digest page was already readable anonymously from GitHub, so the password
 protected nothing.
 
-The file still exists as a pass-through: wrangler discovers `./functions`
-relative to the directory the deploy command runs in, and the deploy contract is
-checked in. The behaviour under test is "an anonymous request reaches the static
-assets and no credential prompt is sent back".
+The file still exists because wrangler discovers `./functions` relative to the
+directory the deploy command runs in and the deploy contract is checked in. The
+behaviour under test is "an anonymous request reaches the static assets and no
+credential prompt is sent back", PLUS the one answer the middleware gives
+itself: a path under /digests/ that Pages would resolve to the archive index
+gets a real 404. Measured in production on 2026-10-31, a missing edition
+answered 200 with the index body, so a status-only monitor was false-green.
 
 WHY A PYTHON WRAPPER EXISTS AT ALL
 ---------------------------------
@@ -283,6 +286,27 @@ REQUIRED_BEHAVIOURS = (
      "the middleware is a pass-through, not merely a 200"),
     ("consecutive requests are all served",
      "consecutive requests all reach the asset"),
+    # The index-as-200 fallback, measured in production on 2026-10-31.
+    ("an unknown .html digest path is a real 404",
+     "an unknown .html digest path answers 404 with the slot page"),
+    ("an unknown extensionless digest path is a real 404",
+     "an unknown extensionless digest path answers 404 too"),
+    ("any unknown path under /digests/ is a real 404",
+     "any unknown path under /digests/ answers 404, including the bare prefix"),
+    ("an existing digest page is still served",
+     "an existing digest page is still served with 200"),
+    ("the archive index is still served",
+     "the archive index is still served with 200"),
+    ("the 308 to the extensionless form is preserved",
+     "the 308 from a .html page to its extensionless form is preserved"),
+    ("a 404 is never cached",
+     "a 404 is never cached"),
+    ("a HEAD on a missing edition is a 404",
+     "a HEAD on a missing edition is a 404 too"),
+    ("the index fingerprint is the real index <title>",
+     "the index fingerprint is the real archive index's own <title>"),
+    ("no digest page carries the index fingerprint",
+     "no committed digest page carries the index fingerprint"),
 )
 
 #: node's own TAP plan line; never counted from console lines.
@@ -354,7 +378,7 @@ class MiddlewareJsSuiteTests(unittest.TestCase):
             "the JS suite must honour the PAGES_MIDDLEWARE override, or nobody "
             "can re-run its red/green pair in one command")
 
-    def test_the_middleware_itself_is_the_shipped_pass_through(self):
+    def test_the_middleware_itself_is_the_shipped_function(self):
         self.assertTrue(
             MIDDLEWARE.is_file(),
             "%s is missing. The site still works without it, but the checked-in "
@@ -368,8 +392,12 @@ class MiddlewareJsSuiteTests(unittest.TestCase):
             "other export." % MIDDLEWARE)
         self.assertIn(
             "context.next()", text,
-            "%s does not call context.next(), so it is not the pass-through this "
-            "repository claims to deploy." % MIDDLEWARE)
+            "%s does not call context.next(), so it no longer serves the static "
+            "assets this repository claims to deploy." % MIDDLEWARE)
+        self.assertIn(
+            "status: 404", text,
+            "%s no longer answers anything with a 404, so a missing edition "
+            "would again be served as the index with HTTP 200." % MIDDLEWARE)
         for needle in ("WWW-Authenticate", "DIGEST_USERNAME", "DIGEST_PASSWORD"):
             self.assertNotIn(
                 needle, text,

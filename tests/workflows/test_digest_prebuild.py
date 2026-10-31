@@ -2844,6 +2844,29 @@ class SealStepExecutionTests(TempDirCase):
                             "it.\n%s" % out)
         self.assertIn("::error::", out)
 
+    def test_the_liveness_check_is_red_on_the_index_fallback_body(self):
+        """THE MEASURED PRODUCTION DEFECT (2026-10-31).
+
+        A path that does not exist answered HTTP 200 with the archive index, so
+        a status-only check reads a failed publish as a success. This step is
+        already body-checked, and this pins that: the index's own bytes must be
+        red, not just an obviously wrong page.
+        """
+        self._write_artifact()
+        index_html = (W.REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn(SECTION_HEADER_MARKUP, index_html,
+                         "docs/index.html carries the digest marker, so this test "
+                         "could not distinguish the fallback from a digest page")
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200", "STUB_CURL_BODY": index_html[:3000]})
+        self.assertNotEqual(0, code,
+                            "production served the archive index with HTTP 200 and "
+                            "the seal passed, so a missing edition would be "
+                            "sealed as published.\n%s" % out)
+        self.assertIn("::error::", out)
+
     def test_the_liveness_check_is_red_on_a_404(self):
         self._write_artifact()
         code, out = self.run_seal_step(

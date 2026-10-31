@@ -1670,10 +1670,11 @@ anonymous client get refused", the question is now "does an anonymous client get
    hostnames, with no Cloudflare Access gate in the redirect chain. `401`/`403`,
    a login page, a `404`, any other non-2xx, an unreachable host or a redirect
    loop all fail.
-4. `tests/security/pages_middleware_auth.test.js` (8 tests, run under
+4. `tests/security/pages_middleware_auth.test.js` (21 tests, run under
    `node --test`) and `tests/security/test_pages_middleware_auth.py` (10 tests)
-   pin the pass-through: no `WWW-Authenticate`, no `401`, no secret read, plus
-   the deploy-step and canary assertions above.
+   pin the pass-through and §38.10's 404 contract: no `WWW-Authenticate`, no
+   `401`, no secret read, no index-as-200 for a missing edition, plus the
+   deploy-step and canary assertions above.
 
 **What was retired.** `DIGEST_PASSWORD` and `DIGEST_USERNAME` are read by
 nothing. If either still exists as a Pages secret, delete it. The
@@ -1691,6 +1692,34 @@ applies to that page and to nothing else here.
 **Unverified at the time of writing.** The live origin was not probed while this
 change was made. The scheduled canary and the post-deploy check are what verify
 it; the owner also confirms the link opens in their browser.
+
+### 38.10 Fixed 2026-10-31 — an unknown digest path is a 404, not the index
+
+**The defect, measured.** `/digests/2026-10-31-evening.html` answered HTTP `200`
+with a 13,859-byte body byte-identical to `/` (sha1 `d6994886…`). Pages serves the
+archive index for any path that does not exist, so a status-only check could not
+tell a failed publish from a successful one — the class of failure the owner's
+quality bar forbids.
+
+**The fix.** `functions/_middleware.js` inspects a request under `/digests/` after
+`context.next()` and returns a small styled 404 ("No edition for this slot",
+`Cache-Control: no-store`) when the answer is the index fallback, recognised by the
+index's own `<title>`, which no rendered digest carries. A real digest page, the
+index, assets and the `308` from a `.html` form to its extensionless form are
+returned unchanged. `no-store` rather than a short max-age, deliberately: a cached
+404 would keep hiding a slot that publishes minutes later.
+
+**Why a body marker and not the status.** Pages distinguishes the fallback neither
+at the status line nor with a response header; the body is the only durable
+difference. `tests/security/pages_middleware_auth.test.js` pins the marker against
+the real `docs/index.html` and asserts no committed digest page carries it, so
+regenerating the index with a new `<title>` fails the suite instead of production.
+
+**Workflow checks audited.** `digest-prebuild.yml`'s "Verify the digest page is live
+before sealing" already requires HTTP 200 **and** `<h2 class="section-header">`, so
+the index body fails it. `daily-news.yml`'s post-deploy probe and
+`drift-canary.yml`'s public-access canary probe `/`, not a digest path. None relied
+on index-as-200 to mean "published".
 
 ## 39. Frozen worker liveness contract (dead-man's switch, 2026-10-02)
 
