@@ -3152,6 +3152,34 @@ jobs:
               # the surface a reader sees first, so the title says it in words.
               unsummarised = str(data.get('edition_kind') or '') == 'unsummarised'
 
+              # --- Why the edition is empty, in the payload's own words ---
+              # `empty_kind` is computed once by scripts/validate_stories.py and
+              # frozen into the payload. A zero-story edition caused by the
+              # VALIDATOR is a pipeline defect, and on 2026-10-30 the push said
+              # "Nothing cleared filtering" (and the glance said "a quiet news
+              # day, not a failure") while three real stories were discarded.
+              # Only a quiet day may claim that now.
+              #
+              # DUPLICATED ON PURPOSE, not imported: this heredoc is sliced out
+              # of the YAML and exec'd with no repo on sys.path (same reason as
+              # the NPT label table above), so an import would break the ntfy
+              # tests. scripts/empty_state.py is the source; the two copies are
+              # pinned against each other in tests/digest/test_empty_digest_recap.py.
+              EMPTY_DEFECT_TEXTS = {
+                  'broken': ('No story survived \u2014 the news sources '
+                             'returned nothing usable.'),
+                  'validator_rejected_all': ('No story survived validation '
+                                             '\u2014 every story produced was '
+                                             'rejected by the pipeline.'),
+              }
+              empty_kind = str(data.get('empty_kind') or '').strip()
+              empty_defect_text = ''
+              if empty_kind and empty_kind != 'quiet_day':
+                  empty_defect_text = EMPTY_DEFECT_TEXTS.get(
+                      empty_kind,
+                      'No story survived \u2014 the digest pipeline reported a '
+                      'failure.')
+
               # --- Weather verdicts (scripts/weather_advice.py) ---
               # The engine writes a top-level `weather_advice` list into
               # state/candidates.json; the validated payload may also carry
@@ -3787,18 +3815,25 @@ jobs:
                   head = '**%s**' % GLANCE_LABEL
                   if not subset:
                       # NOT a healthy-looking empty block. An empty category mix
-                      # reads as "nothing new", and an empty digest has two very
-                      # different causes, so this block separates them using the
-                      # same source_health that produced the banner above it.
-                      lines = ['- **0 stories** cleared filtering — nothing to '
-                               'read below.']
+                      # reads as "nothing new", and an empty digest has three
+                      # very different causes: a quiet day, an outage, or a
+                      # pipeline defect (every story rejected). A defect names
+                      # itself; otherwise this block separates the remaining two
+                      # using the same source_health that produced the banner
+                      # above it. "cleared filtering" is only true of a quiet
+                      # day, so a defect never borrows that sentence.
                       state = health_state(source_health)
-                      if state == 'ok':
-                          lines.append('- Sources answered — a quiet news day, '
-                                       'not a failure.')
+                      if empty_defect_text:
+                          lines = ['- **0 stories.** %s' % empty_defect_text]
                       else:
-                          lines.append('- Source health is **%s** — this may be '
-                                       'an outage, not a quiet day.' % state)
+                          lines = ['- **0 stories** cleared filtering — nothing '
+                                   'to read below.']
+                          if state == 'ok':
+                              lines.append('- Sources answered — a quiet news '
+                                           'day, not a failure.')
+                          else:
+                              lines.append('- Source health is **%s** — this may '
+                                           'be an outage, not a quiet day.' % state)
                       return '%s\n%s' % (head, '\n'.join(lines))
                   base = []
                   mix = glance_mix_line(subset)
@@ -4053,19 +4088,33 @@ jobs:
 
               if not ordered:
                   recap_when, recap_items = recap_rows(today)
-                  recap_tail = ('Nothing new cleared filtering for this slot '
-                                '- nothing above is new.')
-                  degraded_tail = ('**DEGRADED** - nothing new cleared '
-                                   'filtering for this slot, and there is no '
-                                   'recap material to fall back on. This is a '
-                                   'delivery failure notice, not a quiet news '
-                                   'day.')
+                  # The sentence a zero-story push used to say unconditionally.
+                  # Only a genuine quiet day may still say it: a defect kind
+                  # names the break instead (see EMPTY_DEFECT_TEXTS above).
+                  if empty_defect_text:
+                      recap_tail = empty_defect_text
+                      degraded_tail = ('**DEGRADED** - %s This is a delivery '
+                                       'failure notice, not a quiet news day.'
+                                       % empty_defect_text)
+                  else:
+                      recap_tail = ('Nothing new cleared filtering for this slot '
+                                    '- nothing above is new.')
+                      degraded_tail = ('**DEGRADED** - nothing new cleared '
+                                       'filtering for this slot, and there is no '
+                                       'recap material to fall back on. This is a '
+                                       'delivery failure notice, not a quiet news '
+                                       'day.')
                   recap_body = None
                   recap_lines = []
                   if recap_items:
-                      head = ('**RECAP \u2014 not new.** Nothing cleared '
-                              'filtering for this slot; these are the items '
-                              'already pushed %s.' % recap_when)
+                      if empty_defect_text:
+                          head = ('**RECAP \u2014 not new.** %s These are the '
+                                  'items already pushed %s.'
+                                  % (empty_defect_text, recap_when))
+                      else:
+                          head = ('**RECAP \u2014 not new.** Nothing cleared '
+                                  'filtering for this slot; these are the items '
+                                  'already pushed %s.' % recap_when)
                       recap_lines = ['- %s' % str(r.get('title') or '').strip()
                                      for r in recap_items]
                       while recap_lines:

@@ -58,6 +58,12 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import private_values as _pv
 
+try:
+    import empty_state
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import empty_state
+
 # Fixed section order: (category key, display header, accent color)
 # The two institution headers are runtime values (see private_values).
 SECTIONS = [
@@ -2135,7 +2141,13 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     # section_is_hidden exists to prevent, so the two conditions are now
     # separate: no stories, and nothing survived to render.
     if not stories and not sections_html:
-        sections_html = ('<div class="empty-state">No items cleared filtering today.</div>')
+        # The sentence is a function of `empty_kind`: a zero-story edition the
+        # validator caused must not claim that nothing cleared FILTERING, which
+        # is what it said on 2026-10-30 while three real stories were discarded.
+        empty_line = empty_state.empty_state_text(
+            (meta or {}).get("empty_kind"))
+        sections_html = ('<div class="empty-state">%s</div>'
+                         % html.escape(empty_line, quote=False))
 
     hero_html = render_hero(meta, digest_time, date_val, len(stories),
                             (meta or {}).get("source_health"),

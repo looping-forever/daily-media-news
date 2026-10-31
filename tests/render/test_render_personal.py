@@ -42,6 +42,7 @@ from fixtures import (  # noqa: E402
 from test_render_honesty import ntfy_source, run_ntfy  # noqa: E402
 
 import build_email  # noqa: E402
+import empty_state  # noqa: E402
 import render_digest  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -302,6 +303,55 @@ class TestYourDayCombinations(unittest.TestCase):
             self.assertIn(ZERO_STORY_LINE[name], blob,
                           "%s must still say that nothing cleared filtering, in "
                           "its own wording" % name)
+
+    # -- WHY it is empty -----------------------------------------------------
+    def test_a_defect_edition_names_the_break_on_all_three_renderers(self):
+        """A zero-story edition must not blame its filter for a pipeline break.
+
+        THE INCIDENT THIS PINS (2026-10-30): three real stories were produced
+        and `validate_stories.py` rejected all three on a `spoiler_reason`
+        schema check. Every renderer then said "No items cleared filtering
+        today." -- a calm day -- while the pipeline had eaten the news.
+        `empty_kind` is frozen into the payload precisely so that sentence can
+        be a function of the CAUSE, and scripts/empty_state.py is the one place
+        that decides it.
+        """
+        for kind in ("validator_rejected_all", "broken"):
+            expected = empty_state.DEFECT_TEXTS[kind]
+            payload = payload_of([], weather=[])
+            payload["empty_kind"] = kind
+            s = render_all_four(payload, candidates={"weather_advice": []})
+            for name, blob in s.all_four().items():
+                self.assertIn(expected, blob,
+                              "%s (%s) must name the pipeline defect"
+                              % (name, kind))
+                self.assertNotIn("No items cleared filtering today.", blob,
+                                 "%s (%s) still blames the filter for a defect"
+                                 % (name, kind))
+                self.assertNotIn("Nothing cleared filtering for this slot", blob,
+                                 "%s (%s) still claims a quiet slot" % (name, kind))
+                self.assertNotIn("Nothing new cleared filtering for this slot",
+                                 blob,
+                                 "%s (%s) still claims a quiet slot" % (name, kind))
+
+    def test_a_quiet_day_keeps_the_friendly_sentence(self):
+        payload = payload_of([], weather=[])
+        payload["empty_kind"] = "quiet_day"
+        s = render_all_four(payload, candidates={"weather_advice": []})
+        for name, blob in s.all_four().items():
+            self.assertNotIn("No story survived", blob,
+                             "%s must not report a defect on a quiet day" % name)
+        for name in ("website", "email_html", "email_text"):
+            self.assertIn("No items cleared filtering today.", s.all_four()[name],
+                          "%s must stay friendly on a genuinely quiet day" % name)
+        self.assertIn("cleared filtering for this slot", s.ntfy_message)
+
+    def test_an_unknown_kind_is_treated_as_a_defect_not_a_quiet_day(self):
+        """Failing towards "calm day" is the lie; fail towards "something broke"."""
+        self.assertEqual(empty_state.GENERIC_DEFECT_TEXT,
+                         empty_state.empty_state_text("pipeline_exploded"))
+        self.assertEqual(empty_state.QUIET_DAY_TEXT,
+                         empty_state.empty_state_text(None))
 
     def test_deadlines_outrank_weather_in_the_order(self):
         """Deadlines first, then the surviving for_you lines, then weather."""

@@ -47,7 +47,11 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "render"))
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "scripts"))
 from fixtures import WORKFLOW, write_json  # noqa: E402
+import empty_state  # noqa: E402
 
 MAX_BYTES = 4096
 
@@ -252,6 +256,62 @@ class TestZeroDigestRecap(unittest.TestCase):
             got, _ = run_ntfy(tmp, empty_payload(), history=hist(many))
         self.assertLessEqual(len(got["message"].encode("utf-8")), MAX_BYTES)
         self.assertIn("RECAP", got["title"])
+
+
+class TestZeroDigestNamesItsCause(unittest.TestCase):
+    """WHY the edition is empty is part of the message (2026-10-30).
+
+    THE INCIDENT. `validate_stories.py` rejected three REAL stories -- all on a
+    `spoiler_reason` schema check -- and the push said "nothing cleared
+    filtering", which is what it says on a slow news day. The owner read a calm
+    day where the pipeline had eaten the news.
+
+    The payload now carries `empty_kind`, frozen by the validator, and only a
+    `quiet_day` may still use the friendly sentence. `broken` and
+    `validator_rejected_all` name the break instead.
+
+    THE DUPLICATION THESE TESTS PIN. The publisher is a heredoc sliced out of
+    the YAML and exec'd with no repo on sys.path, so it CANNOT import
+    scripts/empty_state.py and carries its own copy of the sentences. Asserting
+    the heredoc's real output against `empty_state.DEFECT_TEXTS` is what stops
+    the two copies drifting apart silently.
+    """
+
+    def test_validator_rejected_says_the_pipeline_rejected_every_story(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            got, _ = run_ntfy(
+                tmp, empty_payload(empty_kind="validator_rejected_all"),
+                history=hist(TODAY_ROWS))
+        self.assertIn(empty_state.DEFECT_TEXTS["validator_rejected_all"],
+                      got["message"],
+                      "the push must name the pipeline break, not a filter")
+        self.assertNotIn("cleared filtering", got["message"],
+                         "nothing CLEARED filtering here -- everything was "
+                         "rejected after collection: %r" % got["message"])
+        self.assertIn("RECAP", got["title"])
+
+    def test_broken_names_the_outage_and_never_the_quiet_day_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            got, _ = run_ntfy(tmp, empty_payload(empty_kind="broken"),
+                              history=hist(TODAY_ROWS))
+        self.assertIn(empty_state.DEFECT_TEXTS["broken"], got["message"])
+        self.assertNotIn("cleared filtering", got["message"])
+        self.assertNotIn("quiet news day, not a failure", got["message"])
+
+    def test_quiet_day_still_says_nothing_cleared_filtering(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            got, _ = run_ntfy(tmp, empty_payload(empty_kind="quiet_day"),
+                              history=hist(TODAY_ROWS))
+        self.assertIn("Nothing cleared filtering for this slot", got["message"])
+        self.assertNotIn("No story survived", got["message"],
+                         "a genuinely quiet day must not read as a defect")
+
+    def test_a_payload_without_empty_kind_keeps_the_old_wording(self):
+        """Backwards compatibility: payloads written before `empty_kind`."""
+        with tempfile.TemporaryDirectory() as tmp:
+            got, _ = run_ntfy(tmp, empty_payload(), history=hist(TODAY_ROWS))
+        self.assertIn("Nothing cleared filtering for this slot", got["message"])
+        self.assertNotIn("No story survived", got["message"])
 
 
 if __name__ == "__main__":

@@ -68,7 +68,9 @@ jobs:
     # from MEASURED source production and never from the agent's opinion:
     # a quiet day is a priority-3 `::notice::` (nobody wants a 3am page for a
     # newsless Tuesday), and a BROKEN digest -- every source empty or dark --
-    # is an immediate priority-5 `::error::`.
+    # is an immediate priority-5 `::error::`. `validator_rejected_all` (stories
+    # were produced and then all rejected on their own fields) is the third
+    # hard kind and is also priority-5 from the first attempt.
     #
     # TRIGGER (2026-10-20): this job runs on the 04/16 crons, on a manual
     # dispatch, and on the Worker's ladder dispatch (ladder_only=true). The
@@ -239,6 +241,15 @@ jobs:
           # The frozen severity split. A quiet day is a notice; a broken
           # digest and the final attempt are errors that page the owner.
           #
+          # `validator_rejected_all` is an error from ATTEMPT 1: the agent did
+          # produce stories and validate_stories threw every one of them away
+          # on their own fields. That is a pipeline content defect, never a
+          # quiet news day, so it must not wait for the third attempt to become
+          # loud -- on 2026-10-30 three real stories were filed as `quiet_day`
+          # and nobody was told. The final-attempt branch below still wins when
+          # the ladder is about to exhaust, because "the fallback is firing"
+          # outranks "here is why" at that point.
+          #
           # The TITLES are unchanged and are pinned exactly by
           # tests/test_payload_io.py:1004/1019/1026, down to the priority.
           # What changes here is the BODY: it now leads with what the miss
@@ -261,6 +272,15 @@ jobs:
                       "firing now and will resend shortly; if nothing has arrived "
                       "by the next slot, the digest pipeline needs attention."
                       % (slot, max_attempts))
+          elif kind == 'validator_rejected_all':
+              title = 'Digest BROKEN: the stories were produced and then all rejected'
+              priority, note = 5, 'error'
+              lead = ("Today's %s digest is empty because the agent DID produce "
+                      "stories and the validator threw every one of them away on "
+                      "its own schema checks. The sources answered and the news was "
+                      "real, so this is a defect in the pipeline rather than a "
+                      "quiet news day or an outage. The retry ladder is armed and "
+                      "will try again (attempt %d of %d)." % (slot, attempt, max_attempts))
           elif attempt == 1:
               title = 'Digest: no stories (1/3) — sources were fine'
               priority, note = 3, 'notice'
@@ -300,7 +320,11 @@ jobs:
           _ledger = alert_dedupe.load()
           _key = alert_dedupe.condition_key('digest.broken', slot, date)
           _post = True
-          if kind == 'broken':
+          # Both hard kinds share ONE condition key on purpose: they are the
+          # same owner-facing fact (the digest is missing and the fallback is
+          # armed) and the recovery step below resolves exactly this key, so a
+          # second key would open an entry nothing ever closes.
+          if kind in ('broken', 'validator_rejected_all'):
               _decision = alert_dedupe.record(_ledger, _key, _now, lead)
               _post = bool(_decision['alert'])
               if _post:

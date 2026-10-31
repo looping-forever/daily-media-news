@@ -88,9 +88,22 @@ VALID_SPOILER_LEVELS = {"none", "low", "medium", "high"}
 VALID_DIGEST_TIMES = {"morning", "evening"}
 VALID_RESEARCH_STATUS = {"full", "limited"}
 
-REQUIRED_STR_FIELDS = [
-    "title", "summary", "source_name",
-    "spoiler_reason", "relevance_reason", "language",
+#: Fields the story CANNOT exist without. A story with no headline or no link
+#: is not a story, so these two (plus the structural fields checked below)
+#: remain fatal: dropping is the only honest answer for them.
+REQUIRED_STR_FIELDS = ["title"]
+
+#: Descriptive fields that are normalised, never a drop reason. This is the
+#: "one bad FIELD must not discard an otherwise valid story" rule, and it is
+#: the fix for run 41082443727: three usable, non-spoiler stories were thrown
+#: away because `spoiler_reason` was absent on stories that had nothing to
+#: spoil. `spoiler_reason` is only meaningful when `spoiler_level` is not
+#: "none" -- the prompt's own SPOILER RULES tie it to "the level" -- so an
+#: absent/null/non-string value becomes "" here and the story is kept. The
+#: same reasoning applies to every other free-text field in this list: none of
+#: them is read to place, rank or link the story.
+NORMALISED_STR_FIELDS = [
+    "summary", "source_name", "spoiler_reason", "relevance_reason", "language",
 ]
 OPTIONAL_NULLABLE_STR_FIELDS = ["published_at", "event_date", "location", "effective_date"]
 
@@ -634,8 +647,16 @@ def _is_str(v):
     return isinstance(v, str)
 
 
-def validate_story(story, index):
-    """Return (ok, reason). reason is None when ok."""
+def validate_story(story, index, normalised=None):
+    """Return (ok, reason). reason is None when ok.
+
+    `normalised` is an optional list the caller may pass; every descriptive
+    field this call repaired instead of dropping the story is appended to it.
+    The caller prints the count so a model that keeps omitting a field is still
+    visible in the run log -- tolerated is not the same as unnoticed.
+    """
+    repaired = normalised if normalised is not None else []
+
     def fail(why):
         return False, why
 
@@ -647,6 +668,20 @@ def validate_story(story, index):
             return fail("schema: missing required field '%s'" % field)
         if not _is_str(story[field]):
             return fail("schema: field '%s' must be a string" % field)
+        if not story[field].strip():
+            # An empty headline is a story with no story in it. There is
+            # nothing to repair and nothing to render.
+            return fail("schema: required field '%s' is blank" % field)
+
+    # Descriptive fields: repair, never drop. `spoiler_reason` is the one that
+    # cost three real stories on 2026-10-30, and it is optional in the
+    # CONTRACT for a story that spoils nothing (`spoiler_level: none`).
+    for field in NORMALISED_STR_FIELDS:
+        value = story.get(field)
+        if _is_str(value):
+            continue
+        story[field] = ""
+        repaired.append(field)
 
     priority = story.get("priority")
     if not isinstance(priority, int) or isinstance(priority, bool):
@@ -1217,6 +1252,14 @@ def crime_violation(text):
 #: exactly how an outage gets filed under "nothing to report".
 BROKEN_HEALTH_STATES = ("degraded", "empty", "unknown")
 
+#: Every empty kind the pipeline can emit. `validator_rejected_all` is the
+#: content defect: stories WERE produced and every one of them failed its own
+#: schema, so the model's output is at fault, not the sources and not the
+#: dedup. It used to be filed as `quiet_day`, which is how three usable,
+#: non-spoiler stories were discarded on 2026-10-30 and reported as a calm day.
+EMPTY_KIND_VALIDATOR_REJECTED_ALL = "validator_rejected_all"
+EMPTY_KINDS = ("quiet_day", "broken", EMPTY_KIND_VALIDATOR_REJECTED_ALL)
+
 
 def _count(value):
     """Best-effort int from a health counter; never raises."""
@@ -1331,20 +1374,34 @@ def collection_path_evidence(candidates, fresh_history, source_health):
 
 
 def derive_empty_outcome(raw, final, source_health, candidates=None,
-                         fresh_history=None):
+                         fresh_history=None, validator_dropped=None):
     """Return ``(stories_outcome, empty_kind, empty_evidence)``.
 
     ``stories_outcome`` is ``"produced"`` or ``"empty"``. ``empty_kind`` is
-    ``"quiet_day"``, ``"broken"`` or ``None`` (a produced digest has no kind).
-    ``empty_evidence`` is a short human-readable string naming the measurement
-    the decision was made from, so the retry ladder's alert can state WHICH
-    fact triggered it rather than repeating the conclusion.
+    ``"quiet_day"``, ``"broken"``, ``"validator_rejected_all"`` or ``None`` (a
+    produced digest has no kind). ``empty_evidence`` is a short human-readable
+    string naming the measurement the decision was made from, so the retry
+    ladder's alert can state WHICH fact triggered it rather than repeating the
+    conclusion.
+
+    ``validator_dropped`` is how many stories STAGE 2 (schema) threw away. It
+    is what separates "the model sent nothing usable" from "the model sent
+    usable stories and the keyword/dedup stages removed them": only the
+    caller knows, so the caller reports it. ``None`` means "not reported" and
+    falls back to the previously silent reading.
 
     The rows, in order:
       final > 0                                    -> produced, None
-      final == 0 and raw > 0                       -> quiet_day (the VALIDATOR
-                                                      dropped them: not a
+      final == 0 and raw > 0 and the validator
+        dropped every collected candidate          -> validator_rejected_all (the
+                                                      stories were produced and
+                                                      then discarded on their own
+                                                      fields: a content defect,
+                                                      not a quiet day and not a
                                                       source outage)
+      final == 0 and raw > 0 otherwise             -> quiet_day (a later stage
+                                                      filtered them: exclusion
+                                                      keywords or dedup)
       final == 0 and raw == 0 and the collection
         path delivered >= 1 usable candidate
         and no critical feed is empty              -> quiet_day (the pool was
@@ -1366,6 +1423,7 @@ def derive_empty_outcome(raw, final, source_health, candidates=None,
     """
     raw_n = len(raw) if isinstance(raw, (list, tuple)) else 0
     final_n = len(final) if isinstance(final, (list, tuple)) else 0
+    rejected_n = _count(validator_dropped)
     health = source_health if isinstance(source_health, dict) else {}
     state = str(health.get("state") or "").strip().lower() or "unknown"
     critical = health.get("critical")
@@ -1383,9 +1441,17 @@ def derive_empty_outcome(raw, final, source_health, candidates=None,
 
     if final_n > 0:
         return "produced", None, evidence
+    if raw_n > 0 and rejected_n >= raw_n:
+        # Every produced story was killed by its own fields. The sources and
+        # the dedup are not implicated at all, so reporting `quiet_day` hides
+        # a real content defect behind a calm label.
+        return "empty", EMPTY_KIND_VALIDATOR_REJECTED_ALL, (
+            evidence + " - the validator dropped all %d collected candidate(s): "
+            "a content defect, not a source outage" % rejected_n)
     if raw_n > 0:
-        return "empty", "quiet_day", (evidence + " - the validator dropped "
-                                      "every collected candidate")
+        return "empty", "quiet_day", (evidence + " - a later stage filtered "
+                                      "every validated story "
+                                      "(validator dropped %d)" % rejected_n)
     if collection["ok"] and not empty_hosts:
         # Collection WORKED. `degraded` says a critical host is dark, not that
         # nothing was fetched, and the pool in hand proves otherwise. Filing
@@ -1529,13 +1595,15 @@ def main(argv=None):
     reported_field = {"morning": "in_morning", "evening": "in_evening"}.get(digest_time)
 
     # -- Stage 2: schema validation ----------------------------------------
-    stage2_counts = {"kept": 0, "dropped": 0}
+    stage2_counts = {"kept": 0, "dropped": 0, "repaired": 0}
     valid_stories = []
     for idx, story in enumerate(raw_stories):
-        ok, reason = validate_story(story, idx)
+        repaired_fields = []
+        ok, reason = validate_story(story, idx, repaired_fields)
         if ok:
             valid_stories.append(story)
             stage2_counts["kept"] += 1
+            stage2_counts["repaired"] += len(repaired_fields)
         else:
             drop(story if isinstance(story, dict) else {}, reason)
             stage2_counts["dropped"] += 1
@@ -1754,7 +1822,8 @@ def main(argv=None):
 
     stories_outcome, empty_kind, empty_evidence = derive_empty_outcome(
         raw_stories, final_stories, source_health_block,
-        candidates=candidates_pool, fresh_history=fresh_history)
+        candidates=candidates_pool, fresh_history=fresh_history,
+        validator_dropped=stage2_counts["dropped"])
 
     payload = {
         "digest_time": digest_time,
@@ -1791,7 +1860,9 @@ def main(argv=None):
 
     # -- Summary ----------------------------------------------------------------
     print("validate_stories: %s" % args.in_path)
-    print("  schema:      %d kept, %d dropped" % (stage2_counts["kept"], stage2_counts["dropped"]))
+    print("  schema:      %d kept, %d dropped, %d field(s) normalised"
+          % (stage2_counts["kept"], stage2_counts["dropped"],
+             stage2_counts["repaired"]))
     print("  keywords:    %d dropped (excluded_keywords loaded: %d)" %
           (len(valid_stories) - len(after_keywords), len(excluded_keywords)))
     print("  promo-demote: %d demoted (foreign promo events capped at priority %d)" %

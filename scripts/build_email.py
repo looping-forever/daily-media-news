@@ -33,6 +33,12 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import private_values as _pv
 
+try:
+    import empty_state
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import empty_state
+
 # Fixed section order: (category key, display header, accent color)
 # The two institution headers are runtime values (see private_values).
 SECTIONS = [
@@ -1181,11 +1187,16 @@ def main(argv=None, schedule_path=None):
         # The personal layer SURVIVES an empty digest. `Your day` is never
         # empty, and a day with no surviving stories is exactly the day he
         # most needs to be told whether anything is due.
+        #
+        # The sentence is NOT fixed: a zero-story edition caused by the
+        # validator rejecting every story is a pipeline defect, and saying
+        # "cleared filtering" there would read as a calm day (2026-10-30).
+        empty_line = empty_state.empty_state_text(data.get("empty_kind"))
         empty_html = ('<div style="padding:16px 14px;font-size:14px;color:#6b7280;'
-                      'font-family:%s;text-align:center;">No items cleared filtering today.</div>'
-                      % FONT_STACK)
+                      'font-family:%s;text-align:center;">%s</div>'
+                      % (FONT_STACK, html.escape(empty_line, quote=False)))
         sections_html = personal_html + empty_html
-        sections_text = personal_text + "\n\nNo items cleared filtering today."
+        sections_text = personal_text + "\n\n" + empty_line
 
     notice_html_block = notice_html(source_health, notes)
     notice_text_block = notice_text(source_health, notes)

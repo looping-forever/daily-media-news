@@ -252,7 +252,8 @@ fine; zero is acceptable. Never pad to hit a number.
 
 For EVERY gaming/anime/manga_manhwa_manhua story set:
 - `spoiler_level`: none | low | medium | high
-- `spoiler_reason`: one short sentence justifying the level.
+- `spoiler_reason`: one short sentence justifying the level. When
+  `spoiler_level` is `none` it is `""` — an empty string, never an omitted key.
 
 HIGH includes: character deaths, major injuries, identity reveals,
 transformations/new powers, major betrayals/plot twists, endings, final-boss info,
@@ -424,7 +425,7 @@ Its entire content = valid JSON matching this exact shape:
       "location": "string or null",
       "reliability": "tier1|tier2|tier3|tier4",
       "spoiler_level": "none|low|medium|high",
-      "spoiler_reason": "string",
+      "spoiler_reason": "string, \"\" when spoiler_level is none",
       "relevance_reason": "string",
       "language": "source language code: en|ja|ko|zh|ne",
       "image": {"url": "string", "width": 1266, "height": 628, "type": "string", "source": "string"},  // optional, passthrough-only
@@ -436,6 +437,9 @@ Its entire content = valid JSON matching this exact shape:
 Contract rules:
 - Include ALL story fields on EVERY story; use null (or []) for unknown values.
   `supporting_sources` = [] when there are none.
+- `spoiler_reason` is NEVER omitted. A story that spoils nothing carries `""`;
+  writing it only for entertainment stories is what produced three discarded
+  stories on 2026-10-30.
 - Optional fields (include on every story; null when unknown):
   - `event_key` (string|null): stable slug identifying the REAL-WORLD EVENT,
     e.g. "tu-csit-exam-form-deadline-sep5", "one-piece-film-god-valley".
