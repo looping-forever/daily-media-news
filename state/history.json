@@ -1581,6 +1581,27 @@
       "title": "Your Photos Are Telling On You: A local tool to remove metadata",
       "category": "tech_career",
       "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/10/2048061/tourists-stranded-in-manang-after-snowfall",
+      "title_hash": "9e380e6feeb88d2e289f5413763fbb63ba928785",
+      "title": "Tourists Stranded in Manang Due to Heavy Snowfall",
+      "category": "local_city",
+      "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "polygon.com/final-fantasy-xiv-evercold-release-date-delayed",
+      "title_hash": "f638468ce513d1f0a69a19725f9d3060108da51c",
+      "title": "Final Fantasy XIV: Evercold Expansion Delayed",
+      "category": "gaming",
+      "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/politics/nc-cwc-meeting-set-for-sunday",
+      "title_hash": "58c2d941377940db7fe75317d56455888bc37b0c",
+      "title": "NC Central Working Committee Meeting Scheduled for Sunday",
+      "category": "nepal",
+      "date_sent": "2026-10-31"
     }
   ]
 }
