@@ -7426,6 +7426,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-31T07:03:25+05:45"
+    },
+    {
+      "event_id": "evt-9a2fdfe75be0",
+      "event_key": "justice-sector-parliament-dispute",
+      "canonical_title": "UPDATE: Disputes in the justice sector to be resolved through Parliament",
+      "category": "nepal",
+      "first_seen": "2026-10-31",
+      "last_seen": "2026-10-31",
+      "first_reported": "2026-10-31",
+      "last_reported": "2026-10-31",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/10/2048018/rsp-directs-parliamentary-parties-to-advance-the-process-of-resolving-disputes-in-the-justice-sector-through-parliament"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Rastriya Swatantra Party (RSP) secretariat meeting directed its parliamentary party to advance the process of resolving ongoing disputes in the justice sector through parliamentary procedures.",
+      "latest_development": "Confirmed: The Rastriya Swatantra Party (RSP) secretariat meeting directed its parliamentary party to advance the process of resolving ongoing disputes in the justice sector through parliamentary procedures.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-10-31",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-31T18:44:17+05:45"
+    },
+    {
+      "event_id": "evt-457eaafae9a4",
+      "event_key": "local-metadata-remover-tool",
+      "canonical_title": "Your Photos Are Telling On You: A local tool to remove metadata",
+      "category": "tech_career",
+      "first_seen": "2026-10-31",
+      "last_seen": "2026-10-31",
+      "first_reported": "2026-10-31",
+      "last_reported": "2026-10-31",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "dev.to/stackmasteraliza/your-photos-are-telling-on-you-i-built-a-metadata-remover-that-never-uploads-your-files-33kf"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: A developer built a tool for removing sensitive image metadata (GPS coordinates, capture time, etc.) locally without uploading files.",
+      "latest_development": "Reported: A developer built a tool for removing sensitive image metadata (GPS coordinates, capture time, etc.) locally without uploading files.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-10-31",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-10-31T18:44:17+05:45"
     }
   ],
   "archived": []
