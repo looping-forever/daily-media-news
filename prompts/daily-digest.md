@@ -402,7 +402,7 @@ Using your Write tool, create EXACTLY ONE file: `state/stories.json`.
 Its entire content = valid JSON matching this exact shape:
 
 {
-  "digest_time": "morning|evening",
+  "digest_time": "morning|evening — must equal the DIGEST_TIME env var verbatim (the slot this run was dispatched for, not the one you would pick)",
   "date": "YYYY-MM-DD — must equal the TODAY env var verbatim (the edition date, not the day you are running)",
   "research_status": "full|limited",
   "notes": "which domains failed / caveats; empty string if none",

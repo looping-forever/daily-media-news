@@ -1745,6 +1745,42 @@ jobs:
           END=$(date +%s)
           STAGE_KEY=derive STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
 
+      - name: Stamp the digest slot from DIGEST_TIME
+        if: env.FALLBACK_NOOP != 'true'
+        # NO MODEL IN THIS STEP. The slot belongs to the schedule that
+        # dispatched this run, not to the thing that wrote the payload: a
+        # writer that answered "morning" on an evening dispatch made
+        # mark_reported record in_morning, and the delivery dedupe then
+        # swallowed the whole edition as a duplicate of the morning one.
+        # Whatever the payload says, the dispatched slot wins from here on.
+        env:
+          DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+          slot = os.environ.get('DIGEST_TIME', '').strip().lower()
+          if slot not in ('morning', 'evening'):
+              sys.exit('FATAL: DIGEST_TIME is %r, which is neither morning nor evening -- '
+                       'this run has no slot, so no edition can be labelled' % slot)
+          path = 'state/stories.json'
+          if not os.path.isfile(path):
+              sys.exit('FATAL: %s is missing -- nothing to stamp the slot on' % path)
+          with open(path, encoding='utf-8') as fh:
+              payload = json.load(fh)
+          if not isinstance(payload, dict):
+              sys.exit('FATAL: %s is not a JSON object' % path)
+          written = payload.get('digest_time')
+          if written != slot:
+              print('Slot correction: the payload said %r, this run is %r' % (written, slot))
+          payload['digest_time'] = slot
+          with open(path + '.tmp', 'w', encoding='utf-8') as fh:
+              json.dump(payload, fh, indent=2, ensure_ascii=False)
+              fh.write('\n')
+          os.replace(path + '.tmp', path)
+          print('Digest slot stamped: %s' % slot)
+          PY
+
       - name: Validate stories
         if: env.FALLBACK_NOOP != 'true'
         run: |
