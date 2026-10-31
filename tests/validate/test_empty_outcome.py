@@ -23,9 +23,15 @@ directions are pinned, and both matter equally:
     must NOT be silenced by the fix)
 
 The other rows of the table are pinned too so the fix cannot quietly widen:
-validator-dropped stories stay `quiet_day`, a produced digest has no kind, and
-a critical feed that answered with nothing (`empty_hosts`) stays `broken` even
-when the pool is full.
+a produced digest has no kind, and a critical feed that answered with nothing
+(`empty_hosts`) stays `broken` even when the pool is full.
+
+THE THIRD KIND (2026-10-30). A run whose stories were all produced and then all
+rejected by the validator's own schema checks used to be `quiet_day`. It is now
+`validator_rejected_all`, an error, because the sources and the dedup are not
+implicated at all -- the pipeline threw real stories away. A run whose stories
+passed the schema and were then filtered by a keyword or the dedup is still a
+`quiet_day`: only the validator rejecting everything is a content defect.
 
 Offline and clock-free: every fixture is a literal, and `derive_empty_outcome`
 takes `source_health` as data rather than reading a clock. Stdlib unittest only.
@@ -140,12 +146,41 @@ class EmptyOutcomeClassification(unittest.TestCase):
         self.assertEqual((outcome, kind), ("empty", "broken"))
         self.assertIn("tu.edu.np", evidence)
 
-    def test_validator_dropped_stories_stay_quiet_day(self):
+    def test_validator_dropped_stories_are_a_content_defect_not_a_quiet_day(self):
+        """THE 2026-10-30 DEFECT, PINNED.
+
+        Three usable, non-spoiler stories were produced, every one was thrown
+        away on a `spoiler_reason` schema check, and the run was filed as
+        `quiet_day` -- a priority-3 notice nobody reads and no page. The new
+        kind is what makes that loud, so this test fails if it is ever folded
+        back into the quiet labels.
+        """
         outcome, kind, evidence = vs.derive_empty_outcome(
-            [{"title": "collected but filtered"}], [], TU_DOWN)
+            [{"title": "collected but rejected"}], [], TU_DOWN,
+            validator_dropped=1)
+
+        self.assertEqual((outcome, kind),
+                         ("empty", vs.EMPTY_KIND_VALIDATOR_REJECTED_ALL))
+        self.assertIn("content defect", evidence)
+        self.assertIn("not a source outage", evidence)
+
+    def test_stories_filtered_after_validation_stay_quiet_day(self):
+        """A keyword exclusion or dedup is NOT a content defect.
+
+        Only the validator rejecting every candidate is. A run whose stories
+        passed the schema and were then removed by the exclusion filter is
+        still an ordinary quiet day, so the new kind cannot be used to page
+        the owner for a keyword.
+        """
+        outcome, kind, evidence = vs.derive_empty_outcome(
+            [{"title": "collected, valid, excluded by keyword"}], [], TU_DOWN,
+            validator_dropped=0)
 
         self.assertEqual((outcome, kind), ("empty", "quiet_day"))
-        self.assertIn("the validator dropped", evidence)
+        self.assertIn("a later stage filtered", evidence)
+
+    def test_the_kind_is_reported_as_a_known_kind(self):
+        self.assertIn(vs.EMPTY_KIND_VALIDATOR_REJECTED_ALL, vs.EMPTY_KINDS)
 
     def test_produced_digest_has_no_kind(self):
         outcome, kind, _evidence = vs.derive_empty_outcome(
