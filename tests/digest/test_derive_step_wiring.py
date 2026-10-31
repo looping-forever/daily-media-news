@@ -106,7 +106,13 @@ class TheFallbackIsWiredTests(unittest.TestCase):
                 "false." % forbidden)
 
     def test_the_step_yields_to_a_digest_the_walk_did_write(self):
-        """A normal run must be unchanged, so the fallback decides from the FILE."""
+        """A normal run must be unchanged, so the fallback decides from the FILE.
+
+        Since 2026-10-31 it decides from the survivors IN that file, not from
+        it being non-empty; `tests/digest/test_derive_survivors_gate.py` owns
+        that half. Here: it still reads state/stories.json BEFORE the deriver
+        and still exits when the walk's work is usable.
+        """
         _index, sd = step_named(DERIVE_STEP)
         run = sd["run"]
         guard_at = run.find("state/stories.json")
@@ -120,8 +126,8 @@ class TheFallbackIsWiredTests(unittest.TestCase):
         self.assertIn("exit 0", run[guard_at:derive_at],
                       "the stories-exist branch does not exit before the "
                       "deriver runs")
-        self.assertRegex(run, r"HAVE=1|stories.{0,40}not used",
-                         "the step has no 'a digest already exists' branch")
+        self.assertIn('if [ "$SURVIVORS" != "0" ]', run,
+                      "the step has no 'usable digest already exists' branch")
 
     def test_the_step_defers_to_the_empty_outcome_path_with_no_candidates(self):
         _index, sd = step_named(DERIVE_STEP)

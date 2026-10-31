@@ -24,13 +24,24 @@ The rule this file pins, in both directions:
     wrong-typed `spoiler_reason`, `summary`, `source_name`, `relevance_reason`
     or `language` becomes "" and the story is KEPT. Nothing reads those fields
     to place, rank or link a story, so none of them can justify a drop.
+  * EVERY OTHER OPTIONAL FIELD is repaired the same way: a wrong-typed
+    `published_at`/`event_date`/`location`/`effective_date`, `event_key`,
+    `personal_relevance` or `deadline` becomes absent, and a bad
+    `supporting_sources` entry is deleted while the story survives. This is the
+    class of defect behind the incident: the same shape hid in seven more
+    fields, and each one was a single bad value away from emptying an edition.
   * STRUCTURAL fields stay FATAL. A story with no headline, a non-string
     headline, a blank headline or a non-http(s) `source_url` is not a story and
     is still dropped -- tolerating a bad field is not tolerating a bad story.
+    So do `category`, `priority`, `reliability` and `spoiler_level`, and so does
+    a `personal_relevance` outside 1-10: an out-of-range rank is a claim the
+    payload made and got wrong, not missing information. `tests/fixtures/
+    input_relevance_sort.json` depends on that drop.
 
 The repair is REPORTED, not silenced: the caller gets the field names back and
-the run summary prints how many were normalised, so a model that keeps omitting
-a field is visible in the log instead of invisible in the payload.
+the run summary prints how many were normalised and WHICH fields they were, so
+a model that keeps omitting a field is visible in the log instead of invisible
+in the payload.
 
 Offline and clock-free: literals and a temp directory only. Stdlib unittest.
 """
@@ -138,6 +149,147 @@ class DescriptiveFieldsAreRepairedTests(unittest.TestCase):
         self.assertEqual([], repaired)
 
 
+class EveryOptionalFieldIsRepairedTests(unittest.TestCase):
+    """The same rule generalised: no OPTIONAL field may cost a story.
+
+    On 2026-10-31 the model wrote three stories and every one of them was
+    thrown away again, this time by a field on this list. Repairing only the
+    field named in the last incident fixed the incident, not the class.
+    """
+
+    def test_wrong_typed_date_and_location_fields_are_repaired(self):
+        cases = (
+            ("published_at", 20261030),
+            ("event_date", ["2026-10-30"]),
+            ("location", {"city": "Kathmandu"}),
+            ("effective_date", 1),
+        )
+        for field, bad in cases:
+            with self.subTest(field=field):
+                s = story(**{field: bad})
+                repaired = []
+                ok, reason = vs.validate_story(s, 0, repaired)
+                self.assertTrue(ok, reason)
+                self.assertIsNone(s[field], field)
+                self.assertIn(field, repaired)
+
+    def test_wrong_typed_event_key_is_repaired(self):
+        s = story(event_key=["a", "b"])
+        repaired = []
+
+        ok, reason = vs.validate_story(s, 0, repaired)
+
+        self.assertTrue(ok, reason)
+        self.assertIsNone(s["event_key"])
+        self.assertIn("event_key", repaired)
+
+    def test_wrong_typed_supporting_sources_never_cost_the_story(self):
+        for bad in ("https://one.example.com/story", {"name": "A"}, 7):
+            with self.subTest(value=bad):
+                s = story(supporting_sources=bad)
+                repaired = []
+                ok, reason = vs.validate_story(s, 0, repaired)
+                self.assertTrue(ok, reason)
+                self.assertNotIn("supporting_sources", s)
+                self.assertIn("supporting_sources", repaired)
+
+    def test_a_malformed_supporting_source_entry_is_dropped_not_the_story(self):
+        s = story(supporting_sources=[
+            {"name": "Kathmandu Post", "url": "https://kathmandupost.example.com/a"},
+            {"name": "No URL"},
+            {"url": "https://noname.example.com/x"},
+            {"name": "FTP", "url": "ftp://files.example.com/y"},
+            "https://bare.example.com/z",
+            {"name": "Pokhara News", "url": "http://pokhara.example.com/b"},
+        ])
+        repaired = []
+
+        ok, reason = vs.validate_story(s, 0, repaired)
+
+        self.assertTrue(ok, reason)
+        self.assertEqual(
+            ["https://kathmandupost.example.com/a", "http://pokhara.example.com/b"],
+            [entry["url"] for entry in s["supporting_sources"]])
+        self.assertEqual(["supporting_sources"], repaired)
+
+    def test_wrong_typed_personal_relevance_is_repaired(self):
+        for bad in ("7", 7.5, True, "high"):
+            with self.subTest(value=bad):
+                s = story(personal_relevance=bad)
+                repaired = []
+                ok, reason = vs.validate_story(s, 0, repaired)
+                self.assertTrue(ok, reason)
+                self.assertIsNone(s["personal_relevance"])
+                self.assertIn("personal_relevance", repaired)
+
+    def test_an_out_of_range_personal_relevance_is_still_fatal(self):
+        """DELIBERATE, and pinned by tests/fixtures/input_relevance_sort.json."""
+        for bad in (0, 11, -3):
+            with self.subTest(value=bad):
+                ok, reason = vs.validate_story(story(personal_relevance=bad), 0)
+                self.assertFalse(ok)
+                self.assertIn("out of range 1-10", reason)
+
+    def test_a_malformed_deadline_never_costs_the_story(self):
+        for bad in (20261030, "30-10-2026", "2026-13-45", "soon", True):
+            with self.subTest(value=bad):
+                s = story(deadline=bad)
+                repaired = []
+                ok, reason = vs.validate_story(s, 0, repaired)
+                self.assertTrue(ok, reason)
+                self.assertIsNone(s["deadline"])
+                self.assertIn("deadline", repaired)
+
+    def test_a_valid_deadline_is_kept(self):
+        s = story(deadline="2026-11-15")
+        repaired = []
+
+        ok, reason = vs.validate_story(s, 0, repaired)
+
+        self.assertTrue(ok, reason)
+        self.assertEqual("2026-11-15", s["deadline"])
+        self.assertNotIn("deadline", repaired)
+
+    def test_every_repair_is_reported(self):
+        s = story(deadline=20261030, event_key=5, published_at=20261030,
+                  supporting_sources="https://one.example.com/story")
+        repaired = []
+
+        ok, reason = vs.validate_story(s, 0, repaired)
+
+        self.assertTrue(ok, reason)
+        self.assertEqual(["deadline", "event_key", "published_at",
+                          "supporting_sources"], sorted(repaired))
+
+
+class RequiredFieldsStayFatalTests(unittest.TestCase):
+    """Tolerance for a FIELD never became tolerance for a STORY."""
+
+    def test_a_wrong_typed_priority_is_still_dropped(self):
+        ok, reason = vs.validate_story(story(priority="5"), 0)
+
+        self.assertFalse(ok)
+        self.assertIn("priority", reason)
+
+    def test_an_unknown_category_is_still_dropped(self):
+        ok, reason = vs.validate_story(story(category="gossip"), 0)
+
+        self.assertFalse(ok)
+        self.assertIn("category", reason)
+
+    def test_an_unknown_reliability_is_still_dropped(self):
+        ok, reason = vs.validate_story(story(reliability="tier9"), 0)
+
+        self.assertFalse(ok)
+        self.assertIn("reliability", reason)
+
+    def test_an_unknown_spoiler_level_is_still_dropped(self):
+        ok, reason = vs.validate_story(story(spoiler_level="extreme"), 0)
+
+        self.assertFalse(ok)
+        self.assertIn("spoiler_level", reason)
+
+
 class StructuralFieldsStayFatalTests(unittest.TestCase):
     """The other half of the rule: tolerance for a field, never for a story."""
 
@@ -237,6 +389,35 @@ class TheIncidentRunTests(unittest.TestCase):
                       "the repair happened silently, so a model that keeps "
                       "omitting the field would never show up in the log")
         self.assertIn("3 kept, 0 dropped", output)
+
+    def test_the_summary_names_what_was_repaired(self):
+        stories = self._incident_stories()
+        for s in stories:
+            s.pop("spoiler_reason")
+
+        _rc, _payload, output = self._run(stories)
+
+        self.assertIn("(spoiler_reason)", output,
+                      "the summary counts the repairs but never names the "
+                      "field, so the next incident is invisible again")
+
+    def test_the_summary_separates_raw_from_candidates_and_survivors(self):
+        """THE MISREADING THIS LINE EXISTS TO PREVENT.
+
+        Both empty editions were read as "the collector found nothing" (or as
+        "a quiet day") while the log actually said three model-written stories
+        had been dropped. `candidates`, `raw` and `schema-survivors` must be
+        three separate numbers on one line, or the next reader repeats it.
+        """
+        stories = self._incident_stories()
+        for s in stories:
+            s.pop("spoiler_reason")
+
+        _rc, _payload, output = self._run(stories)
+
+        self.assertIn(
+            "provenance:  candidates=0 raw=3 (model-written stories) "
+            "schema-survivors=3 final=3", output)
 
     def test_a_story_with_nothing_to_render_is_still_dropped(self):
         """Tolerance did not become 'anything goes'."""

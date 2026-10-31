@@ -1720,13 +1720,53 @@ jobs:
           DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
         run: |
           set -eo pipefail
-          HAVE=0
-          if [ -f state/stories.json ] && python3 -c "import json,sys; d=json.load(open('state/stories.json')); sys.exit(0 if isinstance(d.get('stories'), list) and d['stories'] else 1)" 2>/dev/null; then
-            HAVE=1
+          # SURVIVORS, NOT "THE FILE EXISTS". On 2026-10-30 and again on
+          # 2026-10-31 the model wrote three stories, the schema dropped all
+          # three, and this step still saw a non-empty state/stories.json and
+          # skipped the fallback -- so the owner got an empty edition and the
+          # seal was skipped. The decision is the number of stories that
+          # SURVIVE schema validation, counted with the same validator the
+          # "Validate stories" step runs.
+          python3 - <<'PY' > state/digest_survivors.txt || echo "0 0" > state/digest_survivors.txt
+          import json
+          import os
+          import sys
+          sys.path.insert(0, 'scripts')
+          raw = survivors = 0
+          try:
+              import validate_stories as vs
+          except Exception as exc:
+              print('::warning::the validator could not be imported (%s); treating the model-written digest as unusable' % exc, file=sys.stderr)
+              vs = None
+          if vs is not None and os.path.isfile('state/stories.json'):
+              try:
+                  with open('state/stories.json', encoding='utf-8') as fh:
+                      payload = json.load(fh)
+                  stories = payload.get('stories') if isinstance(payload, dict) else payload
+                  if isinstance(stories, list):
+                      raw = len(stories)
+                      survivors = sum(1 for i, s in enumerate(stories)
+                                      if vs.validate_story(s, i)[0])
+              except Exception as exc:
+                  print('::warning::state/stories.json could not be read (%s); treating the model-written digest as unusable' % exc, file=sys.stderr)
+          print('%d %d' % (raw, survivors))
+          PY
+          read RAW SURVIVORS < state/digest_survivors.txt
+          CANDIDATES=0
+          if [ -s state/candidates.json ]; then
+            CANDIDATES=$(python3 -c "import json;d=json.load(open('state/candidates.json'));print(len(d.get('candidates') or []))" 2>/dev/null || echo 0)
           fi
-          if [ "$HAVE" = "1" ]; then
-            echo "A model-written digest exists; the unsummarised fallback is not used."
+          # ONE LINE, THREE COUNTS: `candidates` is the collector's pool, `raw`
+          # is the MODEL's own story count, and `schema-survivors` is what got
+          # past validation. Naming all three is what stops raw=3 being read as
+          # a collection failure, which is how both empty editions were misread.
+          echo "Digest provenance: candidates=${CANDIDATES} raw=${RAW} (model-written stories) schema-survivors=${SURVIVORS}"
+          if [ "$SURVIVORS" != "0" ]; then
+            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation); the unsummarised fallback is not used."
             exit 0
+          fi
+          if [ "$RAW" != "0" ]; then
+            echo "::warning::All ${RAW} model-written stories were rejected by schema validation -- the empty edition is not shipped; deriving the unsummarised edition instead."
           fi
           if [ ! -s state/candidates.json ]; then
             echo "::warning::No collected candidates to derive from -- the empty-outcome path owns this run."
@@ -1734,7 +1774,7 @@ jobs:
           fi
           # Below the floor the deriver writes NOTHING and exits 0 on purpose:
           # the existing empty-digest classification is the owner of that case.
-          echo "::warning::No digest from the model walk -- deriving the unsummarised edition from the collected candidates (no AI)."
+          echo "::warning::No usable digest from the model walk -- deriving the unsummarised edition from the collected candidates (no AI)."
           echo "### Unsummarised edition (no AI today)" >> "$GITHUB_STEP_SUMMARY"
           START=$(date +%s)
           python3 scripts/derive_unsummarised.py \

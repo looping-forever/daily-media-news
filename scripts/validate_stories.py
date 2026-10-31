@@ -105,6 +105,9 @@ REQUIRED_STR_FIELDS = ["title"]
 NORMALISED_STR_FIELDS = [
     "summary", "source_name", "spoiler_reason", "relevance_reason", "language",
 ]
+#: Optional date/location fields. Absent and null were always allowed; a value
+#: of the WRONG TYPE is repaired to absent here instead of dropping the story,
+#: because the field is optional -- the same class as `spoiler_reason` above.
 OPTIONAL_NULLABLE_STR_FIELDS = ["published_at", "event_date", "location", "effective_date"]
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -705,44 +708,57 @@ def validate_story(story, index, normalised=None):
     if spoiler_level not in VALID_SPOILER_LEVELS:
         return fail("schema: invalid spoiler_level %r" % (spoiler_level,))
 
+    # EVERY OPTIONAL FIELD FROM HERE DOWN IS REPAIRED, NEVER A DROP REASON.
+    # A wrong-typed optional value is missing information, not a bad story --
+    # and this exact shape emptied an edition on 2026-10-30. Required fields
+    # above stay fatal: a story whose title, link, category, priority,
+    # reliability or spoiler level is unusable cannot be placed at all.
     supporting = story.get("supporting_sources")
     if supporting is not None:
         if not isinstance(supporting, list):
-            return fail("schema: supporting_sources must be a list")
-        for i, s in enumerate(supporting):
-            if not isinstance(s, dict):
-                return fail("schema: supporting_sources[%d] is not an object" % i)
-            name, url = s.get("name"), s.get("url")
-            if not _is_str(name) or not _is_str(url):
-                return fail("schema: supporting_sources[%d] needs string name+url" % i)
-            if not re.match(r"^https?://", url.strip(), re.IGNORECASE):
-                return fail("schema: supporting_sources[%d].url must start with http(s)://" % i)
+            story.pop("supporting_sources", None)
+            repaired.append("supporting_sources")
+            supporting = None
+        else:
+            kept = [s for s in supporting
+                    if isinstance(s, dict) and _is_str(s.get("name"))
+                    and _is_str(s.get("url"))
+                    and re.match(r"^https?://", s["url"].strip(), re.IGNORECASE)]
+            if len(kept) != len(supporting):
+                story["supporting_sources"] = kept
+                repaired.append("supporting_sources")
 
     for field in OPTIONAL_NULLABLE_STR_FIELDS:
         v = story.get(field)
         if v is not None and not _is_str(v):
-            return fail("schema: field '%s' must be a string or null" % field)
+            story[field] = None
+            repaired.append(field)
 
     # New optional event-tracking fields (all null-tolerant).
     event_key = story.get("event_key")
     if event_key is not None and not _is_str(event_key):
-        return fail("schema: field 'event_key' must be a string or null")
+        story["event_key"] = None
+        repaired.append("event_key")
 
     personal_relevance = story.get("personal_relevance")
     if personal_relevance is not None:
         if not isinstance(personal_relevance, int) or isinstance(personal_relevance, bool):
-            return fail("schema: personal_relevance must be an integer")
-        if not (1 <= personal_relevance <= 10):
+            story["personal_relevance"] = None
+            repaired.append("personal_relevance")
+        elif not (1 <= personal_relevance <= 10):
             return fail("schema: personal_relevance %r out of range 1-10" % (personal_relevance,))
 
     deadline = story.get("deadline")
     if deadline is not None:
         if not _is_str(deadline) or not DATE_RE.match(deadline.strip()):
-            return fail("schema: field 'deadline' must match YYYY-MM-DD or be null")
-        try:
-            datetime.strptime(deadline.strip(), "%Y-%m-%d")
-        except ValueError:
-            return fail("schema: field 'deadline' is not a valid calendar date")
+            story["deadline"] = None
+            repaired.append("deadline")
+        else:
+            try:
+                datetime.strptime(deadline.strip(), "%Y-%m-%d")
+            except ValueError:
+                story["deadline"] = None
+                repaired.append("deadline")
 
     # Label normalization is a schema-boundary concern, not a renderer one:
     # internal priority chips never belong in user-facing markup.
@@ -1596,6 +1612,7 @@ def main(argv=None):
 
     # -- Stage 2: schema validation ----------------------------------------
     stage2_counts = {"kept": 0, "dropped": 0, "repaired": 0}
+    repaired_names = set()
     valid_stories = []
     for idx, story in enumerate(raw_stories):
         repaired_fields = []
@@ -1604,6 +1621,7 @@ def main(argv=None):
             valid_stories.append(story)
             stage2_counts["kept"] += 1
             stage2_counts["repaired"] += len(repaired_fields)
+            repaired_names.update(repaired_fields)
         else:
             drop(story if isinstance(story, dict) else {}, reason)
             stage2_counts["dropped"] += 1
@@ -1860,9 +1878,19 @@ def main(argv=None):
 
     # -- Summary ----------------------------------------------------------------
     print("validate_stories: %s" % args.in_path)
-    print("  schema:      %d kept, %d dropped, %d field(s) normalised"
+    # ONE LINE, THREE DIFFERENT COUNTS, because they were confused on both
+    # 2026-10-30 and 2026-10-31: `raw` is the MODEL's own story count, never
+    # the collector's candidate count, and the survivors are what survived the
+    # schema. An edition was called a quiet day while all three of the model's
+    # stories were being dropped here.
+    print("  provenance:  candidates=%d raw=%d (model-written stories) "
+          "schema-survivors=%d final=%d"
+          % (len(candidates_pool) if isinstance(candidates_pool, list) else 0,
+             len(raw_stories), stage2_counts["kept"], len(final_stories)))
+    print("  schema:      %d kept, %d dropped, %d field(s) normalised%s"
           % (stage2_counts["kept"], stage2_counts["dropped"],
-             stage2_counts["repaired"]))
+             stage2_counts["repaired"],
+             (" (%s)" % ", ".join(sorted(repaired_names))) if repaired_names else ""))
     print("  keywords:    %d dropped (excluded_keywords loaded: %d)" %
           (len(valid_stories) - len(after_keywords), len(excluded_keywords)))
     print("  promo-demote: %d demoted (foreign promo events capped at priority %d)" %
