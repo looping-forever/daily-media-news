@@ -399,15 +399,17 @@ jobs:
         # `continue-on-error: true`. This comment, that table entry and Check 7
         # are one decision in three places.
         #
-        # TWO HOSTNAMES ON PURPOSE, AND NEITHER ARM IS DROPPED. The production
-        # hostname and `<branch>.<project>.pages.dev` are two public names for
-        # the same Pages project. Checking only the first would leave the second
-        # as an unmonitored way in — and that second arm is the one most likely
-        # to be behind a Cloudflare Access application, which is now a FAILURE
-        # rather than a pass: an anonymous client that lands on a login page has
-        # not been given the archive it was promised.
+        # ONE HOSTNAME, AND IT IS THE PRODUCTION ONE. Pages also serves the same
+        # project from `<branch>.<project>.pages.dev`, but that name is behind a
+        # Cloudflare Access application, so every probe of it ended on a login
+        # page -- a permanent red that said nothing about the archive. The
+        # production name is the one the digest email links to. The branch alias
+        # is therefore no longer probed; nothing else about this check changed,
+        # and an Access gate on the production name is still a FAILURE, not a
+        # pass: an anonymous client that lands on a login page has not been
+        # given the archive it was promised.
         #
-        # Both names are derived by `scripts/archive_origin.py` from
+        # The hostname is derived by `scripts/archive_origin.py` from
         # `CF_ARCHIVE_ORIGIN` (see `env:` below) rather than written here: this
         # file is published, and the sanitiser that keeps the real hostname out
         # of it is what once turned a working probe into a 404.
@@ -428,7 +430,27 @@ jobs:
           # here with an `::error::` line and exit 2, and `pipefail` turns that
           # into a red step before any probe runs. A 404 from a hostname nobody
           # configured is not a verdict about this archive.
-          HOSTS="$(python3 scripts/archive_origin.py --hosts)"
+          #
+          # PRODUCTION HOSTNAME ONLY. The resolver also prints
+          # `<branch>.<project>.pages.dev`, and that name sits behind the wildcard
+          # Cloudflare Access application, so it answers 302 to a login page on
+          # every run. Probing it measured a gate that is known and deliberate,
+          # never the archive, and turned this canary red 6 runs out of 6 -- the
+          # false red that teaches the reader to ignore it. The production
+          # hostname is the one the digest email links to and readers actually
+          # open, so that is the single target now. Every assertion below is
+          # unchanged: an Access gate, a 401/403, a non-2xx or a page without the
+          # archive markers is still a hard failure.
+          HOSTS="$(python3 scripts/archive_origin.py --hosts | grep -v '^master\.' || true)"
+          # A filter that removed everything would let the loop below run over
+          # zero hosts and report success without probing anything. `|| true`
+          # above is what lets this guard SPEAK instead of dying silently at the
+          # assignment; the resolver's own `::error::` still prints, and either
+          # way the step is red.
+          if [ -z "$HOSTS" ]; then
+            echo "::error::the production archive hostname did not resolve, so nothing was probed and no verdict can be given."
+            exit 2
+          fi
           # Markers that appear in this archive's OWN html and nowhere else.
           # `Personal News Informer` is the <title>/<h1> of the index AND of
           # every digest page (scripts/render_digest.py), so it catches a wrong

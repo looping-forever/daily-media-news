@@ -213,5 +213,65 @@ class WorkflowWiringTests(unittest.TestCase):
                       "resolver's exit code and the loop would run over nothing")
 
 
+class ProductionHostOnlyTests(unittest.TestCase):
+    """The canary must probe the PRODUCTION hostname, not the branch alias.
+
+    Pages serves the same project from `<project>.pages.dev` and
+    `<branch>.<project>.pages.dev`. The branch alias sits behind the wildcard
+    Cloudflare Access application, so it answers 302 to a login page and the
+    step went red 6 runs out of 6 while the production hostname -- the one the
+    digest email links to -- was healthy. The branch alias is dropped as a probe
+    target; the Access-gate assertion is NOT weakened, it just now applies to the
+    hostname readers actually use.
+    """
+
+    FILTER = "grep -v '^master\\.'"
+
+    def _run(self):
+        found = [(job, step) for job, name, step in W.iter_all_steps("drift-canary.yml")
+                 if name == STEP_NAME]
+        self.assertEqual(1, len(found),
+                         "expected exactly one %r step in drift-canary.yml" % STEP_NAME)
+        return found[0][1].get("run") or ""
+
+    def test_the_step_filters_out_the_master_branch_alias(self):
+        run = self._run()
+        self.assertIn(self.FILTER, run,
+                      "the canary no longer filters out `<branch>.<project>.pages.dev`, "
+                      "so it probes the Access-gated alias again and goes red for a "
+                      "gate that is deliberate rather than a broken archive")
+        self.assertNotIn('HOSTS="$(python3 scripts/archive_origin.py --hosts)"', run,
+                         "the canary probes every resolved hostname again, including "
+                         "the Access-gated `master.` alias")
+
+    def test_the_filter_leaves_the_production_hostname_and_drops_the_alias(self):
+        """Behavioural, against the resolver's REAL host pair for a fixture origin."""
+        hosts = ao.probe_hosts(FIXTURE_ORIGIN)
+        self.assertEqual((FIXTURE_HOST, "master." + FIXTURE_HOST), hosts)
+        bash = W.bash_executable()
+        self.assertIsNotNone(
+            bash, "bash is required to exercise the canary's host filter; this "
+                  "suite does not skip quietly because a skipped check here is "
+                  "the false-red defect itself")
+        script = ("set -euo pipefail\n"
+                  "HOSTS=\"$(printf '%%s\\n' %s | %s)\"\n"
+                  "printf '%%s\\n' \"$HOSTS\"\n" % (" ".join(hosts), self.FILTER))
+        result = W.run_bash_script(script, bash=bash)
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertEqual([FIXTURE_HOST], result.stdout.split(),
+                         "the probe list after filtering must be the production "
+                         "hostname only; anything else means the canary is still "
+                         "measuring the Access-gated branch alias")
+
+    def test_a_filter_that_empties_the_list_is_refused_rather_than_reported_green(self):
+        """Zero probes must be an error, never a silent pass."""
+        run = self._run()
+        self.assertIn('if [ -z "$HOSTS" ]', run,
+                      "nothing guards an empty host list, so a filter that removes "
+                      "every hostname would loop over nothing and exit 0 -- a "
+                      "canary that measures nothing and reports success")
+        self.assertIn("exit 2", run)
+
+
 if __name__ == "__main__":
     unittest.main()

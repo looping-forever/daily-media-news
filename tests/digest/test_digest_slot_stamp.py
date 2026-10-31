@@ -200,5 +200,143 @@ class TheStampRefusesRatherThanGuessesTests(unittest.TestCase):
         self.assertIn("state/stories.json", result.stderr + result.stdout)
 
 
+# ---------------------------------------------------------------------------
+# THE CLASS, NOT THE INSTANCE.
+#
+# The stamp above is one step in one workflow, and that is exactly the shape
+# that fails: on 2026-10-31 the seal refused an evening artifact because the
+# payload it carried said `digest_time="morning"`. A guard that exists at one
+# producing site is not a guard of the class -- the next workflow that writes
+# the payload would silently bypass it. These tests DISCOVER the producers from
+# the workflow directory instead of naming them, so a new producer that forgets
+# the stamp fails here rather than at the seal, hours later, with a slot that has
+# already been spent.
+#
+# The directory is read, not `tests.workflows.WORKFLOW_NAMES`: that tuple is
+# hardcoded, so a workflow nobody registers is one every check over it silently
+# skips. Discovery is done on the RAW text (not the parsed doc) so a marker
+# inside a heredoc or a YAML block scalar still counts.
+# ---------------------------------------------------------------------------
+
+#: Anything that WRITES `state/stories.json`. A consumer (`--in state/stories.json`,
+#: a `-f` existence test, an `rm -f`) is deliberately not a marker: a validator
+#: must not be forced to carry a producer's stamp.
+PRODUCER_MARKERS = (
+    "--out state/stories.json",       # scripts/derive_unsummarised.py
+    "> state/stories.json",           # a shell redirect writing the payload
+    "prompts/daily-digest.md",        # the agent, which writes the payload itself
+)
+
+
+def workflow_texts():
+    """Every workflow file as (name, raw_text), read from the workflow directory."""
+    out = []
+    workflow_dir = str(W.WORKFLOW_DIR)
+    for name in sorted(os.listdir(workflow_dir)):
+        if not name.endswith((".yml", ".yaml")):
+            continue
+        with open(os.path.join(workflow_dir, name), encoding="utf-8") as fh:
+            out.append((name, fh.read()))
+    return out
+
+
+def is_payload_producer(name, raw_text):
+    """True when this workflow contains a step that produces the payload."""
+    return any(marker in raw_text for marker in PRODUCER_MARKERS)
+
+
+def carries_the_stamp(step):
+    """The signature of a LOUD stamp: right file, dispatched slot, loud refusal."""
+    run = str(step.get("run") or "")
+    env = step.get("env") or {}
+    return (
+        "state/stories.json" in run
+        and "digest_time" in run
+        and "morning" in run
+        and "evening" in run
+        and "sys.exit" in run
+        and str(env.get("DIGEST_TIME")) == "${{ steps.digest_time.outputs.time }}"
+    )
+
+
+class EveryPayloadProducerCarriesTheStampTests(unittest.TestCase):
+    def producers(self):
+        return {name: raw for name, raw in workflow_texts()
+                if is_payload_producer(name, raw)}
+
+    def test_the_discovery_finds_the_digest_pipeline(self):
+        producers = self.producers()
+        self.assertIn(
+            "daily-news.yml", producers,
+            "the producer discovery no longer finds daily-news.yml, so this "
+            "suite would pass on an empty set and guard nothing. The markers "
+            "in PRODUCER_MARKERS have drifted from the workflow.")
+        self.assertNotIn(
+            "digest-prebuild.yml", producers,
+            "digest-prebuild.yml is now seen as a PRODUCER of state/stories.json. "
+            "It only downloads and seals the payload daily-news.yml built "
+            "(prebuild/state/stories.validated.json), so either the build really "
+            "moved there -- in which case it must carry the stamp step -- or the "
+            "marker set has become too loose.")
+
+    def test_every_producer_has_one_loud_stamp_from_the_dispatched_slot(self):
+        producers = self.producers()
+        self.assertTrue(producers, "no payload producer was discovered at all")
+        for name in sorted(producers):
+            with self.subTest(workflow=name):
+                stamped = [(idx, step_name) for idx, (_job, step_name, sd)
+                           in enumerate(W.iter_all_steps(name))
+                           if carries_the_stamp(sd)]
+                self.assertEqual(
+                    1, len(stamped),
+                    "%s produces state/stories.json but carries %d loud stamp "
+                    "step(s) bound to steps.digest_time.outputs.time. Without it "
+                    "the writer's own `digest_time` reaches validation and "
+                    "mark_reported, which is how an evening edition was filed as "
+                    "morning. Found: %r" % (name, len(stamped), stamped))
+
+    def test_the_stamp_runs_before_the_validator_in_every_producer(self):
+        for name in sorted(self.producers()):
+            with self.subTest(workflow=name):
+                all_steps = [(idx, step_name, sd) for idx, (_job, step_name, sd)
+                             in enumerate(W.iter_all_steps(name))]
+                stamp_index = next(idx for idx, _n, sd in all_steps
+                                   if carries_the_stamp(sd))
+                # The VALIDATE INVOCATION, not a step that merely names the
+                # script: daily-news.yml's "Verify required files exist" lists
+                # `scripts/validate_stories.py` in a for-loop and consumes
+                # nothing, so matching on the bare name orders the stamp against
+                # the wrong step.
+                validators = [(idx, step_name) for idx, step_name, sd in all_steps
+                              if "--out state/stories.validated.json"
+                              in str(sd.get("run") or "")]
+                self.assertTrue(
+                    validators,
+                    "%s produces the payload but never invokes validate_stories.py "
+                    "with an output, so there is no downstream site to order the "
+                    "stamp against -- re-read that workflow before assuming the "
+                    "stamp is enough" % name)
+                for idx, step_name in validators:
+                    self.assertLess(
+                        stamp_index, idx,
+                        "%s: the stamp runs after %r, so validation reads the "
+                        "writer's slot and the corrected one never reaches it"
+                        % (name, step_name))
+
+    def test_the_stamp_is_not_exempted_by_the_build_phase(self):
+        """A `phase` condition would exempt the prebuild -- the arm that failed."""
+        for name in sorted(self.producers()):
+            with self.subTest(workflow=name):
+                for _idx, _step_name, sd in W.iter_all_steps(name):
+                    if not carries_the_stamp(sd):
+                        continue
+                    condition = str(sd.get("if") or "")
+                    self.assertNotIn(
+                        "PHASE", condition,
+                        "%s: the stamp is gated on the build phase, so the "
+                        "prebuild arm -- the one whose artifact the seal "
+                        "rejected -- is exempt" % name)
+
+
 if __name__ == "__main__":
     unittest.main()

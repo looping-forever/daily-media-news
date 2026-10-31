@@ -3061,9 +3061,16 @@ test("the archive origin is resolved from one value, and neither side carries a 
   // The canary RESOLVES its hosts; it no longer declares them. A literal here
   // is the exact drift class that caused the nine-day outage, so its absence is
   // asserted rather than assumed.
-  assert.ok(/HOSTS="\$\(python3 scripts\/archive_origin\.py --hosts\)"/.test(canary),
+  assert.ok(/HOSTS="\$\(python3 scripts\/archive_origin\.py --hosts[^"]*\)"/.test(canary),
     "drift-canary.yml no longer resolves its probe hosts at run time, so it is " +
     "back to carrying a host of its own that can drift from the Worker's");
+  // ...and it keeps the PRODUCTION hostname only. The `<branch>.<project>.pages.dev`
+  // alias sits behind the wildcard Cloudflare Access application, so probing it
+  // answered 302 to a login page on every run -- a false red about a gate that is
+  // deliberate. The production hostname is the one the digest email links to.
+  assert.ok(canary.indexOf("grep -v '^master\\.'") >= 0,
+    "drift-canary.yml probes every resolved hostname again, including the " +
+    "Access-gated `master.` alias, so its red is about the gate and not the archive");
   const declared = /HOSTS="(?!\$)[^"]*"/.exec(canary);
   assert.strictEqual(declared, null,
     "drift-canary.yml declares its probe hosts literally: " +
