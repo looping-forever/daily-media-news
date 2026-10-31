@@ -50,7 +50,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read   # read the committed delivery marker
+  contents: write  # read the delivery marker AND push the state ledgers
   issues: write    # file an issue on a missed digest
 
 jobs:
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write  # retire the ladder and commit the alert ledger
       actions: write   # gh workflow run daily-news.yml
 
     steps:
@@ -453,6 +453,8 @@ jobs:
           # escalation alert for the final attempt has already gone out.
           # Bounded to three tries, and merge only -- never rebase, reset or
           # force.
+          push_log="$RUNNER_TEMP/retire_push.log"
+          cause="the push was never attempted"
           published=false
           attempt=1
           while [ "$attempt" -le 3 ]; do
@@ -462,16 +464,25 @@ jobs:
               git merge -X theirs --no-edit FETCH_HEAD >/dev/null 2>&1 || \
                 git merge --abort >/dev/null 2>&1 || true
             fi
-            if git "${auth[@]}" push --quiet origin HEAD:master; then
+            if git "${auth[@]}" push --quiet origin HEAD:master 2>"$push_log"; then
               published=true
               break
             fi
-            echo "::warning::retire ladder push lost the master race (attempt $attempt/3)"
+            # A 403 IS AUTHORISATION, NOT A RACE (measured 2026-10-31, run
+            # 41191885247: "Permission to ... denied to github-actions[bot]"
+            # then 403 on all three attempts). The message must name that, or
+            # a read-only token reads as "master kept moving" for ever.
+            if grep -qE 'Permission to .* denied|error: 403|not authorized|Authentication failed|could not read Username' "$push_log"; then
+              cause="GitHub REFUSED the push: the token is not authorised to write, so the job needs contents: write. $(head -n1 "$push_log")"
+            else
+              cause="the push was rejected: $(head -n1 "$push_log")"
+            fi
+            echo "::warning::retire ladder push failed (attempt $attempt/3): $cause"
             attempt=$((attempt + 1))
             sleep 3
           done
           if [ "$published" != "true" ]; then
-            echo "::warning::could not publish the retired ladder after 3 attempts -- master kept moving, and the next exhausted run will try again."
+            echo "::error::COULD NOT PUBLISH THE RETIRED LADDER after 3 attempts -- $cause. state/digest_retry.json is not retired, so the next exhausted run will try again."
             exit 0
           fi
 
@@ -505,6 +516,8 @@ jobs:
           # Sync, commit and push are retried a BOUNDED three times, and the
           # only way this moves the branch is a merge -- never a rebase, a
           # reset or a force.
+          push_log="$RUNNER_TEMP/ledger_push.log"
+          cause="the push was never attempted"
           published=false
           attempt=1
           while [ "$attempt" -le 3 ]; do
@@ -531,16 +544,25 @@ jobs:
                 echo "::warning::alert ledger: could not merge origin/master (attempt $attempt/3)"
               fi
             fi
-            if git "${auth[@]}" push --quiet origin HEAD:master; then
+            if git "${auth[@]}" push --quiet origin HEAD:master 2>"$push_log"; then
               published=true
               break
             fi
-            echo "::warning::alert ledger push lost the master race (attempt $attempt/3)"
+            # A 403 IS AUTHORISATION, NOT A RACE (measured 2026-10-31, run
+            # 41191885247: "Permission to ... denied to github-actions[bot]"
+            # then 403 on all three attempts). The message must name that, or
+            # a read-only token reads as "master kept moving" for ever.
+            if grep -qE 'Permission to .* denied|error: 403|not authorized|Authentication failed|could not read Username' "$push_log"; then
+              cause="GitHub REFUSED the push: the token is not authorised to write, so the job needs contents: write. $(head -n1 "$push_log")"
+            else
+              cause="the push was rejected: $(head -n1 "$push_log")"
+            fi
+            echo "::warning::alert ledger push failed (attempt $attempt/3): $cause"
             attempt=$((attempt + 1))
             sleep 3
           done
           if [ "$published" != "true" ]; then
-            echo "::warning::COULD NOT PUBLISH THE ALERT LEDGER after 3 attempts -- master kept moving. The 6h de-duplication window is not persisted, so one repeated alert is possible. The digest verdict is unaffected."
+            echo "::error::COULD NOT PUBLISH THE ALERT LEDGER after 3 attempts -- $cause. The 6h de-duplication window is not persisted, so one repeated alert is possible. The digest verdict is unaffected."
             exit 0
           fi
           echo "alert ledger pushed"
@@ -2137,8 +2159,8 @@ jobs:
           set +e
           HEALTH_FILE="$RUNNER_TEMP/chain_health.json"
           # The delivery receipt, from this job's own checkout. Same source the
-          # digest arms read `state/last_digest_sent.json` from; `contents: read`
-          # is already granted for exactly that.
+          # digest arms read `state/last_digest_sent.json` from; `contents:` is
+          # already granted for exactly that.
           DELIVERY_FILE="${CHAIN_DELIVERY_FILE:-state/breaking_delivery.json}"
           URL=""
           CODE=""
@@ -2967,6 +2989,8 @@ jobs:
           # Sync, commit and push are retried a BOUNDED three times, and the
           # only way this moves the branch is a merge -- never a rebase, a
           # reset or a force.
+          push_log="$RUNNER_TEMP/ledger_push.log"
+          cause="the push was never attempted"
           published=false
           attempt=1
           while [ "$attempt" -le 3 ]; do
@@ -2993,16 +3017,25 @@ jobs:
                 echo "::warning::alert ledger: could not merge origin/master (attempt $attempt/3)"
               fi
             fi
-            if git "${auth[@]}" push --quiet origin HEAD:master; then
+            if git "${auth[@]}" push --quiet origin HEAD:master 2>"$push_log"; then
               published=true
               break
             fi
-            echo "::warning::alert ledger push lost the master race (attempt $attempt/3)"
+            # A 403 IS AUTHORISATION, NOT A RACE (measured 2026-10-31, run
+            # 41191885247: "Permission to ... denied to github-actions[bot]"
+            # then 403 on all three attempts). The message must name that, or
+            # a read-only token reads as "master kept moving" for ever.
+            if grep -qE 'Permission to .* denied|error: 403|not authorized|Authentication failed|could not read Username' "$push_log"; then
+              cause="GitHub REFUSED the push: the token is not authorised to write, so the job needs contents: write. $(head -n1 "$push_log")"
+            else
+              cause="the push was rejected: $(head -n1 "$push_log")"
+            fi
+            echo "::warning::alert ledger push failed (attempt $attempt/3): $cause"
             attempt=$((attempt + 1))
             sleep 3
           done
           if [ "$published" != "true" ]; then
-            echo "::warning::COULD NOT PUBLISH THE ALERT LEDGER after 3 attempts -- master kept moving. The 6h de-duplication window is not persisted, so one repeated alert is possible. The digest verdict is unaffected."
+            echo "::error::COULD NOT PUBLISH THE ALERT LEDGER after 3 attempts -- $cause. The 6h de-duplication window is not persisted, so one repeated alert is possible. The digest verdict is unaffected."
             exit 0
           fi
           echo "alert ledger pushed"

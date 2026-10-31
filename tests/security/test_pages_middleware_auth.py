@@ -442,8 +442,20 @@ class WorkflowGuardTests(unittest.TestCase):
             CANARY_STEP_NAME, text,
             "drift-canary.yml has no public-access canary. Without it nothing in "
             "CI can observe that the deployed site stopped opening anonymously.")
+        # Judged by the PROPERTY, not by one exact command string. 2996b69
+        # appended a branch-hostname filter to this assignment and this guard
+        # stayed pinned to the old literal, so the canary was permanently red
+        # while the probe itself was fine.
+        assignments = [
+            line.strip() for line in text.splitlines()
+            if re.match(r'^\s*HOSTS="?\$\(', line)
+        ]
+        self.assertEqual(
+            1, len(assignments),
+            "drift-canary.yml must resolve its probe hosts in exactly one "
+            "HOSTS=\"$( ... )\" command substitution; found %r." % (assignments,))
         self.assertIn(
-            'HOSTS="$(python3 scripts/archive_origin.py --hosts)"', text,
+            "scripts/archive_origin.py --hosts", assignments[0],
             "drift-canary.yml does not resolve its probe hosts through "
             "scripts/archive_origin.py. A host written into the workflow is a "
             "second copy of a value that lives in CF_ARCHIVE_ORIGIN.")
@@ -456,6 +468,15 @@ class WorkflowGuardTests(unittest.TestCase):
         self.assertIsNotNone(body,
                              "the canary step body could not be located in %s" % canary)
 
+        # The resolver's failure path must stay loud and non-zero: a filter that
+        # removed every host would otherwise run the loop over zero hosts and
+        # report a green run that probed nothing.
+        self.assertRegex(
+            body, r'if \[ -z "\$HOSTS" \][^\n]*\n\s*echo "::error::[^\n]*\n\s*exit [1-9]',
+            "drift-canary.yml no longer refuses an empty HOSTS list with an "
+            "::error:: line and a non-zero exit, so a resolver that printed "
+            "nothing would report a green canary that probed nothing.")
+
         archive_index = _archive_index_path()
         archive_digest = _archive_digest_path()
         self.assertGreater(
@@ -464,42 +485,36 @@ class WorkflowGuardTests(unittest.TestCase):
             % archive_index.stat().st_size)
 
         # The shapes that must now FAIL: each is a site the owner cannot open.
+        # Every one is stated on PROD_HOST, because 2996b69 made the production
+        # hostname the only target the canary probes. The same failure classes
+        # are kept, so this is a re-pointing, not a narrowing.
         fail_worlds = [
-            ("THE REGRESSION: both hostnames refuse with 401 again",
+            ("THE REGRESSION: the production hostname refuses with 401 again",
              {PROD_HOST: _refused(), PREVIEW_HOST: _refused()}),
-            ("ONLY the master preview hostname is gated",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _refused("403")}),
-            ("master.* is behind Cloudflare Access, so a browser gets a login page",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _access_redirect(),
+            ("the production hostname refuses with 403",
+             {PROD_HOST: _refused("403")}),
+            ("production is behind Cloudflare Access, so a browser gets a login page",
+             {PROD_HOST: _access_redirect(),
               ACCESS_HOST: _resp("200", text=ACCESS_LOGIN_TEXT)}),
             ("an Access chain that continues to an identity provider is still a gate",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _access_redirect(),
+             {PROD_HOST: _access_redirect(),
               ACCESS_HOST: _resp("302", text=NGINX_302_TEXT,
                                  location="https://%s/login" % STUB_IDP_HOST),
               STUB_IDP_HOST: _resp("200", text=ACCESS_LOGIN_TEXT)}),
             ("a 2xx that serves something other than the archive is not the digest",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _resp("200", text=NEUTRAL_TEXT)}),
+             {PROD_HOST: _resp("200", text=NEUTRAL_TEXT)}),
             ("a 404 is not a public archive",
-             {PROD_HOST: _resp("404", text=NEUTRAL_TEXT),
-              PREVIEW_HOST: _resp("200", archive=archive_index)}),
-            ("UNREACHABLE: a timeout on the apex arm is not a verdict",
-             {PROD_HOST: _resp("000", rc=28),
-              PREVIEW_HOST: _resp("200", archive=archive_index)}),
-            ("a DNS failure on the preview arm alone still fails the canary",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _resp("000", rc=6)}),
+             {PROD_HOST: _resp("404", text=NEUTRAL_TEXT)}),
+            ("UNREACHABLE: a timeout on the probe is not a verdict",
+             {PROD_HOST: _resp("000", rc=28)}),
+            ("a DNS failure is not a verdict either",
+             {PROD_HOST: _resp("000", rc=6)}),
             ("an endless redirect chain is not a verdict either",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _resp("302", text=NGINX_302_TEXT,
-                                  location="https://%s/" % PREVIEW_HOST)}),
+             {PROD_HOST: _resp("302", text=NGINX_302_TEXT,
+                               location="https://%s/" % PROD_HOST)}),
             ("a redirect to something that serves no archive is not the digest",
-             {PROD_HOST: _resp("200", archive=archive_index),
-              PREVIEW_HOST: _resp("302", text=NGINX_302_TEXT,
-                                  location="https://%s/" % STUB_ELSEWHERE_HOST),
+             {PROD_HOST: _resp("302", text=NGINX_302_TEXT,
+                               location="https://%s/" % STUB_ELSEWHERE_HOST),
               STUB_ELSEWHERE_HOST: _resp("200", text=NEUTRAL_TEXT)}),
         ]
         for name, world in fail_worlds:
@@ -535,6 +550,14 @@ class WorkflowGuardTests(unittest.TestCase):
                                         % STUB_TARGET_HOST),
               STUB_TARGET_HOST: _resp("200", archive=_archive_digest_path()),
               PREVIEW_HOST: _resp("200", archive=_archive_index_path())}),
+            # THE DELIBERATE DESIGN since 2996b69: the branch hostname sits
+            # behind the wildcard Access application on every run, so it is
+            # filtered out rather than probed. If that filter is ever removed,
+            # this world goes red and the 6-runs-out-of-6 false red comes back.
+            ("the branch hostname is behind Access and is deliberately not probed",
+             {PROD_HOST: _resp("200", archive=_archive_index_path()),
+              PREVIEW_HOST: _access_redirect(),
+              ACCESS_HOST: _resp("200", text=ACCESS_LOGIN_TEXT)}),
         ]
         for name, world in pass_worlds:
             proc = self._run_canary(body, world)
