@@ -1532,6 +1532,41 @@
       "title": "Spain transport minister says he won't resign over high-speed rail disaster",
       "category": "world_major",
       "date_sent": "2026-10-30"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/10/2047680/bp-highway-blocked-after-rain",
+      "title_hash": "61c310bc6dd1435a2cf12d0c9633a624d012086d",
+      "title": "BP Highway blocked by landslides following continuous rainfall",
+      "category": "local_city",
+      "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/10/2047682/the-federation-of-nepali-journalists-will-hold-a-silent-sit-in-at-maitighar-to-protect-freedom-of-the-press-and-expression",
+      "title_hash": "529ba12632f1325f89ecf910a555c124de2b3882",
+      "title": "Journalists Federation plans silent sit-in at Maitighar over press freedom concerns",
+      "category": "nepal",
+      "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c3vgxznlx7jzo",
+      "title_hash": "77f5fd305447c05e172eafbd36e8db41620bc422",
+      "title": "US approves sale of 500 Patriot interceptor missiles to Ukraine",
+      "category": "world_major",
+      "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/10/2047679/jeep-accident-in-salyan-three-dead-seven-injured",
+      "title_hash": "1a4e00193b2a6e5d89322d16cadbdc5e61435dab",
+      "title": "Jeep accident in Salyan leaves three dead and seven injured",
+      "category": "nepal",
+      "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/crz9824d5e88o",
+      "title_hash": "154a188375e43883e7b9778f122244939549ca68",
+      "title": "Police deployed during stand-off over control of top Poland court",
+      "category": "world_major",
+      "date_sent": "2026-10-31"
     }
   ]
 }

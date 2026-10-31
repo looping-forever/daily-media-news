@@ -1,16 +1,16 @@
 {
   "date": "2026-10-31",
   "time": "morning",
-  "stories": 0,
-  "empty_digest": true,
-  "empty_kind": "quiet_day",
+  "stories": 5,
+  "empty_digest": false,
+  "empty_kind": null,
   "channels": {
-    "website": false,
-    "ntfy": false,
+    "website": true,
+    "ntfy": true,
     "gmail": false,
     "telegram": false
   },
-  "delivered": false,
+  "delivered": true,
   "dry_run": false,
-  "phase": "prebuild"
+  "phase": "full"
 }
