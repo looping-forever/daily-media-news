@@ -646,7 +646,9 @@ jobs:
           EFFECTIVE="${REST#* }"
           HOPS="${HOPS:-0}"
           EFFECTIVE="${EFFECTIVE:-$PAGE_URL}"
-          CHAIN="$(awk 'toupper($1) ~ /^HTTP\// {printf "%s%s", sep, $2; sep=" -> "}' "$HEADER_FILE" 2>/dev/null || true)"
+          # `curl -D` writes CRLF, so $2 is "308\r" and the diagnostic splits
+          # across lines in the log. Strip the CR before splitting the fields.
+          CHAIN="$(awk '{sub(/\r$/, "")} toupper($1) ~ /^HTTP\// {printf "%s%s", sep, $2; sep=" -> "}' "$HEADER_FILE" 2>/dev/null || true)"
           echo "redirect chain: ${CHAIN:-none} ($HOPS hop(s))"
           echo "anonymous GET -> HTTP $CODE, final URL $EFFECTIVE"
           if [ "$HOPS" -gt "$MAX_REDIRECTS" ]; then

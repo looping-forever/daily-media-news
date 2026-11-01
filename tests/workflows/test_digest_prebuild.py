@@ -2944,6 +2944,68 @@ class SealStepExecutionTests(TempDirCase):
         self.assertIn("page liveness: anonymous 200", out)
         self.assertNotIn("::error::", out)
 
+    #: A real `curl -D` header file: CRLF endings, exactly what the live run's
+    #: log was mangled by -- the unstripped `$2` is "308\\r", not "308".
+    REAL_CRLF_HEADERS = (
+        "HTTP/2 308\r\nLocation: /digests/2026-10-09-morning\r\n\r\n"
+        "HTTP/2 200\r\n\r\n")
+
+    def _chain_awk_program(self):
+        """The shipped `CHAIN=` awk program, sliced out of the workflow."""
+        text = (W.REPO_ROOT / ".github" / "workflows"
+                / PREBUILD_WORKFLOW).read_text(encoding="utf-8")
+        m = re.search(r"CHAIN=\"\$\(awk '(.*?)' \"\$HEADER_FILE\"", text, re.S)
+        self.assertIsNotNone(
+            m, "digest-prebuild.yml no longer builds CHAIN= with an awk over "
+               "$HEADER_FILE, so this test cannot see the diagnostic it guards")
+        return m.group(1)
+
+    def test_the_redirect_chain_is_ONE_CR_free_LINE_for_a_real_crlf_header_file(self):
+        """The diagnostic itself, not merely the fact that a redirect happened.
+
+        `curl -D` writes CRLF, so `$2` is "308\\r" and the diagnostic printed
+        `redirect chain: 308\\r -> 200\\r (1 hop(s))`: one message the log renders
+        as three lines, which no exact-form assertion can ever match. The measured
+        failure (run 41276390110) is exactly that shape.
+
+        RUN TWICE, and the second run is why this test can fail here. On Windows
+        gawk strips the CR while READING, so the step-level run alone is green
+        with or without the fix and could not tell the two awks apart. The awk
+        program is therefore also executed on its own with `BINMODE=1`, which is
+        a no-op on Linux and preserves the CR on Windows -- the same bytes the
+        Linux runner hands the same program.
+        """
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200",
+             "STUB_CURL_NUM_REDIRECTS": "1",
+             "STUB_CURL_EFFECTIVE":
+                 "https://daily-digest.example.pages.dev/digests/2026-10-09-morning",
+             "STUB_CURL_HEADERS": self.REAL_CRLF_HEADERS,
+             "STUB_CURL_BODY": self._digest_body()})
+        self.assertEqual(0, code, out)
+
+        chain_lines = [ln for ln in out.splitlines()
+                       if ln.startswith("redirect chain:")]
+        self.assertEqual(["redirect chain: 308 -> 200 (1 hop(s))"], chain_lines, (
+            "the redirect diagnostic is not one CR-free line, so the log splits "
+            "it and its exact form can never be asserted:\n%r" % out))
+
+        header_file = self.tmp / "real_crlf.headers"
+        header_file.write_bytes(self.REAL_CRLF_HEADERS.encode("utf-8"))
+        proc = W.run_bash_script(
+            "set -eo pipefail\n"
+            "CHAIN=\"$(awk -v BINMODE=1 '%s' \"$HEADER_FILE\" 2>/dev/null "
+            "|| true)\"\n"
+            "printf '%%s' \"$CHAIN\"\n" % self._chain_awk_program(),
+            env_overrides={"HEADER_FILE": str(header_file)}, cwd=str(self.tmp))
+        self.assertEqual("308 -> 200", proc.stdout, (
+            "the shipped awk kept the CR curl wrote, so on the Linux runner the "
+            "same program prints a chain split across lines: %r"
+            % proc.stdout))
+
     def test_a_308_is_not_success_on_its_own(self):
         """A redirect is a hop, not a verdict."""
         self._write_artifact()
