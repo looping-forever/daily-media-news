@@ -7839,5 +7839,172 @@ class AcademicOcrCapabilityGateTests(WorkflowLintBase):
             "result path has already failed")
 
 
+# ==========================================================================
+# Check 22 -- a manual prebuild may not publish
+# ==========================================================================
+#
+# WHAT HAPPENED. On 2026-11-01 a manual `workflow_dispatch` of daily-news.yml
+# with `phase=prebuild` (run 41301165662) published the evening page at 17:01
+# NPT for a 19:20 slot -- 2h19m early. The publish steps had no notion of WHO
+# asked for the prebuild, so a test run and the punctual one were the same run.
+#
+# WHAT MUST STAY TRUE. The scheduled prebuild is dispatched by the Cloudflare
+# Worker with `trigger_source: prebuild`, and publishing IS its product: it
+# deploys the page, commits the archive and hands the artifact to the seal. A
+# human-typed dispatch carries no trigger_source, so it reads `manual`. So the
+# gate is `schedule OR explicit opt-in`, never "prebuilds do not publish".
+
+DAILY_NEWS = "daily-news.yml"
+
+#: Steps that reach the live site, the repository or the delivery record. Every
+#: one of them must carry the gate below.
+#:
+#: `Persist model cooldowns` is on this list because it was NOT, and that is how
+#: it escaped: the first version of this gate covered the five steps a reader
+#: thinks of as "publishing", while this one runs on `always()` and carries its
+#: own `git commit`/`git push` to master. A manual `phase=prebuild` therefore
+#: still wrote state, one step below a message promising it would not. Any step
+#: that can reach the network with write credentials belongs here.
+PUBLISH_STEPS = (
+    "Deploy digest to Cloudflare Pages",
+    "Record delivery status",
+    "Archive digest copy",
+    "Commit state changes",
+    "Persist model cooldowns",
+    "Hand this run to the seal",
+)
+
+#: The single condition a publish step is gated on.
+PUBLISH_GATE = "env.PUBLISH_ALLOWED != 'false'"
+
+#: The one step that can see the trigger, the phase and the opt-in together.
+DERIVE_STEP = "Determine date, digest time and trigger source"
+
+
+def _doc_steps(doc):
+    for job_id, job in (doc.get("jobs") or {}).items():
+        if not isinstance(job, dict):
+            continue
+        for step in (job.get("steps") or []):
+            if isinstance(step, dict):
+                yield job_id, str(step.get("name") or "<unnamed step>"), step
+
+
+def step_named(doc, name):
+    """The parsed step dict called `name`, or None."""
+    for _job, step_name, step in _doc_steps(doc):
+        if step_name == name:
+            return step
+    return None
+
+
+def _dispatch_inputs(doc):
+    # PyYAML resolves a bare `on:` to the boolean True; the repository's own
+    # parser keeps it a string. Accept either, as the watchdog checks do.
+    on = doc.get("on") or doc.get(True) or {}
+    dispatch = on.get("workflow_dispatch") if isinstance(on, dict) else None
+    if not isinstance(dispatch, dict):
+        return {}
+    return dispatch.get("inputs") or {}
+
+
+def publish_gate_problems(doc):
+    """Return [] when the manual-prebuild publish gate is intact.
+
+    Three separate things have to hold, and each one alone is not enough: the
+    opt-in input must exist and default to false; the phase step must derive
+    PUBLISH_ALLOWED from BOTH the trigger and that input; and every publish
+    step must carry the derived gate.
+    """
+    problems = []
+
+    publish = _dispatch_inputs(doc).get("publish")
+    if not isinstance(publish, dict):
+        problems.append(
+            "daily-news.yml declares no `workflow_dispatch.inputs.publish`, so a "
+            "manual dispatch has no way to opt in to publishing")
+    else:
+        if str(publish.get("type") or "").lower() != "boolean":
+            problems.append("input `publish` is %r, not boolean"
+                            % (publish.get("type"),))
+        if str(publish.get("default")).lower() != "false":
+            problems.append(
+                "input `publish` defaults to %r; a manual prebuild must default "
+                "to writing nothing outward" % (publish.get("default"),))
+
+    derive = step_named(doc, DERIVE_STEP)
+    if derive is None:
+        problems.append("no step named %r" % (DERIVE_STEP,))
+    else:
+        body = derive.get("run") or ""
+        for token, why in (
+                ("PUBLISH_ALLOWED", "never derives PUBLISH_ALLOWED"),
+                ("INPUT_PUBLISH", "never reads the publish input"),
+                ('"$trigger" != "prebuild"',
+                 "never compares the trigger against the scheduled prebuild, so "
+                 "the Worker's own prebuild would stop publishing"),
+        ):
+            if token not in body:
+                problems.append("the phase step %s (%r is absent)"
+                                % (why, token))
+
+    for name in PUBLISH_STEPS:
+        step = step_named(doc, name)
+        if step is None:
+            problems.append("no step named %r" % (name,))
+            continue
+        cond = str(step.get("if") or "")
+        if PUBLISH_GATE not in cond:
+            problems.append(
+                "step %r has `if: %s` and does not carry %r, so a manual "
+                "phase=prebuild would still publish through it"
+                % (name, cond or "(none)", PUBLISH_GATE))
+    return problems
+
+
+class ManualPrebuildPublishGateTests(WorkflowLintBase):
+    """A TEST RUN MUST NEVER MOVE THE LIVE SITE EARLY."""
+
+    def test_every_publish_step_is_gated_on_the_schedule_or_opt_in(self):
+        problems = publish_gate_problems(W.load_workflow(DAILY_NEWS))
+        self.assertEqual([], problems,
+                         "the manual-prebuild publish gate is broken:\n  "
+                         + "\n  ".join(problems))
+
+    def test_the_scheduled_prebuild_still_publishes(self):
+        body = (step_named(W.load_workflow(DAILY_NEWS), DERIVE_STEP) or {}) \
+            .get("run") or ""
+        self.assertIn(
+            '"$trigger" != "prebuild"', body,
+            "the gate no longer exempts the Worker's own prebuild "
+            "(trigger_source=prebuild). Publishing is that prebuild's product, "
+            "so the fix must not have become 'prebuilds never publish'")
+        self.assertIn("publish_allowed=false", body,
+                      "nothing ever assigns publish_allowed=false, so the gate "
+                      "is decoration: every step would read the default and run")
+        self.assertIn("PUBLISH_ALLOWED=$publish_allowed", body,
+                      "the derived value never reaches the job-wide env, so "
+                      "no `if:` can see it")
+
+    def test_the_gate_rejects_a_step_that_lost_it(self):
+        """A lint that cannot fail is decoration, so break it deliberately."""
+        doc = W.load_workflow(DAILY_NEWS)
+        target = step_named(doc, "Deploy digest to Cloudflare Pages")
+        self.assertIsNotNone(target, "the deploy step has been renamed")
+        target["if"] = str(target["if"]).replace(" && " + PUBLISH_GATE, "")
+        problems = publish_gate_problems(doc)
+        self.assertTrue(
+            any("Deploy digest to Cloudflare Pages" in p for p in problems),
+            "a deploy step with the gate stripped was still accepted, so this "
+            "check cannot protect anything: %r" % (problems,))
+
+    def test_the_opt_in_default_is_pinned_against_a_silent_flip(self):
+        publish = _dispatch_inputs(W.load_workflow(DAILY_NEWS)).get("publish") or {}
+        self.assertEqual(
+            "false", str(publish.get("default")).lower(),
+            "`publish` must default to false: a default of true restores the "
+            "2026-11-01 early publish with no edit to any step")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

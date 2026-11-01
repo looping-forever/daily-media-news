@@ -76,6 +76,22 @@ on:
           - full
           - prebuild
         default: full
+      publish:
+        # A MANUAL DISPATCH MUST SAY SO OUT LOUD BEFORE IT TOUCHES THE LIVE SITE.
+        #
+        # The punctual prebuild is dispatched by the Worker with
+        # `trigger_source: prebuild` and MUST keep publishing: the page, the
+        # archive and the seal hand-off are its whole product. A dispatch typed
+        # by a human carries no `trigger_source` and therefore reads `manual`,
+        # and that is a TEST RUN: run 41301165662 published the evening page at
+        # 17:01 NPT for a 19:20 slot, 2h19m early, from exactly this shape.
+        #
+        # So a manual `phase=prebuild` is build-and-upload only unless this is
+        # true. A deliberate publish is still possible -- pass publish=true.
+        description: 'ALLOW THIS DISPATCH TO PUBLISH. A manual phase=prebuild is build-and-upload only unless this is true; the scheduled prebuild ignores it.'
+        required: false
+        type: boolean
+        default: false
       simulate_pool_refusal:
         # MANUAL ONLY, AND THE DECLARATION IS THE MECHANISM. This input lives
         # under `workflow_dispatch.inputs`, so `schedule` cannot carry it at
@@ -171,6 +187,7 @@ jobs:
           # second source of truth that the shell re-parses.
           INPUT_SLOT_DATE: ${{ github.event.inputs.slot_date }}
           INPUT_PHASE: ${{ github.event.inputs.phase }}
+          INPUT_PUBLISH: ${{ github.event.inputs.publish }}
         run: |
           set -eo pipefail
           # A SLOT IS AN (NEPAL DATE, morning|evening) PAIR, AND BOTH HALVES
@@ -409,6 +426,18 @@ jobs:
             *) echo "FATAL: invalid phase input: $INPUT_PHASE"; exit 1 ;;
           esac
           echo "PHASE=$phase" >> "$GITHUB_ENV"
+          # WHO ASKED FOR THIS PREBUILD. The Worker's punctual arm sets
+          # `trigger_source: prebuild`; a human-typed dispatch leaves it empty
+          # and `trigger` defaults to `manual`. That single fact is the whole
+          # difference between a scheduled prebuild, which publishes, and a
+          # test run, which must not.
+          if [ "$phase" = "prebuild" ] && [ "$trigger" != "prebuild" ] \
+             && [ "${INPUT_PUBLISH:-false}" != "true" ]; then
+            publish_allowed=false
+          else
+            publish_allowed=true
+          fi
+          echo "PUBLISH_ALLOWED=$publish_allowed" >> "$GITHUB_ENV"
           if [ "$phase" = "prebuild" ]; then
             echo "NTFY_DRY_RUN=true" >> "$GITHUB_ENV"
           elif [ "$dry_run" = "true" ]; then
@@ -421,7 +450,10 @@ jobs:
           echo "DIGEST_TIME=$time" >> "$GITHUB_ENV"
           echo "TRIGGER_SOURCE=$trigger" >> "$GITHUB_ENV"
           echo "DRY_RUN=$dry_run" >> "$GITHUB_ENV"
-          echo "Digest run: $time for $today (Asia/Kathmandu), trigger: $trigger, dry_run: $dry_run, phase: $phase"
+          echo "Digest run: $time for $today (Asia/Kathmandu), trigger: $trigger, dry_run: $dry_run, phase: $phase, publish_allowed: $publish_allowed"
+          if [ "$publish_allowed" = "false" ]; then
+            echo "BUILD ONLY: this manual prebuild will NOT deploy the page, will NOT commit digest state, the archive or the model-cooldown ledger, will NOT write the delivery record or the KV ledger, and will NOT hand this run to the seal. It builds and uploads artifacts only. Pass publish=true to publish deliberately."
+          fi
 
       - name: Fallback no-op check
         # Dead-man's-switch guard: if the Cloudflare worker already delivered
@@ -2139,7 +2171,7 @@ jobs:
           rm -f state/.page-backup-${TODAY}-${DIGEST_TIME}.html
 
       - name: Deploy digest to Cloudflare Pages
-        if: env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true' && env.EMPTY_DIGEST != 'true'
+        if: env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true' && env.EMPTY_DIGEST != 'true' && env.PUBLISH_ALLOWED != 'false'
         id: deploy_website
         # PRIMARY channel. continue-on-error keeps the job alive so ntfy (also
         # primary) and the backup channels can still fire when the deploy
@@ -4976,7 +5008,7 @@ jobs:
         # job in the repository green. So a prebuild forces delivered=false AND
         # forces every channel flag false, below, and stamps phase on the marker
         # so the file says WHY it is not a delivered slot.
-        if: env.FALLBACK_NOOP != 'true'
+        if: env.FALLBACK_NOOP != 'true' && env.PUBLISH_ALLOWED != 'false'
         env:
           DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
           TODAY: ${{ env.TODAY }}
@@ -5197,12 +5229,21 @@ jobs:
           # unpacks under its own directory (`prebuild/state/...`,
           # `prebuild/docs/digests/...`) instead of flat. Check 20 derives the
           # root from this same list, so the two cannot drift apart unnoticed.
+          #
+          # state/candidates.json IS UPLOADED FOR AUDIT ONLY. Nothing reads it
+          # after the run, and that is why it has to survive: the seal's
+          # assertions are about a payload that, until now, no run could ever be
+          # inspected for afterwards. Measured at the collector's own writer
+          # (`json.dump(..., ensure_ascii=False, indent=2)`) with the fixture
+          # text lengths: 1,403,697 bytes = 1.34 MiB for 3,300 candidates, about
+          # 2.0 MiB at the SNIPPET_MAX_CHARS ceiling, kept 7 days.
           path: |
             state/email.html
             state/email.txt
             state/stories.validated.json
             state/agent-log.txt
             state/ntfy_payload.json
+            state/candidates.json
             docs/digests/${{ env.TODAY }}-${{ steps.digest_time.outputs.time }}.html
           retention-days: 7
           if-no-files-found: warn
@@ -5269,7 +5310,7 @@ jobs:
           PY
 
       - name: Archive digest copy
-        if: env.FALLBACK_NOOP != 'true'
+        if: env.FALLBACK_NOOP != 'true' && env.PUBLISH_ALLOWED != 'false'
         run: |
           set -eo pipefail
           mkdir -p state/digest-archive
@@ -5351,7 +5392,7 @@ jobs:
         # run must not write to master either. Without this a canary pushes a
         # dry_run marker plus regenerated docs/digests/ + docs/index.html into
         # the repository even though it published nothing.
-        if: env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true'
+        if: env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true' && env.PUBLISH_ALLOWED != 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # U8. The delivery-ledger mirror block below reads these two, and
@@ -5556,9 +5597,14 @@ jobs:
         # refusal, while turning a finished run red would cost the owner the
         # signal that something else broke.
         #
-        # SKIPPED for the same two cases the big commit is skipped for: a no-op
-        # run recorded nothing, and a dry run must write nothing to master.
-        if: always() && env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true'
+        # SKIPPED for the same THREE cases the big commit is skipped for: a no-op
+        # run recorded nothing, a dry run must write nothing to master, and a
+        # BUILD-ONLY prebuild has no publish decision to act on. That third term
+        # was missing until 2026-11-01: it carried only FALLBACK_NOOP and DRY_RUN,
+        # so a manual `phase=prebuild` dispatch reached `git commit` and
+        # `git push` on master from here while the run announced it would not
+        # commit anything.
+        if: always() && env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true' && env.PUBLISH_ALLOWED != 'false'
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -5728,7 +5774,7 @@ jobs:
         # seal never dispatches one. The seal re-reads the conclusion as its
         # own first step, which makes this gate the cheap half of a two-sided
         # check rather than the only one.
-        if: success() && env.PHASE == 'prebuild'
+        if: success() && env.PHASE == 'prebuild' && env.PUBLISH_ALLOWED != 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           API: ${{ github.api_url }}
