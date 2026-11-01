@@ -252,6 +252,16 @@ REASONS = (
     # previously reported as no_semester_token, which points a debugger at the
     # wrong gap.
     "no_semester_number",
+    # ADDED 2026-11-01. ``other_program`` is the only no_match the result pass
+    # can state about the NOTICE rather than about US: the title names another
+    # degree programme (M.Sc. / B.Tech / Data Science / Mathematical Science)
+    # and carries no CSIT marker. The exam lane already wrote this reason
+    # directly; the result pass discarded the classifier's reason and recorded
+    # every no_match as ``no_semester_match``, which made "this is another
+    # programme's result" indistinguishable from "I could not read a semester
+    # out of this" in the state file. The dismissal is terminal (outcome
+    # ``irrelevant``, R4), so the reason is the only record of WHY it happened.
+    "other_program",
 )
 
 USER_AGENT = (
@@ -884,6 +894,17 @@ _MARKER_RE = re.compile(r"(?:B\.?\s*Sc\.?|BSc|CSIT)", re.IGNORECASE)
 #   * BBS / BBA / BIM / B.Ed - the other faculties' UG programmes on the same
 #     TU board. Not present in the current capture; listed so a notice from one
 #     of them is rejected on its first appearance instead of after a report.
+#   * Data Science / Mathematical Science - ADDED 2026-11-01. Both are TU
+#     programmes named in full, with no abbreviation for a table to catch, so
+#     they reached the no_csit_marker DEFER and sat there: measured on the live
+#     board, "Bachelor in Data Science IV Semester-2082 Exam Result" and
+#     "Bachelor in Mathematical Science II Semester-2082 Exam Result" were
+#     deferred indefinitely (state ids 15808 and 15905, streaks 35 and 44).
+#     A permanent defer is not a safe default when the title positively names a
+#     different programme -- it is the same silence, in the other direction.
+#     NOTE these are the only multi-word alternatives, so they are spelled out
+#     rather than abbreviated: "Data Science" has no accepted short form on
+#     this board, and inventing "DS" would match "DS" inside anything.
 #
 # EVERY alternative added here is `\b`-anchored. That is not decoration: a
 # boundary-less `B\.?\s*Ed\.?` matches the "bed" inside "described", and a
@@ -893,7 +914,8 @@ _MARKER_RE = re.compile(r"(?:B\.?\s*Sc\.?|BSc|CSIT)", re.IGNORECASE)
 _NON_CSIT_MARKER_RE = re.compile(
     r"(?:M\.?\s*Sc\.?|MPhil|B\.?\s*Tech\.?|Bachelor\s+in\s+Information"
     r"\s+Technology|\bBIT\b|B\.?\s*Pharm|MBA|MSc"
-    r"|\bMPA\b|\bMBS\b|\bBBS\b|\bBBA\b|\bBIM\b|\bB\.?Ed\b|\bPh\.?D\.?\b)",
+    r"|\bMPA\b|\bMBS\b|\bBBS\b|\bBBA\b|\bBIM\b|\bB\.?Ed\b|\bPh\.?D\.?\b"
+    r"|\bData\s+Science\b|\bMathematical\s+Science\b)",
     re.IGNORECASE)
 # Stage 1(c): a result term. Deliberately wide — see F3. A false positive
 # costs one detail fetch and one PDF download; a false negative loses a
@@ -2010,6 +2032,37 @@ def _decided_ids(examined):
     return out
 
 
+def _reopened_dismissals(examined, notices):
+    """Ids dismissed as another programme whose LIST title now names CSIT.
+
+    ALARM ONLY -- this cannot re-open anything and must not try. A dismissal
+    is terminal under R4 and :func:`advance` has already moved the floor past
+    the id; re-reading it would need the floor LOWERED, which R5 forbids. So
+    the only honest thing left is to make the mistake VISIBLE: if a dismissed
+    notice's list title carries a CSIT marker, either the board re-titled it
+    after the decision, or the marker vocabulary grew afterwards, and a result
+    may have been lost. Silence is the one answer that is not allowed.
+    """
+    out = []
+    if not isinstance(examined, dict):
+        return out
+    for notice in notices or ():
+        try:
+            nid = int(notice.get("id"))
+        except (TypeError, ValueError):
+            continue
+        entry = examined.get(str(nid))
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("outcome") != "irrelevant" \
+                or entry.get("reason") != "other_program":
+            continue
+        title = notice.get("title") or ""
+        if _MARKER_RE.search(title):
+            out.append((nid, title))
+    return out
+
+
 def advance(floor, examined, list_ids):
     """R5. Return the new gap-free floor.
 
@@ -2821,6 +2874,15 @@ def _process_result_feed(state, notices, fetch_fn, timeout, cap,
     poll = _poll_set(state)
     list_ids = [n["id"] for n in notices]
     by_id = {n["id"]: n for n in notices}
+    # A dismissal is permanent, so a later contradiction cannot be corrected --
+    # only reported. See _reopened_dismissals.
+    for reopened_id, reopened_title in _reopened_dismissals(
+            state.get("examined"), notices):
+        print("::error::academic: notice %d was dismissed as another programme "
+              "(reason=other_program), but its LIST title now carries a CSIT "
+              "marker (%r). The dismissal is terminal and the floor is past "
+              "it, so it cannot be re-read; check this one by hand."
+              % (reopened_id, reopened_title), file=sys.stderr)
     floor = state.get("last_examined_notice_id")
     floor = 0 if floor is None else int(floor)
     decided = _decided_ids(state.get("examined"))
@@ -2997,8 +3059,30 @@ def _process_result_feed(state, notices, fetch_fn, timeout, cap,
                 break
             continue
         if verdict["status"] == "no_match":
-            _record(state, "examined", nid, "irrelevant", "no_semester_match",
-                    when)
+            # A no_match is a TERMINAL dismissal (outcome `irrelevant`, R4), so
+            # the reason is the ONLY record of why it happened and the
+            # classifier's own reason was being thrown away here: every
+            # no_match was recorded as the generic `no_semester_match`. That
+            # made "this is another programme's result" indistinguishable from
+            # "I could not read a semester out of this". `other_program` is
+            # preserved because it is the one no_match that states something
+            # about the NOTICE (a different degree programme is named) rather
+            # than about our vocabulary -- the same reason the exam lane
+            # already writes. Every other no_match reason stays
+            # `no_semester_match`, so the existing state vocabulary and the
+            # pinned tests for it are unchanged.
+            other = verdict["reason"] == "other_program"
+            reason = "other_program" if other else "no_semester_match"
+            if other:
+                # LOUD, because this dismissal can never be undone: the floor
+                # moves past the id and R4 makes it permanent. Naming both
+                # titles is what lets a reader see the evidence the decision
+                # was made on, in the run log, without reading the state file.
+                print("academic: notice %d DISMISSED as another programme "
+                      "(reason=other_program, terminal): list title %r, "
+                      "detail title %r"
+                      % (nid, list_title, detail_title), file=sys.stderr)
+            _record(state, "examined", nid, "irrelevant", reason, when)
             continue
         semester = verdict["semester"]
         # status == "match" -> the existing chain below is UNCHANGED.

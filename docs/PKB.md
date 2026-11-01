@@ -809,16 +809,23 @@ line, appended on **every** run including failures (the dead-man's switch
 depends on its recency). It is committed by the workflow so its recency survives
 the run that wrote it.
 
-### Reason tokens (frozen vocabulary, 13)
+### Reason tokens (frozen vocabulary, 19)
 
 `no_semester_match`, `batch_mismatch`, `result_announced`, `already_announced`,
 `wrong_poll_set`, `title_unparseable`, `detail_fetch_failed`, `pdf_missing`,
 `pdf_unextractable`, `dispatch_failed`, `deadline_notified`,
-`semester_not_tracked`, `inconsistent_state`.
+`pdf_text_unreadable`, `semester_not_tracked`, `inconsistent_state`,
+`run_budget_exhausted`, `title_script_unknown`, `no_csit_marker`,
+`no_semester_number`, `other_program`.
 
 `semester_not_tracked` and `inconsistent_state` both mean "the state machine
 could not produce a verdict", which is emphatically **not** a positive decision —
 both are recorded as `deferred` so R1 retries them forever.
+
+`other_program` is the one `no_match` that states something about the NOTICE
+rather than about our own vocabulary: the title positively names another degree
+programme and carries no CSIT marker. It is a terminal `irrelevant` dismissal
+(R4), so the token is the only record of why the dismissal happened.
 
 ### CI arms
 

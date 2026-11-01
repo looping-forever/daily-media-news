@@ -3223,6 +3223,72 @@ class CsitMarkerGapDeferTest(unittest.TestCase):
             self.assertIsNotNone(
                 car._validate_state(json.loads(json.dumps(state))), reason)
 
+    # ---- a programme named IN FULL must be dismissed, not deferred --------
+    # The same gap in the other direction: "no CSIT marker" defers forever,
+    # which is only correct while the title could still BE the owner's. When it
+    # positively names a different programme, a permanent defer is silence.
+    NAMED_PROGRAMMES = (
+        ("Bachelor in Data Science IV Semester-2082 Exam Result", 4),
+        ("Bachelor in Mathematical Science II Semester-2082 Exam Result", 2),
+    )
+
+    def test_a_named_programme_is_dismissed_not_deferred(self):
+        """Measured on the live board: both titles fell into no_csit_marker and
+        sat there (state ids 15808 and 15905, defer streaks 35 and 44)."""
+        for title, _sem in self.NAMED_PROGRAMMES:
+            v = car.classify_semester(title)
+            self.assertEqual(v["status"], "no_match", (title, v))
+            self.assertEqual(v["reason"], "other_program", (title, v))
+            self.assertIsNone(v["semester"], title)
+
+    def test_the_dismissal_is_recorded_under_its_own_reason_and_is_loud(self):
+        """A dismissal is TERMINAL (R4, and the floor moves past it), so the
+        recorded reason and the run-log line are the only record a reader gets.
+        A silent permanent dismissal is the failure this test prevents."""
+        title, _sem = self.NAMED_PROGRAMMES[0]
+        with tempfile.TemporaryDirectory() as d:
+            per_run, after, err = self._run(
+                d, [(15808, "Some notice", "2026-10-30")],
+                {15808: title}, self.ROLL_TEXT)
+            self.assertEqual(per_run[0][0], 0)
+            self.assertEqual(per_run[0][1], [],
+                             "nothing may be announced off a dismissal")
+            entry = after["examined"]["15808"]
+            self.assertEqual(entry["outcome"], "irrelevant")
+            self.assertEqual(entry["reason"], "other_program")
+            self.assertIn("DISMISSED as another programme", err)
+            self.assertIn("other_program", err)
+            self.assertEqual(after["last_examined_notice_id"], 15808,
+                             "a dismissal is a decision, so the floor moves")
+
+    def test_the_vocabulary_may_not_swallow_the_defer(self):
+        """The guard on that fix: only a title that NAMES another programme may
+        be dismissed. A bare semester token plus result term still defers --
+        widening the dismissal to "no CSIT marker" is the original burn."""
+        for title in ("IV Semester-2082 Exam Result",
+                      "Fourth Semester Result 2082"):
+            v = car.classify_semester(title)
+            self.assertEqual(v["status"], "unknown", (title, v))
+            self.assertEqual(v["reason"], "no_csit_marker", (title, v))
+
+    def test_a_dismissal_that_later_names_csit_is_alarmed_not_hidden(self):
+        """The floor is past a dismissed id and R5 forbids lowering it, so a
+        later contradiction cannot be re-read -- it can only be REPORTED.
+        Silence here is a lost result, which is the one answer not allowed."""
+        state = seed_state()
+        state["last_examined_notice_id"] = 15808
+        state["examined"]["15808"] = {
+            "outcome": "irrelevant", "semester": None,
+            "reason": "other_program", "at": "2026-10-30"}
+        title = "B.Sc.CSIT IV Semester-2082 Exam Result"
+        with tempfile.TemporaryDirectory() as d:
+            _per_run, _after, err = self._run(
+                d, [(15808, title, "2026-11-01")], {15808: title},
+                self.ROLL_TEXT, seed=state)
+            self.assertIn("::error::academic", err)
+            self.assertIn("dismissed as another programme", err)
+            self.assertIn("15808", err)
+
 
 class NotificationLogRedactionTest(unittest.TestCase):
     """The delivered payload carries the roll; the public LOG must not.
