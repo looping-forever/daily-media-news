@@ -779,5 +779,107 @@ async function fetch() {
         self.assertEqual(out.get("message_id"), "m1", out)
 
 
+# ==========================================================================
+# DEFECT 6 -- the STORED violation that re-fired on every run
+# ==========================================================================
+
+#: The committed ledger the pipeline mirrors and the watchdog reads.
+LEDGER_PATH = REPO_ROOT / "state" / "digest_slot_ledger.json"
+
+#: The row AS IT STOOD before the data correction, quoted verbatim: filed under
+#: 2026-10-26 evening (due 13:35:00Z), claiming `state: sent`, and carrying a
+#: push instant one hour BEFORE that slot began. 12:34:19Z falls in the same
+#: date's MORNING window (01:35Z), so it cannot be the evening slot's delivery.
+PREFIX_2026_10_26_EVENING = {
+    "actions_dispatch_at": "2026-10-26T13:35:25Z",
+    "actions_dispatch_cause": None,
+    "actions_dispatch_http_status": None,
+    "actions_dispatch_reason": None,
+    "attempts": 1,
+    "build": "b56cbea",
+    "first_ntfy_sent_at": None,
+    "kind": "fallback_last_good",
+    "last_good_shown": "2026-10-18",
+    "late_build_dispatched": True,
+    "ntfy_sent_at": "2026-10-26T12:34:19Z",
+    "pending_at": "2026-10-26T13:55:26Z",
+    "reject_plain": "no digest was built for evening 2026-10-26.",
+    "reject_reason": "absent",
+    "scheduled_instant": "2026-10-26T13:35:00Z",
+    "sequence_id": "dmn-2026-10-26-evening",
+    "state": "sent",
+}
+
+
+def stored_violations(namespace, ledger):
+    """Every `::error::` line the shipped stored-bucket scan prints."""
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        namespace["flag_mislabelled_buckets"](ledger)
+    return [ln for ln in buf.getvalue().splitlines() if ln.strip()]
+
+
+def ledger_with(entry):
+    return {"schema_version": 1, "as_of": "2026-10-27T14:00:00Z",
+            "days": {"2026-10-26": {"evening": json.loads(json.dumps(entry))}}}
+
+
+class StoredMislabelCorrectionTests(unittest.TestCase):
+    """A false stored claim is corrected in the DATA, not by softening the check."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ns = honesty_namespace()
+        cls.ledger = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+
+    def test_a_corrected_row_is_accepted_while_the_uncorrected_claim_is_not(self):
+        """Both worlds, and the check is not the thing that changed.
+
+        The un-corrected row must still be reported, or the correction below
+        would be indistinguishable from deleting the check. The committed row
+        must not be, because it no longer claims the delivery.
+        """
+        uncorrected = stored_violations(self.ns, ledger_with(PREFIX_2026_10_26_EVENING))
+        self.assertEqual(1, len(uncorrected), (
+            "the pre-fix row stopped being reported, so this suite would pass "
+            "even if the check had been weakened: %r" % (uncorrected,)))
+        self.assertIn("::error::LEDGER HONESTY VIOLATION (stored)", uncorrected[0])
+        self.assertIn("2026-10-26 evening", uncorrected[0])
+        self.assertIn("2026-10-26T12:34:19Z", uncorrected[0])
+
+        corrected = stored_violations(self.ns, self.ledger)
+        self.assertEqual([], corrected, (
+            "the committed ledger still raises a stored honesty violation, so "
+            "every run keeps printing it: %r" % (corrected,)))
+
+    def test_the_corrected_row_records_the_truth_and_keeps_the_false_claim(self):
+        """Corrected in place: no row deleted, no evidence deleted, no instant rewritten."""
+        row = self.ledger["days"]["2026-10-26"]["evening"]
+
+        self.assertIs(True, row.get("corrected"), row)
+        self.assertRegex(str(row.get("corrected_at")),
+                         r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
+                         "corrected_at must be a UTC ISO instant: %r" % (row,))
+        self.assertIn("precedes", str(row.get("corrected_reason")), row)
+
+        # The delivery verdict is corrected; the kind is not rewritten, because
+        # the digest really did build and `unavailable` would be a new lie.
+        self.assertEqual("failed", row.get("state"), row)
+        self.assertEqual("fallback_last_good", row.get("kind"), row)
+
+        # The false claim stays visible, in this file.
+        self.assertEqual("sent", row.get("original_state"), row)
+        self.assertEqual("fallback_last_good", row.get("original_kind"), row)
+        self.assertEqual("2026-10-26T12:34:19Z", row.get("original_ntfy_sent_at"), row)
+        # The field the check reads no longer makes a claim for this slot.
+        self.assertNotIn("ntfy_sent_at", row, row)
+
+        # Everything that describes the slot is untouched.
+        self.assertEqual("2026-10-26T13:35:00Z", row.get("scheduled_instant"), row)
+        self.assertEqual("dmn-2026-10-26-evening", row.get("sequence_id"), row)
+        self.assertEqual("no digest was built for evening 2026-10-26.",
+                         row.get("reject_plain"), row)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
