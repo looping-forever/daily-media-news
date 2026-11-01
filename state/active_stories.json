@@ -7706,6 +7706,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-01T07:21:07+05:45"
+    },
+    {
+      "event_id": "evt-e34e580bd8b5",
+      "event_key": "delhi-air-pollution-restrictions",
+      "canonical_title": "New Air Pollution Restrictions in New Delhi",
+      "category": "nepal",
+      "first_seen": "2026-11-01",
+      "last_seen": "2026-11-01",
+      "first_reported": "2026-11-01",
+      "last_reported": "2026-11-01",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2048599/new-restrictions-imposed-in-delhi-to-control-air-pollution"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Authorities in New Delhi have implemented stricter restrictions starting today to control rising air pollution levels.",
+      "latest_development": "Reported: Authorities in New Delhi have implemented stricter restrictions starting today to control rising air pollution levels.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-01",
+      "deadline": null,
+      "effective_date": "2026-11-01",
+      "updated_at": "2026-11-01T17:02:37+05:45"
+    },
+    {
+      "event_id": "evt-4b9861b00436",
+      "event_key": "gandaki-medical-officer-deployment",
+      "canonical_title": "Gandaki Province Deploys 46 Medical Officers",
+      "category": "nepal",
+      "first_seen": "2026-11-01",
+      "last_seen": "2026-11-01",
+      "first_reported": "2026-11-01",
+      "last_reported": "2026-11-01",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.onlinekhabar.com/gandaki-deploys-46-medical-officers-to-strengthen-provincial-healthcare-services.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Gandaki Province has deployed 46 medical officers to district hospitals to address healthcare staffing shortages in remote and mountainous areas, including Mustang and Manang.",
+      "latest_development": "Confirmed: Gandaki Province has deployed 46 medical officers to district hospitals to address healthcare staffing shortages in remote and mountainous areas, including Mustang and Manang.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-01",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-01T17:02:37+05:45"
     }
   ],
   "archived": []
