@@ -1616,6 +1616,27 @@
       "title": "Foreign Currency Exchange Rates for November 1",
       "category": "bank_local",
       "date_sent": "2026-11-01"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/weather/influence-of-cyclone-arnab-diminishing-weather-improving",
+      "title_hash": "6f1bd8221cb97c141bf4bb80135df1f24918249b",
+      "title": "Influence of Cyclone Arnab diminishing, weather improving across Nepal",
+      "category": "nepal",
+      "date_sent": "2026-11-01"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c893z699q401o",
+      "title_hash": "8e15bc83593401b1d3220c1fcc335b12f9332da8",
+      "title": "Serbia election outcome mirrors recent Hungarian political shifts",
+      "category": "world_major",
+      "date_sent": "2026-11-01"
+    },
+    {
+      "url_normalized": "pcgamer.com/games/horror/after-almost-a-decade-of-work-alien-isolation-mod-tools-hit-1-0-with-support-for-full-custom-maps-missions-modes-characters-weapons-animations-sounds-models-textures-and-more",
+      "title_hash": "22682d76ff6ac6c99ab3c3fbbf27cc969b08b672",
+      "title": "Alien: Isolation mod tools hit version 1.0 with comprehensive custom asset support",
+      "category": "gaming",
+      "date_sent": "2026-11-01"
     }
   ]
 }
