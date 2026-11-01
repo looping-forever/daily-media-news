@@ -1588,6 +1588,32 @@ def _ocr_capability_note():
     return "missing: " + ", ".join(missing)
 
 
+def require_ocr_capability(stream=None):
+    """Gate for the workflow: 0 when the OCR stack is complete, 1 otherwise.
+
+    The install step used to be ``continue-on-error: true``, so a half-installed
+    stack was a normal state and the job reported GREEN while every scanned
+    result deferred forever. This is the step that makes that impossible: it
+    runs before any PDF is fetched, and when a piece is missing it prints ONE
+    ``::error::`` naming exactly which pieces, then returns 1 so the job is red.
+
+    A still-missing capability means the honest outcome is a red job that says
+    so -- never a green one that cannot read a scanned result. Names ONLY the
+    missing pieces, so the error cannot be read as blaming an installed one.
+    """
+    out = stream or sys.stdout
+    missing = [k for k, v in ocr_capability().items() if not v]
+    if not missing:
+        print("OCR capability complete: pytesseract, the tesseract binary and "
+              "a PDF rasteriser are all present.", file=out)
+        return 0
+    print("::error::OCR capability incomplete - missing: %s. A scanned result "
+          "PDF cannot be read until every missing piece is installed, so this "
+          "run is RED instead of green-without-OCR." % ", ".join(missing),
+          file=out)
+    return 1
+
+
 def _rasterise_pdf_pages(pdf_bytes, max_pages=OCR_MAX_PAGES, dpi=OCR_DPI):
     """Rasterise up to ``max_pages`` PDF pages to PNG bytes, page by page.
 

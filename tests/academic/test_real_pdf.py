@@ -200,6 +200,49 @@ class OcrCapabilityTest(unittest.TestCase):
                 self.assertNotIn("missing: " + present, note)
 
 
+class OcrCapabilityGateTest(unittest.TestCase):
+    """The workflow gate must be FATAL for every missing piece, and name it.
+
+    `require_ocr_capability` is what the `Verify OCR capability` step runs
+    before any PDF is fetched. A gate that prints a warning and exits 0 is the
+    green-but-cannot-OCR run this change exists to end, so each of the three
+    capabilities is exercised alone.
+    """
+
+    def _run_gate(self, capability):
+        buf = io.StringIO()
+        with mock.patch.object(car, "ocr_capability", lambda: dict(capability)):
+            code = car.require_ocr_capability(stream=buf)
+        return code, buf.getvalue()
+
+    def test_a_complete_stack_passes_without_an_error(self):
+        code, out = self._run_gate(
+            {"pytesseract": True, "binary": True, "pdf_to_image": True})
+        self.assertEqual(0, code, out)
+        self.assertNotIn("::error::", out, out)
+
+    def test_each_missing_capability_fails_with_one_error_naming_it(self):
+        for missing in ("pytesseract", "binary", "pdf_to_image"):
+            capability = {"pytesseract": True, "binary": True,
+                          "pdf_to_image": True}
+            capability[missing] = False
+            code, out = self._run_gate(capability)
+            self.assertEqual(1, code,
+                             "%r missing must fail the job, got exit %r"
+                             % (missing, code))
+            self.assertEqual(
+                1, out.count("::error::"),
+                "a missing capability must produce exactly ONE ::error:: "
+                "line, got:\n%s" % out)
+            self.assertIn(missing, out,
+                          "the error must name %r" % missing)
+            for present in [k for k, v in capability.items() if v]:
+                self.assertNotIn(
+                    present, out,
+                    "the error names %r, which is installed -- it must name "
+                    "ONLY what is missing" % present)
+
+
 class OcrRasterisationTest(unittest.TestCase):
     """The OCR branch used to be `Image.open(io.BytesIO(pdf_bytes))` — PIL on
     PDF BYTES — inside a bare `except: pass`. It therefore NEVER ran. These

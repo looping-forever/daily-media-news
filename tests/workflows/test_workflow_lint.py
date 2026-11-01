@@ -7766,5 +7766,78 @@ class PublicSanitisationTests(unittest.TestCase):
         print("whole-run matching: substring runs ignored, standalone run caught")
 
 
+# ==========================================================================
+# Check 18 -- the OCR install cannot fail silently, and a gap is fatal
+# ==========================================================================
+
+INSTALL_OCR_STEP = "Install PDF/OCR dependencies"
+VERIFY_OCR_STEP = "Verify OCR capability"
+
+
+class AcademicOcrCapabilityGateTests(WorkflowLintBase):
+    """A green run that cannot OCR a scanned result is the defect.
+
+    `Install PDF/OCR dependencies` carried `continue-on-error: true`, so a
+    failed install was silent. The live run then warned "academic: scanned PDF
+    not OCR'd - OCR capability is incomplete (missing: pytesseract, binary,
+    pdf_to_image)" and notice 15771's PDF yielded no text, while the workflow
+    reported success. These tests pin the two halves of the fix: the install
+    must complete the WHOLE capability set, and a still-missing piece must fail
+    the job before any PDF is fetched.
+    """
+
+    def _ordered_steps(self):
+        return [(step, st) for _job, step, st in W.iter_all_steps(ACADEMIC)]
+
+    def _step(self, name):
+        for step, st in self._ordered_steps():
+            if step == name:
+                return st
+        self.fail("%s has no step named %r" % (ACADEMIC, name))
+
+    def test_the_install_step_cannot_fail_silently(self):
+        step = self._step(INSTALL_OCR_STEP)
+        self.assertNotEqual(
+            "true", str(step.get("continue-on-error") or "").lower(),
+            "`%s` is continue-on-error again: a failed install would be silent "
+            "and the job would report GREEN while every scanned result defers"
+            % INSTALL_OCR_STEP)
+        run = step.get("run") or ""
+        for piece in ("pypdf", "pdfplumber", "pytesseract", "pypdfium2",
+                      "tesseract-ocr"):
+            self.assertIn(
+                piece, run,
+                "`%s` no longer installs %r, so ocr_capability() will report "
+                "it missing on the runner" % (INSTALL_OCR_STEP, piece))
+
+    def test_the_capability_gate_is_fatal_and_runs_before_the_pdf_path(self):
+        steps = [step for step, _st in self._ordered_steps()]
+        self.assertIn(VERIFY_OCR_STEP, steps,
+                      "the workflow has no `%s` step, so a half-installed OCR "
+                      "stack can still produce a green run" % VERIFY_OCR_STEP)
+        gate = self._step(VERIFY_OCR_STEP)
+        self.assertNotEqual(
+            "true", str(gate.get("continue-on-error") or "").lower(),
+            "`%s` is continue-on-error, which makes a missing capability "
+            "informational -- the exact silence this gate exists to end"
+            % VERIFY_OCR_STEP)
+        run = gate.get("run") or ""
+        self.assertIn("require_ocr_capability", run,
+                      "the gate must call check_academic_result."
+                      "require_ocr_capability so EACH missing piece is fatal")
+        self.assertIn("sys.exit(", run,
+                      "the gate must exit non-zero; printing the gap is not "
+                      "failing the job")
+        self.assertLess(
+            steps.index(INSTALL_OCR_STEP), steps.index(VERIFY_OCR_STEP),
+            "the capability gate must run after the install")
+        self.assertLess(
+            steps.index(VERIFY_OCR_STEP),
+            steps.index("Run academic result monitor"),
+            "the capability gate must run BEFORE the monitor downloads and "
+            "extracts a PDF, or a broken stack is only discovered after the "
+            "result path has already failed")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

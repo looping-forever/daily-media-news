@@ -84,18 +84,37 @@ jobs:
           python-version: '3.12'
 
       - name: Install PDF/OCR dependencies
-        # pypdf/pdfplumber for direct text extraction, pytesseract + the
-        # tesseract-ocr system binary for scanned-image fallback. Wrapped in
-        # continue-on-error: check_academic_result.py degrades gracefully when
-        # OCR is unavailable (it treats an unextractable PDF as "unknown" and
-        # never marks the student failed), so a missing OCR lib must not kill
-        # the run.
-        continue-on-error: true
+        # The FULL capability set, and it is not optional. OCR needs all three
+        # of pytesseract, the tesseract-ocr system binary and a PDF rasteriser
+        # (pypdfium2, a self-contained wheel), because a PDF is not a bitmap:
+        # check_academic_result.ocr_capability() reports exactly those three,
+        # and a scanned result sheet defers on every run while any is missing.
+        #
+        # This step used to carry continue-on-error: true, so a failed install
+        # was SILENT. Live evidence: the job reported success while the log
+        # warned "OCR capability is incomplete (missing: pytesseract, binary,
+        # pdf_to_image)" and notice 15771's PDF yielded no text. A green run
+        # that cannot read a scanned result IS the defect, so a failed install
+        # now fails the job.
         run: |
           set -eo pipefail
-          pip install pypdf pdfplumber pytesseract
+          pip install pypdf pdfplumber pytesseract pypdfium2
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
+
+      - name: Verify OCR capability
+        # Runs BEFORE the monitor, i.e. before any result PDF is downloaded.
+        # If the install above is still incomplete on this runner, this exits
+        # 1 with ONE ::error:: naming exactly which piece is missing -- a red
+        # job that says why, never a green job that cannot OCR.
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts')
+          import check_academic_result as car
+          sys.exit(car.require_ocr_capability())
+          PY
 
       - name: Restore academic state from KV
         # WHY: state/academic_state.json is never committed -- it carries the

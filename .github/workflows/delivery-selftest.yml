@@ -86,6 +86,12 @@ jobs:
         # repository secrets. An empty value is the supported case: Telegram
         # then discovers the chat from getUpdates, and Gmail falls back to
         # GMAIL_USER as the recipient. The script reports which path was taken.
+        #
+        # THREE STATES, and red means exactly one of them. A channel with no
+        # destination configured is reported `SKIPPED (not configured: <NAME>)`
+        # and does NOT fail the run -- run 40460125670 was red only because
+        # TELEGRAM_CHAT_ID was unset. A channel that IS configured and fails
+        # still turns the run red.
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

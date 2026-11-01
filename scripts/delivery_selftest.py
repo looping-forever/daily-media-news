@@ -45,8 +45,14 @@ RUN IT
 
 Locally that requires TELEGRAM_BOT_TOKEN / GMAIL_USER / GMAIL_APP_PASSWORD in
 the environment. In CI it runs from `.github/workflows/delivery-selftest.yml`,
-which supplies them from repository secrets. Exit code 0 = both channels
-delivered; 1 = at least one failed (the workflow goes red, which is the point).
+which supplies them from repository secrets.
+
+Exit code 0 = every CONFIGURED channel delivered. A channel that was never
+configured is reported `SKIPPED (not configured: <NAME>)` and does NOT make the
+run red: an absent secret is a missing destination, not a broken transport, and
+a red run has to keep meaning "a channel that IS set up failed". Exit code 1 =
+at least one configured channel failed. (Run 40460125670 was red only because
+TELEGRAM_CHAT_ID was unset, which is exactly the noise this rule removes.)
 
 Nothing is written to disk. Nothing is retried: one message per channel per
 run, because a channel test that sends twice proves less than one that sends
@@ -78,6 +84,26 @@ GMAIL_TEXT = ("Test from daily-media-news, ignore\n\n"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_STARTTLS_PORT = 587
 SMTP_SSL_PORT = 465
+
+
+class ChannelResult:
+    """One channel's outcome: PASS, FAIL, or SKIPPED because it is unconfigured.
+
+    The third state is the point. Before this, an absent secret produced
+    ``FAIL`` and exit 1, so the workflow was red for a channel that was never
+    set up -- and a red run stopped meaning "a configured channel is broken".
+    ``passed`` is True, False, or None (SKIPPED); ``missing`` names the
+    environment variables that were not configured.
+    """
+
+    def __init__(self, passed, missing=()):
+        self.passed = passed
+        self.missing = tuple(missing)
+
+    def line(self):
+        if self.passed is None:
+            return "SKIPPED (not configured: %s)" % ", ".join(self.missing)
+        return "PASS" if self.passed else "FAIL"
 
 #: Every value that must never reach stdout. Filled in main() from the
 #: environment; `_scrub` is a last line of defence, not the only one -- the
@@ -250,11 +276,15 @@ def telegram_payload(chat_id, text):
 
 
 def telegram_test():
-    """Send one labelled Telegram message. Returns True on a confirmed ok:true."""
+    """Send one labelled Telegram message.
+
+    Returns a ChannelResult: PASS on a confirmed ok:true, FAIL on a transport
+    or API failure, and SKIPPED when there is no destination configured.
+    """
     token = _env("TELEGRAM_BOT_TOKEN")
     if not token:
-        _emit("telegram: FAIL  TELEGRAM_BOT_TOKEN absent -- channel not configured")
-        return False
+        _emit("telegram: SKIPPED (not configured: TELEGRAM_BOT_TOKEN)")
+        return ChannelResult(None, ("TELEGRAM_BOT_TOKEN",))
 
     explicit = _env("TELEGRAM_CHAT_ID")
     if explicit:
@@ -265,12 +295,16 @@ def telegram_test():
         source = "auto-discovered from getUpdates"
 
     if chat_id is None:
-        _emit("telegram: FAIL  no chat id -- getUpdates held no usable message.chat.id")
+        # NOT a failure: nothing was configured to send TO. The diagnostics
+        # still run, because "no chat id" has several causes and that evidence
+        # tells the owner which one -- but a channel that was never set up
+        # must not paint the run red.
+        _emit("telegram: SKIPPED (not configured: TELEGRAM_CHAT_ID)")
         _report_updates_queue(token)
         _report_updates_shape(token)
         _emit("  owner action: open a PRIVATE chat with the bot named above, send /start, re-run.")
         _emit("  durable fix: save the chat id as TELEGRAM_CHAT_ID (see the report).")
-        return False
+        return ChannelResult(None, ("TELEGRAM_CHAT_ID",))
 
     _emit("telegram: chat id %s (%s)" % (_mask(chat_id), source))
 
@@ -285,24 +319,24 @@ def telegram_test():
     except Exception as exc:
         _emit("telegram: FAIL  transport error %s: %s"
               % (type(exc).__name__, exc))
-        return False
+        return ChannelResult(False)
     try:
         data = json.loads(body)
     except ValueError:
         _emit("telegram: FAIL  non-JSON response (HTTP %s)" % status)
-        return False
+        return ChannelResult(False)
     if not isinstance(data, dict) or data.get("ok") is not True:
         description = ""
         if isinstance(data, dict):
             description = str(data.get("description") or "")
         _emit("telegram: FAIL  ok=false HTTP %s description=%r"
               % (status, description[:300]))
-        return False
+        return ChannelResult(False)
 
     result = data.get("result") or {}
     _emit("telegram: SENT  ok=true message_id=%s date=%s chat_id=%s"
           % (result.get("message_id"), result.get("date"), _mask(chat_id)))
-    return True
+    return ChannelResult(True)
 
 
 def _send_gmail_ssl(user, password, receiver):
@@ -325,7 +359,11 @@ def _send_gmail_ssl(user, password, receiver):
 
 
 def gmail_test():
-    """Send one labelled email. Returns True when a send was accepted."""
+    """Send one labelled email.
+
+    Returns a ChannelResult: PASS when a send was accepted, FAIL when the
+    configured transport failed, SKIPPED when the credentials are not set.
+    """
     user = _env("GMAIL_USER")
     password = _env("GMAIL_APP_PASSWORD")
     receiver = _env("GMAIL_RECEIVER")
@@ -334,9 +372,8 @@ def gmail_test():
                (("GMAIL_USER", user), ("GMAIL_APP_PASSWORD", password))
                if not value]
     if missing:
-        _emit("gmail: FAIL  absent: %s -- channel not configured"
-              % ", ".join(missing))
-        return False
+        _emit("gmail: SKIPPED (not configured: %s)" % ", ".join(missing))
+        return ChannelResult(None, missing)
 
     looks_like_app_password, digits = _app_password_shape(password)
     _emit("gmail: GMAIL_USER present (len=%d)  GMAIL_APP_PASSWORD present "
@@ -351,7 +388,7 @@ def gmail_test():
         bm.send_email(bm.default_smtp_factory, GMAIL_SUBJECT, html_body, GMAIL_TEXT)
         _emit("gmail: SENT  via %s:%d STARTTLS"
               % (SMTP_HOST, SMTP_STARTTLS_PORT))
-        return True
+        return ChannelResult(True)
     except Exception as exc:
         code, detail = _smtp_detail(exc)
         _emit("gmail: FAIL  port %d STARTTLS  %s%s"
@@ -364,14 +401,14 @@ def gmail_test():
         _send_gmail_ssl(user, password, receiver or user)
         _emit("gmail: SENT  via %s:%d SSL  (port %d STARTTLS failed first)"
               % (SMTP_HOST, SMTP_SSL_PORT, SMTP_STARTTLS_PORT))
-        return True
+        return ChannelResult(True)
     except Exception as exc:
         code, detail = _smtp_detail(exc)
         _emit("gmail: FAIL  port %d SSL  %s%s"
               % (SMTP_SSL_PORT,
                  ("SMTP %s " % code) if code else "",
                  detail))
-    return False
+    return ChannelResult(False)
 
 
 def main():
@@ -393,24 +430,23 @@ def main():
     _emit("=== delivery self-test: one labelled message per channel, no digest content ===")
     _emit("channels: %s" % selection)
 
-    telegram_ok = gmail_ok = None
+    telegram_result = gmail_result = None
     if selection in ("both", "telegram"):
-        telegram_ok = telegram_test()
+        telegram_result = telegram_test()
     if selection in ("both", "gmail"):
-        gmail_ok = gmail_test()
+        gmail_result = gmail_test()
 
     _emit("---")
-    if telegram_ok is not None:
-        _emit("telegram: %s" % ("PASS" if telegram_ok else "FAIL"))
-    else:
-        _emit("telegram: SKIPPED (not selected this run)")
-    if gmail_ok is not None:
-        _emit("gmail:    %s" % ("PASS" if gmail_ok else "FAIL"))
-    else:
-        _emit("gmail:    SKIPPED (not selected this run)")
+    _emit("telegram: %s" % (telegram_result.line() if telegram_result
+                            else "SKIPPED (not selected this run)"))
+    _emit("gmail:    %s" % (gmail_result.line() if gmail_result
+                            else "SKIPPED (not selected this run)"))
 
-    results = [r for r in (telegram_ok, gmail_ok) if r is not None]
-    return 0 if all(results) else 1
+    # ONLY a configured channel can turn the run red. A SKIPPED result means
+    # nothing was configured to send to, which is recorded above but is not a
+    # transport failure.
+    results = [r for r in (telegram_result, gmail_result) if r is not None]
+    return 0 if all(r.passed is not False for r in results) else 1
 
 
 if __name__ == "__main__":
