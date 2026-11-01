@@ -699,6 +699,11 @@ NOTICE_DATE_RES = (
                r"\s+\d{1,2},?\s+\d{4})\b", re.IGNORECASE),
 )
 NOTICE_MAX_PER_SITE = 15
+# How far BEFORE an anchor the row's date cell may sit. The live TU/IOST row is
+# `<div class="date"><span>2026-09-18</span></div><div class="detail"><a ...>`,
+# so the cell is ~120 characters back; 800 covers a long title without ever
+# reaching the previous row.
+NOTICE_ROW_WINDOW = 800
 MAX_BYTES_HTML = 2000000
 MAX_BYTES_RSS = 5000000
 
@@ -731,6 +736,13 @@ MIME_BY_EXT = {
 }
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+# A SORT RANK, never a publication date. An undated notice cannot be ranked by
+# its missing date (that is the EPOCH bug), so it ranks BELOW every dated notice
+# of its kind: the real IOST page repeats its newest headlines in an undated
+# marquee above the dated list, and ranking those first made the marquee copy win
+# the title dedup and throw the known date away. Only ever a sort key; `published`
+# stays None.
+UNKNOWN_DATE_RANK = datetime.min.replace(tzinfo=timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -2166,6 +2178,45 @@ def _notice_published_dt(text):
     return None
 
 
+def _parse_notice_date(raw):
+    """One captured date string -> aware UTC datetime, or None."""
+    raw = _normalize_month(raw)
+    for fmt in ("%Y-%m-%d", "%d %B %Y", "%d %b %Y", "%B %d, %Y",
+                "%b %d, %Y", "%d %B, %Y", "%d %b, %Y"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _notice_row_published_dt(body, start, end, prev_end, inner_text):
+    """The date of the LIST ROW the anchor sits in, or None.
+
+    The live TU/IOST anchors are title-only: the date is a sibling cell BEFORE
+    the anchor (`<div class="date">...</div><div class="detail"><a>Title</a>`),
+    which is why reading the anchor text alone gave every real notice None and
+    the cap then deleted the whole kind.
+
+    The window is bounded by the previous anchor's END, so a date can only come
+    from this row -- never from the row above, and never from the row below (the
+    next row's date cell sits before the next anchor, and looking forward would
+    borrow it). The anchor's own text is still checked second, so pages that
+    print the date in the link keep their historical behaviour.
+    """
+    window_start = max(prev_end, start - NOTICE_ROW_WINDOW)
+    found = []
+    for pattern in NOTICE_DATE_RES:
+        for m in pattern.finditer(body[window_start:start]):
+            dt = _parse_notice_date(m.group(1))
+            if dt is not None:
+                found.append((m.start(), dt))
+    if found:
+        found.sort(key=lambda pair: pair[0])
+        return found[-1][1]          # nearest date before the anchor
+    return _notice_published_dt(inner_text)
+
+
 _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun",
            "jul", "aug", "sep", "oct", "nov", "dec")
 
@@ -2258,7 +2309,8 @@ def notices_task(page_url, domain_category, timeout, retry=None,
     base_domain = netloc_of(page_url) or page_url
     out = []
     seen = set()
-    for m in ANCHOR_RE.finditer(body):
+    anchors = list(ANCHOR_RE.finditer(body))
+    for i, m in enumerate(anchors):
         href, inner = m.group(1), m.group(2)
         text = strip_html(inner)
         low = text.lower()
@@ -2283,9 +2335,11 @@ def notices_task(page_url, domain_category, timeout, retry=None,
         if not nu or nu in seen:
             continue
         seen.add(nu)
+        prev_end = anchors[i - 1].end() if i else 0
         out.append(make_candidate(
             title=text[:200], url=abs_url, source=base_domain,
-            published_dt=_notice_published_dt(text),
+            published_dt=_notice_row_published_dt(body, m.start(), m.end(),
+                                                  prev_end, text),
             snippet="",
             domain_category=domain_category, language=language))
         if len(out) >= NOTICE_MAX_PER_SITE:
@@ -2526,6 +2580,13 @@ def collect_parallel(plans, cfg=None):
         by_source[plan["name"]] = round(res["secs"], 2)
         if res["ok"]:
             sources_ok.append(plan["name"])
+            # Tag every candidate with the plan that produced it. `postprocess`
+            # needs this to (a) know which rows are notices and (b) report how
+            # many candidates each SOURCE actually got into the payload, which
+            # is the only honest answer to "did this source contribute?".
+            for cand in res["candidates"]:
+                cand["_plan"] = plan["name"]
+                cand["_kind"] = plan["kind"]
             raw_candidates.extend(res["candidates"])
             if res["weather_summary"]:
                 return_dict["weather_summary"] = res["weather_summary"]
@@ -2627,6 +2688,8 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
     dropped_stale = dropped_keyword = 0
     for cand in raw_candidates:
         dt = cand.pop("_dt", None)
+        kind = cand.pop("_kind", "")
+        plan = cand.pop("_plan", "")
         text = ("%s %s" % (cand.get("title", ""), cand.get("snippet", ""))).lower()
         if any(kw in text for kw in excluded_keywords_lower):
             dropped_keyword += 1
@@ -2634,45 +2697,99 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
         if dt is not None and dt < cutoff:
             dropped_stale += 1
             continue
-        prepared.append((dt or EPOCH, cand))
+        # A notice with no date is ranked by UNKNOWN_DATE_RANK, never by EPOCH:
+        # EPOCH is what buried the whole kind under every dated row. The rank is
+        # a sort key only -- `published` is untouched.
+        if kind == "notice":
+            prepared.append((1, dt or UNKNOWN_DATE_RANK, plan, kind, cand))
+        else:
+            prepared.append((0, dt or EPOCH, plan, kind, cand))
 
-    # Freshest first (stable sort keeps same-second items in source order).
-    prepared.sort(key=lambda pair: pair[0], reverse=True)
+    # Two stable sorts. First freshest-first INSIDE each kind; then the
+    # non-notice band before the notice band, so a burst of undated notices can
+    # never displace dated rows in the fill pass. Survival of a notice is
+    # decided by the reservation below, not by this order.
+    prepared.sort(key=lambda item: item[1], reverse=True)
+    prepared.sort(key=lambda item: item[0])
 
     seen_urls = set()
     seen_token_sets = []
     per_domain = {}
     final = []
-    dropped_dup_url = dropped_dup_title = dropped_domain_cap = 0
-    for _dt, cand in prepared:
+    kept_by_source = {}
+    drops = {"dup_url": 0, "dup_title": 0, "domain_cap": 0, "total_cap": 0}
+
+    def admit(cand, plan):
+        """Try to place one candidate. Returns (ok, reason)."""
         nu = normalize_url(cand.get("url", ""))
         if not nu:
-            continue
+            return False, "no_url"
         if nu in seen_urls:
-            dropped_dup_url += 1
-            continue
+            return False, "dup_url"
         tokens = title_tokens(cand.get("title", ""))
         if any(jaccard(tokens, prev) >= TITLE_JACCARD_THRESHOLD
                for prev in seen_token_sets):
-            dropped_dup_title += 1
-            continue
+            return False, "dup_title"
         domain = cand.get("domain_category", "")
         if per_domain.get(domain, 0) >= max_per_domain:
-            dropped_domain_cap += 1
-            continue
+            return False, "domain_cap"
         if len(final) >= MAX_TOTAL:
-            break
+            return False, "total_cap"
         seen_urls.add(nu)
         seen_token_sets.append(tokens)
         per_domain[domain] = per_domain.get(domain, 0) + 1
         final.append(cand)
+        if plan:
+            kept_by_source[plan] = kept_by_source.get(plan, 0) + 1
+        return True, ""
+
+    # GUARANTEED RESERVATION, one slot per notice SOURCE per domain, taken
+    # BEFORE the freshest-first fill. The bound is max_per_domain - 1, so a
+    # non-notice kind always keeps at least one slot in that domain: that bound
+    # is what makes this non-starving by construction, not by hope.
+    notice_budget = max(0, max_per_domain - 1)
+    reserved_sources = set()
+    reserved_per_domain = {}
+    remaining = []
+    for item in prepared:
+        _band, _rank, plan, kind, cand = item
+        if kind != "notice":
+            remaining.append(item)
+            continue
+        domain = cand.get("domain_category", "")
+        key = (domain, plan)
+        if key in reserved_sources \
+                or reserved_per_domain.get(domain, 0) >= notice_budget:
+            remaining.append(item)
+            continue
+        ok, reason = admit(cand, plan)
+        if ok:
+            reserved_sources.add(key)
+            reserved_per_domain[domain] = reserved_per_domain.get(domain, 0) + 1
+            continue
+        remaining.append(item)
+        if reason == "total_cap":
+            break
+
+    # Freshest-first fill for everything the reservation did not take.
+    for _band, _rank, plan, kind, cand in remaining:
+        ok, reason = admit(cand, plan)
+        if ok:
+            continue
+        if reason in drops:
+            drops[reason] += 1
+        if reason == "total_cap":
+            break
 
     stats = {
         "dropped_stale": dropped_stale,
         "dropped_keyword": dropped_keyword,
-        "dropped_dup_url": dropped_dup_url,
-        "dropped_dup_title": dropped_dup_title,
-        "dropped_domain_cap": dropped_domain_cap,
+        "dropped_dup_url": drops["dup_url"],
+        "dropped_dup_title": drops["dup_title"],
+        "dropped_domain_cap": drops["domain_cap"],
+        "dropped_total_cap": drops["total_cap"],
+        # Per SOURCE survival: the post-cap truth the health record reads.
+        "kept_by_source": kept_by_source,
     }
     return final, per_domain, stats
 
@@ -2750,6 +2867,14 @@ def main(argv=None):
 
     final_candidates, per_domain, stats = postprocess(
         raw_candidates, excluded_lower, max(1, args.max_per_domain))
+
+    # Post-cap survival per source. `items_found` says what the source PARSED;
+    # this says what actually reached the payload. A source with items_found > 0
+    # and candidates_kept == 0 contributed nothing, and the health record must
+    # be able to say so instead of reporting `ok`.
+    kept_by_source = stats.get("kept_by_source") or {}
+    for rec in source_results:
+        rec["candidates_kept"] = int(kept_by_source.get(rec["name"], 0))
 
     total_sec = round(time.perf_counter() - t_start, 2)
 

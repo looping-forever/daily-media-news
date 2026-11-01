@@ -303,11 +303,14 @@ def empty_source_health(now_npt=""):
         "critical": {"total": 0, "ok": 0, "empty": 0, "failed": 0, "skipped": 0,
                      "hosts_down": [], "empty_hosts": [], "reasons": []},
         "all": {"total": 0, "ok": 0, "empty": 0, "failed": 0, "skipped": 0,
-                "items_found": 0},
+                "items_found": 0, "candidates_kept": 0},
         "by_category": {},
         "failed_names": [],
         "empty_names": [],
         "reachable_hosts": [],
+        # Sources that PARSED items and contributed none to the payload. Not a
+        # failure and not an outage: a cap or a dedup ate the whole yield.
+        "zero_survival_names": [],
     }
 
 
@@ -324,7 +327,8 @@ def _row_from_entry(raw):
         # hostile row. items_found is None (UNKNOWN), never 0.
         return {"name": "", "kind": "", "category": "", "host": "", "url": "",
                 "outcome": "skipped_budget", "reason": "malformed", "ok": False,
-                "reachable": False, "empty": False, "items_found": None}
+                "reachable": False, "empty": False, "items_found": None,
+                "candidates_kept": None}
 
     outcome = raw.get("outcome")
     if not isinstance(outcome, str) or outcome not in VALID_OUTCOMES:
@@ -357,17 +361,28 @@ def _row_from_entry(raw):
         # of a legacy record and could turn a healthy run into "empty". It must
         # stay None so the sum below skips it and no host is declared empty.
         "items_found": _items_found(raw),
+        # What the source got INTO the payload after every cap and dedup. Same
+        # UNKNOWN rule: absent means "cannot answer", never zero.
+        "candidates_kept": _candidates_kept(raw),
     }
 
 
 def _items_found(raw):
-    """`items_found` as a non-negative int, or None when UNKNOWN.
+    return _count_field(raw, "items_found")
+
+
+def _candidates_kept(raw):
+    return _count_field(raw, "candidates_kept")
+
+
+def _count_field(raw, field):
+    """A count field as a non-negative int, or None when UNKNOWN.
 
     None (not 0) is the whole point: absent, null, negative, bool and junk all
     mean "this record cannot answer the question", and an unknown must never be
     laundered into a zero-yield claim.
     """
-    v = raw.get("items_found")
+    v = raw.get(field)
     if isinstance(v, bool) or v is None:
         return None
     if isinstance(v, int):
@@ -403,7 +418,8 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
         min_items = 1
 
     all_c = {"total": 0, "ok": 0, "empty": 0, "failed": 0, "skipped": 0,
-             "items_found": 0, "any_items_known": False}
+             "items_found": 0, "any_items_known": False,
+             "candidates_kept": 0, "any_kept_known": False}
     crit_c = {"total": 0, "ok": 0, "empty": 0, "failed": 0, "skipped": 0}
     crit_failed_hosts = set()
     crit_reasons = set()
@@ -423,6 +439,7 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
     empty_crit_hosts_raw = set()
     failed_names = []
     empty_names = []
+    zero_survival_names = []
     cats = {}
     # outcome -> counter key (a malformed entry counts as UNKNOWN/skipped).
     # "empty" maps to "ok" DELIBERATELY: it is reachable, so every existing
@@ -451,6 +468,16 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
         if row["items_found"] is not None:
             all_c["items_found"] += row["items_found"]
             all_c["any_items_known"] = True
+        if row["candidates_kept"] is not None:
+            all_c["candidates_kept"] += row["candidates_kept"]
+            all_c["any_kept_known"] = True
+        # The honesty signal this field exists for: the source PARSED items and
+        # the payload contains none of them. That is not an outage (the row is
+        # still `ok`/reachable), but it must never read as a clean pass either.
+        kept = row["candidates_kept"]
+        if kept == 0 and row["items_found"] is not None \
+                and row["items_found"] >= min_items and row["name"]:
+            zero_survival_names.append(row["name"])
 
         is_critical = bool(row["host"]) and canonical_host(row["host"]) in crit_hosts
         if is_critical:
@@ -504,6 +531,8 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
                                           "failed": 0, "skipped": 0,
                                           "items_found": 0,
                                           "any_items_known": False,
+                                          "candidates_kept": 0,
+                                          "any_kept_known": False,
                                           "notice_urls": set(),
                                           "hosts": {}, "empty_hosts": set()})
             entry["total"] += 1
@@ -513,6 +542,9 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
             if row["items_found"] is not None:
                 entry["items_found"] += row["items_found"]
                 entry["any_items_known"] = True
+            if row["candidates_kept"] is not None:
+                entry["candidates_kept"] += row["candidates_kept"]
+                entry["any_kept_known"] = True
             if row["kind"] == "notice" and row["url"]:
                 entry["notice_urls"].add(row["url"])
             if row["host"]:
@@ -551,6 +583,8 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
             "failed": entry["failed"],
             "skipped": entry["skipped"],
             "items_found": entry["items_found"] if entry["any_items_known"] else 0,
+            "candidates_kept": (entry["candidates_kept"]
+                                if entry["any_kept_known"] else 0),
             "empty_hosts": cat_empty,
             "urls": urls[:MAX_CATEGORY_URLS] if urls else [CATEGORY_URL_FALLBACK],
         }
@@ -644,10 +678,13 @@ def _compute(source_results, critical_hosts, now_npt, min_items_per_source=1):
             "failed": all_c["failed"],
             "skipped": all_c["skipped"],
             "items_found": all_c["items_found"] if all_c["any_items_known"] else 0,
+            "candidates_kept": (all_c["candidates_kept"]
+                                if all_c["any_kept_known"] else 0),
         },
         "by_category": dict(sorted(by_category.items())),
         "failed_names": sorted(failed_names),
         "empty_names": sorted(empty_names),
+        "zero_survival_names": sorted(set(zero_survival_names)),
         "reachable_hosts": sorted(reachable),
     }
 

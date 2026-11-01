@@ -402,6 +402,11 @@ def assert_d4_notice_is_not_chrome(blob):
     tu.edu.np 2, iost 6, college 3, nea 2). A source with nothing today is
     reported as EMPTY, which is real truth and not a failure; only "no notice
     source anywhere produced a real title" is a failure.
+
+    `nea 2` is history, not a current source: nea.org.np was retired from
+    NOTICE_SITES afterwards (a utility, not an education body -- see the WHY
+    there), so D4 is now decided by BANK_URL, tu.edu.np, iost.tu.edu.np and
+    COLLEGE_URL. The measurement above is left as measured.
     """
     kw = _notice_keyword_re()
     passed, chrome, empty = [], [], []
@@ -819,16 +824,59 @@ MAX_PDFS = 2
 CANARY_PDF_MAX_BYTES = 64 * 1024 * 1024
 
 
+def _as_count(v):
+    """A count as a non-negative int, or None when UNKNOWN/absent."""
+    if isinstance(v, bool) or v is None:
+        return None
+    if isinstance(v, int):
+        return v if v >= 0 else None
+    if isinstance(v, str) and v.strip().isdigit():
+        return int(v.strip())
+    return None
+
+
+def source_row_verdict(row):
+    """What one `source_results` row actually says. Pure; never raises.
+
+    "ok"             -- reachable, and it contributed at least one candidate
+    "zero_yield"     -- it PARSED items and the payload contains none of them
+    "skipped_budget" -- the budget expired: reachability UNKNOWN, not a pass
+    "failed"         -- the request was attempted and failed
+
+    WHY zero_yield is separate from ok: `items_found` is counted BEFORE
+    `postprocess`, so a source whose whole yield died on a cap still reads
+    `ok`. Reporting that as a clean pass is how the notice kind disappeared
+    without a single red line. An ABSENT count is UNKNOWN, never zero, so a
+    legacy row cannot be accused of zero yield.
+    """
+    if not isinstance(row, dict):
+        return "failed"
+    outcome = row.get("outcome")
+    if outcome == "failed":
+        return "failed"
+    if outcome == "skipped_budget":
+        return "skipped_budget"
+    kept = _as_count(row.get("candidates_kept"))
+    found = _as_count(row.get("items_found"))
+    if kept == 0 and found is not None and found >= 1:
+        return "zero_yield"
+    return "ok"
+
+
 def collect(workdir=None, digest=True, academic=True):
     """Fetch the live blob. The ONLY function here that touches the network.
 
     Returns ``{"digest": {...} | None, "academic": {...} | None,
-    "net_ok": int, "net_failures": int, "reasons": {code: count}}``.
+    "net_ok": int, "net_failures": int, "reasons": {code: count},
+    "net_skipped_budget": int, "net_zero_yield": int,
+    "skipped_budget_names": [...], "zero_yield_names": [...]}``.
     """
     import datetime
     import tempfile
 
-    blob = {"net_ok": 0, "net_failures": 0, "reasons": {}}
+    blob = {"net_ok": 0, "net_failures": 0, "reasons": {},
+            "net_skipped_budget": 0, "net_zero_yield": 0,
+            "skipped_budget_names": [], "zero_yield_names": []}
     tmp = workdir or tempfile.mkdtemp(prefix="live-canary-")
 
     def record(ok, reason=""):
@@ -844,8 +892,13 @@ def collect(workdir=None, digest=True, academic=True):
                     pass
             blob["reasons"][code] = blob["reasons"].get(code, 0) + 1
 
+    def note(kind, name):
+        blob["net_" + kind] = blob.get("net_" + kind, 0) + 1
+        if name:
+            blob[kind + "_names"].append(name)
+
     if digest:
-        blob["digest"] = _collect_digest(tmp, record)
+        blob["digest"] = _collect_digest(tmp, record, note)
     if academic:
         blob["academic"] = _collect_academic(tmp, record)
     blob["captured_at"] = datetime.datetime.now(
@@ -853,7 +906,7 @@ def collect(workdir=None, digest=True, academic=True):
     return blob
 
 
-def _collect_digest(tmp, record):
+def _collect_digest(tmp, record, note=None):
     """Run the product's own collector and return its real output payload."""
     if CN is None:
         return None
@@ -889,10 +942,18 @@ def _collect_digest(tmp, record):
     for row in (payload.get("source_results") or []):
         if not isinstance(row, dict):
             continue
-        if row.get("outcome") == "failed":
+        verdict = source_row_verdict(row)
+        if verdict == "failed":
             record(False, str(row.get("error") or "failed"))
         else:
+            # net_ok is DELIBERATELY unchanged for the other three verdicts:
+            # the anti-flake gate reads net_ok/net_failures and this change must
+            # not move it. The two non-clean, non-failing verdicts are counted
+            # and NAMED separately instead, so neither hides behind a green
+            # line in the summary.
             record(True)
+        if verdict in ("skipped_budget", "zero_yield") and note:
+            note(verdict, str(row.get("name") or ""))
     return payload
 
 
@@ -1147,6 +1208,18 @@ def main(argv=None):
         net_ok, net_fail, ("(" + ", ".join("%s=%d" % kv
                                            for kv in sorted(reasons.items())) + ")")
         if reasons else ""))
+    # Honest per-source line: these two are neither passes nor failures, and
+    # leaving them inside the green count is how a dead notice kind went
+    # unnoticed for weeks.
+    _skipped = int(blob.get("net_skipped_budget") or 0)
+    _zero = int(blob.get("net_zero_yield") or 0)
+    if _skipped:
+        print("live-canary: %d skipped_budget (reachability UNKNOWN): %s"
+              % (_skipped,
+                 ", ".join(blob.get("skipped_budget_names") or []) or "-"))
+    if _zero:
+        print("live-canary: %d zero_yield (parsed but contributed nothing): %s"
+              % (_zero, ", ".join(blob.get("zero_yield_names") or []) or "-"))
 
     # --- The anti-flake gate. Upstream unreachable -> INCONCLUSIVE, exit 0.
     if net_ok == 0 or (net_fail / float(total)) >= 0.5:

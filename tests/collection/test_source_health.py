@@ -177,7 +177,8 @@ class TestStateDecisionTable(unittest.TestCase):
         h = sh.compute_source_health(results, self.crit, "2026-09-27 06:12")
         self.assertEqual(h["state"], "unknown")
         self.assertEqual(h["all"], {"total": 1, "ok": 0, "empty": 0, "failed": 0,
-                                    "skipped": 1, "items_found": 0})
+                                    "skipped": 1, "items_found": 0,
+                                    "candidates_kept": 0})
         # Data was present, so the check timestamp is real.
         self.assertEqual(h["checked_at_npt"], "2026-09-27 06:12")
 
@@ -232,7 +233,7 @@ class TestEmptyIsAdditiveAndShielded(unittest.TestCase):
         # v1 numbers, unchanged: 2 ok (one of them empty), 1 failed, 1 skipped.
         self.assertEqual(h["all"], {"total": 4, "ok": 2, "empty": 1,
                                     "failed": 1, "skipped": 1,
-                                    "items_found": 4})
+                                    "items_found": 4, "candidates_kept": 0})
         self.assertEqual(h["critical"], {
             "total": 2, "ok": 2, "empty": 1, "failed": 0, "skipped": 0,
             "hosts_down": [], "empty_hosts": [], "reasons": []})
@@ -483,7 +484,8 @@ class TestAggregateShape(unittest.TestCase):
         h = sh.compute_source_health(results, self.crit, "2026-09-27 06:12")
         self.assertEqual(sorted(h), [
             "all", "by_category", "checked_at_npt", "critical", "empty_names",
-            "failed_names", "reachable_hosts", "schema_version", "state"])
+            "failed_names", "reachable_hosts", "schema_version", "state",
+            "zero_survival_names"])
         self.assertEqual(h["schema_version"], 2)
         self.assertEqual(h["state"], "degraded")
         self.assertEqual(h["checked_at_npt"], "2026-09-27 06:12")
@@ -495,7 +497,8 @@ class TestAggregateShape(unittest.TestCase):
         # the v1 numbers are unchanged; `items_found` is 0 because no row in
         # this fixture carried the field (UNKNOWN, never manufactured).
         self.assertEqual(h["all"], {"total": 6, "ok": 4, "empty": 0, "failed": 2,
-                                    "skipped": 0, "items_found": 0})
+                                    "skipped": 0, "items_found": 0,
+                                    "candidates_kept": 0})
         self.assertEqual(h["failed_names"],
                          ["notice:iost.tu.edu.np", "notice:tu.edu.np"])
         self.assertEqual(h["empty_names"], [])
@@ -504,7 +507,7 @@ class TestAggregateShape(unittest.TestCase):
         "www.bank.example.com"])
         self.assertEqual(h["by_category"]["education_tu"], {
             "total": 2, "ok": 0, "empty": 0, "failed": 2, "skipped": 0,
-            "items_found": 0, "empty_hosts": [],
+            "items_found": 0, "candidates_kept": 0, "empty_hosts": [],
             "urls": ["https://iost.tu.edu.np/", "https://tu.edu.np/"]})
         self.assertEqual(sorted(h["by_category"]), [
             "bank_local", "college_local", "education_tu", "local_city"])
@@ -667,7 +670,7 @@ class TestNeverRaises(unittest.TestCase):
         h = sh.compute_source_health(results, ["tu.edu.np"], "2026-09-27 06:12")
         self.assertEqual(h["all"], {"total": 2, "ok": 1, "empty": 0,
                                     "failed": 0, "skipped": 1,
-                                    "items_found": 0})
+                                    "items_found": 0, "candidates_kept": 0})
         self.assertEqual(h["critical"]["reasons"], ["malformed"])
         self.assertEqual(h["critical"]["hosts_down"], [])
         self.assertEqual(h["state"], "partial")

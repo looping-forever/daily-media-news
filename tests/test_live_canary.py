@@ -289,7 +289,8 @@ class D4Tests(unittest.TestCase):
         the loop, so the FIRST notice source decided the outcome: with
         bank.example.com (0 candidates) first, four healthy sources behind it
         were never even looked at. Measured per source on the live board:
-        examplebank 0, tu.edu.np 2, iost 6, college 3, nea 2."""
+        examplebank 0, tu.edu.np 2, iost 6, college 3, nea 2 -- nea.org.np was
+        retired from NOTICE_SITES afterwards, so that number is history."""
         blob = {
             "source_results": [
                 _row("notice:bank.example.com", "notice", "ok", 0,
@@ -1151,6 +1152,55 @@ class RealFixtureExpectationTests(unittest.TestCase):
                     name.lower().endswith(".pdf"),
                     "%s: a real result PDF must never be committed"
                     % os.path.join(dirpath, name))
+
+
+# ---------------------------------------------------------------------------
+# A source that contributed NOTHING is not a clean pass
+# ---------------------------------------------------------------------------
+
+class SourceRowVerdictTests(unittest.TestCase):
+    """`items_found` is counted before the caps, so `ok` alone cannot tell a
+    contributing source from one whose whole yield was dropped. These verdicts
+    are what stop `skipped_budget` and a zero-contribution source from hiding
+    inside the green count."""
+
+    def test_a_source_that_parsed_items_and_kept_none_is_zero_yield(self):
+        row = _row("notice:tu.edu.np", "notice", "ok", 9,
+                   category="education_tu", host="tu.edu.np")
+        row["candidates_kept"] = 0
+        self.assertEqual(LC.source_row_verdict(row), "zero_yield")
+
+    def test_a_source_that_contributed_is_ok(self):
+        row = _row("gnews:nepal", "gnews", "ok", 5, category="nepal",
+                   host="news.google.com")
+        row["candidates_kept"] = 2
+        self.assertEqual(LC.source_row_verdict(row), "ok")
+
+    def test_skipped_budget_is_named_separately(self):
+        row = _row("notice:tu.edu.np", "notice", "skipped_budget", None,
+                   category="education_tu", host="tu.edu.np")
+        self.assertEqual(LC.source_row_verdict(row), "skipped_budget")
+
+    def test_a_legacy_row_without_candidates_kept_is_not_accused(self):
+        row = _row("gnews:nepal", "gnews", "ok", 5, category="nepal",
+                   host="news.google.com")
+        self.assertEqual(LC.source_row_verdict(row), "ok",
+                         "an ABSENT count is UNKNOWN, never zero yield")
+
+    def test_a_failed_row_is_failed(self):
+        row = _row("notice:tu.edu.np", "notice", "failed", 0,
+                   category="education_tu", host="tu.edu.np",
+                   error="URLError: timed out")
+        row["candidates_kept"] = 0
+        self.assertEqual(LC.source_row_verdict(row), "failed")
+
+    def test_an_empty_row_is_not_zero_yield(self):
+        """`empty` already means the source answered with nothing; it must not
+        be double-labelled as having lost a yield it never had."""
+        row = _row("notice:tu.edu.np", "notice", "empty", 0,
+                   category="education_tu", host="tu.edu.np")
+        row["candidates_kept"] = 0
+        self.assertEqual(LC.source_row_verdict(row), "ok")
 
 
 if __name__ == "__main__":
