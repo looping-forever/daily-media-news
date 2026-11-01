@@ -30,15 +30,17 @@ blanket rule would fire on them until someone deleted the rule.
 
 WHAT IT CANNOT DO
 -----------------
-It reads the two trees it is pointed at. On CI only one tree exists, so the
-cross-tree arm reports a skip there -- stated, not silent. It also cannot tell a
-placeholder from a real id that HAPPENS to be the placeholder, which would be a
-Cloudflare namespace nobody can be using.
+It reads every working copy it is pointed at, and falls back to this one when no
+other exists, so a single-tree machine is still scanned rather than skipped. It
+also cannot tell a placeholder from a real id that HAPPENS to be the placeholder,
+which would be a Cloudflare namespace nobody can be using.
 """
 
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import unittest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -66,11 +68,10 @@ CONST_ID_RE = re.compile(
 
 #: Trees to check beyond the one this file lives in. Set
 #: DMNEWS_SIBLING_TREES (os.pathsep-separated) to point at others; when it is
-#: unset the two known working copies are tried and any that is absent is
-#: reported as a skip. On CI neither exists, which is expected and stated.
+#: unset the known working copy is tried, and this checkout is scanned when none
+#: is present, so the arm never goes quiet on a single-tree machine.
 SIBLING_ENV = "DMNEWS_SIBLING_TREES"
 DEFAULT_SIBLINGS = (
-    r"C:\Users\Nitro 5\daily-media-news",
     r"C:\src\dmnews-public",
 )
 
@@ -254,49 +255,122 @@ class RenderScriptTest(unittest.TestCase):
                          "from the index with `git rm --cached`." % RENDERED_CONFIG_REL)
 
 
+def tree_problems(root):
+    """Every non-placeholder declaration in one working copy, as strings.
+
+    Path, shape and location only -- never the value, which would put a real id
+    into a CI log. Extracted from the sibling arm below so the negative control
+    can run the SAME predicate against a tree it planted a real id in; a check
+    whose only observed outcome is an empty list cannot be distinguished from a
+    check that does nothing.
+    """
+    problems = []
+    if not os.path.isfile(os.path.join(root, WRANGLER_TOML_REL)):
+        return ["%s: no %s" % (root, WRANGLER_TOML_REL)]
+    for rel in tracked_files(root):
+        if any(part in SKIP_DIRS for part in rel.split(os.sep)):
+            continue
+        text = _read(os.path.join(root, rel))
+        if text is None:
+            continue
+        for label, value in declared_namespace_ids(text):
+            if value.lower() != PLACEHOLDER:
+                problems.append("%s -> %s (%s)"
+                                % (root, rel.replace(os.sep, "/"), label))
+    return problems
+
+
 class SiblingTreeTest(unittest.TestCase):
     """Rule 4: the OTHER working copy is held to the same rule.
 
-    Locally this is the whole point -- the two trees are not synced by a tool, so
-    a fix applied to one and not the other is exactly how the real id survived in
-    the private copy while the published one was clean. On CI only one tree
-    exists; that arm reports a skip and says so.
+    Locally this is the whole point -- two trees are not synced by a tool, so a
+    fix applied to one and not the other is exactly how the real id survived in
+    the private copy while the published one was clean. When no second checkout
+    exists the arm scans this tree instead, so the rule is never left unrun.
     """
 
     def _siblings(self):
         configured = os.environ.get(SIBLING_ENV, "")
         candidates = ([p for p in configured.split(os.pathsep) if p.strip()]
                       if configured.strip() else list(DEFAULT_SIBLINGS))
-        return [p for p in candidates
-                if os.path.abspath(p) != os.path.abspath(REPO_ROOT)]
+        others = [p for p in candidates
+                  if os.path.abspath(p) != os.path.abspath(REPO_ROOT)]
+        # No other checkout exists: scan this tree rather than skip the rule.
+        return others or [REPO_ROOT]
 
     def test_no_sibling_tree_commits_a_real_namespace_id(self):
         siblings = self._siblings()
         present = [p for p in siblings if os.path.isdir(os.path.join(p, "deploy"))]
         if not present:
+            # Unreachable inside a checkout: this tree always carries deploy/.
             self.skipTest(
-                "no sibling tree to check (tried: %s). On CI only this checkout "
-                "exists; the cross-tree arm runs locally." % ", ".join(siblings or ["-"]))
+                "no working copy on disk to scan (tried: %s), and this checkout "
+                "has no %s either." % (", ".join(siblings), WRANGLER_TOML_REL))
 
         problems = []
         for root in present:
-            template = os.path.join(root, WRANGLER_TOML_REL)
-            if not os.path.isfile(template):
-                problems.append("%s: no %s" % (root, WRANGLER_TOML_REL))
-                continue
-            for rel in tracked_files(root):
-                if any(part in SKIP_DIRS for part in rel.split(os.sep)):
-                    continue
-                text = _read(os.path.join(root, rel))
-                if text is None:
-                    continue
-                for label, value in declared_namespace_ids(text):
-                    if value.lower() != PLACEHOLDER:
-                        problems.append("%s -> %s (%s)"
-                                        % (root, rel.replace(os.sep, "/"), label))
+            problems.extend(tree_problems(root))
         self.assertEqual([], problems,
                          "another working copy commits a 32-hex id that is not "
                          "the placeholder:\n  " + "\n  ".join(problems))
+
+
+class SiblingArmNegativeControlTest(unittest.TestCase):
+    """The sibling arm must be able to FAIL. Nothing above proves that.
+
+    `test_no_sibling_tree_commits_a_real_namespace_id` only ever observes an
+    empty problem list, and a predicate that returned `[]` unconditionally would
+    pass it just as happily as a working one. So this plants two throwaway
+    working copies and runs the SAME function the arm runs:
+
+      * the placeholder                     -> must be clean;
+      * a non-placeholder 32-hex id          -> must be REPORTED.
+
+    The second is the negative control, and it is the real shape of the defect:
+    the private copy carried a live namespace id in exactly this declaration.
+    If that case stops being detected, the sibling arm has quietly become a
+    green light with no bulb behind it.
+    """
+
+    #: Not the placeholder, and not a real id either -- shaped exactly like one.
+    PASTED = "0123456789abcdef0123456789abcdef"
+
+    def _tree(self, kv_id):
+        root = tempfile.mkdtemp(prefix="deploy-id-")
+        self.addCleanup(shutil.rmtree, root, True)
+        os.makedirs(os.path.join(root, "deploy"))
+        with open(os.path.join(root, WRANGLER_TOML_REL), "w",
+                  encoding="utf-8") as handle:
+            handle.write('name = "throwaway"\n\n'
+                         '[[kv_namespaces]]\n'
+                         'binding = "DIGEST_LEDGER"\n'
+                         'id = "%s"\n' % kv_id)
+        return root
+
+    def test_a_pasted_non_placeholder_id_is_detected(self):
+        self.assertNotEqual(PLACEHOLDER, self.PASTED)
+        problems = tree_problems(self._tree(self.PASTED))
+        self.assertTrue(
+            problems,
+            "a working copy whose %s declares id = %r was reported as CLEAN (%r), "
+            "so the sibling arm cannot detect the one thing it exists to detect "
+            "-- it is decoration, and a real id pasted back in would ship."
+            % (WRANGLER_TOML_REL, "32-hex non-placeholder", problems))
+        self.assertEqual(1, len(problems),
+                         "expected exactly one offender, got %r" % (problems,))
+        self.assertIn("deploy/wrangler.toml", problems[0].replace(os.sep, "/"),
+                      "the report must name the file the id sits in: %r"
+                      % (problems[0],))
+        self.assertNotIn(self.PASTED, problems[0],
+                         "the report printed the id itself, which is how a real "
+                         "namespace id ends up in a CI log")
+
+    def test_the_placeholder_alone_stays_clean(self):
+        """The control for the control: the same builder, the permitted value."""
+        self.assertEqual([], tree_problems(self._tree(PLACEHOLDER)),
+                         "a tree carrying only the placeholder must be clean, or "
+                         "the negative control above proves nothing about which "
+                         "value triggered it")
 
 
 if __name__ == "__main__":
