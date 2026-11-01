@@ -75,6 +75,7 @@ import argparse
 import concurrent.futures as cf
 import html
 import json
+import math
 import os
 import queue as _queue
 import re
@@ -420,10 +421,20 @@ WEATHER_URL = (
 # plan count, worker count and budget are unchanged.
 WEATHER_HOURLY_FIELDS = (
     "precipitation_probability,precipitation,apparent_temperature,"
-    "temperature_2m,wind_speed_10m,visibility"
+    "temperature_2m,wind_speed_10m,visibility,dew_point_2m,uv_index"
 )
 WEATHER_DAILY_FIELDS = (
-    "temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode"
+    "temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode,"
+    "sunrise,sunset,uv_index_max,precipitation_probability_max,"
+    "wind_gusts_10m_max"
+)
+# The `current` block fed the frozen `weather` block's now-values. Requested
+# here ONLY, so WEATHER_URL -- which breaking_monitor.py fetches -- keeps its
+# daily-only shape.
+WEATHER_CURRENT_FIELDS = (
+    "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,"
+    "precipitation,weathercode,cloud_cover,wind_speed_10m,wind_gusts_10m,"
+    "wind_direction_10m"
 )
 WEATHER_HOURLY_DAYS = 3
 
@@ -466,6 +477,12 @@ WEATHERCODE_TEXT = {
     95: "thunderstorm", 96: "thunderstorm with slight hail",
     99: "thunderstorm with heavy hail",
 }
+
+# UV index -> band, as (upper_bound, name). The ONLY UV threshold in the tree:
+# renderers receive `uv_band` as text and never re-derive it. Bounds are the
+# WHO ladder: <3 low, 3-5 moderate, 6-7 high, 8-10 very high, 11+ extreme.
+UV_BANDS = ((3, "low"), (6, "moderate"), (8, "high"), (11, "very high"),
+            (None, "extreme"))
 
 # Best-effort official notice pages: (page URL, domain_category). The two
 # institution-specific entries come from the environment (private_values), so a
@@ -1502,6 +1519,10 @@ def weather_task(url, timeout, retry=None, on_attempt=None,
         snippet=summary, domain_category="weather_forecast", language="en")
 
     if box is not None:
+        # The raw response is kept for the frozen `weather` block: the
+        # normalized payload deliberately drops `current`, dew point and the
+        # sunrise/sunset/UV daily fields this block needs.
+        box["raw"] = payload
         norm, err = normalize_hourly_forecast(
             payload, box.get("place"), box.get("fetched_at_npt"),
             max_days=WEATHER_HOURLY_DAYS)
@@ -1543,9 +1564,9 @@ def build_weather_url(profile=None):
     if not isinstance(tz, str) or not tz.strip():
         return WEATHER_URL
     return ("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"
-            "&hourly=%s&daily=%s&timezone=%s&forecast_days=%d"
+            "&hourly=%s&daily=%s&current=%s&timezone=%s&forecast_days=%d"
             % (lat, lon, WEATHER_HOURLY_FIELDS, WEATHER_DAILY_FIELDS,
-               quote(tz, safe=""), WEATHER_HOURLY_DAYS))
+               WEATHER_CURRENT_FIELDS, quote(tz, safe=""), WEATHER_HOURLY_DAYS))
 
 
 def default_profile_path():
@@ -1580,7 +1601,7 @@ def new_weather_box(profile=None, fetched_at_npt=None):
     the next one's advice.
     """
     return {"place": weather_place(profile), "fetched_at_npt": fetched_at_npt,
-            "payload": None, "error": ""}
+            "payload": None, "error": "", "raw": None}
 
 
 def _num(value):
@@ -1736,6 +1757,252 @@ def normalize_hourly_forecast(payload, place, fetched_at_npt, max_days=3):
     return {"fetched_at_npt": fetched_at_npt,
             "place": place if isinstance(place, dict) else {},
             "days": days}, ""
+
+
+# ---------------------------------------------------------------------------
+# The frozen `weather` block. This is a PRESENTATION CONTRACT, not advice: the
+# renderers read exactly these keys and are allowed to know nothing else --
+# no weathercode, no UV threshold, no placeholder text. Everything here is
+# derived from the payload alone, so the same response always gives the same
+# block.
+# ---------------------------------------------------------------------------
+
+WEATHER_NARRATIVE_MAX = 220
+
+
+def uv_band(uv_max):
+    """UV index -> band name, or None. The ladder itself is UV_BANDS."""
+    value = _wnum(uv_max)
+    if value is None:
+        return None
+    for bound, name in UV_BANDS:
+        if bound is None or value < bound:
+            return name
+    return None
+
+
+def _wnum(value):
+    """A finite real number, or None. bool and NaN/inf are not numbers here."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if math.isnan(value) or math.isinf(value):
+        return None
+    return value
+
+
+def _wlist(container, key):
+    """A list-valued field, or []. Never returns a str/number to iterate."""
+    if not isinstance(container, dict):
+        return []
+    values = container.get(key)
+    return values if isinstance(values, list) else []
+
+
+def _wcondition(code):
+    """weathercode -> WEATHERCODE_TEXT text, or None.
+
+    Deliberately `get()` with no default: "unknown" is a placeholder token the
+    renderers must never see, so an unmapped code becomes null instead.
+    """
+    value = _wnum(code)
+    if value is None or value != int(value):
+        return None
+    return WEATHERCODE_TEXT.get(int(value))
+
+
+def _hour_index(times, day, hour):
+    """Index of the hourly sample at (day, hour), or None."""
+    if day is None or hour is None:
+        return None
+    for i, stamp in enumerate(times):
+        sday, shour = _split_hourly_stamp(stamp)
+        if sday == day and shour == hour:
+            return i
+    return None
+
+
+def _hour_of(stamp):
+    return _split_hourly_stamp(stamp)[1]
+
+
+def build_weather_block(box):
+    """Assemble the `weather` block from the raw open-meteo response.
+
+    Returns {} when it cannot be built -- never raises. The block is a frozen
+    contract for the renderers, so a missing optional field is null, not text.
+    """
+    if not isinstance(box, dict):
+        return {}
+    raw = box.get("raw")
+    if not isinstance(raw, dict):
+        return {}
+    try:
+        return _assemble_weather_block(raw, box.get("place"),
+                                       box.get("fetched_at_npt")) or {}
+    except Exception:
+        return {}
+
+
+def _assemble_weather_block(raw, place, fetched_at_npt):
+    if not isinstance(fetched_at_npt, str) or len(fetched_at_npt) < 10:
+        return {}
+    today = fetched_at_npt[:10]
+    now_hour = _hour_of(fetched_at_npt)
+
+    current = raw.get("current")
+    current = current if isinstance(current, dict) else {}
+    hourly = raw.get("hourly")
+    hourly = hourly if isinstance(hourly, dict) else {}
+    daily = raw.get("daily")
+    daily = daily if isinstance(daily, dict) else {}
+
+    hourly_times = _wlist(hourly, "time")
+    now_i = _hour_index(hourly_times, today, now_hour)
+
+    dtimes = [d for d in _wlist(daily, "time") if isinstance(d, str)]
+    # `today` and `outlook` are REQUIRED members of the contract, and both are
+    # built off the daily axis. Without one there is no honest block to emit,
+    # so this is the empty case rather than a scaffold of nulls.
+    if not dtimes:
+        return {}
+    today_i = dtimes.index(today) if today in dtimes else None
+
+    def daily_num(key, i):
+        if i is None:
+            return None
+        return _wnum(_at(_wlist(daily, key), i))
+
+    def daily_str(key, i):
+        if i is None:
+            return None
+        value = _at(_wlist(daily, key), i)
+        return value if isinstance(value, str) and value.strip() else None
+
+    def hourly_num(key, i):
+        if i is None:
+            return None
+        return _wnum(_at(_wlist(hourly, key), i))
+
+    # --- the next 12 hours, counted from the current hour of the response ---
+    pop_peak, pop_peak_hour, precip_mm, window = None, None, None, None
+    if now_i is not None:
+        last_i = min(now_i + 11, len(hourly_times) - 1)
+        start_h, end_h = _hour_of(hourly_times[now_i]), _hour_of(
+            hourly_times[last_i])
+        if start_h is not None and end_h is not None:
+            window = "%02d:00-%02d:00" % (start_h, end_h)
+        total = 0.0
+        for j in range(now_i, last_i + 1):
+            pop = hourly_num("precipitation_probability", j)
+            if pop is not None and (pop_peak is None or pop > pop_peak):
+                pop_peak, pop_peak_hour = pop, _hour_of(hourly_times[j])
+            amount = hourly_num("precipitation", j)
+            if amount is not None:
+                total += amount
+                precip_mm = total
+
+    today_block = {
+        "tmax_c": daily_num("temperature_2m_max", today_i),
+        "tmin_c": daily_num("temperature_2m_min", today_i),
+        "pop_max_pct": daily_num("precipitation_probability_max", today_i),
+        "precip_sum_mm": daily_num("precipitation_sum", today_i),
+        "condition": _wcondition(_at(_wlist(daily, "weathercode"), today_i))
+        if today_i is not None else None,
+        "sunrise": daily_str("sunrise", today_i),
+        "sunset": daily_str("sunset", today_i),
+        "uv_max": daily_num("uv_index_max", today_i),
+    }
+    today_block["uv_band"] = uv_band(today_block["uv_max"])
+
+    outlook = []
+    for i, day in enumerate(dtimes):
+        if day < today:
+            continue
+        outlook.append({
+            "day": day,
+            "tmax_c": daily_num("temperature_2m_max", i),
+            "tmin_c": daily_num("temperature_2m_min", i),
+            "pop_pct": daily_num("precipitation_probability_max", i),
+            "precip_mm": daily_num("precipitation_sum", i),
+            "condition": _wcondition(_at(_wlist(daily, "weathercode"), i)),
+            "gust_max_kmh": daily_num("wind_gusts_10m_max", i),
+        })
+        if len(outlook) >= 3:
+            break
+
+    block = {
+        "fetched_at_npt": fetched_at_npt,
+        "place": place if isinstance(place, dict) else {},
+        "temperature_c": _wnum(current.get("temperature_2m")),
+        "apparent_c": _wnum(current.get("apparent_temperature")),
+        "humidity_pct": _wnum(current.get("relative_humidity_2m")),
+        "dew_point_c": hourly_num("dew_point_2m", now_i),
+        "wind_kmh": _wnum(current.get("wind_speed_10m")),
+        "gust_kmh": _wnum(current.get("wind_gusts_10m")),
+        "cloud_pct": _wnum(current.get("cloud_cover")),
+        "precip_now_mm": _wnum(current.get("precipitation")),
+        "condition": _wcondition(current.get("weathercode")),
+        "today": today_block,
+        "next12h": {"pop_peak_pct": pop_peak, "pop_peak_hour": pop_peak_hour,
+                    "precip_mm": precip_mm, "window": window},
+        "outlook": outlook,
+    }
+    block["narrative"] = weather_narrative(block)
+    return block
+
+
+def weather_narrative(block):
+    """One sentence from the numbers that are present, <= 220 chars.
+
+    Deterministic by construction: no clock, no random, no locale-dependent
+    formatting, and no placeholder for an absent number -- the clause is simply
+    dropped. Clauses are added in priority order, so truncation can only ever
+    remove the tail.
+    """
+    clauses = []
+    temp = block.get("temperature_c")
+    if temp is not None:
+        text = "Now %d\u00b0C" % int(round(temp))
+        apparent = block.get("apparent_c")
+        if apparent is not None:
+            text += " (feels %d\u00b0C)" % int(round(apparent))
+        if block.get("condition"):
+            text += ", %s" % block["condition"]
+        clauses.append(text)
+
+    today = block.get("today") or {}
+    tmax, tmin = today.get("tmax_c"), today.get("tmin_c")
+    if tmax is not None and tmin is not None:
+        clauses.append("high %d\u00b0C / low %d\u00b0C"
+                       % (int(round(tmax)), int(round(tmin))))
+    elif tmax is not None:
+        clauses.append("high %d\u00b0C" % int(round(tmax)))
+    elif tmin is not None:
+        clauses.append("low %d\u00b0C" % int(round(tmin)))
+
+    nxt = block.get("next12h") or {}
+    pop = nxt.get("pop_peak_pct")
+    if pop is not None:
+        text = "rain peaks at %d%%" % int(round(pop))
+        if nxt.get("pop_peak_hour") is not None:
+            text += " around %02d:00" % nxt["pop_peak_hour"]
+        clauses.append(text)
+
+    precip = nxt.get("precip_mm")
+    if precip is not None and precip > 0:
+        clauses.append("%.1f mm expected" % precip)
+
+    if today.get("uv_band"):
+        clauses.append("UV %s" % today["uv_band"])
+
+    text = ""
+    for clause in clauses:
+        candidate = clause if not text else text + "; " + clause
+        if len(candidate) + 1 > WEATHER_NARRATIVE_MAX:
+            break
+        text = candidate
+    return (text + ".") if text else ""
+
 
 
 def kathmandu_now_str():
@@ -2496,6 +2763,10 @@ def main(argv=None):
         # digest went blind to weather for weeks with nothing complaining; a
         # presence assertion in tests/collection now guards it.
         "weather_advice": weather_advice_lines,
+        # The frozen renderer contract. Always present, {} when the response
+        # could not produce it -- a missing key would be indistinguishable from
+        # "no weather today".
+        "weather": build_weather_block(weather_box),
         "candidates": final_candidates,
     }
     # Merge with any stage timings already recorded by the workflow

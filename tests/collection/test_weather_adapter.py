@@ -23,6 +23,7 @@ Run:
 
 import io
 import json
+import math
 import os
 import re
 import sys
@@ -120,6 +121,41 @@ def wet_body(dates=None, start=7, end=20, pop=70, apparent=8.0, mm=2.4):
             mms[h] = mm
     return hourly_body(dates, precipitation_probability=pops,
                        apparent_temperature=appar, precipitation=mms)
+
+
+def weather_body(dates=None, drop=(), current=None, **overrides):
+    """hourly_body() plus the pass-1a `current` block and the new arrays.
+
+    `drop` names dotted paths ("daily.sunrise", "current.temperature_2m") to
+    delete, which is how one test asks "what does the block look like when this
+    optional field is simply not there?".
+    """
+    dates = dates or DAYS
+    body = hourly_body(dates, **overrides)
+    count = 24 * len(dates)
+    body["hourly"]["dew_point_2m"] = [15.2] * count
+    body["hourly"]["uv_index"] = [0.0] * count
+    body["daily"].update({
+        "sunrise": ["%sT05:55" % day for day in dates],
+        "sunset": ["%sT17:58" % day for day in dates],
+        "uv_index_max": [8.4] * len(dates),
+        "precipitation_probability_max": [85] * len(dates),
+        "wind_gusts_10m_max": [22.0] * len(dates),
+    })
+    body["current"] = current if current is not None else {
+        "time": "%sT06:15" % dates[0], "interval": 900,
+        "temperature_2m": 21.4, "relative_humidity_2m": 78,
+        "apparent_temperature": 22.1, "is_day": 1, "precipitation": 0.2,
+        "weathercode": 51, "cloud_cover": 64, "wind_speed_10m": 6.3,
+        "wind_gusts_10m": 14.0, "wind_direction_10m": 170,
+    }
+    for path in drop:
+        parts = path.split(".")
+        target = body
+        for part in parts[:-1]:
+            target = target[part]
+        target.pop(parts[-1], None)
+    return body
 
 
 def profile_path(tmpdir, unavailable=None, mutate=None, name="profile.yml"):
@@ -252,6 +288,41 @@ class TestWeatherUrlBuilder(unittest.TestCase):
         self.assertIn("forecast_days=3", url)
         # daily rides along in the SAME request, so the plan count is unchanged
         self.assertIn("daily=temperature_2m_max", url)
+
+    def test_url_requests_the_current_block_and_the_new_arrays(self):
+        """The frozen `weather` block needs fields the advice lane never reads."""
+        url = cn.build_weather_url(self.profile)
+        self.assertIn("&current=", url)
+        params = dict(part.partition("=")[::2]
+                      for part in url.split("?", 1)[1].split("&"))
+        self.assertEqual(
+            params["current"].split(","),
+            ["temperature_2m", "relative_humidity_2m", "apparent_temperature",
+             "is_day", "precipitation", "weathercode", "cloud_cover",
+             "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m"])
+        self.assertEqual(
+            params["hourly"].split(","),
+            ["precipitation_probability", "precipitation",
+             "apparent_temperature", "temperature_2m", "wind_speed_10m",
+             "visibility", "dew_point_2m", "uv_index"])
+        self.assertEqual(
+            params["daily"].split(","),
+            ["temperature_2m_max", "temperature_2m_min", "precipitation_sum",
+             "weathercode", "sunrise", "sunset", "uv_index_max",
+             "precipitation_probability_max", "wind_gusts_10m_max"])
+        # The daily-only literal breaking_monitor.py fetches keeps its shape.
+        self.assertNotIn("current=", cn.WEATHER_URL)
+        self.assertNotIn("uv_index", cn.WEATHER_URL)
+
+    def test_no_new_field_enters_the_required_hourly_tuple(self):
+        """A new field must never be able to make a day 'incomplete'."""
+        self.assertEqual(cn.WEATHER_REQUIRED_HOURLY,
+                         ("time", "precipitation_probability",
+                          "apparent_temperature"))
+        for name in ("dew_point_2m", "uv_index", "sunrise", "sunset",
+                     "uv_index_max", "precipitation_probability_max",
+                     "wind_gusts_10m_max"):
+            self.assertNotIn(name, cn.WEATHER_REQUIRED_HOURLY)
 
     def test_a_profile_without_coordinates_falls_back_rather_than_invents(self):
         for location in ({}, {"city": "Example City"}, {"latitude": "12.34"},
@@ -778,6 +849,406 @@ class TestRecordWeatherAdvice(unittest.TestCase):
         self.assertEqual(out_rows[-1]["attempts"], 2)
         self.assertEqual(out_rows[-1]["kind"], "weather")
         self.assertEqual(out_failed, ["weather_advice:open-meteo (boom)"])
+
+
+# ---------------------------------------------------------------------------
+# The frozen `weather` block -- pass 1a. The renderers read exactly these keys
+# and are allowed to know nothing else: no weathercode, no UV threshold, no
+# placeholder text. Everything here is derived from the response alone.
+# ---------------------------------------------------------------------------
+
+BLOCK_KEYS = {"fetched_at_npt", "place", "temperature_c", "apparent_c",
+              "humidity_pct", "dew_point_c", "wind_kmh", "gust_kmh",
+              "cloud_pct", "precip_now_mm", "condition", "today", "next12h",
+              "outlook", "narrative"}
+PLACE_KEYS = {"city", "latitude", "longitude", "timezone"}
+TODAY_KEYS = {"tmax_c", "tmin_c", "pop_max_pct", "precip_sum_mm", "condition",
+              "sunrise", "sunset", "uv_max", "uv_band"}
+NEXT12H_KEYS = {"pop_peak_pct", "pop_peak_hour", "precip_mm", "window"}
+OUTLOOK_KEYS = {"day", "tmax_c", "tmin_c", "pop_pct", "precip_mm", "condition",
+                "gust_max_kmh"}
+NUMERIC_PATHS = ("temperature_c", "apparent_c", "humidity_pct", "dew_point_c",
+                 "wind_kmh", "gust_kmh", "cloud_pct", "precip_now_mm",
+                 "today.tmax_c", "today.tmin_c", "today.pop_max_pct",
+                 "today.precip_sum_mm", "today.uv_max",
+                 "next12h.pop_peak_pct", "next12h.pop_peak_hour",
+                 "next12h.precip_mm")
+OUTLOOK_NUMERIC = ("tmax_c", "tmin_c", "pop_pct", "precip_mm", "gust_max_kmh")
+# Never a stand-in for a number: a null stays null.
+PLACEHOLDER_TOKENS = ("none", "n/a", "?", "nan", "unknown")
+
+#: Every field this pass added. Deleting one must cost that value and nothing
+#: else -- never a placeholder, never a failed run.
+NEW_FIELDS = (
+    "current.temperature_2m", "current.relative_humidity_2m",
+    "current.apparent_temperature", "current.is_day", "current.precipitation",
+    "current.weathercode", "current.cloud_cover", "current.wind_speed_10m",
+    "current.wind_gusts_10m", "current.wind_direction_10m",
+    "hourly.dew_point_2m", "hourly.uv_index",
+    "hourly.precipitation_probability",
+    "daily.sunrise", "daily.sunset", "daily.uv_index_max",
+    "daily.precipitation_probability_max", "daily.wind_gusts_10m_max",
+)
+
+
+def strings_in(value):
+    """Every string VALUE in a nested structure (keys are not values)."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            for found in strings_in(item):
+                yield found
+    elif isinstance(value, list):
+        for item in value:
+            for found in strings_in(item):
+                yield found
+
+
+def dig(block, path):
+    current = block
+    for part in path.split("."):
+        current = current[part]
+    return current
+
+
+class TestWeatherBlock(unittest.TestCase):
+    """The `weather` key in candidates.json: shape, degradation, narrative."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="wx-block-")
+        self.profile, _ = cn.load_weather_profile(REPO_PROFILE)
+        self.place = cn.weather_place(self.profile)
+
+    def box_for(self, body, fetched=NPT0):
+        return {"place": self.place, "fetched_at_npt": fetched,
+                "payload": None, "error": "", "raw": body}
+
+    def block_for(self, body, fetched=NPT0):
+        return cn.build_weather_block(self.box_for(body, fetched))
+
+    def assert_no_placeholder(self, block, label=""):
+        for text in strings_in(block):
+            low = text.lower()
+            for token in PLACEHOLDER_TOKENS:
+                self.assertNotIn(token, low,
+                                 "%r carries the placeholder %r" % (label, token))
+        for path in NUMERIC_PATHS:
+            value = dig(block, path)
+            if isinstance(value, float):
+                self.assertFalse(math.isnan(value), path)
+
+    # -- shape -------------------------------------------------------------
+
+    def test_block_matches_the_frozen_shape(self):
+        pops = [0] * 72
+        for hour in range(6, 18):
+            pops[hour] = 70
+        pops[9] = 85
+        body = weather_body(precipitation_probability=pops)
+        body["daily"]["precipitation_probability_max"] = [40, 55, 5]
+        block = self.block_for(body)
+
+        self.assertEqual(set(block), BLOCK_KEYS)
+        self.assertEqual(set(block["place"]), PLACE_KEYS)
+        self.assertEqual(set(block["today"]), TODAY_KEYS)
+        self.assertEqual(set(block["next12h"]), NEXT12H_KEYS)
+        self.assertEqual(len(block["outlook"]), 3)
+        for entry in block["outlook"]:
+            self.assertEqual(set(entry), OUTLOOK_KEYS)
+        self.assertEqual([e["day"] for e in block["outlook"]], DAYS)
+
+        self.assertEqual(block["fetched_at_npt"], NPT0)
+        self.assertEqual(block["place"]["city"], "Kathmandu")
+        self.assertEqual(block["temperature_c"], 21.4)
+        # The header temperature is the apparent one -- the decision, not a
+        # renderer's choice.
+        self.assertEqual(block["apparent_c"], 22.1)
+        self.assertEqual(block["humidity_pct"], 78)
+        self.assertEqual(block["dew_point_c"], 15.2)
+        self.assertEqual(block["wind_kmh"], 6.3)
+        self.assertEqual(block["gust_kmh"], 14.0)
+        self.assertEqual(block["cloud_pct"], 64)
+        self.assertEqual(block["precip_now_mm"], 0.2)
+        self.assertEqual(block["condition"], "light drizzle")
+
+        self.assertEqual(block["today"]["tmax_c"], 26.1)
+        self.assertEqual(block["today"]["tmin_c"], 12.6)
+        self.assertEqual(block["today"]["pop_max_pct"], 40)
+        self.assertEqual(block["today"]["condition"], "light drizzle")
+        self.assertEqual(block["today"]["sunrise"], "2026-09-28T05:55")
+        self.assertEqual(block["today"]["sunset"], "2026-09-28T17:58")
+        self.assertEqual(block["today"]["uv_max"], 8.4)
+        self.assertEqual(block["today"]["uv_band"], "very high")
+
+        self.assertEqual(block["next12h"]["pop_peak_pct"], 85)
+        self.assertEqual(block["next12h"]["pop_peak_hour"], 9)
+        self.assertEqual(block["next12h"]["precip_mm"], 0.0)
+        self.assertEqual(block["next12h"]["window"], "06:00-17:00")
+
+        self.assertEqual(block["outlook"][0]["gust_max_kmh"], 22.0)
+        self.assert_no_placeholder(block)
+
+    def test_every_numeric_is_a_number_or_null(self):
+        for body in (weather_body(), weather_body(
+                drop=("current.temperature_2m", "daily.uv_index_max")),
+                weather_body(current={})):
+            block = self.block_for(body)
+            for path in NUMERIC_PATHS:
+                value = dig(block, path)
+                self.assertIsInstance(value, (int, float, type(None)),
+                                      "%s was %r" % (path, value))
+                self.assertNotIsInstance(value, bool, path)
+            for entry in block["outlook"]:
+                for key in OUTLOOK_NUMERIC:
+                    value = entry[key]
+                    self.assertIsInstance(value, (int, float, type(None)),
+                                          "%s was %r" % (key, value))
+
+    def test_condition_is_null_rather_than_the_word_unknown(self):
+        body = weather_body()
+        body["current"]["weathercode"] = 42        # not in WEATHERCODE_TEXT
+        body["daily"]["weathercode"] = [42, 61, 0]
+        block = self.block_for(body)
+        self.assertIsNone(block["condition"])
+        self.assertIsNone(block["today"]["condition"])
+        self.assertIsNone(block["outlook"][0]["condition"])
+        self.assertEqual(block["outlook"][1]["condition"], "slight rain")
+        self.assert_no_placeholder(block)
+
+    def test_uv_band_ladder_lives_here_and_is_text(self):
+        cases = {0: "low", 2.9: "low", 3: "moderate", 5.9: "moderate",
+                 6: "high", 7.9: "high", 8: "very high", 10.9: "very high",
+                 11: "extreme", 14: "extreme"}
+        for value, band in cases.items():
+            self.assertEqual(cn.uv_band(value), band, value)
+        for absent in (None, "", "high", True, float("nan")):
+            self.assertIsNone(cn.uv_band(absent), absent)
+
+    # -- optional fields must never make a day incomplete ------------------
+
+    def test_missing_optional_daily_fields_do_not_incomplete_a_day(self):
+        body = weather_body(drop=("daily.uv_index_max", "daily.sunrise",
+                                  "daily.sunset",
+                                  "daily.precipitation_probability_max",
+                                  "daily.wind_gusts_10m_max"))
+        norm, err = cn.normalize_hourly_forecast(body, self.place, NPT0)
+        self.assertEqual(err, "")
+        self.assertEqual([d["date"] for d in norm["days"]], DAYS)
+
+        block = self.block_for(body)
+        self.assertIsNone(block["today"]["uv_max"])
+        self.assertIsNone(block["today"]["uv_band"])
+        self.assertIsNone(block["today"]["sunrise"])
+        self.assertIsNone(block["today"]["pop_max_pct"])
+        self.assertIsNone(block["outlook"][0]["gust_max_kmh"])
+        self.assertEqual(len(block["outlook"]), 3)
+        self.assert_no_placeholder(block)
+
+    def test_missing_precipitation_probability_degrades_the_block_not_the_run(self):
+        """Contrast with test_short_required_array_makes_today_incomplete.
+
+        For the ADVICE lane a missing precipitation_probability is a hole and
+        the day is dropped -- unchanged, and deliberately so. The block has no
+        such completeness rule: it degrades the window to null and the daily
+        maximum still stands.
+        """
+        body = weather_body(drop=("hourly.precipitation_probability",))
+        norm, err = cn.normalize_hourly_forecast(body, self.place, NPT0)
+        self.assertIsNone(norm)
+        self.assertIn("precipitation_probability", err)
+
+        block = self.block_for(body)
+        self.assertIsNone(block["next12h"]["pop_peak_pct"])
+        self.assertIsNone(block["next12h"]["pop_peak_hour"])
+        self.assertEqual(block["today"]["pop_max_pct"], 85)
+        self.assertEqual(len(block["outlook"]), 3)
+        self.assert_no_placeholder(block)
+
+    def test_truncated_required_array_still_refuses_advice(self):
+        """The existing :430 rule, restated against the extended body."""
+        norm, err = cn.normalize_hourly_forecast(
+            weather_body(precipitation_probability=[0] * 10), self.place, NPT0)
+        self.assertIsNone(norm)
+        self.assertIn("incomplete", err)
+
+    def test_deleting_any_new_field_leaves_no_placeholder(self):
+        for path in NEW_FIELDS:
+            with self.subTest(field=path):
+                box = cn.new_weather_box(self.profile, NPT0)
+                body = json.dumps(weather_body(drop=(path,))).encode("utf-8")
+                saved = cn.fetch_bytes
+                cn.fetch_bytes = lambda url, timeout, max_bytes: body
+                try:
+                    candidates, summary = cn.weather_task(
+                        cn.WEATHER_URL, 1, None, None, None, box)
+                finally:
+                    cn.fetch_bytes = saved
+                self.assertEqual(len(candidates), 1)
+                self.assertTrue(summary)
+                block = cn.build_weather_block(box)
+                self.assertEqual(set(block), BLOCK_KEYS, path)
+                self.assert_no_placeholder(block, path)
+
+    # -- narrative ---------------------------------------------------------
+
+    def headline_body(self):
+        pops = [0] * 72
+        for hour in range(6, 18):
+            pops[hour] = 70
+        pops[9] = 85
+        return weather_body(precipitation_probability=pops)
+
+    def test_narrative_is_deterministic(self):
+        body = self.headline_body()
+        first = self.block_for(body)["narrative"]
+        second = self.block_for(body)["narrative"]
+        third = self.block_for(json.loads(json.dumps(body)))["narrative"]
+        self.assertEqual(first, second)
+        self.assertEqual(first, third)
+        self.assertTrue(first)
+
+    def test_narrative_carries_the_two_headline_numbers(self):
+        block = self.block_for(self.headline_body())
+        narrative = block["narrative"]
+        self.assertIn(str(int(round(block["temperature_c"]))), narrative)
+        self.assertIn(str(int(round(block["next12h"]["pop_peak_pct"]))),
+                      narrative)
+        self.assertIn("rain peaks at 85%", narrative)
+
+    def test_narrative_drops_the_rain_clause_when_pop_is_absent(self):
+        body = weather_body(drop=("hourly.precipitation_probability",
+                                  "daily.precipitation_probability_max"))
+        narrative = self.block_for(body)["narrative"]
+        self.assertNotIn("rain", narrative)
+        self.assertIn("Now 21", narrative)
+        self.assertTrue(narrative.endswith("."))
+
+    def test_narrative_omits_every_clause_whose_numbers_are_missing(self):
+        narrative = self.block_for(weather_body(drop=(
+            "current.temperature_2m", "current.apparent_temperature",
+            "current.weathercode", "daily.temperature_2m_max",
+            "daily.temperature_2m_min", "hourly.precipitation_probability",
+            "daily.precipitation_probability_max", "daily.uv_index_max",
+            "hourly.precipitation")))["narrative"]
+        self.assertEqual(narrative, "", "nothing present -> nothing claimed")
+
+    def test_narrative_never_exceeds_the_cap(self):
+        bodies = [self.headline_body(),
+                  weather_body(precipitation_probability=[100] * 72)]
+        for body in bodies:
+            narrative = self.block_for(body)["narrative"]
+            self.assertLessEqual(len(narrative), 220)
+            self.assertTrue(narrative.endswith("."))
+
+    def test_narrative_cap_is_a_hard_guard(self):
+        """A clause longer than any real condition text must still be capped."""
+        oversized = {"temperature_c": 21.0, "apparent_c": 22.0,
+                     "condition": "x" * 300, "today": {}, "next12h": {}}
+        self.assertLessEqual(len(cn.weather_narrative(oversized)), 220)
+        realistic = {"temperature_c": 21.0, "apparent_c": 22.0,
+                     "condition": "thunderstorm with heavy hail",
+                     "today": {"tmax_c": 26.0, "tmin_c": 12.0,
+                               "uv_band": "extreme"},
+                     "next12h": {"pop_peak_pct": 100.0, "pop_peak_hour": 23,
+                                 "precip_mm": 99.9}}
+        narrative = cn.weather_narrative(realistic)
+        self.assertLessEqual(len(narrative), 220)
+        self.assertIn("Now 21", narrative)
+        self.assertIn("rain peaks at 100%", narrative)
+
+    def test_the_block_reaches_candidates_json_end_to_end(self):
+        """The wiring, not just the function: the key is written by main()."""
+        day = cn.kathmandu_now_str()[:10]
+        with WeatherFixture(json.dumps(weather_body([day])).encode("utf-8"),
+                            self.tmp) as fx:
+            rc, payload, _log = fx.run()
+        self.assertEqual(rc, 0)
+        self.assertIn("weather", payload)
+        block = payload["weather"]
+        self.assertEqual(set(block), BLOCK_KEYS)
+        self.assertEqual(set(block["place"]), PLACE_KEYS)
+        self.assertEqual(set(block["today"]), TODAY_KEYS)
+        self.assertEqual(set(block["next12h"]), NEXT12H_KEYS)
+        self.assertEqual([e["day"] for e in block["outlook"]], [day])
+        self.assertEqual(block["temperature_c"], 21.4)
+        self.assertEqual(block["condition"], "light drizzle")
+        self.assertEqual(block["today"]["uv_band"], "very high")
+        self.assertTrue(block["narrative"])
+        self.assert_no_placeholder(block)
+        # The payload the renderers already read is untouched by this pass.
+        self.assertIn("weather_advice", payload)
+        self.assertTrue(payload["weather_summary"])
+
+    # -- junk --------------------------------------------------------------
+
+    def test_junk_payloads_emit_an_empty_block_and_exit_zero(self):
+        for junk in ({}, "not json", [], {"hourly": {}}):
+            with self.subTest(payload=junk):
+                with WeatherFixture(json.dumps(junk).encode("utf-8"),
+                                    self.tmp) as fx:
+                    rc, payload, _log = fx.run()
+                self.assertEqual(rc, 0)
+                self.assertIn("weather", payload)
+                self.assertEqual(payload["weather"], {})
+                self.assertTrue(payload["candidates"], "news still collected")
+
+    def test_a_payload_with_no_hourly_block_still_emits_the_block(self):
+        """The daily-only shape has no `current`; the block degrades to nulls."""
+        body = weather_body(drop=("hourly", "current"))
+        block = self.block_for(body)
+        self.assertEqual(set(block), BLOCK_KEYS)
+        self.assertIsNone(block["temperature_c"])
+        self.assertIsNone(block["dew_point_c"])
+        self.assertIsNone(block["next12h"]["pop_peak_pct"])
+        self.assertEqual(len(block["outlook"]), 3)
+        self.assert_no_placeholder(block)
+
+    def test_an_unusable_fetch_time_emits_nothing_rather_than_guessing(self):
+        for fetched in ("", "nonsense", None):
+            self.assertEqual(self.block_for(weather_body(), fetched=fetched),
+                             {}, fetched)
+
+    # -- nothing downstream moved -----------------------------------------
+
+    def test_the_new_fields_do_not_move_the_summary_or_the_advice(self):
+        """The frozen summary and the advice templates are untouched.
+
+        The daily-only expectations pinned in TestDailyOnlyPathStillWorks stay
+        as they were; this proves the same response with `current` and the new
+        arrays attached produces byte-identical output.
+        """
+        saved = cn.fetch_bytes
+
+        def fetch(body):
+            cn.fetch_bytes = lambda url, timeout, max_bytes: json.dumps(
+                body).encode("utf-8")
+            try:
+                return cn.weather_task(cn.WEATHER_URL, 1)
+            finally:
+                cn.fetch_bytes = saved
+
+        plain_c, plain_summary = fetch(hourly_body())
+        rich_c, rich_summary = fetch(weather_body())
+        self.assertEqual(plain_summary, rich_summary)
+        self.assertEqual([c["snippet"] for c in plain_c],
+                         [c["snippet"] for c in rich_c])
+        self.assertEqual(
+            rich_summary,
+            "Weather forecast for the configured location (next 3 days, "
+            "Asia/Kathmandu, open-meteo): "
+            "2026-09-28: max +26\u00b0C / min +13\u00b0C, precip 1.0 mm, "
+            "light drizzle; "
+            "2026-09-29: max +26\u00b0C / min +13\u00b0C, precip 1.0 mm, "
+            "light drizzle; "
+            "2026-09-30: max +26\u00b0C / min +13\u00b0C, precip 1.0 mm, "
+            "light drizzle")
+
+        fresh = cn.normalize_hourly_forecast(hourly_body(), self.place, NPT0)[0]
+        rich = cn.normalize_hourly_forecast(weather_body(), self.place, NPT0)[0]
+        self.assertEqual(fresh, rich)
+        self.assertEqual(wa.weather_advice(fresh, self.profile, []),
+                         wa.weather_advice(rich, self.profile, []))
 
 
 if __name__ == "__main__":
