@@ -88,6 +88,11 @@ WORKFLOW_NAMES = (
     # every check below silently skips, and a green suite then means "the
     # workflows I was told about are fine".
     "delivery-selftest.yml",
+    # Added 2026-11-01 with the file itself. Manual dispatch only, no cron, so
+    # it contributes nothing to the cron table -- but it runs a job, so it is
+    # budgeted. Registered for the reason above: an unregistered workflow is
+    # one every check below silently skips.
+    "ledger-repair.yml",
 )
 
 try:  # pragma: no cover - environment dependent, both branches are exercised

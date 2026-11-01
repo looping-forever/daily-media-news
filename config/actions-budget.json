@@ -112,7 +112,16 @@
   },
   "repo_soft_cap_minutes": 1400,
   "days_per_month": 30,
-  "current_projected_minutes": 1776,
+  "current_projected_minutes": 1791,
+  "_projection_change_2026_11_01": [
+    "ledger-repair.yml added: 1 job, p95 0.5 min, max 1 run/day, no cron",
+    "-> +15 min/month (1776 -> 1791). Manual dispatch only, so this is a",
+    "CEILING on what a human can spend, not a forecast. It exists because the",
+    "false 2026-10-26 evening row sits in KV, not in the mirror, and every",
+    "seal copies KV over the mirror verbatim. Hard ceiling 1800 still holds",
+    "(+9 margin) -- the 0.5 is checkout + setup-python + two KV round trips,",
+    "not a 10-minute job timeout."
+  ],
   "_projection_change_2026_10_27": [
     "delivery-selftest.yml added: 1 job, p95 1.0 min, max 1 run/day, no cron",
     "-> +30 min/month (1746 -> 1776). Manual dispatch only, so this is a",
@@ -184,6 +193,13 @@
       "p95_minutes": 1.0,
       "crons": [],
       "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch, so it costs nothing until a human asks for it, and `max_runs_per_day: 1` is a ceiling on that asking rather than a forecast. It is budgeted anyway because the checker fails a workflow file with no entry here, and because 'it is only manual' is exactly how an unbudgeted job becomes an unbudgeted habit. One job: checkout, setup-python, one script. The script's own work is bounded by SMTP_TIMEOUT_SEC (20s) and the Bot API's 10s timeout, so 1.0 minute is the honest shape, not the 10-minute job timeout."
+    },
+    "ledger-repair.yml": {
+      "max_runs_per_day": 1,
+      "jobs_per_run": 1,
+      "p95_minutes": 0.5,
+      "crons": [],
+      "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch. It exists to retire one historical false row in KV `digest:ledger` (2026-10-26 evening), and a second run finds nothing to do. `max_runs_per_day: 1` is a ceiling on human asking, not a forecast. Budgeted because the checker fails a workflow file with no entry, and because 'it is one-off' is how an unbudgeted job becomes an unbudgeted habit. ONE job: checkout, setup-python and one script that makes two KV round trips (GET, then PUT + read-back), each bounded at 30s -- 0.5 minute is the shape of that work, not the 5-minute job timeout."
     },
     "digest-watchdog.yml": {
       "max_runs_per_day": 2,

@@ -1,0 +1,85 @@
+name: Ledger Repair
+
+# MANUAL ONLY, AND THAT IS THE DESIGN.
+#
+# KV key `digest:ledger` holds a false delivery claim at `2026-10-26 evening`:
+# state=sent beside ntfy_sent_at=2026-10-26T12:34:19Z, an instant 1h00m41s
+# BEFORE that slot's 13:35Z (19:20 NPT) due moment and inside the same day's
+# MORNING window. daily-news.yml reports it on every run as
+# `LEDGER HONESTY VIOLATION (stored)` and deliberately never rewrites it.
+#
+# WHY THE COMMITTED MIRROR ALONE CANNOT FIX IT. The seal step in
+# digest-prebuild.yml lifts `days` out of KV VERBATIM on every seal, and the
+# daily step reads KV: the mirror is a lagging copy, KV is the original. So the
+# correction has to be made in KV, once, by the owner -- which is what this
+# workflow is for. It runs scripts/repair_ledger.py, which reads KV, applies a
+# DECLARED correction list, PUTs the result back, re-reads it and verifies.
+#
+# WHY NO SCHEDULE AND NO OTHER TRIGGER. This is a one-off historical repair,
+# not a routine. A cron would re-read the ledger every day to find nothing to
+# do, and a repository_dispatch trigger would let the pipeline edit its own
+# delivery history -- the thing daily-news.yml refuses to do on purpose. It is
+# registered in tests/workflows/__init__.py and budgeted in
+# config/actions-budget.json, so it is linted and counted like every workflow.
+#
+# DRY RUN FIRST, AND BY DEFAULT. `dry_run` defaults to true, so a dispatch that
+# changes nothing is the accidental case and a write has to be asked for. The
+# script also refuses to write anything at all when a declared row does not
+# match the shape the declaration describes.
+#
+# WHAT IT NEVER PRINTS. The token, the account id and the namespace id are
+# environment variables and the log carries only presence, counts and the
+# before/after diff of the affected row. This repository is public.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Read KV and print the planned diff without writing (uncheck to write)'
+        required: true
+        type: boolean
+        default: true
+
+# Nothing here writes to the repository: no state commit, no artifact, no
+# dispatch. The only write is the one KV PUT the script performs, and it is
+# gated on `dry_run` being false.
+permissions:
+  contents: read
+
+concurrency:
+  group: ledger-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-ledger:
+    runs-on: ubuntu-latest
+    # Two KV round trips and one small script. The Cloudflare calls time out at
+    # 30s each, so a wedged run is bounded well inside this.
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # The script and its declared corrections are all that is needed, and
+          # this job must not be able to push.
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Apply the declared ledger corrections
+        env:
+          # THE SAME TWO SECRETS AND ONE VARIABLE THE DAILY STEP USES. The KV
+          # token is CF_PAGES_API_TOKEN, which needs Account > KV Storage >
+          # Read and Write; the namespace id comes from a repository variable,
+          # never from deploy/wrangler.toml's placeholder.
+          CF_LEDGER_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ vars.CF_KV_NAMESPACE_ID }}
+          # DERIVED, NEVER TYPED. The script defaults to a dry run; only an
+          # explicit dry_run=false produces the write flag, so a mistyped or
+          # forgotten dispatch reads and prints and writes nothing.
+          REPAIR_MODE: ${{ inputs.dry_run == false && '--write' || '--dry-run' }}
+        run: python scripts/repair_ledger.py "$REPAIR_MODE"
