@@ -187,11 +187,14 @@ def render_all_four(payload, candidates=None, tmp=None):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
-def payload_of(stories, weather=None, health_state="degraded", notes=""):
+def payload_of(stories, weather=None, health_state="degraded", notes="",
+               weather_detail=None):
     data = validated_payload(health_state, stories=stories, notes=notes,
                              hosts_down=TU_HOSTS)
     if weather is not None:
         data["weather_advice"] = weather
+    if weather_detail is not None:
+        data["weather"] = weather_detail
     return data
 
 
@@ -625,9 +628,48 @@ LONG_FOR_YOU = ("Your TU re-registration form is due before Friday and the porta
 assert len(LONG_FOR_YOU) == 140, len(LONG_FOR_YOU)
 
 
+def worst_case_weather_detail():
+    """A full frozen `weather` block, stamped NOW so the age gate passes.
+
+    It is part of the worst case because the detail card is a real, rendered
+    surface with real bytes: a fixture that omits it measures a page the
+    pipeline can no longer produce.
+    """
+    now = render_digest._npt_now()
+    stamp = now.strftime("%Y-%m-%d %H:%M")
+    day = now.strftime("%Y-%m-%d")
+    return {
+        "fetched_at_npt": stamp,
+        "place": {"name": "Kathmandu"},
+        "temperature_c": 18.4, "apparent_c": 17.2,
+        "humidity_pct": 64, "dew_point_c": 11.3,
+        "wind_kmh": 6.1, "gust_kmh": 18.2,
+        "cloud_pct": 40, "precip_now_mm": 0.0,
+        "condition": "Partly cloudy",
+        "today": {"tmax_c": 24.1, "tmin_c": 11.8, "pop_max_pct": 78,
+                  "precip_sum_mm": 2.4, "condition": "Light rain",
+                  "sunrise": day + "T06:12", "sunset": day + "T17:04",
+                  "uv_max": 6.2, "uv_band": "high"},
+        "next12h": {"pop_peak_pct": 78, "pop_peak_hour": 14,
+                    "precip_mm": 0.6, "window": "14:00-17:59"},
+        "outlook": [
+            {"day": day, "tmax_c": 24.1, "tmin_c": 11.8, "pop_pct": 78,
+             "precip_mm": 2.4, "condition": "Light rain", "gust_max_kmh": 22},
+            {"day": day, "tmax_c": 23.0, "tmin_c": 11.0, "pop_pct": 20,
+             "precip_mm": 0.1, "condition": "Partly cloudy", "gust_max_kmh": 18},
+            {"day": day, "tmax_c": 25.5, "tmin_c": 12.4, "pop_pct": 0,
+             "precip_mm": 0.0, "condition": "Clear sky", "gust_max_kmh": 15},
+        ],
+        "narrative": ("Now 18\u00b0C (feels 17\u00b0C), Partly cloudy; high 24\u00b0C / "
+                      "low 12\u00b0C; rain peaks at 78% around 14:00; 0.6 mm "
+                      "expected; UV high."),
+    }
+
+
 def worst_case_payload(stories=15):
-    """15 stories, each with a 140-char `for_you`, plus 2 weather lines and a
-    degraded health banner. The brief's exact worst case."""
+    """15 stories, each with a 140-char `for_you`, plus 2 weather lines, the
+    full weather detail card and a degraded health banner. The brief's exact
+    worst case."""
     filler = ("Tribhuvan University and the wider Nepali public sector continue "
               "to publish overlapping notices, and the digest builder keeps "
               "every field intact while doing it. ")
@@ -649,6 +691,7 @@ def worst_case_payload(stories=15):
             ]))
     return payload_of(stories_list, weather=WEATHER_TWO,
                       health_state="degraded",
+                      weather_detail=worst_case_weather_detail(),
                       notes="TU notice board unreachable (DNS SERVFAIL) for 41 minutes.")
 
 

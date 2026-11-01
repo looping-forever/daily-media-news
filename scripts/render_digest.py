@@ -171,6 +171,23 @@ CITY = "Example City"
 #: rejected instead.
 WEATHER_TEMP_KEY = "temperature_c"
 
+#: What the header shows when both readings exist. See `weather_temperature()`.
+WEATHER_APPARENT_KEY = "apparent_c"
+
+#: How old the frozen `weather` block may be before the DETAIL card is
+#: withheld. Deliberately the same three hours the advice engine enforces
+#: (weather_advice.DEFAULT_MAX_AGE_HOURS), so the numbers and the advice can
+#: never disagree about how fresh the sky is.
+WEATHER_DETAIL_MAX_AGE_HOURS = 3
+
+#: The detail card is all-or-nothing below this many live cells. One lonely
+#: figure is a teaser, not a weather block.
+WEATHER_DETAIL_MIN_CELLS = 2
+
+_DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
 
 def esc(value):
     """HTML-escape any story-derived string."""
@@ -1533,17 +1550,22 @@ def weather_temperature(*payloads):
         for holder in (payload, payload.get("weather")):
             if not isinstance(holder, dict):
                 continue
-            raw = holder.get(WEATHER_TEMP_KEY)
-            if isinstance(raw, bool) or raw is None:
-                continue
-            if isinstance(raw, (int, float)):
-                return "%d°C" % round(float(raw))
-            text = str(raw).strip()
-            # Tolerate "12", "12C" and "12°C"; refuse anything else rather than
-            # print a half-parsed fragment.
-            m = re.match(r"^(-?\d+(?:\.\d+)?)\s*°?\s*C?$", text, re.IGNORECASE)
-            if m:
-                return "%d°C" % round(float(m.group(1)))
+            # APPARENT FIRST: the header sits beside the glyph a reader looks at
+            # to decide what to wear, and the felt temperature is that answer.
+            # `temperature_c` stays the fallback so a payload carrying only the
+            # raw reading still renders.
+            for key in (WEATHER_APPARENT_KEY, WEATHER_TEMP_KEY):
+                raw = holder.get(key)
+                if isinstance(raw, bool) or raw is None:
+                    continue
+                if isinstance(raw, (int, float)):
+                    return "%d°C" % round(float(raw))
+                text = str(raw).strip()
+                # Tolerate "12", "12C" and "12°C"; refuse anything else rather
+                # than print a half-parsed fragment.
+                m = re.match(r"^(-?\d+(?:\.\d+)?)\s*°?\s*C?$", text, re.IGNORECASE)
+                if m:
+                    return "%d°C" % round(float(m.group(1)))
     return None
 
 
@@ -2006,7 +2028,15 @@ def render_hero(meta, digest_time, date_val, story_count, source_health=None,
         your_day_lines(stories or [], weather, date_val,
                        max_lines=YOUR_DAY_MAX_LINES, include_weather=False),
         temperature=weather_temperature(meta))
-    weather_html = render_weather_block(weather)
+
+    # The detail card reads the frozen `weather` block and nothing else. It is
+    # gated on the fetch stamp, so it can only ever show numbers it can also
+    # date. `label` is suppressed when the advice block above already said
+    # `★ Weather · HH:MM NPT`, so the label appears exactly once.
+    weather_data = fresh_weather_detail((meta or {}).get("weather"))
+    weather_html = render_weather_block(
+        weather, _npt_stamp(weather_data.get("fetched_at_npt")) if weather_data else None)
+    detail_html = render_weather_detail(weather_data, label=not weather_html)
 
     cutoff_html = ""
     line = cutoff_line(cutoff, source_health)
@@ -2019,9 +2049,10 @@ def render_hero(meta, digest_time, date_val, story_count, source_health=None,
                                       edition_line)
 
     return ('<section class="hero">'
-            '%s%s%s%s'
+            '%s%s%s%s%s'
             '</section>'
-            % (banner_html, your_day_html, weather_html, cutoff_html))
+            % (banner_html, your_day_html, weather_html, detail_html,
+               cutoff_html))
 
 
 def render_your_day(lines, temperature=None):
@@ -2079,7 +2110,7 @@ def render_your_day(lines, temperature=None):
             '</div>' % (esc(YOUR_DAY_LABEL), weather_icon_svg(), temp_html, items))
 
 
-def render_weather_block(lines):
+def render_weather_block(lines, stamp=None):
     """The weather block, or '' when the engine had nothing to say.
 
     An empty list must render NOTHING - not a heading, not "no weather
@@ -2098,14 +2129,252 @@ def render_weather_block(lines):
     the same number as `weather_advice.max_lines` in config/profile.yml, which
     is the ENGINE's cap on how many verdicts it produces at all - a different
     contract, and both are required.
+
+    `stamp` is the 'HH:MM' the frozen `weather` block was fetched. When it is
+    present the label says so, so a number further down the page can never read
+    as current; when it is absent the label makes no freshness claim at all
+    rather than inventing one.
     """
     if not lines:
         return ""
     items = "".join("<li>%s</li>" % esc(ln) for ln in lines[:WEATHER_MAX])
+    label = "\u2605 %s" % esc(WEATHER_LABEL)
+    if stamp:
+        label += " \u00b7 %s NPT" % esc(stamp)
     return ('<div class="weather-block">'
-            '<p class="weather-label">\u2605 %s</p>'
+            '<p class="weather-label">%s</p>'
             '<ul>%s</ul>'
-            '</div>' % (esc(WEATHER_LABEL), items))
+            '</div>' % (label, items))
+
+
+def _npt_stamp(value):
+    """'HH:MM' from an NPT 'YYYY-MM-DD HH:MM' string, or None."""
+    text = str(value or "").strip()[:16]
+    try:
+        return datetime.datetime.strptime(text, "%Y-%m-%d %H:%M").strftime("%H:%M")
+    except ValueError:
+        return None
+
+
+def _npt_now():
+    """The current Nepal-time wall clock, naive, matching fetched_at_npt."""
+    now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    return now_utc + KATHMANDU_UTC_OFFSET
+
+
+def fresh_weather_detail(weather, now=None):
+    """The frozen `weather` block, but only while it is still true. {} otherwise.
+
+    THE AGE GATE IS THE POINT. The collector stamps `fetched_at_npt` and this
+    renderer runs later; past three hours the numbers describe a sky that has
+    moved on. Rendering nothing is honest, and rendering old numbers under a
+    fresh label is not - so the label and the gate are one decision.
+    """
+    if not isinstance(weather, dict):
+        return {}
+    raw = str(weather.get("fetched_at_npt") or "").strip()[:16]
+    try:
+        fetched = datetime.datetime.strptime(raw, "%Y-%m-%d %H:%M")
+    except ValueError:
+        return {}
+    if now is None:
+        now = _npt_now()
+    if now - fetched > datetime.timedelta(hours=WEATHER_DETAIL_MAX_AGE_HOURS):
+        return {}
+    return weather
+
+
+def _num(value):
+    """A finite number from the block, or None. Bools and junk are not numbers."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
+
+def _deg(value):
+    return "%d\u00b0C" % int(round(value))
+
+
+def _weather_cells(weather):
+    """[(label, value)] for the current-conditions grid, in reading order.
+
+    A cell exists only when its value is present. There is no placeholder for a
+    missing one: the grid simply has one fewer box.
+    """
+    cells = []
+    apparent = _num(weather.get("apparent_c"))
+    if apparent is not None:
+        cells.append(("Feels like", _deg(apparent)))
+    humidity = _num(weather.get("humidity_pct"))
+    if humidity is not None:
+        cells.append(("Humidity", "%d%%" % int(round(humidity))))
+    dew = _num(weather.get("dew_point_c"))
+    if dew is not None:
+        cells.append(("Dew point", _deg(dew)))
+    wind = _num(weather.get("wind_kmh"))
+    gust = _num(weather.get("gust_kmh"))
+    if wind is not None and gust is not None:
+        cells.append(("Wind", "%d km/h, gust %d"
+                      % (int(round(wind)), int(round(gust)))))
+    elif wind is not None:
+        cells.append(("Wind", "%d km/h" % int(round(wind))))
+    elif gust is not None:
+        cells.append(("Wind", "gust %d km/h" % int(round(gust))))
+    cloud = _num(weather.get("cloud_pct"))
+    if cloud is not None:
+        cells.append(("Cloud", "%d%%" % int(round(cloud))))
+    condition = weather.get("condition")
+    if isinstance(condition, str) and condition.strip():
+        cells.append(("Sky", condition.strip()))
+    return cells
+
+
+def _weather_rain_line(next12h):
+    """'Rain 78% 14:00-17:59, ~0.6 mm', or '' when there is no rain to report.
+
+    A peak of 0% is omitted rather than printed: `0%` reads as a placeholder
+    wearing a number, and "it is not going to rain" is already said by silence.
+    """
+    if not isinstance(next12h, dict):
+        return ""
+    pop = _num(next12h.get("pop_peak_pct"))
+    if pop is None or pop <= 0:
+        return ""
+    text = "Rain %d%%" % int(round(pop))
+    window = next12h.get("window")
+    if isinstance(window, str) and window.strip():
+        text += " %s" % window.strip()
+    precip = _num(next12h.get("precip_mm"))
+    if precip is not None and precip > 0:
+        text += ", ~%.1f mm" % precip
+    return text
+
+
+def _short_day(value):
+    """'Mon 3 Nov' from 'YYYY-MM-DD', or ''. Locale-free by construction."""
+    text = str(value or "").strip()[:10]
+    try:
+        day = datetime.datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return ""
+    return "%s %d %s" % (_DAY_NAMES[day.weekday()], day.day,
+                         _MONTH_NAMES[day.month - 1])
+
+
+def _weather_outlook_items(outlook):
+    """Up to three outlook rows, ascending, as plain strings for <li>."""
+    if not isinstance(outlook, list):
+        return []
+    items = []
+    for day in outlook[:3]:
+        if not isinstance(day, dict):
+            continue
+        parts = []
+        when = _short_day(day.get("day"))
+        if when:
+            parts.append(when)
+        tmax, tmin = _num(day.get("tmax_c")), _num(day.get("tmin_c"))
+        if tmax is not None and tmin is not None:
+            parts.append("%d\u00b0 / %d\u00b0" % (int(round(tmax)), int(round(tmin))))
+        elif tmax is not None:
+            parts.append("high %d\u00b0C" % int(round(tmax)))
+        elif tmin is not None:
+            parts.append("low %d\u00b0C" % int(round(tmin)))
+        pop = _num(day.get("pop_pct"))
+        if pop is not None and pop > 0:
+            parts.append("%d%% rain" % int(round(pop)))
+        condition = day.get("condition")
+        if isinstance(condition, str) and condition.strip():
+            parts.append(condition.strip())
+        if parts:
+            items.append(" \u00b7 ".join(parts))
+    return items
+
+
+def _clock(value):
+    """'06:12' from an open-meteo ISO stamp, or ''."""
+    text = str(value or "").strip()
+    if "T" in text:
+        text = text.split("T", 1)[1]
+    text = text[:5]
+    return text if re.match(r"^\d{2}:\d{2}$", text) else ""
+
+
+def _weather_sun_line(today):
+    """Sunrise/sunset and UV-with-band, joined, or ''."""
+    if not isinstance(today, dict):
+        return ""
+    parts = []
+    rise, setting = _clock(today.get("sunrise")), _clock(today.get("sunset"))
+    if rise and setting:
+        parts.append("Sun %s\u2013%s" % (rise, setting))
+    elif rise:
+        parts.append("Sunrise %s" % rise)
+    elif setting:
+        parts.append("Sunset %s" % setting)
+    uv = _num(today.get("uv_max"))
+    if uv is not None:
+        text = "UV %d" % int(round(uv))
+        band = today.get("uv_band")
+        if isinstance(band, str) and band.strip():
+            text += " %s" % band.strip()
+        parts.append(text)
+    return " \u00b7 ".join(parts)
+
+
+def _weather_detail_html(weather, cells, label):
+    parts = ['<div class="weather-detail">']
+    stamp = _npt_stamp(weather.get("fetched_at_npt"))
+    if label and stamp:
+        parts.append('<p class="weather-label">\u2605 %s \u00b7 %s NPT</p>'
+                     % (esc(WEATHER_LABEL), esc(stamp)))
+    narrative = weather.get("narrative")
+    if isinstance(narrative, str) and narrative.strip():
+        parts.append('<p class="weather-narrative">%s</p>' % esc(narrative.strip()))
+    parts.append('<div class="weather-grid">%s</div>' % "".join(
+        '<div class="weather-cell"><span class="weather-cell-k">%s</span>'
+        '<span class="weather-cell-v">%s</span></div>' % (esc(k), esc(v))
+        for k, v in cells))
+    rain = _weather_rain_line(weather.get("next12h"))
+    if rain:
+        parts.append('<p class="weather-rain">%s</p>' % esc(rain))
+    outlook = _weather_outlook_items(weather.get("outlook"))
+    if outlook:
+        parts.append('<ul class="weather-outlook">%s</ul>'
+                     % "".join("<li>%s</li>" % esc(item) for item in outlook))
+    sun = _weather_sun_line(weather.get("today"))
+    if sun:
+        parts.append('<p class="weather-sun">%s</p>' % esc(sun))
+    parts.append('</div>')
+    return "".join(parts)
+
+
+def render_weather_detail(weather, now=None, label=True):
+    """The current-conditions detail card, or '' when there is nothing honest.
+
+    NEVER RAISES. `render_page` builds the whole document from one format
+    string, so an exception here would take the page with it; a malformed block
+    is a reason to show less, not a reason to fail the build.
+
+    `label` is False when the advice block above already carries the label, so
+    the reader sees `★ Weather · HH:MM NPT` once rather than twice.
+    """
+    try:
+        block = fresh_weather_detail(weather, now)
+        if not block:
+            return ""
+        cells = _weather_cells(block)
+        if len(cells) < WEATHER_DETAIL_MIN_CELLS:
+            return ""
+        return _weather_detail_html(block, cells, label)
+    except Exception:
+        return ""
 
 
 def render_page(stories, digest_time, date_val, timestamp, meta=None,
@@ -2339,6 +2608,71 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
       line-height: 1.45;
     }
     .weather-block li + li { margin-top: 4px; }
+
+    /* -- weather detail -------------------------------------------------- */
+    /* The numbers behind the advice, from the frozen `weather` block. Same card
+       surface as the advice block above it. No placeholders and no percent
+       signs anywhere below: this CSS lives inside the one giant format string,
+       and every placeholder added here would have to be threaded into the
+       45-entry argument list. The palette values are written out instead. */
+    .weather-detail {
+      background: #171A21;
+      border-radius: 14px;
+      padding: 13px 15px;
+      margin: 10px 0 0 0;
+    }
+    .weather-detail .weather-label { margin: 0 0 8px 0; }
+    .weather-narrative {
+      color: #ECEEF2;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0 0 10px 0;
+    }
+    .weather-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .weather-cell {
+      min-width: 0;
+      background: #1F232C;
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .weather-cell-k {
+      display: block;
+      color: #6C727C;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .weather-cell-v {
+      display: block;
+      color: #ECEEF2;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 2px;
+      overflow-wrap: break-word;
+    }
+    .weather-rain,
+    .weather-sun {
+      color: #9BA1AC;
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 10px 0 0 0;
+    }
+    .weather-outlook {
+      margin: 8px 0 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .weather-outlook li {
+      color: #9BA1AC;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .weather-outlook li + li { margin-top: 2px; }
 
     /* -- honesty + freshness --------------------------------------------- */
     /* ALSO not in the approved design, and deliberately NOT restyled with it.
@@ -3086,6 +3420,11 @@ def main(argv=None):
     if not meta.get("weather_advice") and candidates.get("weather_advice"):
         meta = dict(meta)
         meta["weather_advice"] = candidates["weather_advice"]
+    # The frozen detail block travels the same road, so `weather_temperature`
+    # and the detail card read it from `meta` without a second lookup.
+    if not meta.get("weather") and candidates.get("weather"):
+        meta = dict(meta)
+        meta["weather"] = candidates["weather"]
 
     # Load plain-text digest (best-effort).
     parsed = []

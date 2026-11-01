@@ -521,6 +521,22 @@ def resolve_weather_advice(*payloads):
     return []
 
 
+def resolve_weather_detail(*payloads):
+    """The frozen `weather` detail block, or {} when nobody produced one.
+
+    Tolerant on purpose, exactly like `resolve_weather_advice`: the collector
+    writes it into state/candidates.json, the validated payload may also carry
+    one, and either file may be absent.
+    """
+    for payload in payloads:
+        if not isinstance(payload, dict):
+            continue
+        raw = payload.get("weather")
+        if isinstance(raw, dict) and raw:
+            return raw
+    return {}
+
+
 def due_stories(stories, today):
     """[(index, title, due_iso)] for stories due today or tomorrow, nearest
     first, in input order within a date."""
@@ -626,6 +642,284 @@ def weather_block_lines(weather, max_lines=None, max_bytes=None):
     return _cap_lines(list(weather)[:WEATHER_MAX], max_lines, max_bytes)
 
 
+# ---------------------------------------------------------------------------
+# The weather DETAIL block: the numbers behind the advice
+# ---------------------------------------------------------------------------
+#: Same three hours the advice engine enforces, so the numbers and the advice
+#: can never disagree about how fresh the sky is.
+WEATHER_DETAIL_MAX_AGE_HOURS = 3
+
+#: Below this many live cells the whole card is withheld. One lonely figure is
+#: a teaser, not a weather block.
+WEATHER_DETAIL_MIN_CELLS = 2
+
+_DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _npt_now():
+    """The current Nepal-time wall clock, naive, matching fetched_at_npt."""
+    now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    return now_utc + KATHMANDU_UTC_OFFSET
+
+
+def fresh_weather_detail(weather, now=None):
+    """The frozen `weather` block, but only while it is still true. {} otherwise."""
+    if not isinstance(weather, dict):
+        return {}
+    raw = str(weather.get("fetched_at_npt") or "").strip()[:16]
+    try:
+        fetched = datetime.datetime.strptime(raw, "%Y-%m-%d %H:%M")
+    except ValueError:
+        return {}
+    if now is None:
+        now = _npt_now()
+    if now - fetched > datetime.timedelta(hours=WEATHER_DETAIL_MAX_AGE_HOURS):
+        return {}
+    return weather
+
+
+def _w_num(value):
+    """A finite number from the block, or None. Bools and junk are not numbers."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
+
+def _w_deg(value):
+    return "%d\u00b0C" % int(round(value))
+
+
+def _w_cells(weather):
+    """[(label, value)] for the current-conditions grid, in reading order.
+
+    A cell exists only when its value is present. There is no placeholder for a
+    missing one: the grid simply has one fewer box.
+    """
+    cells = []
+    apparent = _w_num(weather.get("apparent_c"))
+    if apparent is not None:
+        cells.append(("Feels like", _w_deg(apparent)))
+    humidity = _w_num(weather.get("humidity_pct"))
+    if humidity is not None:
+        cells.append(("Humidity", "%d%%" % int(round(humidity))))
+    dew = _w_num(weather.get("dew_point_c"))
+    if dew is not None:
+        cells.append(("Dew point", _w_deg(dew)))
+    wind = _w_num(weather.get("wind_kmh"))
+    gust = _w_num(weather.get("gust_kmh"))
+    if wind is not None and gust is not None:
+        cells.append(("Wind", "%d km/h, gust %d"
+                      % (int(round(wind)), int(round(gust)))))
+    elif wind is not None:
+        cells.append(("Wind", "%d km/h" % int(round(wind))))
+    elif gust is not None:
+        cells.append(("Wind", "gust %d km/h" % int(round(gust))))
+    cloud = _w_num(weather.get("cloud_pct"))
+    if cloud is not None:
+        cells.append(("Cloud", "%d%%" % int(round(cloud))))
+    condition = weather.get("condition")
+    if isinstance(condition, str) and condition.strip():
+        cells.append(("Sky", condition.strip()))
+    return cells
+
+
+def _w_rain(next12h):
+    """'Rain 78% 14:00-17:59, ~0.6 mm', or '' when there is no rain to report.
+
+    A peak of 0% is omitted rather than printed: `0%` reads as a placeholder
+    wearing a number, and "it is not going to rain" is already said by silence.
+    """
+    if not isinstance(next12h, dict):
+        return ""
+    pop = _w_num(next12h.get("pop_peak_pct"))
+    if pop is None or pop <= 0:
+        return ""
+    text = "Rain %d%%" % int(round(pop))
+    window = next12h.get("window")
+    if isinstance(window, str) and window.strip():
+        text += " %s" % window.strip()
+    precip = _w_num(next12h.get("precip_mm"))
+    if precip is not None and precip > 0:
+        text += ", ~%.1f mm" % precip
+    return text
+
+
+def _w_short_day(value):
+    """'Mon 3 Nov' from 'YYYY-MM-DD', or ''. Locale-free by construction."""
+    text = str(value or "").strip()[:10]
+    try:
+        day = datetime.datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return ""
+    return "%s %d %s" % (_DAY_NAMES[day.weekday()], day.day,
+                         _MONTH_NAMES[day.month - 1])
+
+
+def _w_outlook(outlook):
+    """Up to three outlook rows, ascending, as plain strings."""
+    if not isinstance(outlook, list):
+        return []
+    items = []
+    for day in outlook[:3]:
+        if not isinstance(day, dict):
+            continue
+        parts = []
+        when = _w_short_day(day.get("day"))
+        if when:
+            parts.append(when)
+        tmax, tmin = _w_num(day.get("tmax_c")), _w_num(day.get("tmin_c"))
+        if tmax is not None and tmin is not None:
+            parts.append("%d\u00b0 / %d\u00b0" % (int(round(tmax)), int(round(tmin))))
+        elif tmax is not None:
+            parts.append("high %d\u00b0C" % int(round(tmax)))
+        elif tmin is not None:
+            parts.append("low %d\u00b0C" % int(round(tmin)))
+        pop = _w_num(day.get("pop_pct"))
+        if pop is not None and pop > 0:
+            parts.append("%d%% rain" % int(round(pop)))
+        condition = day.get("condition")
+        if isinstance(condition, str) and condition.strip():
+            parts.append(condition.strip())
+        if parts:
+            items.append(" \u00b7 ".join(parts))
+    return items
+
+
+def _w_clock(value):
+    """'06:12' from an open-meteo ISO stamp, or ''."""
+    text = str(value or "").strip()
+    if "T" in text:
+        text = text.split("T", 1)[1]
+    text = text[:5]
+    return text if re.match(r"^\d{2}:\d{2}$", text) else ""
+
+
+def _w_sun(today):
+    """Sunrise/sunset and UV-with-band, joined, or ''."""
+    if not isinstance(today, dict):
+        return ""
+    parts = []
+    rise, setting = _w_clock(today.get("sunrise")), _w_clock(today.get("sunset"))
+    if rise and setting:
+        parts.append("Sun %s\u2013%s" % (rise, setting))
+    elif rise:
+        parts.append("Sunrise %s" % rise)
+    elif setting:
+        parts.append("Sunset %s" % setting)
+    uv = _w_num(today.get("uv_max"))
+    if uv is not None:
+        text = "UV %d" % int(round(uv))
+        band = today.get("uv_band")
+        if isinstance(band, str) and band.strip():
+            text += " %s" % band.strip()
+        parts.append(text)
+    return " \u00b7 ".join(parts)
+
+
+def _w_stamp(weather):
+    """'HH:MM' from the fetch stamp, or ''."""
+    text = str(weather.get("fetched_at_npt") or "").strip()[:16]
+    try:
+        return datetime.datetime.strptime(text, "%Y-%m-%d %H:%M").strftime("%H:%M")
+    except ValueError:
+        return ""
+
+
+def weather_detail_lines(weather, now=None):
+    """ONE compact plain-text line for the detail block, or [].
+
+    The plain-text body is read on a phone lock screen, so it gets the two facts
+    that change a decision - how warm it feels and when the rain comes - rather
+    than the whole grid. The grid belongs to the HTML body.
+    """
+    try:
+        block = fresh_weather_detail(weather, now)
+        if not block:
+            return []
+        parts = []
+        temperature = _w_num(block.get("temperature_c"))
+        apparent = _w_num(block.get("apparent_c"))
+        if temperature is not None:
+            text = "Now %d\u00b0C" % int(round(temperature))
+            if apparent is not None:
+                text += ", feels %d\u00b0C" % int(round(apparent))
+            parts.append(text)
+        elif apparent is not None:
+            parts.append("Feels %d\u00b0C" % int(round(apparent)))
+        rain = _w_rain(block.get("next12h"))
+        if rain:
+            parts.append(rain)
+        if not parts:
+            return []
+        return [" - ".join(parts)]
+    except Exception:
+        return []
+
+
+def weather_detail_html(weather, now=None):
+    """The detail card for the email HTML body, or '' when there is nothing.
+
+    Inline styles only, and no <table>: the two-column grid is inline-block
+    boxes at a fixed width, which every mail client lays out the same way.
+    NEVER RAISES - a malformed block is a reason to show less, not to fail the
+    send.
+    """
+    try:
+        block = fresh_weather_detail(weather, now)
+        if not block:
+            return ""
+        cells = _w_cells(block)
+        if len(cells) < WEATHER_DETAIL_MIN_CELLS:
+            return ""
+        stamp = _w_stamp(block)
+        label = "&#9733; %s" % esc(WEATHER_LABEL)
+        if stamp:
+            label += " &middot; %s NPT" % esc(stamp)
+        parts = ['<div style="border:1px solid #cbd5e1;border-left:4px solid #0ea5e9;'
+                 'border-radius:6px;padding:10px 14px;margin:0 0 12px 0;'
+                 'background-color:#f8fafc;font-family:%s;">' % FONT_STACK,
+                 '<div style="font-size:12px;font-weight:bold;letter-spacing:0.06em;'
+                 'color:#0369a1;margin:0 0 6px 0;">%s</div>' % label]
+        narrative = block.get("narrative")
+        if isinstance(narrative, str) and narrative.strip():
+            parts.append('<p style="margin:0 0 8px 0;font-size:13px;'
+                         'color:#111827;">%s</p>' % esc(narrative.strip()))
+        parts.append('<div>%s</div>' % "".join(
+            '<div style="display:inline-block;width:170px;vertical-align:top;'
+            'padding:0 8px 8px 0;">'
+            '<span style="display:block;font-size:10px;letter-spacing:0.06em;'
+            'text-transform:uppercase;color:#6b7280;">%s</span>'
+            '<span style="display:block;font-size:13px;font-weight:bold;'
+            'color:#111827;">%s</span></div>' % (esc(k), esc(v))
+            for k, v in cells))
+        rain = _w_rain(block.get("next12h"))
+        if rain:
+            parts.append('<p style="margin:0 0 0 0;font-size:13px;'
+                         'color:#374151;">%s</p>' % esc(rain))
+        outlook = _w_outlook(block.get("outlook"))
+        if outlook:
+            parts.append('<ul style="margin:6px 0 0 16px;padding:0;font-size:12px;'
+                         'color:#374151;">%s</ul>'
+                         % "".join('<li style="margin:0 0 2px 0;">%s</li>' % esc(item)
+                                   for item in outlook))
+        sun = _w_sun(block.get("today"))
+        if sun:
+            parts.append('<p style="margin:8px 0 0 0;font-size:12px;'
+                         'color:#374151;">%s</p>' % esc(sun))
+        parts.append('</div>')
+        return "".join(parts)
+    except Exception:
+        return ""
+
+
 def your_day_html(weather, stories, date_val):
     """`Your day` block for the email HTML body (inline styles only).
 
@@ -677,7 +971,7 @@ def weather_html(weather):
             '</div>' % (FONT_STACK, esc(WEATHER_LABEL), items))
 
 
-def your_day_text(weather, stories, date_val):
+def your_day_text(weather, stories, date_val, detail=None):
     """`Your day` + weather for the PLAIN-TEXT body (Gmail and Telegram).
 
     Bullets are `- ` and headers are bare, never `== SECTION ==` and never
@@ -700,11 +994,15 @@ def your_day_text(weather, stories, date_val):
     out.append(YOUR_DAY_LABEL)
     out += ["- %s" % ln for ln in yd]
     lines = weather_block_lines(weather)
-    if lines:
+    # The detail arrives as ONE compact line and rides under the SAME `Weather`
+    # heading, so the reader never sees two weather sections.
+    compact = list(detail or [])[:1]
+    if lines or compact:
         if out:
             out.append("")
         out.append(WEATHER_LABEL)
         out += ["- %s" % ln for ln in lines]
+        out += ["- %s" % ln for ln in compact]
     return "\n".join(out)
 
 
@@ -1172,14 +1470,18 @@ def main(argv=None, schedule_path=None):
         except (OSError, ValueError):
             candidates = {}
     weather = resolve_weather_advice(data, candidates)
+    weather_detail = resolve_weather_detail(data, candidates)
 
     sections_html = render_sections_html(grouped, source_health)
     sections_text = render_sections_text(grouped, source_health)
 
     # The personal layer goes FIRST, ahead of every section: it is the only
     # part of the digest that is about him rather than about the world.
-    personal_html = your_day_html(weather, stories, date_val) + weather_html(weather)
-    personal_text = your_day_text(weather, stories, date_val)
+    personal_html = (your_day_html(weather, stories, date_val)
+                     + weather_html(weather)
+                     + weather_detail_html(weather_detail))
+    personal_text = your_day_text(weather, stories, date_val,
+                                  weather_detail_lines(weather_detail))
     sections_html = personal_html + sections_html
     sections_text = personal_text + "\n\n" + sections_text
 
