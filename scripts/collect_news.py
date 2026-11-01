@@ -492,12 +492,23 @@ UV_BANDS = ((3, "low"), (6, "moderate"), (8, "high"), (11, "very high"),
 # An unset BANK_URL/COLLEGE_URL is dropped rather than fetched, because the plan
 # name below is built from the host: two empty URLs would both be "notice:" and
 # collide, and there is nothing to fetch anyway.
+#
+# WHY nea.org.np WAS RETIRED (it used to be the fifth entry, `local_city`): it
+# is the Nepal Electricity Authority -- a utility, not an education body -- so
+# nothing it publishes is a notice this digest is for, and its `local_city`
+# notices were the ones the keyword gate kept rescuing from nav chrome. Its
+# real anchors are `detail/<slug>`, `product_detail/<id>`, `staffdetail/<id>`
+# and `pages/anniversary-detail-page`: they identify a product, a staff member
+# or a page of site history, never one published notice. DO NOT widen
+# NOTICE_DETAIL_URL_RE to admit those shapes so this source can be kept: that
+# gate is what stops a nav frame being collected as news, and admitting
+# `product_detail` would admit every product listing on every future site.
+# Retiring the source is the smaller change.
 NOTICE_SITES = [
     (_pv.bank_url(), "bank_local"),
     ("https://tu.edu.np/", "education_tu"),
     ("https://iost.tu.edu.np/", "education_tu"),
     (_pv.college_url(), "college_local"),
-    ("https://nea.org.np/", "local_city"),
 ]
 NOTICE_SITES = [site for site in NOTICE_SITES if site[0]]
 NOTICE_KEYWORDS = ("notice", "result", "exam", "admission", "rate", "branch")

@@ -163,9 +163,10 @@ class TestNoPlaceholderInABuiltDigest(unittest.TestCase):
             self.assertTrue(url.startswith("http"),
                             "NOTICE_SITES carries a non-URL entry: %r" % url)
         self.assertEqual(
-            ["https://tu.edu.np/", "https://iost.tu.edu.np/", "https://nea.org.np/"],
+            ["https://tu.edu.np/", "https://iost.tu.edu.np/"],
             sites,
-            "the three public notice sources must survive an unset deployment")
+            "the two public notice sources must survive an unset deployment "
+            "(nea.org.np was retired -- see NOTICE_SITES)")
 
     def test_an_unset_host_is_not_a_tier1_domain(self):
         out, _err = probe({})

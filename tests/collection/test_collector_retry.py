@@ -1031,7 +1031,11 @@ class TestCollectionConfig(unittest.TestCase):
         # plans do not exist at all. That they are dropped, and that a configured
         # one reaches the page, is tests/render/test_private_values.py. Their
         # timeout class is the same as the public notice hosts above.
-        self.assertEqual(seen["https://nea.org.np/"], 10)
+        # nea.org.np is NOT fetched any more: it was retired from NOTICE_SITES
+        # (a utility, not an education body). Asserting its ABSENCE is what
+        # locks the retirement in -- a re-added entry would fetch it again and
+        # put a utility's product pages back into `local_city`.
+        self.assertNotIn("https://nea.org.np/", seen)
         self.assertTrue(all(t == 10 for u, t in seen.items()
                             if "news.google.com" in u or "open-meteo" in u))
         self.assertGreaterEqual(len(seen), 8)
