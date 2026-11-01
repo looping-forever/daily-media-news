@@ -241,7 +241,7 @@
       "evening": {
         "built_at": "2026-11-01T12:56:38Z",
         "source_health_state": "ok",
-        "story_count": 2
+        "story_count": 3
       },
       "morning": {
         "actions_dispatch_at": "2026-11-01T01:35:25Z",
