@@ -7762,6 +7762,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-01T17:02:37+05:45"
+    },
+    {
+      "event_id": "evt-f1b43bcb94ba",
+      "event_key": "nepali-congress-parliamentary-meeting-nov2",
+      "canonical_title": "Nepali Congress calls parliamentary party meeting for Monday morning",
+      "category": "nepal",
+      "first_seen": "2026-11-01",
+      "last_seen": "2026-11-01",
+      "first_reported": "2026-11-01",
+      "last_reported": "2026-11-01",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.nepalnews.com/s/politics/nepali-congress-calls-parliamentary-party-meeting-for-tomorrow"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Nepali Congress has called a meeting of its parliamentary party for 8:30 AM on Monday at the party's parliamentary office in Singha Durbar to discuss contemporary political issues.",
+      "latest_development": "Reported: The Nepali Congress has called a meeting of its parliamentary party for 8:30 AM on Monday at the party's parliamentary office in Singha Durbar to discuss contemporary political issues.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-01",
+      "deadline": null,
+      "effective_date": "2026-11-02 08:30 AM",
+      "updated_at": "2026-11-01T18:41:16+05:45"
+    },
+    {
+      "event_id": "evt-e52387b60516",
+      "event_key": "jun-kirarazaka-blobtopia-manga-ending",
+      "canonical_title": "Jun Kirarazaka's Blobtopia manga series scheduled to conclude in three chapters",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-01",
+      "last_seen": "2026-11-01",
+      "first_reported": "2026-11-01",
+      "last_reported": "2026-11-01",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-01/jun-kirarazaka-blobtopia-manga-ends-in-3-chapters/.243401"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Confirmed: Weekly manga announcements indicate that Jun Kirarazaka's Blobtopia manga series is ending in its next three chapters.",
+      "latest_development": "Confirmed: Weekly manga announcements indicate that Jun Kirarazaka's Blobtopia manga series is ending in its next three chapters.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-01",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-01T18:41:16+05:45"
     }
   ],
   "archived": []
