@@ -56,12 +56,14 @@ from test_selfcheck_result_path import (  # noqa: E402
 #: probe classifies the notice and reaches the PDF.
 KNOWN_TITLE = KNOWN_CSIT_TITLE
 
-# The literal failure text the owner actually received, reproduced verbatim from
-# state/exam_selfcheck.json line 62. A test whose RED case is a paraphrase would
-# not catch the thing that happened.
-REAL_NO_TEXT_FAILURE = (
-    "notice %d PDF yielded no text - the extraction path is broken (a scanned "
-    "sheet needs pytesseract + the tesseract binary + a PDF rasteriser)")
+# The stable part of the no-text failure the owner receives. It used to be the
+# whole sentence "the extraction path is broken (a scanned sheet needs
+# pytesseract + the tesseract binary + a PDF rasteriser)" - a message that
+# blamed a stack which was verified present while the OCR pass had completed.
+# The stage detail that follows this prefix is environment-dependent (which
+# piece, if any, is missing), so the cooldown assertions anchor on the prefix
+# and the detail is asserted on its own in StageMessageHonestyTest.
+REAL_NO_TEXT_FAILURE = "notice %d PDF yielded no text - "
 
 #: N runs after the first. The real cron is hourly, so N=5 covers the observed
 #: four-alert burst and one more.

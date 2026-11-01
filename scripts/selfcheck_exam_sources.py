@@ -60,6 +60,8 @@ from check_academic_result import (  # noqa: E402
     download_pdf,
     extract_pdf_text,
     sheet_text_is_readable,
+    roll_structure,
+    structure_summary,
     is_site_constant_title,
     FetchError,
 )
@@ -259,7 +261,8 @@ def check_feed(feed, matchers, fetch_fn, timeout, max_notices):
 #      and Latin vocabularies can still READ a real board title. A title we
 #      cannot read is not a quiet pass, it is a floor that never moves;
 #   4. a real PDF downloads and extract_pdf_text yields a roll-shaped token
-#      (an 8-digit token or the split "1357 2468" form the real sheet uses).
+#      (an 8-digit token, a 5-digit token, or the split "1357 2468" form the
+#      real sheet uses).
 #
 # EXIT-CODE SEMANTICS - UNCHANGED IN SPIRIT, and the distinction is the point:
 #   * the result feed is UNREACHABLE (DNS/SERVFAIL/HTTP error, e.g. the
@@ -272,6 +275,57 @@ def check_feed(feed, matchers, fetch_fn, timeout, max_notices):
 #     is NOT softened to keep the log quiet.
 #   * no notices on the feed to probe -> ``::warning::``, exit 0 (an empty
 #     result feed is not evidence of a broken pipeline).
+
+
+def _shape_note(shapes):
+    """``"8digit=False, 5digit=True"`` from :func:`extract_pdf_text`'s diag.
+    Booleans only - nothing from a real sheet may be printed."""
+    shapes = shapes or {}
+    if not shapes:
+        return "not tested"
+    return ", ".join("%s=%s" % (name, bool(shapes.get(name))) for name in shapes)
+
+
+def _pdf_stage_note(diag, pdf_bytes_len):
+    """Name the STAGE that produced nothing, from recorded evidence only.
+
+    The old message said "a scanned sheet needs pytesseract + the tesseract
+    binary + a PDF rasteriser" whether or not all three were present - it blamed
+    the stack while the capability gate was green and the OCR pass had in fact
+    completed. Each branch below is only reachable on evidence for that branch,
+    so the message can no longer name a stage that did not fail.
+    """
+    diag = diag or {}
+    missing = diag.get("capability_missing") or []
+    if missing:
+        return ("OCR stack missing: %s (downloaded %d bytes)"
+                % (", ".join(missing), pdf_bytes_len))
+    rasterise = diag.get("rasterise") or []
+    failed = [note for note in rasterise if " failed: " in note]
+    if failed:
+        return ("rasterise failed: %s (downloaded %d bytes)"
+                % ("; ".join(failed), pdf_bytes_len))
+    pages = diag.get("pages") or 0
+    if not pages:
+        return ("downloaded %d bytes, rasteriser produced 0 pages%s"
+                % (pdf_bytes_len,
+                   (" (" + "; ".join(rasterise) + ")") if rasterise else ""))
+    joined = diag.get("joined_chars") or 0
+    if not joined:
+        return ("downloaded %d bytes, %d pages, OCR produced 0 chars"
+                % (pdf_bytes_len, pages))
+    structure = diag.get("structure") or {}
+    if structure.get("roll_tokens"):
+        # It found roll-shaped tokens but no table: say which structural test
+        # failed instead of blaming the roll shape that is present.
+        return ("downloaded %d bytes, %d pages, OCR produced %d chars with %d "
+                "roll-shaped token(s) but no table structure (%s)"
+                % (pdf_bytes_len, pages, joined, structure.get("roll_tokens"),
+                   structure_summary(structure)))
+    return ("downloaded %d bytes, %d pages, OCR produced %d chars, no "
+            "roll-shaped token (shapes: %s)"
+            % (pdf_bytes_len, pages, joined, _shape_note(diag.get("shapes"))))
+
 
 def check_result_path(feed, cfg, fetch_fn, timeout, max_probes=3):
     """Probe the RESULT path end to end. Returns a result dict.
@@ -400,17 +454,18 @@ def check_result_path(feed, cfg, fetch_fn, timeout, max_probes=3):
         except Exception as exc:
             result["failures"].append("notice %d pdf error: %s" % (nid, exc))
             continue
-        text = extract_pdf_text(pdf_bytes)
+        diag = {}
+        text = extract_pdf_text(pdf_bytes, diag=diag)
         if not text:
             result["failures"].append(
-                "notice %d PDF yielded no text - the extraction path is "
-                "broken (a scanned sheet needs pytesseract + the tesseract "
-                "binary + a PDF rasteriser)" % nid)
+                "notice %d PDF yielded no text - %s"
+                % (nid, _pdf_stage_note(diag, len(pdf_bytes))))
             continue
         if not sheet_text_is_readable(text):
             result["failures"].append(
-                "notice %d PDF text carries no roll-shaped token, so a pass or "
-                "fail could never be decided from it" % nid)
+                "notice %d PDF text carries no result-table structure (%s), so "
+                "a pass or fail could never be decided from it"
+                % (nid, structure_summary(roll_structure(text))))
             continue
         result["pdf_ok"] = True
         result["roll_token_found"] = True
@@ -594,7 +649,8 @@ def main(argv=None):
                          result_probe.get("classify")))
                 if result_probe.get("pdf_ok"):
                     print("result path OK on %s: PDF extracted and a "
-                          "roll-shaped token was found" % result_probe["id"])
+                          "result-table structure was found"
+                          % result_probe["id"])
             else:
                 for failure in result_probe.get("failures") or []:
                     print("::error::result path on %s: %s"

@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import selfcheck_exam_sources as scs  # noqa: E402
+import check_academic_result as car  # noqa: E402
 from real_pdf_builder import build_one_page_pdf  # noqa: E402
 
 CONFIG_PATH = os.path.join(REPO_ROOT, "config", "exam_notices.json")
@@ -240,8 +241,26 @@ class ResultPathProbeUnitTest(unittest.TestCase):
             RESULT_FEED, cfg_with_result_path(),
             healthy_fetch(pdf_bytes=no_roll), 15)
         self.assertFalse(r["roll_token_found"])
-        self.assertTrue(any("roll-shaped token" in f for f in r["failures"]),
-                        r["failures"])
+        self.assertTrue(any("no result-table structure" in f
+                            for f in r["failures"]), r["failures"])
+
+    def test_a_pdf_with_one_stray_number_is_not_a_read_sheet(self):
+        """One 5-digit run inside prose is not a roll column. The message must
+        say WHICH structural test failed, not blame the roll shape that is
+        present - and it must never quote the text."""
+        stray = build_one_page_pdf(roll="not a roll at all", lines=[
+            "Ph.D. entrance notice 45123 was published on this page",
+            "candidates should check the portal for updates"])
+        r = scs.check_result_path(
+            RESULT_FEED, cfg_with_result_path(),
+            healthy_fetch(pdf_bytes=stray), 15)
+        self.assertFalse(r["roll_token_found"])
+        failures = " ".join(r["failures"])
+        self.assertIn("no result-table structure", failures)
+        self.assertIn("distinct_rolls=1", failures)
+        self.assertIn("evidence=none", failures)
+        self.assertNotIn("45123", failures,
+                         "a digit run from the sheet must not be quoted back")
 
     def test_a_missing_pdf_link_is_not_by_itself_a_failure(self):
         """A notice with no PDF attached is normal on this board. The title
@@ -441,6 +460,90 @@ class StudentDataHygieneTest(unittest.TestCase):
                             or rel in allowed_exact,
                             "%s carries the tracked roll, which is neither a "
                             "test fixture nor prose about its shape" % rel)
+
+
+class StageMessageHonestyTest(unittest.TestCase):
+    """The old message blamed the OCR STACK for every empty extraction:
+    "a scanned sheet needs pytesseract + the tesseract binary + a PDF
+    rasteriser", printed while all three were verified present and the OCR pass
+    had completed. These pin the message to recorded evidence, so it can only
+    name a stage that actually produced nothing."""
+
+    def test_the_stack_is_named_only_when_a_piece_is_missing(self):
+        msg = scs._pdf_stage_note({"capability_missing": ["binary"]}, 1340821)
+        self.assertIn("OCR stack missing: binary", msg)
+        self.assertIn("downloaded 1340821 bytes", msg)
+        self.assertNotIn("pytesseract", msg,
+                         "only the MISSING piece may be named")
+
+    def test_a_completed_ocr_pass_with_no_roll_shape_blames_no_stack(self):
+        """Notice 15771's real shape: 875752 bytes, 2 pages, OCR ran, and the
+        text carried a roll shape this gate did not accept."""
+        msg = scs._pdf_stage_note(
+            {"capability_missing": [], "rasterise": [], "pages": 2,
+             "ocr_chars": 810, "joined_chars": 812,
+             "shapes": {"8digit": False, "5digit": False, "split4_4": False}},
+            875752)
+        self.assertIn("downloaded 875752 bytes, 2 pages, OCR produced 812 "
+                      "chars, no roll-shaped token", msg)
+        self.assertIn("5digit=False", msg)
+        self.assertNotIn("needs pytesseract", msg)
+        self.assertNotIn("tesseract binary", msg)
+        self.assertNotIn("rasteriser", msg)
+
+    def test_a_rasteriser_failure_is_named_as_a_failure(self):
+        msg = scs._pdf_stage_note(
+            {"capability_missing": [], "pages": 0,
+             "rasterise": ["pypdfium2 failed: PdfiumError: broken"]}, 875752)
+        self.assertTrue(msg.startswith("rasterise failed: pypdfium2 failed: "
+                                       "PdfiumError: broken"), msg)
+
+    def test_an_empty_rasteriser_is_not_called_a_failure(self):
+        msg = scs._pdf_stage_note(
+            {"capability_missing": [], "pages": 0,
+             "rasterise": ["pypdfium2 unavailable: ModuleNotFoundError: none"]},
+            875752)
+        self.assertIn("rasteriser produced 0 pages", msg)
+        self.assertNotIn("rasterise failed", msg)
+
+    def test_a_scanned_five_digit_sheet_probes_clean_end_to_end(self):
+        """Notice 15771 through the ACTUAL probe: a scanned PDF with no text
+        layer, a completed OCR pass, and a 5-digit roll column."""
+        sheet = ("Ph.D. Entrance Exam Result Sheet\n"
+                 "Roll No   Name        Result\n"
+                 "45123     Student A   PASS\n"
+                 "45124     Student B   PASS\n")
+        scanned = b"%PDF-1.3 scanned image only, no text layer"
+
+        class _PageImage(object):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def close(self):
+                pass
+
+        patches = (
+            mock.patch.object(car, "ocr_capability", lambda: {
+                "pytesseract": True, "binary": True, "pdf_to_image": True}),
+            mock.patch.object(car, "_rasterise_pdf_pages",
+                              lambda pdf_bytes, *a, **kw: [b"\x89PNG fake"]),
+            mock.patch.dict(sys.modules, {
+                "pytesseract": mock.MagicMock(
+                    image_to_string=lambda image: sheet),
+                "PIL": mock.MagicMock(Image=mock.MagicMock(
+                    open=lambda *a, **kw: _PageImage())),
+            }),
+        )
+        with patches[0], patches[1], patches[2]:
+            r = scs.check_result_path(
+                RESULT_FEED, cfg_with_result_path(),
+                healthy_fetch(pdf_bytes=scanned), 15)
+        self.assertEqual([], r["failures"], r["failures"])
+        self.assertTrue(r["pdf_ok"])
+        self.assertTrue(r["roll_token_found"])
 
 
 if __name__ == "__main__":

@@ -330,7 +330,7 @@ class OcrRasterisationTest(unittest.TestCase):
                 mock.patch.dict(sys.modules, {
                     "pytesseract": mock.MagicMock(
                         image_to_string=lambda img: (
-                            "Roll 1357 2468 passed")),
+                            "Roll 1357 2468 passed\n1357 2469 failed")),
                     "PIL": mock.MagicMock(Image=mock.MagicMock(
                         open=lambda *a, **kw: FakeImage())),
                 }):
@@ -379,6 +379,133 @@ class PdfDownloadPolicyTest(unittest.TestCase):
         with self.assertRaises(car.FetchError):
             car.download_pdf("https://x/y.pdf",
                              fetch_fn=lambda url, timeout=15: (404, b""))
+
+
+class _FakePageImage(object):
+    """Stands in for a PIL image so the OCR loop needs no real PNG."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def close(self):
+        pass
+
+
+class ScannedSheetDiagnosticsTest(unittest.TestCase):
+    """notice 15771: the OCR pass COMPLETED, produced text, and the 8-digit-only
+    gate threw it away without printing a line. Three things are pinned here -
+    a 5-digit roll column is now read, a prose-only scan still deferring says
+    which stage produced nothing, and no path returns "" in silence.
+
+    A scanned sheet has no text layer, so every case patches the whole OCR stack;
+    nothing here needs tesseract, a rasteriser or a network.
+    """
+
+    #: The shape notice 15771 actually is: an exam result sheet with a 5-digit
+    #: "Roll No" column. Fabricated - no real roll, name or mark.
+    FIVE_DIGIT_SHEET = ("Ph.D. Entrance Exam Result Sheet\n"
+                        "Roll No   Name            Result\n"
+                        "45123     Student A       PASS\n"
+                        "45124     Student B       PASS\n")
+
+    def _stack(self, ocr, pages=None, raises=None):
+        """Patch capability green, one rasterised page, and the given OCR."""
+        rendered = [b"\x89PNG\r\n\x1a\nfake"] if pages is None else list(pages)
+
+        def image_to_string(image):
+            if raises is not None:
+                raise raises
+            return ocr
+
+        return (
+            mock.patch.object(car, "ocr_capability", lambda: {
+                "pytesseract": True, "binary": True, "pdf_to_image": True}),
+            mock.patch.object(car, "_rasterise_pdf_pages",
+                              lambda pdf_bytes, *a, **kw: list(rendered)),
+            mock.patch.dict(sys.modules, {
+                "pytesseract": mock.MagicMock(
+                    image_to_string=image_to_string),
+                "PIL": mock.MagicMock(Image=mock.MagicMock(
+                    open=lambda *a, **kw: _FakePageImage())),
+            }),
+        )
+
+    def test_a_scanned_five_digit_sheet_is_read_and_recognised(self):
+        """THE BUG. OCR read the sheet; an 8-digit-only gate discarded it."""
+        patches = self._stack(self.FIVE_DIGIT_SHEET)
+        err = io.StringIO()
+        with patches[0], patches[1], patches[2], mock.patch("sys.stderr", err):
+            text = car.extract_pdf_text(b"%PDF-1.3 scanned image only")
+        self.assertIn("45123", text,
+                      "a completed OCR pass over a 5-digit roll column must be "
+                      "KEPT, not discarded")
+        self.assertTrue(car.roll_in_text(text, "45123"))
+        self.assertTrue(car.sheet_text_is_readable(text))
+        self.assertNotIn("OCR pass gave no usable text", err.getvalue(),
+                         "a successful OCR pass must not warn")
+
+    def test_a_prose_only_scanned_notice_defers_and_names_the_stage(self):
+        """Notice 15793: a scanned Nepali prose notice. It must still DEFER -
+        and the warning must say which stage produced nothing, with counts."""
+        prose = "\u0936\u0948\u0915\u094d\u0937\u093f\u0915 \u0938\u0942\u091a\u0928\u093e\n\u092f\u094b \u0938\u092c\u0948\u0915\u093e \u0932\u093e\u0917\u093f \u0939\u094b\n"
+        patches = self._stack(prose)
+        err = io.StringIO()
+        with patches[0], patches[1], patches[2], mock.patch("sys.stderr", err):
+            text = car.extract_pdf_text(b"%PDF-1.3 prose scan")
+        self.assertEqual("", text, "prose with no roll shape must defer")
+        msg = err.getvalue()
+        self.assertIn("no usable text", msg)
+        self.assertIn("no roll-shaped token", msg,
+                      "the failing stage must be named: %r" % msg)
+        self.assertIn("pages_rasterised=1", msg)
+        self.assertIn("5digit=False", msg,
+                      "the failing shape test must be named: %r" % msg)
+        self.assertNotIn("\u0936\u0948\u0915\u094d\u0937\u093f\u0915", msg,
+                         "never print sheet text")
+
+    def test_a_rasteriser_that_returns_nothing_is_not_silent(self):
+        patches = self._stack("", pages=[])
+        err = io.StringIO()
+        with patches[0], patches[1], patches[2], mock.patch("sys.stderr", err):
+            text = car.extract_pdf_text(b"%PDF-1.3")
+        self.assertEqual("", text)
+        self.assertIn("the rasteriser produced 0 pages", err.getvalue())
+
+    def test_an_ocr_raise_is_still_loud(self):
+        patches = self._stack("", raises=RuntimeError("tesseract died"))
+        err = io.StringIO()
+        with patches[0], patches[1], patches[2], mock.patch("sys.stderr", err):
+            text = car.extract_pdf_text(b"%PDF-1.3")
+        self.assertEqual("", text)
+        self.assertIn("OCR pass failed (RuntimeError: tesseract died)",
+                      err.getvalue())
+
+    def test_the_rasteriser_records_why_it_produced_nothing(self):
+        """"rasteriser failed: <exc>" must be distinguishable from "returned
+        nothing" - the bare except recorded neither."""
+        notes = []
+        self.assertEqual([], car._rasterise_pdf_pages(b"not a pdf", notes=notes))
+        self.assertTrue(notes, "the failure must leave a note, not silence")
+        self.assertTrue(any((" failed: " in n or " unavailable: " in n)
+                            for n in notes), notes)
+        self.assertTrue(any("Error" in n for n in notes),
+                        "the note must carry the exception TYPE: %r" % notes)
+
+    def test_the_diag_records_stages_and_counts_without_sheet_text(self):
+        patches = self._stack(self.FIVE_DIGIT_SHEET)
+        diag = {}
+        with patches[0], patches[1], patches[2]:
+            car.extract_pdf_text(b"%PDF-1.3 scanned image only", diag=diag)
+        self.assertEqual("ocr", diag["stage"])
+        self.assertEqual(1, diag["pages"])
+        self.assertGreater(diag["ocr_chars"], 0)
+        self.assertEqual(diag["ocr_chars"], diag["joined_chars"])
+        self.assertEqual({"8digit": False, "5digit": True, "split4_4": False},
+                         diag["shapes"])
+        self.assertEqual([], diag["capability_missing"])
 
 
 if __name__ == "__main__":

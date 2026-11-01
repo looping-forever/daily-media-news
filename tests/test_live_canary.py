@@ -92,7 +92,9 @@ def good_academic():
              "pdf_url": "https://portal.tu.edu.np/notice/15673/x.pdf"},
         ],
         "pdfs": [
-            {"notice_id": 15673, "text": "1357 2468 3.5 GPA",
+            # Two distinct rolls: sheet_text_is_readable demands table structure,
+            # and one number alone is not a table (a stray notice id would pass).
+            {"notice_id": 15673, "text": "1357 2468 9001 1500 3.5 GPA",
              "deferred": False, "deferral_reason": ""},
         ],
     }

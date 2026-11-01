@@ -45,6 +45,13 @@ ROLL = "13572468"
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
 
+# A READ sheet on which the owner's roll is ABSENT: a roll COLUMN with two
+# distinct rolls. One number in prose no longer counts as a read sheet - the
+# gate demands table structure (see sheet_text_is_readable) - so a one-line stub
+# would silently test the deferral branch instead of the FAILED branch.
+NO_OWN_ROLL_SHEET = "Roll No\n99999999 Absent A\n99999998 Absent B"
+
+
 def seed_state():
     """A fresh state dict mirroring the seed file (schema_version 2)."""
     return {
@@ -318,7 +325,7 @@ class AcademicResultTest(unittest.TestCase):
                   "url": "https://iost.tu.edu.np/notices/14559",
                   "pdf_url": "https://portal.tu.edu.np/notice/9300/x.pdf"}
         with mock.patch.object(car, "extract_pdf_text",
-                               return_value="Roll 99999999 not here"):
+                               return_value=NO_OWN_ROLL_SHEET):
             payload = car.process_notice(state, notice, fake_pdf_bytes())
         self.assertIsNotNone(payload)
         self.assertFalse(payload["passed"])
@@ -1307,7 +1314,7 @@ class ReviewerReproTest(unittest.TestCase):
             rc, payloads, after = self._run_result(
                 d, [(15240, "B.Sc.CSIT I Semester-2081 Result", "2026-08-01")],
                 {15240: "B.Sc.CSIT I Semester Result"},
-                "Roll 99999999 not present", state=state)
+                NO_OWN_ROLL_SHEET, state=state)
         self.assertEqual(rc, 0)
         self.assertEqual(len(payloads), 0,
                          "re-announcing an unchanged FAILED verdict is not news")
@@ -1584,7 +1591,7 @@ class JustCreatedSemesterKeyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, payloads, after, _calls = drive_result_pass(
                 d, self._state_without_sem4(), self.ROWS, self.TITLES,
-                {700: "Roll 99999999 not present"})
+                {700: NO_OWN_ROLL_SHEET})
         self.assertEqual(rc, 0)
         self.assertEqual(payloads, [],
                          "a FAILED verdict invented from a missing state entry "
@@ -1605,7 +1612,7 @@ class JustCreatedSemesterKeyTest(unittest.TestCase):
         written on run 1 is real state on disk, so run 2 is entitled to a
         verdict. (Re-driving with run 1's own saved state is byte-identical to
         the next cron tick reading the same file.)"""
-        texts = {700: "Roll 99999999 not present"}
+        texts = {700: NO_OWN_ROLL_SHEET}
         with tempfile.TemporaryDirectory() as d:
             rc1, first, after1, _ = drive_result_pass(
                 d, self._state_without_sem4(), self.ROWS, self.TITLES, texts)
@@ -1644,7 +1651,7 @@ class JustCreatedSemesterKeyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, payloads, after, _calls = drive_result_pass(
                 d, state, self.ROWS, self.TITLES,
-                {700: "Roll 99999999 not present"})
+                {700: NO_OWN_ROLL_SHEET})
         self.assertEqual(rc, 0)
         self.assertEqual(len(payloads), 1)
         self.assertFalse(payloads[0]["passed"])
@@ -1942,6 +1949,12 @@ class FalseFailedGuardTest(unittest.TestCase):
         # a long roll column of SPLIT rolls is still a read sheet
         self.assertTrue(car.sheet_text_is_readable(
             " ".join("1357 %04d" % i for i in range(100))))
+        # 5-digit rolls are what the boards currently print. The gate used to
+        # demand 8 digits, so a completed OCR pass over this shape was thrown
+        # away (notice 15771) - this assertion is that widening.
+        self.assertTrue(car.sheet_text_is_readable(
+            "Ph.D. Entrance Exam Result Sheet\nRoll No Name\n"
+            "45123 A\n45124 B"))
 
     def test_the_guard_rejects_unreadable_text(self):
         self.assertFalse(car.sheet_text_is_readable(unreadable_pdf_text()))
@@ -1949,9 +1962,9 @@ class FalseFailedGuardTest(unittest.TestCase):
         self.assertFalse(car.sheet_text_is_readable(""))
         # digits present but far too few to be a result sheet
         self.assertFalse(car.sheet_text_is_readable("Total 42 students passed."))
-        # digits present but no roll-like token at all
+        # digits present but no roll-shaped token at all
         self.assertFalse(car.sheet_text_is_readable(
-            " ".join("12345" for _ in range(100))))
+            " ".join("123" for _ in range(100))))
 
     def test_an_unreadable_sheet_never_marks_failed(self):
         state = seed_state()
@@ -1993,6 +2006,77 @@ class FalseFailedGuardTest(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertFalse(payload["passed"])
         self.assertEqual(state["semesters"]["4"]["status"], "failed")
+
+    # --- the structure rule -------------------------------------------------
+    # A shape alone was not enough: the caller uses the SAME test to decide
+    # whether "the roll is absent" can be believed, so one stray 5-digit run in
+    # a prose notice made it "readable" and armed a FAILED verdict.
+
+    def test_one_stray_five_digit_number_in_prose_is_not_a_read_sheet(self):
+        prose = ("Ph.D. entrance notice 45123 was published today; candidates "
+                 "should check the portal for the result schedule")
+        self.assertFalse(car.sheet_text_is_readable(prose),
+                         "one number in prose is not a roll column")
+        facts = car.roll_structure(prose)
+        self.assertEqual(1, facts["roll_tokens"])
+        self.assertEqual(1, facts["distinct_rolls"])
+        self.assertEqual("", facts["table_evidence"])
+        self.assertIn("evidence=none", car.structure_summary(facts))
+
+    def test_a_repeated_number_is_not_a_roll_column(self):
+        """Distinct values are what make a column. A notice id repeated down a
+        page must not pass as a roll count."""
+        repeated = "Notice 45123\n" * 30
+        self.assertFalse(car.sheet_text_is_readable(repeated))
+
+    def test_roll_beside_a_result_word_is_a_table(self):
+        """The single-row case: one roll on the same line as a result word.
+        Both vocabularies count - Latin and Nepali."""
+        self.assertTrue(car.sheet_text_is_readable("Result 45123 PASS"))
+        self.assertTrue(car.sheet_text_is_readable("45123 उत्तीर्ण"))
+
+    def test_a_result_word_three_lines_up_is_not_the_same_row(self):
+        far = "Result\n\n\n45123 is unrelated to the table above"
+        self.assertFalse(car.sheet_text_is_readable(far))
+
+    def test_an_eight_digit_column_is_still_read(self):
+        self.assertTrue(car.sheet_text_is_readable(
+            "Roll No\n13572468 A\n13572469 B"))
+
+    def test_a_five_digit_sheet_without_the_roll_still_fails(self):
+        """The 15771 shape, end to end: a 5-digit roll column is READ, so a
+        genuinely absent roll IS a failed verdict. This is the case the
+        widening existed to rescue."""
+        state = seed_state()
+        text = ("Ph.D. Entrance Exam Result Sheet\n"
+                "Roll No   Name        Result\n"
+                "45123     Student A   PASS\n"
+                "45124     Student B   PASS\n")
+        self.assertTrue(car.sheet_text_is_readable(text))
+        self.assertFalse(car.roll_in_text(text, ROLL))
+        with mock.patch.object(car, "extract_pdf_text", return_value=text):
+            payload = car.process_notice(state, self._sem4_notice(),
+                                        fake_pdf_bytes())
+        self.assertIsNotNone(payload)
+        self.assertFalse(payload["passed"])
+        self.assertEqual(state["semesters"]["4"]["status"], "failed")
+
+    def test_a_prose_notice_with_one_stray_number_defers_instead_of_failing(self):
+        """THE BUG THIS RULE EXISTS FOR. Non-empty prose carrying one 5-digit
+        run, the roll absent: DEFER (R1), never a FAILED verdict."""
+        state = seed_state()
+        text = ("Ph.D. entrance notice 45123 was published today; candidates "
+                "should check the portal for the result schedule")
+        with mock.patch.object(car, "extract_pdf_text", return_value=text):
+            payload = car.process_notice(state, self._sem4_notice(),
+                                        fake_pdf_bytes())
+        self.assertIsNone(payload)
+        sem4 = state["semesters"]["4"]
+        self.assertEqual(sem4["status"], "pending",
+                         "one stray number must never produce a verdict")
+        self.assertFalse(sem4["result_announced"])
+        self.assertFalse(sem4["roll_found"])
+        self.assertEqual(state["current_semester"], 4)
 
     def test_end_to_end_an_unreadable_sheet_defers_and_does_not_burn(self):
         state = seed_state()
@@ -2096,7 +2180,7 @@ class RollFoundNormalisationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, payloads, after, _calls = drive_result_pass(
                 d, state, rows, {800: "B.Sc.CSIT I Semester Result"},
-                {800: "Roll 99999999 not present"})
+                {800: NO_OWN_ROLL_SHEET})
         self.assertEqual(rc, 0)
         self.assertEqual(payloads, [],
                          "an unchanged FAILED verdict is not news, and the "

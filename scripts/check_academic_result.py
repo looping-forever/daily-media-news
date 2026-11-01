@@ -1494,43 +1494,146 @@ def download_pdf(pdf_url, fetch_fn=None, timeout=30, max_bytes=PDF_MAX_BYTES):
     return body
 
 
+# The shapes a board actually PRINTS a roll in, in one place, so the
+# OCR-accept test and the caller's re-check can never disagree: both go through
+# sheet_text_is_readable, which is the only definition of "read".
+_ROLL_SHAPE_RES = (
+    # "13572468" - the shape the older sheets and this module's tests use.
+    ("8digit", re.compile(r"\b\d{8}\b")),
+    # "45123" - what the boards currently print. An 8-digit-only gate threw
+    # away a COMPLETED OCR pass over a real 5-digit roll column (notice 15771).
+    ("5digit", re.compile(r"\b\d{5}\b")),
+    # "1357 2468" - one roll split across a column boundary by the PDF. The
+    # real sem-1 2082 sheet does exactly this.
+    ("split4_4", re.compile(r"\b\d{4}\s+\d{4}\b")),
+)
+
+# The words a result TABLE prints beside a roll. This is the repo's existing
+# vocabulary, not a new list: the Latin _RESULT_TERMS_RE above plus
+# devanagari.NEPALI_RESULT_TERMS, which already carries उत्तीर्ण and अनुत्तीर्ण
+# (passed / failed). Built once, from those two, so the two can never drift.
+_ROLL_MARKER_RE = re.compile(
+    "(?:%s)|(?:%s)" % (_RESULT_TERMS_RE.pattern,
+                      "|".join(re.escape(term)
+                               for term in devanagari.NEPALI_RESULT_TERMS)),
+    re.IGNORECASE)
+
+# How close a result word must sit to a roll to count as the same row. Deliberately
+# TIGHT: "beside" means beside. A wide window would let any prose sentence that
+# happens to contain "result" somewhere on the same line re-open the hole this
+# rule exists to close, and the safe direction is to defer.
+_ROLL_MARKER_WINDOW = 16
+
+
+def _marker_near(text, start, end, window=_ROLL_MARKER_WINDOW):
+    """The result word immediately beside a roll on the SAME line, else ""."""
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    if line_end == -1:
+        line_end = len(text)
+    fragment = text[max(line_start, start - window):
+                    min(line_end, end + window)]
+    match = _ROLL_MARKER_RE.search(fragment)
+    return match.group(0) if match else ""
+
+
+def roll_structure(text):
+    """Structural facts about extracted text: counts and booleans only.
+
+    NEVER returns sheet text - these values are printed into CI warnings and
+    failure messages, which must not carry a student's roll number or a notice's
+    prose.
+
+    ``table_evidence`` is the verdict, as one of:
+
+      * ``"distinct_rolls>=2"`` - two or more DIFFERENT roll-shaped tokens, i.e.
+        a roll column. Distinct values, so one number repeated down a page (a
+        notice id in a footer, a page number) cannot pass as a column;
+      * ``"roll_marker_adjacent"`` - one roll-shaped token on the same line as a
+        result word, which is a one-row result line;
+      * ``""`` - no evidence of a table.
+
+    A single token in running prose is NOT evidence. That was the bug: a notice
+    whose text carried one stray 5-digit run was "readable", so the caller's
+    absent-roll check declared the semester FAILED on the strength of a number
+    that was never a roll.
+    """
+    body = text or ""
+    matches = [(name, match) for name, pattern in _ROLL_SHAPE_RES
+               for match in pattern.finditer(body)]
+    distinct = set(match.group(0) for _name, match in matches)
+    marker = ""
+    for _name, match in matches:
+        marker = _marker_near(body, match.start(), match.end())
+        if marker:
+            break
+    if len(distinct) >= 2:
+        evidence = "distinct_rolls>=2"
+    elif marker:
+        evidence = "roll_marker_adjacent"
+    else:
+        evidence = ""
+    return {
+        "shapes": _roll_shape_hits(body),
+        "roll_tokens": len(matches),
+        "distinct_rolls": len(distinct),
+        "marker_adjacent": bool(marker),
+        "table_evidence": evidence,
+    }
+
+
+def structure_summary(structure):
+    """``"distinct_rolls=1, marker_adjacent=False, evidence=none"`` - no text."""
+    facts = structure or {}
+    return ("distinct_rolls=%d, marker_adjacent=%s, evidence=%s"
+            % (int(facts.get("distinct_rolls") or 0),
+               bool(facts.get("marker_adjacent")),
+               facts.get("table_evidence") or "none"))
+
+
+def _roll_shape_hits(text):
+    """``{shape_name: bool}`` for ``text``. Booleans only, so a diagnostic can
+    say which shape test failed without printing any sheet text."""
+    body = text or ""
+    return {name: pattern.search(body) is not None
+            for name, pattern in _ROLL_SHAPE_RES}
+
+
+def _shape_summary(shapes):
+    """``"8digit=False, 5digit=True, split4_4=False"`` - booleans, no text."""
+    return ", ".join("%s=%s" % (name, bool((shapes or {}).get(name)))
+                     for name, _ in _ROLL_SHAPE_RES)
+
+
 def _has_roll_like_tokens(text):
-    """True if the text contains at least one 8-digit token (a scanned result
-    PDF that OCR'd would have roll numbers)."""
-    return re.search(r"\b\d{8}\b", text or "") is not None
-
-
-# A roll that the PDF prints as "1357 2468" rather than "13572468". The real
-# sem-1 2082 sheet does exactly this, so a whitespace-tolerant roll shape is
-# evidence the sheet was READ, not evidence it was not.
-_SPLIT_ROLL_RE = re.compile(r"\b\d{4}\s+\d{4}\b")
+    """True if the text carries at least one roll-shaped token (a scanned result
+    PDF that OCR'd would have roll numbers). Any of the three shapes counts."""
+    return any(_roll_shape_hits(text).values())
 
 def sheet_text_is_readable(text):
-    """True when extracted PDF text is plausibly a real, READ result sheet.
+    """True when extracted PDF text has the STRUCTURE of a result table.
 
-    "The roll is not in this text" is only evidence of absence when the text
-    was actually read. The test is deliberately the same gate
-    :func:`extract_pdf_text` already uses to decide whether a PDF needs OCR,
-    widened to the shape the real sheet uses:
+    "The roll is not in this text" is only evidence of absence when the text was
+    actually read. This is that test, and it is the only definition of "read":
+    :func:`extract_pdf_text` accepts an OCR pass on it and the caller re-checks
+    it before it decides anything, so the two can never disagree.
 
-      * an 8-digit token (``13572468``), or
-      * a roll split across a column boundary (``1357 2468``) - which is how
-        the real sem-1 2082 sheet prints it.
+    The roll must be printed in a shape the board actually uses - an 8-digit
+    token (``13572468``), a 5-digit token (``45123``, what the current boards
+    print), or a roll split across a column boundary (``1357 2468``) - AND that
+    shape must look like a TABLE, not prose with a number in it. See
+    :func:`roll_structure`: either at least two DISTINCT roll-shaped tokens, or
+    one on the same line as a result word.
 
-    A PDF with a legacy custom-encoded font that pypdf cannot map extracts to
-    non-empty, prose-shaped garbage carrying no roll-shaped token at all. That
-    is the case this exists to catch, and it is the exact shape that used to
-    produce a FALSE FAILED.
-
-    This is the guard against the most damaging outcome this script has:
-    marking a semester failed for a student who passed. It advances
-    ``current_semester``, sets ``result_announced``, and tells the owner the
-    wrong thing about a real result. So non-empty-but-unreadable must DEFER
-    (R1 retries it), never decide.
+    The second half is not decoration. A scanned notice defers only when this
+    returns False, so a rule satisfied by any single 5-digit run let a prose
+    notice arm the absent-roll check and mark the semester FAILED on a number
+    that was never a roll. One stray number is cheap; a FALSE FAILED is the most
+    damaging thing this script can emit - it advances ``current_semester``, arms
+    ``result_announced``, and tells the owner the wrong thing about a real
+    result. So a doubtful text must DEFER (R1 retries it), never decide.
     """
-    if not text:
-        return False
-    return _has_roll_like_tokens(text) or _SPLIT_ROLL_RE.search(text) is not None
+    return bool(roll_structure(text)["table_evidence"])
 
 
 def ocr_capability():
@@ -1614,12 +1717,23 @@ def require_ocr_capability(stream=None):
     return 1
 
 
-def _rasterise_pdf_pages(pdf_bytes, max_pages=OCR_MAX_PAGES, dpi=OCR_DPI):
+def _exception_note(stage, exc):
+    """``"<stage> failed: <Type>: <msg>"`` - the stage and the exception, and
+    never the document's content."""
+    kind = "unavailable" if isinstance(exc, ImportError) else "failed"
+    return "%s %s: %s: %s" % (stage, kind, type(exc).__name__, exc)
+
+
+def _rasterise_pdf_pages(pdf_bytes, max_pages=OCR_MAX_PAGES, dpi=OCR_DPI,
+                         notes=None):
     """Rasterise up to ``max_pages`` PDF pages to PNG bytes, page by page.
 
     Returns a list of PNG byte strings, one per page rendered. An empty list
     means "no rasteriser available" or "the PDF could not be rendered" - both
-    are handled by the caller, which never treats them as a decision.
+    are handled by the caller, which never treats them as a decision. Pass a
+    list as ``notes`` to collect WHY: each failed or unavailable rasteriser
+    appends one ``<stage> failed: <Type>: <msg>`` line, so "rasteriser failed"
+    is distinguishable from "rasteriser returned nothing".
 
     Prefers pypdfium2 (a self-contained wheel, no system binary) and falls back
     to pdf2image (which needs poppler-utils). Either is enough; a scanned
@@ -1653,8 +1767,12 @@ def _rasterise_pdf_pages(pdf_bytes, max_pages=OCR_MAX_PAGES, dpi=OCR_DPI):
                 pass
         if pages:
             return pages
-    except Exception:
-        pass
+    except Exception as exc:
+        # Recorded, never swallowed: an empty result used to be unattributable,
+        # so "the rasteriser raised" and "the rasteriser had nothing to give"
+        # looked identical in the log.
+        if notes is not None:
+            notes.append(_exception_note("pypdfium2", exc))
     # --- pdf2image: needs poppler, renders whole documents -----------------
     try:
         from pdf2image import convert_from_bytes
@@ -1672,20 +1790,28 @@ def _rasterise_pdf_pages(pdf_bytes, max_pages=OCR_MAX_PAGES, dpi=OCR_DPI):
                 except Exception:
                     pass
         return pages
-    except Exception:
+    except Exception as exc:
+        if notes is not None:
+            notes.append(_exception_note("pdf2image", exc))
         return pages
 
 
-def extract_pdf_text(pdf_bytes, ocr=True):
+def extract_pdf_text(pdf_bytes, ocr=True, diag=None):
     """Extract text from PDF bytes.
 
     Direct text extraction first (pypdf, else pdfplumber, else a minimal
-    fallback). If the result is empty or has no 8-digit roll-like tokens
+    fallback). If the result is empty or has no roll-shaped token
     (a scanned image), fall back to OCR: rasterise page by page to PNG and hand
     each page to pytesseract, bounded to OCR_MAX_PAGES pages at OCR_DPI.
     Gracefully degrades: if any part of the OCR stack is unavailable, returns
     whatever direct extraction gave (possibly ""), and the caller treats empty
     as "couldn't extract", which must NOT mark the student as failed.
+
+    Pass a dict as ``diag`` to have the STAGE recorded: ``stage`` is one of
+    "direct", "direct_unreadable", "ocr", "ocr_empty", "ocr_unreadable",
+    "rasterise_nothing", "capability_missing", plus byte counts, page count and
+    per-shape booleans. Counts and booleans only - no sheet text ever goes in
+    there, because the whole point is to be printable in a log.
 
     THE OCR BRANCH WAS BROKEN AND ALWAYS HAS BEEN. It did
     ``Image.open(io.BytesIO(pdf_bytes))`` - PIL on PDF BYTES, which raises
@@ -1695,7 +1821,19 @@ def extract_pdf_text(pdf_bytes, ocr=True):
     exited 0. That is a silent, permanent loss of exactly the notices a scan
     produces. Rasterise first, OCR second, and say so when the stack is
     incomplete.
+
+    NOTHING HERE RETURNS "" SILENTLY. A completed OCR pass that is discarded
+    (it produced text, but no roll shape) prints the counts and the failing
+    shape, because silence was the second half of the bug: notice 15771 OCR'd
+    fine, the 8-digit-only gate rejected it, and the notice deferred for weeks
+    with no line anywhere saying why.
     """
+    if diag is not None:
+        diag.clear()
+        diag.update({"stage": "direct", "direct_chars": 0, "pages": 0,
+                     "ocr_chars": 0, "joined_chars": 0, "shapes": {},
+                     "structure": {}, "rasterise": [],
+                     "capability_missing": []})
     text = ""
     # --- Direct text extraction -------------------------------------------
     try:
@@ -1722,6 +1860,11 @@ def extract_pdf_text(pdf_bytes, ocr=True):
         except Exception:
             text = ""
     text = _clean_ws(text)
+    if diag is not None:
+        diag["direct_chars"] = len(text)
+        # True only when the direct layer carried a roll shape on its own.
+        diag["stage"] = ("direct" if text and sheet_text_is_readable(text)
+                         else "direct_unreadable" if text else "direct_empty")
     # --- OCR fallback for scanned images ----------------------------------
     if ocr and (not text or not _has_roll_like_tokens(text)):
         cap = ocr_capability()
@@ -1734,35 +1877,101 @@ def extract_pdf_text(pdf_bytes, ocr=True):
                   "every run until pytesseract, the tesseract binary and a "
                   "PDF rasteriser are all present." % _ocr_capability_note(),
                   file=sys.stderr)
+            if diag is not None:
+                diag["stage"] = "capability_missing"
+                diag["capability_missing"] = [k for k, v in cap.items() if not v]
             return text
         try:
             import pytesseract
             from PIL import Image
             import io as _io
+            raster_notes = []
+            pages = _rasterise_pdf_pages(pdf_bytes, notes=raster_notes)
             ocr_chunks = []
-            for png in _rasterise_pdf_pages(pdf_bytes):
+            for png in pages:
                 with Image.open(_io.BytesIO(png)) as page_image:
+                    # No lang argument: this machine has no tesseract at all, so
+                    # no installed pack can be verified here, and CI installs
+                    # the English default. eng is what is guaranteed; rolls are
+                    # ASCII digits, which eng reads. A language pin is added
+                    # only when a pack is verified present, never presumed.
                     ocr_chunks.append(pytesseract.image_to_string(page_image)
                                       or "")
             joined = "\n".join(ocr_chunks)
-            # Accept on the SAME shape test the caller uses
-            # (:func:`sheet_text_is_readable`), not on a bare 8-digit token.
-            # The two disagreed, and the disagreement was a burn: the real
-            # sem-1 sheet prints the roll SPLIT across a column boundary
-            # ("1357 2468"), so an OCR pass that read the scanned sheet
-            # correctly still produced no 8-digit token and its text was
-            # thrown away, leaving the notice deferred forever. Widening here
-            # cannot manufacture a verdict - the caller re-checks
-            # sheet_text_is_readable before it will decide anything.
+            shapes = _roll_shape_hits(joined)
+            structure = roll_structure(joined)
+            ocr_chars = sum(len(chunk) for chunk in ocr_chunks)
+            if diag is not None:
+                diag.update({"pages": len(pages), "ocr_chars": ocr_chars,
+                             "joined_chars": len(joined), "shapes": shapes,
+                             "structure": structure,
+                             "rasterise": list(raster_notes)})
+            # Accept on the SAME test the caller uses
+            # (:func:`sheet_text_is_readable`), not on a bare 8-digit token and
+            # not on any single number. The two disagreed once, and the
+            # disagreement was a burn: the real sem-1 sheet prints the roll
+            # SPLIT across a column boundary ("1357 2468"), and the current
+            # boards print a 5-DIGIT roll, so an OCR pass that read the scanned
+            # sheet correctly still produced no 8-digit token and its text was
+            # thrown away, deferring the notice forever. Widening the SHAPE was
+            # not enough on its own: the caller uses this same test to decide
+            # whether "roll absent" can be believed, so a single stray 5-digit
+            # run made a prose notice "readable" and armed a FAILED verdict.
+            # The test now demands table STRUCTURE as well as a shape.
             if joined and sheet_text_is_readable(joined):
                 text = _clean_ws(joined)
+                if diag is not None:
+                    diag["stage"] = "ocr"
+            else:
+                # The one exit that used to be silent. Say which stage produced
+                # nothing and how much it produced, never what it said.
+                if diag is not None:
+                    diag["stage"] = ("rasterise_nothing" if not pages
+                                     else "ocr_empty" if not joined
+                                     else "ocr_unreadable")
+                print("::warning::academic: OCR pass gave no usable text - %s. "
+                      "pages_rasterised=%d, ocr_chars=%d, joined_chars=%d, "
+                      "shapes: %s; structure: %s; rasteriser: %s. Keeping "
+                      "whatever direct extraction produced."
+                      % (_ocr_stage_note(len(pages), len(joined), structure),
+                         len(pages), ocr_chars, len(joined),
+                         _shape_summary(shapes),
+                         structure_summary(structure),
+                         "; ".join(raster_notes) if raster_notes
+                         else "returned nothing, no note"),
+                      file=sys.stderr)
         except Exception as exc:
             # Never swallow silently: a failure here is why a real result may
             # go unread for days.
+            if diag is not None:
+                diag["stage"] = "ocr_raised"
+                diag["rasterise"] = list(diag.get("rasterise") or []) + [
+                    _exception_note("OCR", exc)]
             print("::warning::academic: OCR pass failed (%s: %s); keeping "
                   "whatever direct extraction produced"
                   % (type(exc).__name__, exc), file=sys.stderr)
     return text
+
+
+def _ocr_stage_note(pages, joined_chars, structure=None):
+    """Name the stage of an OCR pass that produced nothing usable, from counts
+    alone. Ordered by how far the pass got, so the earliest silent stage is the
+    one reported."""
+    if not pages:
+        return "the rasteriser produced 0 pages"
+    if not joined_chars:
+        return "the rasteriser produced %d page(s) but OCR produced 0 chars" % pages
+    facts = structure or {}
+    if facts.get("table_evidence"):
+        return ("OCR produced %d chars, a table shape, but the pass was rejected"
+                % joined_chars)
+    if facts.get("roll_tokens"):
+        return ("OCR produced %d chars with %d roll-shaped token(s) but no table "
+                "structure (%s)"
+                % (joined_chars, facts.get("roll_tokens"),
+                   structure_summary(facts)))
+    return ("OCR produced %d chars but no roll-shaped token (shapes: %s)"
+            % (joined_chars, _shape_summary(facts.get("shapes"))))
 
 
 def roll_in_text(text, roll_number):
