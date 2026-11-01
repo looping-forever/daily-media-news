@@ -138,7 +138,7 @@ class TestDetailBlockPresent(unittest.TestCase):
 
     def test_sun_and_uv_render_with_their_band(self):
         self.assertIn("Sun 06:12\u201317:04", self.html)
-        self.assertIn("UV 6 high", self.html)
+        self.assertIn("UV max 6 (high)", self.html)
 
     def test_the_narrative_is_one_paragraph(self):
         self.assertEqual(self.html.count('class="weather-narrative"'), 1)
@@ -192,7 +192,7 @@ class TestSingleFieldRemoval(unittest.TestCase):
                                       % (other, fields))
                 # The rest of the card is untouched by a missing cell.
                 self.assertIn("Rain 78% 14:00-17:59", html)
-                self.assertIn("UV 6 high", html)
+                self.assertIn("UV max 6 (high)", html)
 
     def test_a_zero_rain_peak_omits_the_whole_line(self):
         html = render_digest.render_weather_detail(

@@ -40,6 +40,8 @@ if SCRIPTS not in sys.path:
 
 import collect_news as cn  # noqa: E402
 import weather_advice as wa  # noqa: E402
+import build_email as be  # noqa: E402
+import render_digest as rd  # noqa: E402
 
 REPO_PROFILE = os.path.join(REPO_ROOT, "config", "profile.yml")
 REPO_INTERESTS = os.path.join(REPO_ROOT, "config", "interests.yml")
@@ -594,6 +596,38 @@ class TestAdviceCall(unittest.TestCase):
         self.assertEqual(lines, [])
         self.assertIn("apparent_temperature", err)
 
+    def test_a_wet_day_is_never_called_dry_just_because_its_hours_are(
+            self):
+        """The 2026-11-01 evening contradiction, pinned.
+
+        The outlook row reports the DAY (pop_max 78%, 1.0 mm); the advice used
+        to read only the hours still ahead. At 17:01 those were dry, so the
+        digest printed "dry and mild today" beside an outlook saying 78% rain.
+        Both surfaces now decide from the same daily numbers.
+        """
+        body = wet_body(pop=0, mm=0.0, apparent=18.6)     # every hour dry
+        body["daily"]["precipitation_probability_max"] = [78] * len(DAYS)
+        body["daily"]["precipitation_sum"] = [1.0] * len(DAYS)
+        fetched = "2026-09-28 17:01"
+        box = self.box(body, fetched)
+        box["raw"] = body
+        lines, err = cn.compute_weather_advice(box, self.profile, now=fetched)
+        self.assertEqual(err, "")
+        self.assertNotIn("dry and mild",
+                         " ".join(line["text"] for line in lines))
+
+    def test_a_genuinely_dry_day_still_reports_nothing_to_plan_for(self):
+        """The guard is about contradiction, not about silencing the calm line."""
+        body = wet_body(pop=0, mm=0.0, apparent=18.6)
+        body["daily"]["precipitation_probability_max"] = [5] * len(DAYS)
+        body["daily"]["precipitation_sum"] = [0.0] * len(DAYS)
+        fetched = "2026-09-28 17:01"
+        box = self.box(body, fetched)
+        box["raw"] = body
+        lines, err = cn.compute_weather_advice(box, self.profile, now=fetched)
+        self.assertEqual(err, "")
+        self.assertEqual([line["id"] for line in lines], ["C"])
+
     def test_stale_payload_is_silence_not_a_warning(self):
         lines, err = cn.compute_weather_advice(self.box(wet_body()),
                                                self.profile,
@@ -866,7 +900,11 @@ TODAY_KEYS = {"tmax_c", "tmin_c", "pop_max_pct", "precip_sum_mm", "condition",
               "sunrise", "sunset", "uv_max", "uv_band"}
 NEXT12H_KEYS = {"pop_peak_pct", "pop_peak_hour", "precip_mm", "window"}
 OUTLOOK_KEYS = {"day", "tmax_c", "tmin_c", "pop_pct", "precip_mm", "condition",
-                "gust_max_kmh"}
+                "gust_max_kmh",
+                # Added 2026-11-01: the row's rain wording, decided once from the
+                # same daily numbers as the advice's wet verdict. Optional to a
+                # hand-built block, always present in a collected one.
+                "rain"}
 NUMERIC_PATHS = ("temperature_c", "apparent_c", "humidity_pct", "dew_point_c",
                  "wind_kmh", "gust_kmh", "cloud_pct", "precip_now_mm",
                  "today.tmax_c", "today.tmin_c", "today.pop_max_pct",
@@ -925,7 +963,7 @@ class TestWeatherBlock(unittest.TestCase):
                 "payload": None, "error": "", "raw": body}
 
     def block_for(self, body, fetched=NPT0):
-        return cn.build_weather_block(self.box_for(body, fetched))
+        return cn.build_weather_block(self.box_for(body, fetched), self.profile)
 
     def assert_no_placeholder(self, block, label=""):
         for text in strings_in(block):
@@ -1086,7 +1124,7 @@ class TestWeatherBlock(unittest.TestCase):
                     cn.fetch_bytes = saved
                 self.assertEqual(len(candidates), 1)
                 self.assertTrue(summary)
-                block = cn.build_weather_block(box)
+                block = cn.build_weather_block(box, self.profile)
                 self.assertEqual(set(block), BLOCK_KEYS, path)
                 self.assert_no_placeholder(block, path)
 
@@ -1249,6 +1287,78 @@ class TestWeatherBlock(unittest.TestCase):
         self.assertEqual(fresh, rich)
         self.assertEqual(wa.weather_advice(fresh, self.profile, []),
                          wa.weather_advice(rich, self.profile, []))
+
+
+class TestWetVerdictAndOutlookRowCannotDisagree(unittest.TestCase):
+    """One day, two surfaces, one decision.
+
+    THE DEFECT THIS CLOSES. `day_is_wet()` reads pop_max AND precip_sum; the
+    outlook row printed "%d%% rain" from pop ALONE. On a day with no rain
+    probability but 6 mm in the forecast -- ordinary in the monsoon -- the advice
+    was told the day is wet (so it suppressed "dry and mild") while the row for
+    that same day mentioned no rain at all. The two surfaces agreed in the sample
+    data by luck, which is why nothing caught it.
+
+    The invariant is one-directional and that is deliberate: a wet verdict MUST
+    be visible in the row. A dry verdict does not forbid a "10% rain" note,
+    because quoting a real percentage is honest.
+    """
+
+    #: (label, pop_max_pct, precip_sum_mm, what the verdict must be)
+    CASES = (
+        ("wet by amount, zero probability", 0, 6.0, True),
+        ("wet by amount, probability absent", None, 6.0, True),
+        ("wet by probability, no amount", 85, 0.0, True),
+        ("dry", 0, 0.0, False),
+        ("some chance, not wet", 10, 0.0, False),
+    )
+
+    def setUp(self):
+        self.profile, _ = cn.load_weather_profile(REPO_PROFILE)
+        self.place = cn.weather_place(self.profile)
+
+    def block_and_raw(self, pop, mm):
+        body = weather_body()
+        body["daily"]["precipitation_probability_max"] = [pop, 0, 0]
+        body["daily"]["precipitation_sum"] = [mm, 0.0, 0.0]
+        box = {"place": self.place, "fetched_at_npt": NPT0,
+               "payload": None, "error": "", "raw": body}
+        return cn.build_weather_block(box, self.profile), body
+
+    def test_a_day_the_verdict_calls_wet_always_says_so_in_the_row(self):
+        for label, pop, mm, expect_wet in self.CASES:
+            with self.subTest(case=label):
+                block, raw = self.block_and_raw(pop, mm)
+                # The verdict the ADVICE reads, obtained the way the advice
+                # obtains it -- not re-derived here.
+                verdict = cn._today_daily_wet(raw, NPT0, self.profile.thresholds)
+                self.assertEqual(expect_wet, verdict,
+                                 "fixture sanity for %r" % (label,))
+                stamped = block["outlook"][0].get("rain")
+                row = rd._weather_outlook_items(block["outlook"])[0]
+                if not verdict:
+                    continue
+                self.assertTrue(
+                    isinstance(stamped, str) and stamped,
+                    "the wet verdict for %r (pop=%r, mm=%r) is True, but the "
+                    "outlook row for the same day carries no rain wording at all "
+                    "(%r). The advice and the row are then reading the same day "
+                    "from different fields." % (label, pop, mm, stamped))
+                self.assertIn(
+                    stamped, row,
+                    "the outlook row %r ignored the wording the block derived "
+                    "from the same daily numbers (%r)" % (row, stamped))
+
+    def test_the_two_renderers_say_the_same_thing(self):
+        """The email and the page carry duplicated outlook code; pin them equal."""
+        for label, pop, mm, _wet in self.CASES:
+            with self.subTest(case=label):
+                block, _raw = self.block_and_raw(pop, mm)
+                self.assertEqual(
+                    rd._weather_outlook_items(block["outlook"]),
+                    be._w_outlook(block["outlook"]),
+                    "the HTML and the email render the same outlook rows "
+                    "differently for %r" % (label,))
 
 
 if __name__ == "__main__":

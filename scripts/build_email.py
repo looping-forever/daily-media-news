@@ -782,9 +782,18 @@ def _w_outlook(outlook):
             parts.append("high %d\u00b0C" % int(round(tmax)))
         elif tmin is not None:
             parts.append("low %d\u00b0C" % int(round(tmin)))
-        pop = _w_num(day.get("pop_pct"))
-        if pop is not None and pop > 0:
-            parts.append("%d%% rain" % int(round(pop)))
+        # The block already decided this day's rain wording from pop AND
+        # precip_sum (`collect_news.day_rain_wording`, the same flags the advice's
+        # wet verdict reads), so the row prints that decision. Re-deriving it here
+        # from `pop` alone is what let a 6 mm day read as no rain. The fallback is
+        # for hand-built blocks: production always carries the stamp.
+        rain = day.get("rain")
+        if isinstance(rain, str) and rain.strip():
+            parts.append(rain.strip())
+        else:
+            pop = _w_num(day.get("pop_pct"))
+            if pop is not None and pop > 0:
+                parts.append("%d%% rain" % int(round(pop)))
         condition = day.get("condition")
         if isinstance(condition, str) and condition.strip():
             parts.append(condition.strip())
@@ -803,7 +812,7 @@ def _w_clock(value):
 
 
 def _w_sun(today):
-    """Sunrise/sunset and UV-with-band, joined, or ''."""
+    """Sunrise/sunset and the day's UV MAXIMUM with its band, joined, or ''."""
     if not isinstance(today, dict):
         return ""
     parts = []
@@ -816,10 +825,10 @@ def _w_sun(today):
         parts.append("Sunset %s" % setting)
     uv = _w_num(today.get("uv_max"))
     if uv is not None:
-        text = "UV %d" % int(round(uv))
+        text = "UV max %d" % int(round(uv))
         band = today.get("uv_band")
         if isinstance(band, str) and band.strip():
-            text += " %s" % band.strip()
+            text += " (%s)" % band.strip()
         parts.append(text)
     return " \u00b7 ".join(parts)
 

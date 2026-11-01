@@ -681,7 +681,13 @@ def _eval_calm(index, _thresholds, _outdoor, _wash, daily):
     header must never be empty, so "nothing to plan for" is stated out loud.
     It is the LAST rule, so it is also the first thing `max_lines` sheds, and
     it only fires when nothing else did.
+
+    It is unreachable when the day's own daily numbers say the day was wet:
+    "dry and mild today" is a claim about the WHOLE day, and an evening run
+    whose remaining hours are clear must not make it.
     """
+    if daily.get("wet") is True:
+        return None
     tmax = daily.get("tmax_c")
     if not _is_number(tmax):
         return None

@@ -1848,11 +1848,17 @@ def _hour_of(stamp):
     return _split_hourly_stamp(stamp)[1]
 
 
-def build_weather_block(box):
+def build_weather_block(box, profile):
     """Assemble the `weather` block from the raw open-meteo response.
 
     Returns {} when it cannot be built -- never raises. The block is a frozen
     contract for the renderers, so a missing optional field is null, not text.
+
+    `profile` is REQUIRED rather than optional. Each outlook row carries the same
+    rain wording the advice's wet verdict is derived from, and that needs the
+    profile's two rain floors. An optional argument would let a caller build rows
+    whose words were chosen from different floors than the verdict -- which is the
+    drift this parameter exists to make impossible.
     """
     if not isinstance(box, dict):
         return {}
@@ -1861,12 +1867,13 @@ def build_weather_block(box):
         return {}
     try:
         return _assemble_weather_block(raw, box.get("place"),
-                                       box.get("fetched_at_npt")) or {}
+                                       box.get("fetched_at_npt"),
+                                       getattr(profile, "thresholds", None)) or {}
     except Exception:
         return {}
 
 
-def _assemble_weather_block(raw, place, fetched_at_npt):
+def _assemble_weather_block(raw, place, fetched_at_npt, thresholds=None):
     if not isinstance(fetched_at_npt, str) or len(fetched_at_npt) < 10:
         return {}
     today = fetched_at_npt[:10]
@@ -1941,12 +1948,18 @@ def _assemble_weather_block(raw, place, fetched_at_npt):
     for i, day in enumerate(dtimes):
         if day < today:
             continue
+        # Bound once so the row's numbers and its rain wording cannot be read
+        # from different entries of the daily arrays.
+        pop = daily_num("precipitation_probability_max", i)
+        amount = daily_num("precipitation_sum", i)
         outlook.append({
             "day": day,
             "tmax_c": daily_num("temperature_2m_max", i),
             "tmin_c": daily_num("temperature_2m_min", i),
-            "pop_pct": daily_num("precipitation_probability_max", i),
-            "precip_mm": daily_num("precipitation_sum", i),
+            "pop_pct": pop,
+            "precip_mm": amount,
+            # The verdict's own decision, rendered. The row never re-derives it.
+            "rain": day_rain_wording(pop, amount, thresholds),
             "condition": _wcondition(_at(_wlist(daily, "weathercode"), i)),
             "gust_max_kmh": daily_num("wind_gusts_10m_max", i),
         })
@@ -2130,6 +2143,84 @@ def advice_blockers(profile):
             for w in (getattr(profile, "unavailable_windows", ()) or ())]
 
 
+def _wet_floors(thresholds):
+    """(population floor, amount floor) -- the profile's two rain rules."""
+    return (getattr(thresholds, "umbrella", None),
+            getattr(thresholds, "precip_wet_mm", None))
+
+
+def _wet_flags(pop, mm, pop_floor, mm_floor):
+    """(wet by probability, wet by amount) -- the ONE reading of those floors."""
+    return (
+        pop is not None and pop_floor is not None and pop >= pop_floor,
+        mm is not None and mm_floor is not None and mm >= mm_floor,
+    )
+
+
+def day_rain_wording(pop_max_pct, precip_sum_mm, thresholds=None):
+    """The rain phrase an outlook row prints, from the verdict's own numbers.
+
+    ONE decision, two surfaces: this phrase and `day_is_wet()` both come from
+    `_wet_flags()` over the day's own pop_max and precip_sum. Until 2026-11-01 the
+    row printed `pop` alone, so a 6 mm day with no rain probability read as no rain
+    at all while the advice was suppressing "dry and mild" for that same day.
+    """
+    pop_floor, mm_floor = _wet_floors(thresholds)
+    pop, mm = _wnum(pop_max_pct), _wnum(precip_sum_mm)
+    _wet_pop, wet_mm = _wet_flags(pop, mm, pop_floor, mm_floor)
+    if wet_mm:
+        text = "~%.1f mm rain" % mm
+        if pop is not None and pop > 0:
+            text += " (%d%%)" % int(round(pop))
+        return text
+    if pop is not None and pop > 0:
+        return "%d%% rain" % int(round(pop))
+    return ""
+
+
+def day_is_wet(pop_max_pct, precip_sum_mm, thresholds=None):
+    """The ONE "is today wet" test -- advice and outlook both decide from it.
+
+    It reads the DAY's own numbers, the same daily fields the outlook row prints,
+    so the advice cannot call a day dry while that row shows its rain. The floors
+    are the hourly rain rules' own thresholds, reused rather than restated, so one
+    profile edit moves both surfaces together. `day_rain_wording()` reads the same
+    flags, which is what keeps the wording and the verdict from drifting apart.
+    """
+    pop_floor, mm_floor = _wet_floors(thresholds)
+    wet_pop, wet_mm = _wet_flags(_wnum(pop_max_pct), _wnum(precip_sum_mm),
+                                 pop_floor, mm_floor)
+    return wet_pop or wet_mm
+
+
+def _today_daily_wet(raw, fetched_at_npt, thresholds):
+    """day_is_wet() for the day the forecast is anchored on. False if unknown."""
+    daily = raw.get("daily") if isinstance(raw, dict) else None
+    times = [d for d in _wlist(daily, "time") if isinstance(d, str)]
+    today = (fetched_at_npt or "")[:10]
+    if today not in times:
+        return False
+    i = times.index(today)
+    return day_is_wet(
+        _at(_wlist(daily, "precipitation_probability_max"), i),
+        _at(_wlist(daily, "precipitation_sum"), i),
+        thresholds)
+
+
+def _with_wet_verdict(box, payload, profile):
+    """A copy of the payload carrying today's daily `wet` verdict."""
+    days = payload.get("days")
+    if not isinstance(days, list) or not days or not isinstance(days[0], dict):
+        return payload
+    copied = [dict(day) for day in days]
+    copied[0]["wet"] = _today_daily_wet(
+        box.get("raw"), box.get("fetched_at_npt"),
+        getattr(profile, "thresholds", None))
+    copy = dict(payload)
+    copy["days"] = copied
+    return copy
+
+
 def compute_weather_advice(box, profile, now=None):
     """(lines, error) from the weather box. Never raises, never kills the run.
 
@@ -2151,6 +2242,7 @@ def compute_weather_advice(box, profile, now=None):
         reason = (box.get("error") if isinstance(box, dict) else "") \
             or "no normalized forecast"
         return [], reason
+    payload = _with_wet_verdict(box, payload, profile)
     try:
         return _wa.weather_advice(payload, profile, advice_blockers(profile),
                                   now=now), ""
@@ -2902,7 +2994,7 @@ def main(argv=None):
         # The frozen renderer contract. Always present, {} when the response
         # could not produce it -- a missing key would be indistinguishable from
         # "no weather today".
-        "weather": build_weather_block(weather_box),
+        "weather": build_weather_block(weather_box, profile),
         "candidates": final_candidates,
     }
     # Merge with any stage timings already recorded by the workflow
