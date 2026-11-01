@@ -1,17 +1,35 @@
 # Project Knowledge Base — daily-media-news
 
-Durable knowledge for future sessions. Verified 2026-09-17. Do not edit product
-source code from this file; record decisions here instead.
+Durable knowledge for future sessions. Verified 2026-09-17. **2026-11-01:** only
+§1, §28 and the §35 secret list were re-checked against the code that day (each
+says so in place); nothing else was re-verified, so do not read this file's age
+as freshness. Do not edit product source code from this file; record decisions
+here instead.
 
-## 1. Repo state (verified 2026-08-30)
+## 1. Repo state (re-verified 2026-11-01)
 
-- Repo: this repository (git, branch `main`).
-- origin/master HEAD = `9328e80` (chore: reset delivery marker); workflow's own
-  state commit `d2552a8` sits on top. Working tree clean.
-- Key commits:
-  - `65baa93` — feat: media-rich digests, ntfy/website primary delivery,
-    big-pickle model ladder.
-  - `9328e80` — chore: reset delivery marker.
+- Repo: this repository (git, branch `master`). This section said `main` until
+  2026-11-01; no ref of that name exists.
+- HEAD = `a38165b` ("test: assert the ledger repair contract, not a pinned
+  instant"). Four commits from a concurrent actor landed during the
+  2026-10-31/11-01 session (`29f98ca`, `e4a84f6`, `9450ef7`, `a38165b`), taking
+  HEAD off the `4ab6e44` that session started on. Treat the tip as moving: read
+  `git log --oneline`.
+- Working tree DIRTY during a session by design: `git status --short` showed 10
+  modified files and no untracked files at the 2026-11-01 check (this line said 9
+  until the same day's audit recounted them). Nothing was committed or pushed.
+- Measured suite counts, 2026-11-01, `unittest discover` from the repo root:
+  workflows **482**, render **488**, digest **392**, collection **254**, weather
+  **135** -- all green. Two earlier readings in this session were stale, not
+  different measurements: 476 was the count BEFORE the four manual-prebuild
+  publish-gate tests landed, and 480/252 was before the tree-problems negative
+  control (2 tests) and the wet-verdict/outlook-row invariant class (2 tests).
+  One digest run in between failed
+  `test_the_same_input_yields_the_same_payload_bytes` because the payload title
+  carries the wall clock and the two builds straddled a minute boundary; the
+  test alone passed on re-run and the full suite then passed 392.
+- The August commit list that used to sit here (`65baa93`, `9328e80`,
+  `d2552a8`) described a HEAD four months gone; read `git log` instead.
 - Secrets (set via `gh`): `NTFY_TOPIC` = a topic name you generate yourself;
   `NTFY_SERVER` exists.
   **Superseded 2026-10-30:** `DIGEST_PASSWORD` and `DIGEST_USERNAME` are retired.
@@ -940,8 +958,10 @@ should be corrected to 102 / 103→131 / 410 in a follow-up.
 ## 28. Frozen contracts from this rebuild (do not re-derive)
 
 - **Reason-code set** and **outcome set** in `scripts/source_health.py`;
-  **13 reason tokens** in `scripts/check_academic_result.py` (they are validated
-  on read — an unknown token is a `StateError`).
+  **19 reason tokens** in `scripts/check_academic_result.py` (they are validated
+  on read — an unknown token is a `StateError`). **This line said 13 until
+  2026-11-01**, contradicting §25's 19; `len(REASONS)` is 19, read from the
+  module itself.
 - **R1-R5** and their mirrored copy in `deploy/cloudflare-worker.js`
   (`tests/academic/test_worker_parity.py` fails on drift, including
   `ACADEMIC_SEM_TOKEN`).
@@ -953,7 +973,10 @@ should be corrected to 102 / 103→131 / 410 in a follow-up.
 - **`resolve_article_url` detects at render time.** Do not add a collector field
   for it.
 - **Secret names only, never values:** `NTFY_TOPIC`, `NTFY_SERVER`,
-  `DIGEST_PASSWORD`, `CF_PAGES_API_TOKEN`, `GH_TOKEN`.
+  `CF_PAGES_API_TOKEN`, `GH_TOKEN`. `DIGEST_PASSWORD` was removed from this list
+  on 2026-11-01: it and `DIGEST_USERNAME` were retired 2026-10-30 with the Pages
+  Basic-auth gate (see §38.4, `docs/OPERATIONS.md`), and
+  `tests/workflows/test_digest_prebuild.py` now asserts neither name reaches a run.
 
 ## 29. Known limitations and unverified items (2026-09-27) — READ BEFORE TRUSTING
 
@@ -1299,7 +1322,8 @@ are as-reported by the 2026-09-28 session close.
   Actions, not the worker. Its only job is "spot something → poke GitHub".
 - **Secret names only, never values:** `GH_TOKEN`, `NTFY_TOPIC`, `NTFY_SERVER`,
   `CF_PAGES_API_TOKEN`, `CF_ACCOUNT_ID`, `GMAIL_APP_PASSWORD`,
-  `TELEGRAM_BOT_TOKEN`, `DIGEST_PASSWORD`, `GITHUB_TOKEN`.
+  `TELEGRAM_BOT_TOKEN`, `GITHUB_TOKEN`. `DIGEST_PASSWORD` was dropped from this
+  list on 2026-11-01 — retired 2026-10-30 with the Pages Basic-auth gate (§38.4).
 - **The digest site is effectively PUBLIC (V).** `https://daily-digest.example.pages.dev/`
   returns **HTTP 200, 34 137 bytes, unauthenticated**. The `digest-auth` worker
   correctly returned 401, but it only *proxied* to an origin anyone can hit
