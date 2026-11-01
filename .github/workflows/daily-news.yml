@@ -125,7 +125,7 @@ jobs:
           echo "RUN_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # fetch-depth: 0 (full history) chosen over shallow (1): the final
@@ -991,7 +991,7 @@ jobs:
 
       - name: Setup Node.js
         if: env.FALLBACK_NOOP != 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
 
@@ -5172,7 +5172,7 @@ jobs:
 
       - name: Upload digest artifacts
         if: always() && env.FALLBACK_NOOP != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: daily-digest-${{ steps.digest_time.outputs.time }}-${{ github.run_id }}
           # THE RENDERED WEB PAGE IS IN THIS LIST, and it is the last entry on

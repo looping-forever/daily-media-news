@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         # DEFECT 2 (2026-09-30): a read-only job never commits, so there is
         # no reason to leave GITHUB_TOKEN in .git/config for the whole run.
         #
@@ -595,7 +595,7 @@ jobs:
       # the 07:50 slot itself, and then by digest-watchdog. Nothing in this
       # workflow dispatches any more, so it holds no `actions: write`.
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
 

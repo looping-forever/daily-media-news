@@ -113,7 +113,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         # Read-only job: never commits, so GITHUB_TOKEN does not need to sit in
         # .git/config for the whole run.
         with:

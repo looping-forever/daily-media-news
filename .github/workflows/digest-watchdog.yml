@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         # DEFECT 2 (2026-09-30): keep GITHUB_TOKEN out of .git/config for the
         # whole job. "Retire the exhausted ladder" below injects it explicitly
         # for its own pull/push only.
@@ -604,7 +604,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         # DEFECT 2 (2026-09-30): a read-only job never commits, so there is
         # no reason to leave GITHUB_TOKEN in .git/config for the whole run.
         with:
