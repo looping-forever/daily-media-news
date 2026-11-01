@@ -602,27 +602,88 @@ jobs:
       - name: Verify the digest page is live before sealing
         # Needs the artifact's own page_url, so it cannot run on a defined skip.
         if: success() && steps.fetch.outputs.skip != '1'
-        # THE PAGE IS PUBLIC BY DESIGN, SO THIS IS AN ANONYMOUS GET. It asserts
-        # HTTP 200 AND the archive's own <h2 class="section-header"> markup:
-        # that is what proves the exact page the artifact points at is the one
-        # the owner's browser will load. No credentials are sent, and a 401 or
-        # 403 here is the defect this check exists to catch.
+        # THE PAGE IS PUBLIC BY DESIGN, SO THIS IS AN ANONYMOUS GET. Pages
+        # answers an EXISTING digest's `/digests/<date>-<slot>.html` with HTTP
+        # 308 to the extensionless form and serves 200 there, so the GET follows
+        # the chain (bounded) and judges the FINAL response: 200, not Cloudflare
+        # Access, and the body is THIS date's and slot's digest -- its own
+        # <title> plus the archive's <h2 class="section-header"> markup -- never
+        # the archive index. A redirect on its own is never success. No
+        # credentials are sent, and a 401 or 403 here is the defect this check
+        # exists to catch.
         run: |
           set -eo pipefail
-          PAGE_URL="$(python3 -c "import json;print(json.load(open('prebuild/artifact.json'))['page_url'])")"
-          echo "page under test: $PAGE_URL"
-          BODY_FILE="$RUNNER_TEMP/prebuild_page.html"
-          CODE="$(curl --disable -sS -m 20 -o "$BODY_FILE" -w '%{http_code}' "$PAGE_URL")"
-          echo "anonymous GET -> HTTP $CODE"
-          if [ "$CODE" != "200" ]; then
-            echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an ANONYMOUS request. The site is public by design, so a non-200 means the owner's link is gated or dead."
+          FIELDS="$(python3 -c "import json;a=json.load(open('prebuild/artifact.json'));print(a.get('page_url',''),a.get('slot',''),a.get('date',''))")" || {
+            echo "::error::prebuild/artifact.json could not be read, so the page the owner will open cannot be verified."
+            exit 1
+          }
+          if [ -z "$FIELDS" ]; then
+            echo "::error::prebuild/artifact.json carries no page_url/slot/date, so the page the owner will open cannot be verified."
             exit 1
           fi
-          if ! grep -q '<h2 class="section-header"' "$BODY_FILE"; then
+          read -r PAGE_URL SLOT TODAY <<< "$FIELDS"
+          if [ -z "$PAGE_URL" ] || [ -z "$SLOT" ] || [ -z "$TODAY" ]; then
+            echo "::error::prebuild/artifact.json carries no page_url/slot/date, so the page the owner will open cannot be verified."
+            exit 1
+          fi
+          echo "page under test: $PAGE_URL"
+          BODY_FILE="$RUNNER_TEMP/prebuild_page.html"
+          HEADER_FILE="$RUNNER_TEMP/prebuild_page.headers"
+          MAX_REDIRECTS=5
+          set +e
+          RAW="$(curl --disable -sS -m 20 -L --max-redirs "$MAX_REDIRECTS" \
+            -D "$HEADER_FILE" -o "$BODY_FILE" \
+            -w '%{http_code} %{num_redirects} %{url_effective}' "$PAGE_URL")"
+          CURL_RC=$?
+          set -e
+          if [ "$CURL_RC" -ne 0 ] || [ -z "$RAW" ]; then
+            echo "::error::the anonymous GET of $PAGE_URL failed (curl exit $CURL_RC), so the page the owner will open cannot be verified. A redirect chain longer than $MAX_REDIRECTS is the usual cause."
+            exit 1
+          fi
+          CODE="${RAW%% *}"
+          REST="${RAW#* }"
+          HOPS="${REST%% *}"
+          EFFECTIVE="${REST#* }"
+          HOPS="${HOPS:-0}"
+          EFFECTIVE="${EFFECTIVE:-$PAGE_URL}"
+          CHAIN="$(awk 'toupper($1) ~ /^HTTP\// {printf "%s%s", sep, $2; sep=" -> "}' "$HEADER_FILE" 2>/dev/null || true)"
+          echo "redirect chain: ${CHAIN:-none} ($HOPS hop(s))"
+          echo "anonymous GET -> HTTP $CODE, final URL $EFFECTIVE"
+          if [ "$HOPS" -gt "$MAX_REDIRECTS" ]; then
+            echo "::error::the digest page took $HOPS redirects, more than the $MAX_REDIRECTS allowed. That is a redirect loop, not the one-hop extensionless redirect."
+            exit 1
+          fi
+          case "$EFFECTIVE" in
+            *cloudflareaccess.com*)
+              echo "::error::the digest page redirected to Cloudflare Access ($EFFECTIVE). The site is public by design, so the owner's link is gated or dead."
+              exit 1 ;;
+          esac
+          if grep -aqi 'cloudflareaccess\.com' "$BODY_FILE"; then
+            echo "::error::the digest page answered with a Cloudflare Access login, not the digest. The site is public by design, so the owner's link is gated."
+            exit 1
+          fi
+          if [ "$CODE" != "200" ]; then
+            echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an ANONYMOUS request after $HOPS redirect hop(s) (final URL $EFFECTIVE). The site is public by design, so a non-200 FINAL status means the owner's link is gated or dead."
+            exit 1
+          fi
+          if grep -aqF '<title>Personal News Informer — Digest Archive</title>' "$BODY_FILE"; then
+            echo "::error::the digest page answered 200 with the ARCHIVE INDEX, not the digest. Production is serving the index fallback at the artifact's click target."
+            exit 1
+          fi
+          SLOT_TITLE="${SLOT^}"
+          if ! grep -aqF "<title>Personal News Informer — ${SLOT_TITLE} Digest · due " "$BODY_FILE"; then
+            echo "::error::the digest page answered 200 but its <title> is not a ${SLOT_TITLE} digest, so production is serving something other than the digest that was just built."
+            exit 1
+          fi
+          if ! grep -aqF "— ${TODAY}</title>" "$BODY_FILE"; then
+            echo "::error::the digest page answered 200 but its <title> is not dated ${TODAY}, so the artifact's click target points at the wrong day's page."
+            exit 1
+          fi
+          if ! grep -aqF '<h2 class="section-header"' "$BODY_FILE"; then
             echo "::error::the digest page answered 200 but carries no <h2 class=\"section-header\">. Production is serving something other than the digest that was just built, so the artifact's click target is wrong."
             exit 1
           fi
-          echo "page liveness: anonymous 200 + archive markup present"
+          echo "page liveness: anonymous 200 + ${SLOT_TITLE} ${TODAY} digest markup present"
 
       - name: Seal the artifact into the Worker
         # Seals prebuild/artifact.json. On a defined skip there is no record to

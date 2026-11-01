@@ -2661,28 +2661,49 @@ class SealSealsThePageItLinksToTests(TempDirCase):
 #: in scope, so this cannot quietly stop being true either.
 def _stub_preamble():
     return """
-python3() { "%s" "$@"; }
+python3() { "__PYTHON__" "$@"; }
 gh() {
   case "${STUB_GH_MODE:-}" in
-    list) printf '[{"id": %%s, "conclusion": "%%s"}]' \\
+    list) printf '[{"id": %s, "conclusion": "%s"}]' \\
           "${STUB_GH_BEFORE:-1}" "${STUB_GH_CONCLUSION:-success}" ;;
-    *)   printf '%%s' "${STUB_GH_CONCLUSION:-success}" ;;
+    *)   printf '%s' "${STUB_GH_CONCLUSION:-success}" ;;
   esac
 }
 curl() {
-  out=""
-  prev=""
+  out=""; hdr=""; fmt=""; url=""; prev=""
   for a in "$@"; do
-    if [ "$prev" = "-o" ]; then out="$a"; fi
+    case "$prev" in
+      -o) out="$a" ;;
+      -D) hdr="$a" ;;
+      -w) fmt="$a" ;;
+      -m|--max-redirs) ;;
+      *) case "$a" in -*) ;; *) url="$a" ;; esac ;;
+    esac
     prev="$a"
   done
   # Optional argument recorder. Without it, "the step passes the configured
   # username to curl" can only be asserted as a string in the YAML.
-  if [ -n "${STUB_CURL_ARGS_LOG:-}" ]; then printf '%%s\\n' "$*" >> "$STUB_CURL_ARGS_LOG"; fi
-  if [ -n "$out" ]; then printf '%%s' "${STUB_CURL_BODY:-}" > "$out"; fi
-  printf '%%s' "${STUB_CURL_CODE:-200}"
+  if [ -n "${STUB_CURL_ARGS_LOG:-}" ]; then printf '%s\\n' "$*" >> "$STUB_CURL_ARGS_LOG"; fi
+  if [ -n "$hdr" ]; then
+    printf '%s' "${STUB_CURL_HEADERS:-HTTP/1.1 ${STUB_CURL_CODE:-200}}" > "$hdr"
+  fi
+  if [ -n "$out" ]; then printf '%s' "${STUB_CURL_BODY:-}" > "$out"; fi
+  code="${STUB_CURL_CODE:-200}"
+  hops="${STUB_CURL_NUM_REDIRECTS:-0}"
+  eff="${STUB_CURL_EFFECTIVE:-$url}"
+  if [ -n "$fmt" ]; then
+    line="$fmt"
+    line="${line//'%{http_code}'/$code}"
+    line="${line//'%{num_redirects}'/$hops}"
+    line="${line//'%{url_effective}'/$eff}"
+    printf '%s' "$line"
+  else
+    printf '%s' "$code"
+  fi
+  # A redirect loop is curl exit 47, so the stub can refuse the same way.
+  return "${STUB_CURL_EXIT:-0}"
 }
-""" % sys.executable
+""".replace("__PYTHON__", sys.executable)
 
 
 class SealStepExecutionTests(TempDirCase):
@@ -2736,6 +2757,20 @@ class SealStepExecutionTests(TempDirCase):
                 "generated_at_npt": "2026-10-09 06:41",
                 "source_health": {"state": "ok"}})
 
+    def _digest_body(self, slot="morning", date="2026-10-09"):
+        """A body shaped like a really-rendered digest page.
+
+        The title is the renderer's own: `<slot> Digest · due <HH:MM> — <date>`.
+        The liveness check pins the slot and the date from it, so the fixture
+        has to carry both -- the old fixture was a bare section header, a body
+        no renderer has ever produced.
+        """
+        due = "07:20" if slot == "morning" else "19:20"
+        return ('<!doctype html><html><head><title>Personal News Informer — %s '
+                'Digest · due %s — %s</title></head><body>'
+                '<h2 class="section-header" style="--dot:red;">X</h2>'
+                '</body></html>' % (slot.capitalize(), due, date))
+
     def test_the_stubs_are_actually_in_effect(self):
         """The precondition for every other test in this class, asserted rather
         than assumed. Without it, a stub that silently fails to be found leaves
@@ -2745,7 +2780,7 @@ class SealStepExecutionTests(TempDirCase):
         script = _stub_preamble() + '\nfor t in gh curl python3; do\n' \
                  '  printf "%s=%s\\n" "$t" "$(type -t $t)"\ndone\n' \
                  'printf "verdict=%s\\n" "$(gh api x --jq .conclusion)"\n' \
-                 'printf "code=%s\\n" "$(curl -sS -o /dev/null -w x https://example.invalid)"\n'
+                 'printf "code=%s\\n" "$(curl -sS -o /dev/null -w \'%{http_code}\' https://example.invalid)"\n'
         proc = W.run_bash_script(script, env_overrides={
             "STUB_GH_CONCLUSION": "cancelled",
             "STUB_CURL_CODE": "418"}, cwd=str(self.tmp))
@@ -2806,12 +2841,17 @@ class SealStepExecutionTests(TempDirCase):
             {"SLOT": "morning", "TODAY": "2026-10-09",
              "STUB_CURL_ARGS_LOG": str(args_log),
              "STUB_CURL_CODE": "200",
-             "STUB_CURL_BODY": '<h2 class="section-header" style="--dot:red;">X</h2>'})
+             "STUB_CURL_BODY": self._digest_body()})
         self.assertEqual(0, code, out)
         self.assertIn("page liveness: anonymous 200", out)
         self.assertNotIn("::error::", out)
         args = args_log.read_text(encoding="utf-8") if args_log.exists() else ""
         self.assertTrue(args, "the liveness check did not call curl at all")
+        self.assertIn("-L", args,
+                      "the 308 to the extensionless page is legitimate, so the "
+                      "check must follow the chain. curl was called with:\n%s"
+                      % args)
+        self.assertIn("--max-redirs", args, args)
         self.assertNotIn(" -u ", args,
                          "the liveness check sent credentials. The site is public "
                          "by design and the measurement is anonymous. curl was "
@@ -2874,6 +2914,138 @@ class SealStepExecutionTests(TempDirCase):
             {"SLOT": "morning", "TODAY": "2026-10-09",
              "STUB_CURL_CODE": "404", "STUB_CURL_BODY": ""})
         self.assertNotEqual(0, code, out)
+        self.assertIn("::error::", out)
+
+    # -- the 308-following contract, world by world. The deployed page
+    #    LEGITIMATELY answers `/digests/<date>-<slot>.html` with 308 to the
+    #    extensionless path, so a check that rejects 308 has never sealed.
+
+    REDIRECT_HEADERS_308_200 = (
+        "HTTP/2 308\r\nLocation: /digests/2026-10-09-morning\r\n\r\n"
+        "HTTP/2 200\r\n\r\n")
+
+    def test_the_liveness_check_passes_when_the_308_lands_on_the_digest(self):
+        """WORLD (a): the measured production shape. 308 -> 200 digest PASSES."""
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200",
+             "STUB_CURL_NUM_REDIRECTS": "1",
+             "STUB_CURL_EFFECTIVE":
+                 "https://daily-digest.example.pages.dev/digests/2026-10-09-morning",
+             "STUB_CURL_HEADERS": self.REDIRECT_HEADERS_308_200,
+             "STUB_CURL_BODY": self._digest_body()})
+        self.assertEqual(0, code,
+                         "the page 308'd to the extensionless digest and the "
+                         "seal still refused it:\n%s" % out)
+        self.assertIn("redirect chain: 308 -> 200", out,
+                      "the log must show the chain it followed:\n%s" % out)
+        self.assertIn("page liveness: anonymous 200", out)
+        self.assertNotIn("::error::", out)
+
+    def test_a_308_is_not_success_on_its_own(self):
+        """A redirect is a hop, not a verdict."""
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "308", "STUB_CURL_NUM_REDIRECTS": "0",
+             "STUB_CURL_BODY": ""})
+        self.assertNotEqual(0, code,
+                            "a bare 308 was accepted as success:\n%s" % out)
+        self.assertIn("::error::", out)
+
+    def test_the_liveness_check_is_red_when_the_redirect_lands_on_a_404(self):
+        """WORLD (b): the final status, not the first, decides."""
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "404",
+             "STUB_CURL_NUM_REDIRECTS": "1",
+             "STUB_CURL_EFFECTIVE":
+                 "https://daily-digest.example.pages.dev/digests/2026-10-09-morning",
+             "STUB_CURL_HEADERS": (
+                 "HTTP/2 308\r\n\r\nHTTP/2 404\r\n\r\n"),
+             "STUB_CURL_BODY": ""})
+        self.assertNotEqual(0, code, out)
+        self.assertIn("::error::", out)
+
+    def test_the_liveness_check_is_red_when_the_redirect_lands_on_access(self):
+        """WORLD (c): a Cloudflare Access login is the gated defect."""
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200",
+             "STUB_CURL_NUM_REDIRECTS": "1",
+             "STUB_CURL_EFFECTIVE":
+                 "https://team.cloudflareaccess.com/cdn-cgi/access/login",
+             "STUB_CURL_HEADERS": (
+                 "HTTP/2 302\r\n\r\nHTTP/2 200\r\n\r\n"),
+             "STUB_CURL_BODY": "<html>Sign in to continue</html>"})
+        self.assertNotEqual(0, code, out)
+        self.assertIn("::error::", out)
+        self.assertIn("Cloudflare Access", out)
+
+    def test_the_liveness_check_is_red_on_the_archive_index_after_a_redirect(self):
+        """WORLD (d): 200 at the end of the chain, but the body is the index."""
+        self._write_artifact()
+        index_html = (W.REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200",
+             "STUB_CURL_NUM_REDIRECTS": "1",
+             "STUB_CURL_EFFECTIVE":
+                 "https://daily-digest.example.pages.dev/digests/2026-10-09-morning",
+             "STUB_CURL_HEADERS": (
+                 "HTTP/2 308\r\n\r\nHTTP/2 200\r\n\r\n"),
+             "STUB_CURL_BODY": index_html})
+        self.assertNotEqual(0, code,
+                            "the archive index was served at the digest's click "
+                            "target and the seal passed:\n%s" % out)
+        self.assertIn("::error::", out)
+        self.assertIn("ARCHIVE INDEX", out)
+
+    def test_the_liveness_check_is_red_on_a_redirect_loop(self):
+        """WORLD (e): curl refuses at --max-redirs; that refusal is fatal."""
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "",
+             "STUB_CURL_EXIT": "47",
+             "STUB_CURL_HEADERS":
+                 ("HTTP/2 308\r\n\r\n" * 6),
+             "STUB_CURL_BODY": ""})
+        self.assertNotEqual(0, code,
+                            "a redirect loop was accepted:\n%s" % out)
+        self.assertIn("::error::", out)
+        self.assertIn("curl exit 47", out)
+
+    def test_the_liveness_check_pins_the_slot_and_the_date(self):
+        """A live 200 for the WRONG slot or WRONG day is not this artifact."""
+        self._write_artifact()
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200",
+             "STUB_CURL_BODY": self._digest_body(slot="evening",
+                                                 date="2026-10-09")})
+        self.assertNotEqual(0, code,
+                            "the evening digest was accepted for the morning "
+                            "slot:\n%s" % out)
+        self.assertIn("::error::", out)
+
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing",
+            {"SLOT": "morning", "TODAY": "2026-10-09",
+             "STUB_CURL_CODE": "200",
+             "STUB_CURL_BODY": self._digest_body(date="2026-10-08")})
+        self.assertNotEqual(0, code,
+                            "yesterday's digest was accepted for today:\n%s" % out)
         self.assertIn("::error::", out)
 
 
