@@ -7566,6 +7566,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-10-31T19:21:47+05:45"
+    },
+    {
+      "event_id": "evt-11a83f5d6f6d",
+      "event_key": "kathmandu-weather-forecast-nov1",
+      "canonical_title": "Weather Forecast: Moderate Drizzle Expected",
+      "category": "local_city",
+      "first_seen": "2026-11-01",
+      "last_seen": "2026-11-01",
+      "first_reported": "2026-11-01",
+      "last_reported": "2026-11-01",
+      "importance": 0,
+      "personal_relevance": 9,
+      "sources": [
+        "api.open-meteo.com/v1/forecast"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The weather forecast for Kathmandu for November 1–2 indicates moderate drizzle with maximum temperatures ranging from 24°C to 25°C and precipitation of 1.6 mm to 2.0 mm.",
+      "latest_development": "Confirmed: The weather forecast for Kathmandu for November 1–2 indicates moderate drizzle with maximum temperatures ranging from 24°C to 25°C and precipitation of 1.6 mm to 2.0 mm.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-01",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-01T06:41:41+05:45"
+    },
+    {
+      "event_id": "evt-12f2f7fe422c",
+      "event_key": "nepal-foreign-exchange-nov1",
+      "canonical_title": "Foreign Currency Exchange Rates for November 1",
+      "category": "bank_local",
+      "first_seen": "2026-11-01",
+      "last_seen": "2026-11-01",
+      "first_reported": "2026-11-01",
+      "last_reported": "2026-11-01",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2048176/this-is-the-foreign-currency-exchange-rate-for-today-32"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has set the foreign currency exchange rates for today. The US Dollar buying rate is Rs 151.63 and the selling rate is Rs 152.23. The Euro buying rate is Rs 169.86 and selling rate is Rs 170.54.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has set the foreign currency exchange rates for today. The US Dollar buying rate is Rs 151.63 and the selling rate is Rs 152.23. The Euro buying rate is Rs 169.86 and selling rate is Rs 170.54.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-01",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-01T06:41:41+05:45"
     }
   ],
   "archived": []

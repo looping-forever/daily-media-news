@@ -1602,6 +1602,20 @@
       "title": "NC Central Working Committee Meeting Scheduled for Sunday",
       "category": "nepal",
       "date_sent": "2026-10-31"
+    },
+    {
+      "url_normalized": "api.open-meteo.com/v1/forecast",
+      "title_hash": "88f9583ddc0bc9604be0092a2d34d7832c34ff16",
+      "title": "Weather Forecast: Moderate Drizzle Expected",
+      "category": "local_city",
+      "date_sent": "2026-11-01"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2048176/this-is-the-foreign-currency-exchange-rate-for-today-32",
+      "title_hash": "555f37f3800ae8df9de923a365c844e873b1031b",
+      "title": "Foreign Currency Exchange Rates for November 1",
+      "category": "bank_local",
+      "date_sent": "2026-11-01"
     }
   ]
 }
