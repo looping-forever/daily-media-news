@@ -222,13 +222,51 @@ class TheCorrectionShapeTests(unittest.TestCase):
         The mirror was corrected by hand in the earlier repair; this asserts
         the script produces that same record, so the next seal (which copies KV
         over the mirror verbatim) changes nothing a reader has already seen.
+
+        `corrected_at` is the ONE field that is allowed to differ, because it is
+        volatile data rather than part of the contract: it records the instant
+        the repair happened to run, and the mirror is free to carry a different
+        one (it carries 07:07:16Z, this fixture clock says 05:19:42Z). Pinning
+        that instant here made the test go red when the repair was re-run at a
+        different second -- a test may not encode a value the data owns. What
+        IS asserted is the contract the correction promises, plus the one
+        property `corrected_at` must have: a real UTC instant that is not in
+        the future relative to the fixture clock.
         """
         mirror = mirror_row()
+
+        # The contract, stated on the MIRROR (the record read from disk), so it
+        # holds whatever instant the repair ran at.
+        self.assertIs(True, mirror.get("corrected"), mirror)
+        self.assertEqual("failed", mirror.get("state"), mirror)
+        self.assertEqual("2026-10-26T12:34:19Z",
+                         mirror.get("original_ntfy_sent_at"), mirror)
+        self.assertNotIn("ntfy_sent_at", mirror,
+                         "the mirror still claims a push beside a record that "
+                         "says the push did not happen: %r" % (mirror,))
+
         for key, value in mirror.items():
+            if key == "corrected_at":
+                continue
             self.assertEqual(value, self.fixed.get(key),
                              "the corrected row's %r is %r but the committed "
                              "mirror says %r -- the two records disagree"
                              % (key, self.fixed.get(key), value))
+        self.assertEqual(set(mirror) - {"corrected_at"},
+                         set(self.fixed) - {"corrected_at"},
+                         "the corrected row and the mirror do not carry the "
+                         "same fields: %r"
+                         % sorted(set(mirror) ^ set(self.fixed)))
+
+        stamp = R.instant_or_none(mirror.get("corrected_at"))
+        self.assertIsNotNone(stamp,
+                             "the mirror's corrected_at is not an ISO-8601 "
+                             "instant: %r" % (mirror.get("corrected_at"),))
+        self.assertLessEqual(
+            stamp, R.instant_or_none(LATER),
+            "the mirror says it was corrected at %r, which is in the future "
+            "relative to the fixture clock %s"
+            % (mirror.get("corrected_at"), LATER))
 
     def test_the_false_claim_moves_aside_instead_of_disappearing(self):
         self.assertEqual("failed", self.fixed["state"])
