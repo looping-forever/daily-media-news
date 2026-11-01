@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "at_npt": "2026-10-31T16:10:40+0545",
+  "at_npt": "2026-11-01T11:04:08+0545",
   "emitted": 0,
   "deliveries_owed": 0,
   "ntfy_delivered": 0,
   "page_ok": false,
-  "dry_run": false,
+  "dry_run": true,
   "ok": true,
   "reason": "nothing_emitted",
   "degraded": false,
