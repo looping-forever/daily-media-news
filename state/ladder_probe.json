@@ -1,0 +1,54 @@
+{
+  "run_at": "2026-11-02T13:06:31+00:00",
+  "head_sha": "d1193bb972b4e702efe52af4394b8450fa861a10",
+  "trigger": "ladder_probe",
+  "per_attempt_sec": 150,
+  "attempt_budget_sec": 720,
+  "pool": [
+    "opencode/deepseek-v4.1-flash-free",
+    "opencode/beam-free",
+    "opencode/mimo-v2.6-flash-free",
+    "opencode/nemotron-3.5-lightning-free"
+  ],
+  "attempts": [
+    {
+      "model": "opencode/deepseek-v4.1-flash-free",
+      "attempt": 1,
+      "granted_sec": 150,
+      "wall_sec": 150.1,
+      "first_byte_sec": null,
+      "outcome": "timeout",
+      "tail_excerpt": "\u001b[0m > build · deepseek-v4.1-flash-free \u001b[0m"
+    },
+    {
+      "model": "opencode/beam-free",
+      "attempt": 1,
+      "granted_sec": 150,
+      "wall_sec": 150.15,
+      "first_byte_sec": null,
+      "outcome": "timeout",
+      "tail_excerpt": "\u001b[0m > build · beam-free \u001b[0m"
+    },
+    {
+      "model": "opencode/mimo-v2.6-flash-free",
+      "attempt": 1,
+      "granted_sec": 150,
+      "wall_sec": 150.16,
+      "first_byte_sec": null,
+      "outcome": "timeout",
+      "tail_excerpt": "\u001b[0m > build · mimo-v2.6-flash-free \u001b[0m"
+    },
+    {
+      "model": "opencode/nemotron-3.5-lightning-free",
+      "attempt": 1,
+      "granted_sec": 150,
+      "wall_sec": 150.15,
+      "first_byte_sec": null,
+      "outcome": "timeout",
+      "tail_excerpt": "\u001b[0m > build · nemotron-3.5-lightning-free \u001b[0m"
+    }
+  ],
+  "verdict": "none",
+  "ladder_seconds": 602.59,
+  "error": "models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/deepseek-v4.1-flash-free: timed out after 150s -- \u001b[0m > build · deepseek-v4.1-flash-free \u001b[0m; opencode/beam-free: timed out after 150s -- \u001b[0m > build · beam-free \u001b[0m; opencode/mimo-v2.6-flash-free: timed out after 150s -- \u001b[0m > build · mimo-v2.6-"
+}
