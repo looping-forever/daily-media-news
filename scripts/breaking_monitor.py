@@ -278,6 +278,19 @@ def _reachable_only(models):
 #: not even start, and at 60s the 2026-11-01 sweep timed out on every rung.
 AI_PER_ATTEMPT_TIMEOUT_SEC = 150
 
+#: THE FIRST-OUTPUT DEADLINE. A rung that has written no model output -- only
+#: its own `> build · <model>` banner -- in this long is abandoned instead of
+#: being paid for to the end of its 150s grant. Measured 2026-11-02: a probe of
+#: all four free rungs produced ZERO model output in 150s each, 602.59s total,
+#: so without this the probe cost ten minutes to learn "nothing".
+#: The 150s ceiling is UNCHANGED for a rung that has started producing output:
+#: this shortens silence, never a slow answer.
+#: KNOWN TENSION, recorded rather than hidden: one free rung once took 137.63s
+#: to its FIRST token (see AI_PER_ATTEMPT_TIMEOUT_SEC). If a probe now shows a
+#: rung streaming after 40s, this number is what abandoned a working rung and
+#: must be raised -- `first_byte_sec` in state/ladder_probe.json is the evidence.
+AI_FIRST_OUTPUT_SEC = 40
+
 #: HOW MANY RUNGS THIS STAGE CAN AFFORD -- the only place the number lives.
 #: 4 x 150 = 600s, which leaves 120s of the 720s wall for discovery and slack.
 #: The digest walk still seeds from the WHOLE config ladder (AI_MODELS); this
@@ -1259,18 +1272,184 @@ def _strip_internals(cand):
     return {k: v for k, v in cand.items() if not k.startswith("_")}
 
 
+class NoFirstOutput(RuntimeError):
+    """The child wrote nothing but its own banner inside the first-output window.
+
+    DISTINCT from TimeoutExpired on purpose. A timeout means the rung was given
+    a full window and used it; this means it never started answering, and the
+    two are different facts about the ladder. `stdout`/`stderr` carry what the
+    child DID write, which is the evidence that it was alive and silent rather
+    than dead.
+    """
+
+    def __init__(self, waited_sec, stdout_text="", stderr_text=""):
+        super().__init__("no model output within %.1fs" % waited_sec)
+        self.waited_sec = waited_sec
+        self.stdout = _as_text(stdout_text)
+        self.stderr = _as_text(stderr_text)
+
+
+class _FirstModelByte:
+    """The first stdout byte that is NOT part of a leading CLI banner line.
+
+    The CLI opens with `> build · <model>` and, on the free tier, sometimes
+    never says anything else. A banner is not an answer, so counting it as
+    "output" would defeat the first-output deadline exactly when the deadline
+    matters. Leading blank lines and leading `>`-prefixed lines are skipped;
+    the first other byte is the model speaking.
+    """
+
+    __slots__ = ("_in_banner", "first_sec")
+
+    def __init__(self):
+        self._in_banner = False
+        self.first_sec = None
+
+    def feed(self, ch, at_sec):
+        if self.first_sec is not None:
+            return
+        if self._in_banner:
+            if ch == "\n":
+                self._in_banner = False
+            return
+        if ch in " \t\r\n":
+            return
+        if ch == ">":
+            self._in_banner = True
+            return
+        self.first_sec = at_sec
+
+
+#: Set by `_stream_child` on every call: seconds from child start to its first
+#: model byte, or None when only the banner ever arrived. A module-level
+#: attribute on a plain function keeps the (rc, stdout, stderr) contract every
+#: stubbed runner in the suites already implements -- a runner that does not
+#: set it reports an honest null instead of an invented number.
+def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
+    """Run one child, streaming its pipes, and return (rc, stdout, stderr).
+
+    WHY NOT `subprocess.run(capture_output=True)`. That call hands back the
+    buffers only when the child EXITS, so a 150s silent rung was indistinguish-
+    able from a 150s working one until the very end, and `first_byte_sec` could
+    only ever be null. Reading incrementally makes the first model byte
+    observable, which is the measurement that separates "queue-stalled" from
+    "the CLI never streams here".
+
+    FIRST-OUTPUT DEADLINE. A rung that has produced no model output in
+    `first_output_sec` is abandoned (`NoFirstOutput`) rather than paid for to
+    the end of its grant. The grant still caps a rung that HAS started: once
+    output flows, the rung gets its whole window.
+
+    Only STDOUT counts as model output: the answer is parsed from stdout, and a
+    stderr warning is not the model speaking.
+
+    Two daemon threads drain the pipes (a select() loop would not run on
+    Windows, and a single-threaded read of one pipe deadlocks when the child
+    fills the other), while the main thread watches clocks only.
+    """
+    started = time.monotonic()
+    deadline = started + float(timeout_sec)
+    first_deadline = (None if not first_output_sec
+                      else started + float(first_output_sec))
+    proc = subprocess.Popen(
+        argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, env=env, text=True, encoding="utf-8",
+        errors="replace")
+    out_chunks, err_chunks = [], []
+    first = _FirstModelByte()
+
+    def drain(pipe, sink, tracker):
+        try:
+            while True:
+                ch = pipe.read(1)
+                if not ch:
+                    break
+                sink.append(ch)
+                if tracker is not None:
+                    tracker.feed(ch, time.monotonic() - started)
+        except (OSError, ValueError):
+            pass            # a killed child's closed pipe is EOF, not a fault
+        finally:
+            try:
+                pipe.close()
+            except (OSError, ValueError):
+                pass
+
+    readers = [
+        threading.Thread(target=drain, args=(proc.stdout, out_chunks, first),
+                         daemon=True),
+        threading.Thread(target=drain, args=(proc.stderr, err_chunks, None),
+                         daemon=True),
+    ]
+    for thread in readers:
+        thread.start()
+    try:
+        proc.stdin.write(prompt_text)
+        proc.stdin.close()
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+
+    stalled = timed_out = False
+    while True:
+        if proc.poll() is not None:
+            break
+        now = time.monotonic()
+        if now >= deadline:
+            timed_out = True
+            break
+        if first_deadline is not None and now >= first_deadline \
+                and first.first_sec is None:
+            stalled = True
+            break
+        time.sleep(0.05)
+
+    if stalled or timed_out:
+        try:
+            proc.kill()
+        except OSError:
+            pass
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass
+    for thread in readers:
+        thread.join(timeout=10)
+
+    out = "".join(out_chunks)
+    err = "".join(err_chunks)
+    _stream_child.last_first_byte_sec = first.first_sec
+    if stalled:
+        raise NoFirstOutput(time.monotonic() - started, out, err)
+    if timed_out:
+        raise subprocess.TimeoutExpired(argv, timeout_sec, output=out,
+                                        stderr=err)
+    return proc.returncode, out, err
+
+
+_stream_child.last_first_byte_sec = None
+
+
 def default_ai_runner(model, prompt_text, env, timeout_sec):
-    """`cat prompt | opencode run --auto --model <model>` equivalent.
-    NOTE: --standalone is v2/opencode2-only; v1 run is already in-process."""
+    """`cat prompt | opencode run --auto --model <model>`, streamed.
+
+    NOTE: --standalone is v2/opencode2-only; v1 run is already in-process.
+    `last_first_byte_sec` is set on every call (None when only the banner
+    arrived) and read back by `ai_classify`; `ai_classify` also enforces the
+    first-output deadline via this runner's `AI_FIRST_OUTPUT_SEC`.
+    """
     exe = shutil.which("opencode")
     if not exe:
         raise RuntimeError("opencode binary not found on PATH")
-    proc = subprocess.run(
-        [exe, "run", "--auto", "--model", model],
-        input=prompt_text, env=env, capture_output=True,
-        timeout=timeout_sec, text=True, encoding="utf-8",
-        errors="replace")
-    return proc.returncode, proc.stdout or "", proc.stderr or ""
+    try:
+        return _stream_child([exe, "run", "--auto", "--model", model],
+                             prompt_text, env, timeout_sec,
+                             first_output_sec=AI_FIRST_OUTPUT_SEC)
+    finally:
+        default_ai_runner.last_first_byte_sec = \
+            _stream_child.last_first_byte_sec
+
+
+default_ai_runner.last_first_byte_sec = None
 
 
 def extract_verdict_json(stdout_text):
@@ -1439,10 +1618,23 @@ def _emit_attempt(on_attempt, model, attempt, granted_sec, wall_sec, outcome,
               % (type(exc).__name__, exc))
 
 
+def _runner_first_byte(runner):
+    """The runner's own measured first model byte, or None when it cannot say.
+
+    A stubbed runner never sets it, which is why the probe's `first_byte_sec`
+    is null under test and real in production: absent evidence stays absent.
+    """
+    value = getattr(runner, "last_first_byte_sec", None)
+    try:
+        return None if value is None else round(float(value), 2)
+    except (TypeError, ValueError):
+        return None
+
+
 def ai_classify(pending_path, runner=None, models=None,
                 prompt_path=PROMPT_PATH,
                 attempts_per_model=AI_ATTEMPTS_PER_MODEL,
-                on_attempt=None):
+                on_attempt=None, extra_env=None):
     """Returns (verdict|None, error). Any failure => (None, err) and the
     caller fails safe to level 1 (silence).
 
@@ -1460,12 +1652,11 @@ def ai_classify(pending_path, runner=None, models=None,
     attempt. The retry covers a dropped connection, not a slow model: a rung
     that used its whole window has proved it is too slow for this wall.
 
-    A TIMEOUT IS DIAGNOSABLE. `subprocess.run(capture_output=True)` raises
-    TimeoutExpired with the child's partial stdout and stderr, and those were
-    read by nobody: the run could not say which model produced what before it
-    was killed. They are now recorded (secrets redacted) in
-    `state/breaking_attempts.jsonl`, which the workflow uploads as the
-    `breaking-attempts` artifact.
+    A TIMEOUT IS DIAGNOSABLE. `_stream_child` raises TimeoutExpired carrying the
+    child's partial stdout and stderr; before streaming they were read by nobody,
+    so the run could not say which model produced what before it was killed.
+    They are now recorded (secrets redacted) in `state/breaking_attempts.jsonl`,
+    which the workflow uploads as the `breaking-attempts` artifact.
 
     An UNPARSEABLE verdict is deliberately NOT retried: that is the model
     answering, and asking it the same question again is how a broken classifier
@@ -1481,6 +1672,16 @@ def ai_classify(pending_path, runner=None, models=None,
     `--ladder-probe` turns ONE real walk into per-model evidence without paying
     for a second walk; it cannot alter the walk, and `None` is the production
     default.
+
+    `extra_env` is added to the CHILD's environment only (never to this
+    process's). The probe uses it to point the control attempt at the keyed
+    provider's config file without exporting that variable to a real sweep.
+
+    A RUNNER THAT NEVER STARTED ANSWERING IS ITS OWN OUTCOME. `NoFirstOutput`
+    (raised by the streaming default runner when a rung wrote only its banner
+    for AI_FIRST_OUTPUT_SEC) is recorded as `no_output` and NOT retried: a
+    second attempt inside the same window buys the same silence. `first_byte_sec`
+    rides along when the runner can measure it.
     """
     started = time.monotonic()
     deadline = started + AI_TOTAL_BUDGET_SEC
@@ -1546,6 +1747,7 @@ def ai_classify(pending_path, runner=None, models=None,
         return None, "prompt_unreadable: %s" % exc
     runner = runner or default_ai_runner
     env = dict(os.environ)
+    env.update(extra_env or {})
     env["CANDIDATES_PATH"] = os.path.abspath(pending_path)
     errors = ["models=%s source=%s%s"
           % (",".join(selected), info.get("source"),
@@ -1584,8 +1786,36 @@ def ai_classify(pending_path, runner=None, models=None,
             timeout = model_selector.attempt_timeout(
                 model_deadline, now, AI_PER_ATTEMPT_TIMEOUT_SEC)
             attempt_started = time.monotonic()
+            # Cleared first: a previous attempt's first-byte number must never
+            # be read back as this attempt's.
+            if hasattr(runner, "last_first_byte_sec"):
+                runner.last_first_byte_sec = None
             try:
                 rc, out, err = runner(model, prompt_text, env, timeout)
+            except NoFirstOutput as exc:
+                # NO MODEL OUTPUT INSIDE THE DEADLINE. Not a timeout: the rung
+                # was alive and wrote its banner, then never spoke. Recorded as
+                # its own outcome so the probe can attribute the silence, and
+                # NOT retried -- the second attempt would buy the same silence.
+                wall_sec = time.monotonic() - attempt_started
+                model_selector.record_failure(health, model, "slow_or_stalled",
+                                              at=time.time())
+                out_tail, err_tail = exc.stdout, exc.stderr
+                record_attempt(state_dir, model, attempt, timeout, "no_output",
+                               stdout_text=out_tail, stderr_text=err_tail,
+                               wall_sec=wall_sec)
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "no_output", out_tail, err_tail)
+                evidence = collect_news.clean_ws(
+                    _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
+                errors.append(
+                    "%s: no model output within %ds of its %ds window%s"
+                    % (model, AI_FIRST_OUTPUT_SEC, timeout,
+                       (" -- %s" % evidence[-200:]) if evidence else ""))
+                print("ai_classify: %s wrote no model output within %ds, so it "
+                      "is abandoned instead of spending its %ds window."
+                      % (model, AI_FIRST_OUTPUT_SEC, timeout))
+                break
             except subprocess.TimeoutExpired as exc:
                 wall_sec = time.monotonic() - attempt_started
                 model_selector.record_failure(health, model, "timeout",
@@ -1599,7 +1829,8 @@ def ai_classify(pending_path, runner=None, models=None,
                                stdout_text=out_tail, stderr_text=err_tail,
                                wall_sec=wall_sec)
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "timeout", out_tail, err_tail)
+                              "timeout", out_tail, err_tail,
+                              first_byte_sec=_runner_first_byte(runner))
                 evidence = collect_news.clean_ws(
                     _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
                 errors.append("%s: timed out after %ds%s"
@@ -1637,7 +1868,8 @@ def ai_classify(pending_path, runner=None, models=None,
                                stdout_text=out, stderr_text=err,
                                wall_sec=wall_sec)
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "verdict", out, err)
+                              "verdict", out, err,
+                              first_byte_sec=_runner_first_byte(runner))
                 return verdict, None
             # A QUOTA REFUSAL IS THE WHOLE WALK'S INDICTMENT, not this model's.
             # The provider refuses pre-generation and every free id shares the
@@ -1663,7 +1895,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               "serve this id; cooled for %dh and skipped"
                               % (model, hours))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "model_not_found", out, err)
+                              "model_not_found", out, err,
+                              first_byte_sec=_runner_first_byte(runner))
                 print("ai_classify: %s -> model_not_found. The provider does "
                       "not serve this id, so it is cooled for %dh and the walk "
                       "moves to the next rung." % (model, hours))
@@ -1683,7 +1916,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 errors.append("%s: payment_required -- the plan refuses the %r "
                               "provider" % (model, provider_prefix))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "payment_required", out, err)
+                              "payment_required", out, err,
+                              first_byte_sec=_runner_first_byte(runner))
                 print("ai_classify: %s -> payment_required. The plan refuses the "
                       "'%s' provider, not this model id, so re-asking it is "
                       "pointless; trying the next rung."
@@ -1704,7 +1938,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               "own allowance, not the shared pool; no pool row "
                               "written" % (model, provider_prefix))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "quota_or_rate_limited", out, err)
+                              "quota_or_rate_limited", out, err,
+                              first_byte_sec=_runner_first_byte(runner))
                 print("ai_classify: %s -> quota_or_rate_limited on the '%s' "
                       "provider's own allowance, so the shared pool row is NOT "
                       "written; trying the next rung."
@@ -1725,7 +1960,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               "until %s; walk stopped"
                               % (model, row.get("until")))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "quota_or_rate_limited", out, err)
+                              "quota_or_rate_limited", out, err,
+                              first_byte_sec=_runner_first_byte(runner))
                 model_selector.record_failure(health, model, "transport",
                                               at=time.time())
                 pool_walled = True
@@ -1736,7 +1972,8 @@ def ai_classify(pending_path, runner=None, models=None,
             record_attempt(state_dir, model, attempt, timeout, "unparseable",
                            stdout_text=out, stderr_text=err, wall_sec=wall_sec)
             _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                          "unparseable", out, err)
+                          "unparseable", out, err,
+                          first_byte_sec=_runner_first_byte(runner))
             # The model answered; it answered unusably. Do not re-ask, but DO
             # remember it: this is the 2026-10-13 mimo failure, and the next
             # run must not pay for it again.
@@ -1810,14 +2047,17 @@ def _ladder_probe_pending(window_min=90, now_utc=None):
 
 
 def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
-                      stdout_text="", stderr_text="", first_byte_sec=None):
+                      stdout_text="", stderr_text="", first_byte_sec=None,
+                      control=False):
     """One attempt, in the stable shape the committed file documents.
 
     `granted_sec` is the window GRANTED and `wall_sec` is what it took -- the
-    pair is what sizes AI_PER_ATTEMPT_TIMEOUT_SEC. `first_byte_sec` is null
-    because `subprocess.run(capture_output=True)` cannot observe the first
-    token; it is never estimated. The tail is redacted and whitespace-collapsed
-    so a credential can never ride into a committed file.
+    pair is what sizes AI_PER_ATTEMPT_TIMEOUT_SEC. `first_byte_sec` is measured
+    by the streaming runner and is NULL, never estimated, when only the banner
+    arrived or the runner cannot say. `control` marks the keyed rung: it proves
+    the harness can stream and is never counted in the free verdict. The tail is
+    redacted and whitespace-collapsed so a credential can never ride into a
+    committed file.
     """
     tail = collect_news.clean_ws("%s %s" % (_as_text(stdout_text),
                                             _as_text(stderr_text)))
@@ -1828,11 +2068,93 @@ def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
             "first_byte_sec": (None if first_byte_sec is None
                                else round(first_byte_sec, 2)),
             "outcome": outcome,
+            "control": bool(control),
             "tail_excerpt": _redact_secrets(tail)[-160:]}
 
 
+def _ladder_probe_control_rung(config_dir):
+    """(model, credential_env) for the keyed provider, or (None, "").
+
+    NO LITERAL PROVIDER, MODEL OR CREDENTIAL NAME APPEARS HERE.
+    `config/opencode-cli.json` already declares the keyed provider: its
+    `apiKey` is an `{env:NAME}` template and its `models` block lists the ids it
+    serves. The control is the first provider whose credential is PRESENT in
+    this process, and the first model that block declares -- so the answer
+    tracks that file instead of a second copy of it that can rot.
+
+    The credential VALUE is never read as text and never printed: only the
+    variable's NAME is returned, and the child inherits the value through its
+    own environment.
+    """
+    path = os.path.join(config_dir, "opencode-cli.json")
+    if not os.path.isfile(path):
+        return None, ""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cli = json.load(fh)
+    except (OSError, ValueError):
+        return None, ""
+    if not isinstance(cli, dict):
+        return None, ""
+    for provider, block in (cli.get("provider") or {}).items():
+        if not isinstance(block, dict):
+            continue
+        options = block.get("options")
+        api_key = options.get("apiKey") if isinstance(options, dict) else ""
+        match = re.fullmatch(r"\{env:([A-Za-z_][A-Za-z0-9_]*)\}",
+                             str(api_key or ""))
+        if not match:
+            continue
+        env_name = match.group(1)
+        if not os.environ.get(env_name):
+            continue
+        served = block.get("models")
+        if not isinstance(served, dict):
+            continue
+        for model_id in served:
+            if isinstance(model_id, str) and model_id:
+                return "%s/%s" % (provider, model_id), env_name
+    return None, ""
+
+
+#: The whole attribution vocabulary. One value, never a sentence.
+LADDER_PROBE_ATTRIBUTIONS = ("harness_no_stream", "free_tier_stalled",
+                             "free_tier_answered", "inconclusive")
+
+
+def _probe_attribution(control, free_rows):
+    """Exactly one of four values, by this rule and no other.
+
+    THE QUESTION IS WHOSE SILENCE IT IS. A probe that sees nothing cannot tell
+    "the free tier is queue-stalled" from "the CLI never streams in a non-TTY
+    runner", and every sizing change is wasted until it can. Only a KEYED rung
+    answering the same prompt in the same window separates them:
+
+      * control emitted nothing AND no free rung emitted one model byte
+        -> `harness_no_stream`. The harness cannot see output from ANY provider,
+           so the free tier is not what was measured.
+      * control answered (or answered unusably) AND no free rung emitted a byte
+        -> `free_tier_stalled`. The harness works; the tier is what is silent.
+      * any free rung emitted model output -> `free_tier_answered`, whatever the
+        control did; whether the answer PARSES is the `verdict` field's job.
+      * anything else -- no credential, a control that never ran, an
+        unrecognised state -- -> `inconclusive`. Never guessed upward.
+    """
+    free_emitted = any(r.get("first_byte_sec") is not None
+                       for r in (free_rows or []))
+    if control == "unconfigured":
+        return "inconclusive"
+    if control == "no_output" and not free_emitted:
+        return "harness_no_stream"
+    if control in ("answered", "unparseable") and not free_emitted:
+        return "free_tier_stalled"
+    if free_emitted:
+        return "free_tier_answered"
+    return "inconclusive"
+
+
 def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
-                     window_min=90):
+                     window_min=90, config_dir="config"):
     """Walk the ladder ONCE on the fixed candidate and write the result.
 
     ISOLATED ON PURPOSE. Health, cooldown, cache and attempt files live in
@@ -1845,6 +2167,13 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
     The result file is COMMITTED by the workflow. Artifacts expire in 7 days,
     so an artifact-only answer would be the same unrecoverable evidence the
     honesty gate was fixed to stop producing.
+
+    ONE CONTROL RUNG, ALWAYS SEPARATE. A free-tier silence cannot be attributed
+    by the free tier itself, so the probe also asks the KEYED provider once (see
+    _ladder_probe_control_rung) in its own dir. Its rows are marked
+    `control: true`, it never enters `verdict`, and if no credential is present
+    the file says `control: unconfigured` rather than failing -- a probe that
+    could not run its control is still a probe, it just cannot attribute.
 
     Returns a process exit code: 0 when the probe ran and wrote its result
     (whatever the verdict -- "the ladder is broken" IS a result), 1 when the
@@ -1868,27 +2197,84 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
     verdict, err = ai_classify(pending_path, runner=runner, models=models,
                                on_attempt=collect)
     ladder_seconds = time.perf_counter() - started
-    attempts = list(rows.values())
+    free_attempts = list(rows.values())
 
     # DID IT ANSWER, AND WAS THE ANSWER USABLE? "parseable" needs a verdict;
     # "unparseable" means a model answered and the answer did not parse;
     # "none" means no answer came back at all (timeout, transport, refusal).
+    # ONLY THE FREE RUNGS DECIDE THIS. The control below is evidence about the
+    # harness, never about the pool this stage sizes its wall for.
     if verdict is not None:
         state = "parseable"
-    elif any(a["outcome"] == "unparseable" for a in attempts):
+    elif any(a["outcome"] == "unparseable" for a in free_attempts):
         state = "unparseable"
     else:
         state = "none"
+
+    # THE CONTROL RUNG. One attempt against the KEYED provider, in its own
+    # isolated state dir (so a free-pool refusal cannot suppress it, and its
+    # success cannot promote a rung). If the keyed rung also emits nothing in
+    # the same window, the harness cannot see model output and no free-tier
+    # tuning matters; if it answers, the free tier is the fault. Exactly one
+    # attempt: paying 150s twice to ask the same question is the burn the
+    # deadline above exists to stop.
+    control_model, control_env = _ladder_probe_control_rung(config_dir)
+    control_state = "unconfigured"
+    control_attempts = []
+    control_seconds = None
+    if control_model:
+        control_dir = os.path.join(probe_dir, "control")
+        os.makedirs(control_dir, exist_ok=True)
+        control_pending = os.path.join(control_dir, "breaking_pending.json")
+        write_json_atomic(control_pending, _ladder_probe_pending(window_min))
+        control_rows = {}
+
+        def collect_control(**attempt):
+            attempt["control"] = True
+            control_rows[(attempt["model"], attempt["attempt"])] = \
+                _ladder_probe_row(**attempt)
+
+        control_started = time.perf_counter()
+
+        control_verdict, _control_err = ai_classify(
+            control_pending, runner=runner, models=[control_model],
+            attempts_per_model=1, on_attempt=collect_control,
+            # The keyed provider only exists for the CLI when its own config
+            # file is the one loaded. Set for THIS child only: exporting it
+            # here would reorder a real sweep's ladder.
+            extra_env={"OPENCODE_CONFIG": os.path.abspath(
+                os.path.join(config_dir, "opencode-cli.json"))})
+        control_attempts = list(control_rows.values())
+        control_seconds = round(time.perf_counter() - control_started, 2)
+        if control_verdict is not None:
+            control_state = "answered"
+        elif any(a["outcome"] == "no_output" for a in control_attempts):
+            control_state = "no_output"
+        elif any(a["outcome"] == "unparseable" for a in control_attempts):
+            control_state = "unparseable"
+        elif control_attempts:
+            control_state = "failed"
+        else:
+            control_state = "not_run"      # suppressed before any attempt
+
+    attribution = _probe_attribution(control_state, free_attempts)
+    attempts = free_attempts + control_attempts
 
     doc = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "head_sha": head_sha or "",
            "trigger": "ladder_probe",
            "per_attempt_sec": AI_PER_ATTEMPT_TIMEOUT_SEC,
+           "first_output_sec": AI_FIRST_OUTPUT_SEC,
            "attempt_budget_sec": AI_TOTAL_BUDGET_SEC,
            "pool": list(AI_LADDER),
            "attempts": attempts,
            "verdict": state,
+           "control": control_state,
+           "control_model": control_model or "",
+           "control_env": control_env,
+           "attribution": attribution,
            "ladder_seconds": round(ladder_seconds, 2),
+           "control_seconds": control_seconds,
            "error": (err or "")[:400]}
     try:
         write_json_atomic(os.path.join(state_dir, LADDER_PROBE_FILENAME), doc)
@@ -1897,13 +2283,20 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
         return 1
 
     for a in attempts:
-        print("ladder_probe: %s attempt %d granted=%ss wall=%ss outcome=%s"
-              % (a["model"], a["attempt"], a["granted_sec"],
+        print("ladder_probe: %s%s attempt %d granted=%ss wall=%ss "
+              "first_byte=%s outcome=%s"
+              % ("control " if a["control"] else "", a["model"],
+                 a["attempt"], a["granted_sec"],
                  "n/a" if a["wall_sec"] is None else a["wall_sec"],
+                 "n/a" if a["first_byte_sec"] is None else a["first_byte_sec"],
                  a["outcome"]))
     print("ladder_probe: verdict=%s in %.2fs over %d attempt(s)%s"
           % (state, ladder_seconds, len(attempts),
              "" if not err else " -- %s" % collect_news.clean_ws(err)[:300]))
+    print("ladder_probe: control=%s attribution=%s%s"
+          % (control_state, attribution,
+             "" if not control_model
+             else " (%s, %.2fs)" % (control_model, control_seconds or 0.0)))
     return 0
 
 
@@ -3128,7 +3521,8 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
     # answers.
     if args.ladder_probe:
         return run_ladder_probe(state_dir, head_sha=args.head_sha,
-                                runner=ai_runner, window_min=args.window_min)
+                                runner=ai_runner, window_min=args.window_min,
+                                config_dir=args.config_dir)
 
     paths = {
         "active": os.path.join(state_dir, "active_stories.json"),

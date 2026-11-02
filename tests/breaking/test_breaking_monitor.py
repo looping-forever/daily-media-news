@@ -2899,12 +2899,17 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             code = bm.main(["--ladder-probe", "--state-dir", sd,
+                            "--config-dir", fresh_dir(),
                             "--head-sha", "deadbeef"], ai_runner=runner)
 
     assert code == 0, ("the probe ran but did not report success once it had "
                        "written its answer")
     doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
     assert doc["verdict"] == "parseable", doc
+    # No keyed provider config in that empty dir, so the control is a stated
+    # absence -- not a failure, and not an attribution that was guessed.
+    assert doc["control"] == "unconfigured", doc
+    assert doc["attribution"] == "inconclusive", doc
     assert doc["head_sha"] == "deadbeef", doc
     assert doc["per_attempt_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, doc
     assert doc["pool"] == list(bm.AI_LADDER), doc
@@ -2914,13 +2919,15 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
         "the probe must record the REAL walk, one row per attempt, in order: %r"
         % (doc["attempts"],))
     wanted = {"model", "attempt", "granted_sec", "wall_sec", "first_byte_sec",
-              "outcome", "tail_excerpt"}
+              "outcome", "control", "tail_excerpt"}
     for row in doc["attempts"]:
         assert set(row) == wanted, row
+        assert row["control"] is False, (
+            "a free-rung row must never be labelled as the control: %r" % (row,))
         assert row["granted_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, row
         assert row["first_byte_sec"] is None, (
-            "subprocess.run(capture_output=True) cannot see the first token, "
-            "so a number here would be invented: %r" % (row,))
+            "this stub runner cannot measure a first byte, so a number here "
+            "would be invented rather than observed: %r" % (row,))
     assert doc["attempts"][0]["outcome"] == "timeout", doc["attempts"][0]
     assert doc["attempts"][-1]["outcome"] == "verdict", doc["attempts"][-1]
     assert "sk-abcdefghijklmnopqrstuvwx" not in json.dumps(doc), (
@@ -2961,7 +2968,7 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
     bad = fresh_dir()
     with contextlib.redirect_stdout(io.StringIO()):
         bm.run_ladder_probe(bad, runner=lambda m, p, e, t: (0, "no json here", ""),
-                            models=["p/garbage"])
+                            models=["p/garbage"], config_dir=fresh_dir())
     assert read_json(os.path.join(bad, bm.LADDER_PROBE_FILENAME))["verdict"] \
         == "unparseable"
 
@@ -2971,7 +2978,8 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
         raise OSError("connection reset")
 
     with contextlib.redirect_stdout(io.StringIO()):
-        bm.run_ladder_probe(down, runner=unreachable_model, models=["p/down"])
+        bm.run_ladder_probe(down, runner=unreachable_model, models=["p/down"],
+                            config_dir=fresh_dir())
     assert read_json(os.path.join(down, bm.LADDER_PROBE_FILENAME))["verdict"] \
         == "none"
 
@@ -2987,7 +2995,8 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
     with unittest.mock.patch.object(bm, "write_json_atomic", disk_full), \
             contextlib.redirect_stdout(io.StringIO()):
         assert bm.run_ladder_probe(fresh_dir(), runner=runner,
-                                   models=["p/fast"]) == 1
+                                   models=["p/fast"],
+                                   config_dir=fresh_dir()) == 1
 
     # AND IT IS UNREACHABLE BY DEFAULT. A default-ON probe would spend the
     # free pool on every scheduled sweep.
@@ -3003,6 +3012,208 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
     assert 'ARGS="--ladder-probe' in src, "the input never reaches the script"
     assert "inputs.ladder_probe" in src, (
         "the probe flag must come from the dispatch input, not a schedule")
+
+
+def test_67_a_silent_rung_is_abandoned_at_the_first_output_deadline():
+    """A rung that writes only its own banner is abandoned, not paid for.
+
+    The observed probe: four rungs, 150s each, ZERO model output -- every tail
+    just `> build - <model>`. Burning the full grant on that silence is what
+    made the probe cost 600s and a real sweep lose ten minutes of dead time.
+    Abandonment must be honest about what it saw: first_byte_sec stays null
+    (nothing was invented) and the banner it did write is kept as evidence.
+    """
+    code = ("import sys,time;"
+            "sys.stdout.write('> build - p/silent\\n');sys.stdout.flush();"
+            "time.sleep(60)")
+    started = time.monotonic()
+    try:
+        bm._stream_child([sys.executable, "-c", code], "", dict(os.environ),
+                         timeout_sec=60, first_output_sec=2)
+    except bm.NoFirstOutput as exc:
+        waited = time.monotonic() - started
+        # Python unbinds `exc` when the block ends, so read it here.
+        reported = exc.waited_sec
+        seen_stdout = exc.stdout
+        first_seen = bm._stream_child.last_first_byte_sec
+    else:
+        raise AssertionError(
+            "a rung that never emitted model output was allowed to run to its "
+            "whole 60s grant; the first-output deadline did not fire")
+    assert waited < 10, ("abandonment must be fast, not 'soon': waited %.1fs"
+                         % waited)
+    assert reported < 10, reported
+    assert first_seen is None, (
+        "no model byte ever arrived, so a first-output TIME would be invented: "
+        "%r" % (first_seen,))
+    assert "> build" in seen_stdout, (
+        "the banner the rung DID write is the evidence for 'stalled, not "
+        "failed'; it was thrown away: %r" % (seen_stdout,))
+
+
+def test_68_a_rung_that_emits_at_five_seconds_is_allowed_to_finish():
+    """The deadline must not cut a rung that simply takes a few seconds."""
+    code = ("import sys,time;"
+            "sys.stdout.write('> build - p/fast\\n');sys.stdout.flush();"
+            "time.sleep(2);"
+            "sys.stdout.write('{\"level\": 1}\\n');sys.stdout.flush()")
+    rc, out, err = bm._stream_child([sys.executable, "-c", code], "",
+                                   dict(os.environ), timeout_sec=30,
+                                   first_output_sec=10)
+    assert rc == 0, rc
+    assert '{"level": 1}' in out, (
+        "a completed run must still hand the parser its FULL stdout: %r"
+        % (out,))
+    assert out.startswith("> build"), (
+        "the banner is part of the real output; dropping it would change what "
+        "the parser sees: %r" % (out,))
+    assert bm._stream_child.last_first_byte_sec is not None, (
+        "the rung DID emit model output, so the first-output time is known "
+        "and must be reported")
+
+
+def test_69_first_byte_time_is_recorded_for_a_slow_but_streaming_rung():
+    """`first_byte_sec` is measured, not inferred from the wall clock."""
+    code = ("import sys,time;"
+            "sys.stdout.write('> build - p/slow\\n');sys.stdout.flush();"
+            "time.sleep(1.5);"
+            "sys.stdout.write('{\"level\": 1}\\n');sys.stdout.flush()")
+    bm._stream_child([sys.executable, "-c", code], "", dict(os.environ),
+                     timeout_sec=30, first_output_sec=10)
+    first = bm._stream_child.last_first_byte_sec
+    assert first is not None, (
+        "a rung that streamed after its banner has a first-output time")
+    assert 0.8 <= first <= 6.0, (
+        "the first byte arrived after the 1.5s sleep, so the recorded time "
+        "must be that moment -- not 0 (the banner) and not the exit: %r"
+        % (first,))
+
+
+def test_70_the_control_rung_is_labelled_and_excluded_from_the_free_verdict():
+    """The control answers the attribution question, never the free verdict.
+
+    If the KEYED rung also emits nothing in the same window the harness cannot
+    stream and no free-tier tuning matters; if it answers, the free tier is the
+    fault. That only holds if the control (a) is a real attempt, (b) is labelled
+    in the rows, and (c) cannot change `verdict`, which is about the free rungs.
+    """
+    good = json.dumps({"level": 1, "confidence": "LOW", "event_key": "",
+                       "title": "", "summary": "", "why_urgent": "",
+                       "escalated_from_previous": False, "sources": [],
+                       "category_suggestion": "nepal"})
+    seen_env = {}
+
+    def runner(model, prompt_text, env, timeout_sec):
+        seen_env[model] = dict(env)
+        if model.startswith("ctrl/"):
+            return 0, good, ""
+        return 0, "no json here", ""
+
+    cfgdir = fresh_dir()
+    with open(os.path.join(cfgdir, "opencode-cli.json"), "w",
+              encoding="utf-8") as fh:
+        json.dump({"provider": {"ctrl": {
+            "options": {"apiKey": "{env:LADDER_PROBE_TEST_KEY}"},
+            "models": {"cheap-1": {"name": "Cheap One"}}}}}, fh)
+    sd = fresh_dir()
+    with unittest.mock.patch.dict(os.environ,
+                                  {"LADDER_PROBE_TEST_KEY": "not-a-real-key"}):
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = bm.run_ladder_probe(sd, runner=runner, models=["free/one"],
+                                       config_dir=cfgdir)
+    assert code == 0, code
+    doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+
+    control_rows = [a for a in doc["attempts"] if a.get("control")]
+    free_rows = [a for a in doc["attempts"] if not a.get("control")]
+    assert [r["model"] for r in control_rows] == ["ctrl/cheap-1"], doc["attempts"]
+    assert [r["model"] for r in free_rows] == ["free/one"], doc["attempts"]
+    assert doc["control"] == "answered", doc
+    assert doc["control_model"] == "ctrl/cheap-1", doc
+    assert "not-a-real-key" not in json.dumps(doc), (
+        "the credential VALUE reached the committed file: %s" % json.dumps(doc))
+    assert seen_env["ctrl/cheap-1"].get("LADDER_PROBE_TEST_KEY") == \
+        "not-a-real-key", (
+            "the control attempt was not given the credential at all, so it "
+            "could only ever fail")
+    assert seen_env["ctrl/cheap-1"].get("OPENCODE_CONFIG", "").endswith(
+        "opencode-cli.json"), (
+        "the keyed provider only exists for the CLI when its config file is "
+        "the one loaded: %r" % (seen_env["ctrl/cheap-1"].get("OPENCODE_CONFIG"),))
+    assert doc["verdict"] == "unparseable", (
+        "a control that ANSWERED must not turn the FREE rungs' garbage into a "
+        "pass: %r" % (doc["verdict"],))
+
+    # No credential configured => a stated state, never a failed probe.
+    bare = fresh_dir()
+    with unittest.mock.patch.dict(os.environ,
+                                  {"LADDER_PROBE_TEST_KEY": ""}):
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert bm.run_ladder_probe(bare, runner=runner,
+                                       models=["free/one"],
+                                       config_dir=cfgdir) == 0
+    bare_doc = read_json(os.path.join(bare, bm.LADDER_PROBE_FILENAME))
+    assert bare_doc["control"] == "unconfigured", bare_doc
+    assert not [a for a in bare_doc["attempts"] if a.get("control")], (
+        "an unconfigured control has no row: there was no attempt")
+
+
+def test_71_every_attribution_value_comes_from_its_stated_condition():
+    """Exactly one of four values, by a rule that is stated, not implied."""
+    silent = [{"first_byte_sec": None}]
+    streamed = [{"first_byte_sec": 5.0}]
+    cases = [
+        ("no_output", silent, "harness_no_stream"),
+        ("failed", silent, "inconclusive"),
+        ("unconfigured", silent, "inconclusive"),
+        ("answered", silent, "free_tier_stalled"),
+        ("answered", streamed, "free_tier_answered"),
+        ("unparseable", streamed, "free_tier_answered"),
+        ("no_output", streamed, "free_tier_answered"),
+        ("ANSWERED", silent, "inconclusive"),
+    ]
+    for control, rows, want in cases:
+        got = bm._probe_attribution(control, rows)
+        assert got == want, (
+            "control=%r free=%r must be %r by the stated rule, got %r"
+            % (control, rows, want, got))
+    for value in ("harness_no_stream", "free_tier_stalled",
+                  "free_tier_answered", "inconclusive"):
+        assert value in bm.LADDER_PROBE_ATTRIBUTIONS, (
+            "%r is not in the declared vocabulary" % value)
+
+
+def test_72_the_silent_probe_is_bounded_by_the_new_arithmetic():
+    """The 600s probe becomes a few minutes, and the arithmetic says so."""
+    assert bm.AI_FIRST_OUTPUT_SEC == 40, (
+        "the first-output deadline is the number this whole task turns on: %r"
+        % (bm.AI_FIRST_OUTPUT_SEC,))
+    silent_bound = (bm.AI_POOL_SIZE * bm.AI_FIRST_OUTPUT_SEC
+                    + bm.AI_FIRST_OUTPUT_SEC)
+    assert silent_bound <= 200, (
+        "four silent free rungs plus a silent control must fit under 200s, not "
+        "%ds" % silent_bound)
+    assert silent_bound < bm.AI_POOL_SIZE * bm.AI_PER_ATTEMPT_TIMEOUT_SEC, (
+        "the deadline must actually reduce the worst case it was added for")
+
+    # AND IT IS BEHAVIOURAL: a stalled rung is not re-asked. A second attempt
+    # buys the same silence and doubles the dead time.
+    sd = fresh_dir()
+
+    def stalled(model, prompt_text, env, timeout_sec):
+        raise bm.NoFirstOutput(bm.AI_FIRST_OUTPUT_SEC, "> build - %s" % model, "")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert bm.run_ladder_probe(sd, runner=stalled,
+                                   models=["p/a", "p/b"], config_dir=fresh_dir()) == 0
+    doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+    free = [a for a in doc["attempts"] if not a.get("control")]
+    assert [a["model"] for a in free] == ["p/a", "p/b"], free
+    assert all(a["attempt"] == 1 for a in free), (
+        "a stalled rung must not be retried inside its window: %r" % (free,))
+    assert all(a["outcome"] == "no_output" for a in free), free
+    assert all(a["first_byte_sec"] is None for a in free), free
+    assert doc["verdict"] == "none", doc
 
 
 def main():
@@ -3073,6 +3284,12 @@ def main():
         test_64_a_model_not_found_is_cooled_not_called_garbage,
         test_65_the_attempt_record_keeps_the_measured_wall_not_just_the_window,
         test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote,
+        test_67_a_silent_rung_is_abandoned_at_the_first_output_deadline,
+        test_68_a_rung_that_emits_at_five_seconds_is_allowed_to_finish,
+        test_69_first_byte_time_is_recorded_for_a_slow_but_streaming_rung,
+        test_70_the_control_rung_is_labelled_and_excluded_from_the_free_verdict,
+        test_71_every_attribution_value_comes_from_its_stated_condition,
+        test_72_the_silent_probe_is_bounded_by_the_new_arithmetic,
     ]
     failures = []
     for test in tests:

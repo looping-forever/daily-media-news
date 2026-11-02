@@ -198,6 +198,15 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           GMAIL_RECEIVER: ${{ secrets.GMAIL_RECEIVER }}
+          # READ BY THE PROBE'S CONTROL RUNG ONLY. A free-tier silence cannot be
+          # attributed from inside the free tier, so a probe run asks the KEYED
+          # provider once (see _ladder_probe_control_rung). The monitor passes
+          # this var to the control CHILD only, via ai_classify(extra_env=...),
+          # together with an OPENCODE_CONFIG that the free walk never sees -- so
+          # the real sweep's ladder and reachability are unchanged. Absent
+          # secret => the probe records `control: unconfigured`, never a guess.
+          # The variable NAME is recorded in the result; its value never is.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # ntfy is the PRIMARY breaking channel; email and Telegram are
           # fallbacks that fire only when ntfy did not deliver. Reuses the
           # existing NTFY secrets (daily-news.yml, digest-watchdog.yml,
@@ -433,12 +442,27 @@ jobs:
               lines.append("- Confirmed answer, no answer, or garbage? "
                            "`parseable` / `none` / `unparseable` are those three "
                            "and nothing else.")
+              # WHOSE FAULT IS THE SILENCE. `verdict: none` alone cannot tell a
+              # stopped-up free tier from a runner that never shows model
+              # output; the control rung and the measured first byte are what
+              # separate them. Printed as a raw record, not as a conclusion the
+              # probe is not entitled to draw.
+              lines.append("- Attribution: %s" % probe.get("attribution"))
+              lines.append("- Control rung: %s in %ss%s, first output deadline %ss"
+                           % (probe.get("control"),
+                              probe.get("control_seconds"),
+                              "" if not probe.get("control_model")
+                              else " (%s, credential %s)"
+                              % (probe.get("control_model"),
+                                 probe.get("control_env")),
+                              probe.get("first_output_sec")))
               for a in probe.get("attempts") or []:
-                  lines.append("  * %s attempt %s: granted %ss, measured %ss, "
-                               "outcome %s"
-                               % (a.get("model"), a.get("attempt"),
+                  lines.append("  * %s%s attempt %s: granted %ss, measured %ss, "
+                               "first byte %s, outcome %s"
+                               % ("control " if a.get("control") else "",
+                                  a.get("model"), a.get("attempt"),
                                   a.get("granted_sec"), a.get("wall_sec"),
-                                  a.get("outcome")))
+                                  a.get("first_byte_sec"), a.get("outcome")))
               if probe.get("error"):
                   lines.append("- Classifier detail: %s"
                                % str(probe["error"])[:300])
