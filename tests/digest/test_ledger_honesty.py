@@ -786,6 +786,26 @@ async function fetch() {
 #: The committed ledger the pipeline mirrors and the watchdog reads.
 LEDGER_PATH = REPO_ROOT / "state" / "digest_slot_ledger.json"
 
+
+def committed_days(ledger):
+    return sorted(ledger.get("days") or {})
+
+
+def committed_corrected_rows(ledger):
+    """Every row the data correction has touched, oldest day first.
+
+    Selected by PREDICATE, never by date: the mirror keeps a rolling window, so
+    a row present today is pruned within a week and a test naming it would rot.
+    """
+    days = ledger.get("days") or {}
+    rows = []
+    for day in sorted(days):
+        for slot in sorted(days.get(day) or {}):
+            row = (days.get(day) or {}).get(slot)
+            if isinstance(row, dict) and row.get("corrected") is True:
+                rows.append((day, slot, row))
+    return rows
+
 #: The row AS IT STOOD before the data correction, quoted verbatim: filed under
 #: 2026-10-26 evening (due 13:35:00Z), claiming `state: sent`, and carrying a
 #: push instant one hour BEFORE that slot began. 12:34:19Z falls in the same
@@ -819,9 +839,9 @@ def stored_violations(namespace, ledger):
     return [ln for ln in buf.getvalue().splitlines() if ln.strip()]
 
 
-def ledger_with(entry):
+def ledger_with(entry, day="2026-10-26", slot="evening"):
     return {"schema_version": 1, "as_of": "2026-10-27T14:00:00Z",
-            "days": {"2026-10-26": {"evening": json.loads(json.dumps(entry))}}}
+            "days": {day: {slot: json.loads(json.dumps(entry))}}}
 
 
 class StoredMislabelCorrectionTests(unittest.TestCase):
@@ -831,13 +851,24 @@ class StoredMislabelCorrectionTests(unittest.TestCase):
     def setUpClass(cls):
         cls.ns = honesty_namespace()
         cls.ledger = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+        cls.corrected = committed_corrected_rows(cls.ledger)
 
-    def test_a_corrected_row_is_accepted_while_the_uncorrected_claim_is_not(self):
-        """Both worlds, and the check is not the thing that changed.
+    def skip_without_correction(self):
+        """The committed window may not hold the corrected row any more."""
+        if self.corrected:
+            return
+        days = committed_days(self.ledger)
+        self.skipTest(
+            "the committed ledger holds no corrected row: its window is %s..%s "
+            "and the corrected 2026-10-26 evening row has been pruned, so there "
+            "is no stored correction left to check"
+            % (days[0] if days else "empty", days[-1] if days else "empty"))
 
-        The un-corrected row must still be reported, or the correction below
-        would be indistinguishable from deleting the check. The committed row
-        must not be, because it no longer claims the delivery.
+    def test_the_uncorrected_claim_is_still_reported(self):
+        """The pre-fix row must still be caught, or the correction is a deletion.
+
+        The un-corrected row must be reported, or a check that silently stopped
+        reporting anything would look identical to a corrected ledger.
         """
         uncorrected = stored_violations(self.ns, ledger_with(PREFIX_2026_10_26_EVENING))
         self.assertEqual(1, len(uncorrected), (
@@ -847,38 +878,47 @@ class StoredMislabelCorrectionTests(unittest.TestCase):
         self.assertIn("2026-10-26 evening", uncorrected[0])
         self.assertIn("2026-10-26T12:34:19Z", uncorrected[0])
 
-        corrected = stored_violations(self.ns, self.ledger)
-        self.assertEqual([], corrected, (
-            "the committed ledger still raises a stored honesty violation, so "
-            "every run keeps printing it: %r" % (corrected,)))
+    def test_a_corrected_row_is_accepted(self):
+        """Every corrected row in the committed ledger is accepted by the check."""
+        self.skip_without_correction()
+        reported = []
+        for day, slot, row in self.corrected:
+            reported.extend(stored_violations(self.ns, ledger_with(row, day, slot)))
+        self.assertEqual([], reported, (
+            "a corrected row still raises a stored honesty violation, so every "
+            "run keeps printing it: %r" % (reported,)))
 
     def test_the_corrected_row_records_the_truth_and_keeps_the_false_claim(self):
         """Corrected in place: no row deleted, no evidence deleted, no instant rewritten."""
-        row = self.ledger["days"]["2026-10-26"]["evening"]
+        self.skip_without_correction()
+        day, slot, row = self.corrected[-1]
 
         self.assertIs(True, row.get("corrected"), row)
         self.assertRegex(str(row.get("corrected_at")),
                          r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$",
                          "corrected_at must be a UTC ISO instant: %r" % (row,))
-        self.assertIn("precedes", str(row.get("corrected_reason")), row)
+        self.assertTrue(str(row.get("corrected_reason") or "").strip(), row)
 
         # The delivery verdict is corrected; the kind is not rewritten, because
         # the digest really did build and `unavailable` would be a new lie.
         self.assertEqual("failed", row.get("state"), row)
-        self.assertEqual("fallback_last_good", row.get("kind"), row)
+        self.assertEqual(row.get("original_kind"), row.get("kind"), row)
 
-        # The false claim stays visible, in this file.
+        # The false claim stays visible, in this file, with its own instant.
         self.assertEqual("sent", row.get("original_state"), row)
-        self.assertEqual("fallback_last_good", row.get("original_kind"), row)
-        self.assertEqual("2026-10-26T12:34:19Z", row.get("original_ntfy_sent_at"), row)
+        self.assertTrue(row.get("original_ntfy_sent_at"), row)
+        # Both strings are UTC `Z` instants, so they order as instants: the claim
+        # the check reads must still precede this row's own slot.
+        self.assertLess(str(row.get("original_ntfy_sent_at")),
+                        str(row.get("scheduled_instant")), row)
         # The field the check reads no longer makes a claim for this slot.
         self.assertNotIn("ntfy_sent_at", row, row)
 
         # Everything that describes the slot is untouched.
-        self.assertEqual("2026-10-26T13:35:00Z", row.get("scheduled_instant"), row)
-        self.assertEqual("dmn-2026-10-26-evening", row.get("sequence_id"), row)
-        self.assertEqual("no digest was built for evening 2026-10-26.",
-                         row.get("reject_plain"), row)
+        self.assertTrue(str(row.get("scheduled_instant")).startswith(day), row)
+        self.assertEqual("dmn-%s-%s" % (day, slot), row.get("sequence_id"), row)
+        if "reject_plain" in row:
+            self.assertIn(day, str(row.get("reject_plain")), row)
 
 
 if __name__ == "__main__":

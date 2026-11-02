@@ -103,10 +103,20 @@ def ledger_with_false_row():
     }
 
 
-def mirror_row():
-    """The committed mirror's 2026-10-26 evening row -- the shape to match."""
+def mirror_corrected_row():
+    """The committed mirror's corrected row as (day, slot, row); None if pruned.
+
+    Selected by PREDICATE, never by date: the mirror is a rolling window, so a
+    hard-coded day is present today and gone within a week.
+    """
     data = json.loads(MIRROR_PATH.read_text(encoding="utf-8"))
-    return data["days"]["2026-10-26"]["evening"]
+    days = data.get("days") or {}
+    for day in sorted(days, reverse=True):
+        for slot in sorted(days.get(day) or {}):
+            row = (days.get(day) or {}).get(slot)
+            if isinstance(row, dict) and row.get("corrected") is True:
+                return day, slot, row
+    return None
 
 
 def second_run_is_clean(apply):
@@ -219,44 +229,54 @@ class TheCorrectionShapeTests(unittest.TestCase):
     def test_it_matches_the_committed_mirror_row(self):
         """The repaired KV row and the committed mirror must say the same thing.
 
-        The mirror was corrected by hand in the earlier repair; this asserts
-        the script produces that same record, so the next seal (which copies KV
-        over the mirror verbatim) changes nothing a reader has already seen.
+        The mirror carries the correction already applied; this reconstructs
+        the row's original claim from the mirror itself and asserts the script
+        produces that same record, so the next seal (which copies KV over the
+        mirror verbatim) changes nothing a reader has already seen.
 
         `corrected_at` is the ONE field that is allowed to differ, because it is
         volatile data rather than part of the contract: it records the instant
         the repair happened to run, and the mirror is free to carry a different
-        one (it carries 07:07:16Z, this fixture clock says 05:19:42Z). Pinning
-        that instant here made the test go red when the repair was re-run at a
-        different second -- a test may not encode a value the data owns. What
-        IS asserted is the contract the correction promises, plus the one
-        property `corrected_at` must have: a real UTC instant that is not in
+        one. Pinning that instant here made the test go red when the repair was
+        re-run at a different second -- a test may not encode a value the data
+        owns. What IS asserted is the contract the correction promises, plus the
+        one property `corrected_at` must have: a real UTC instant that is not in
         the future relative to the fixture clock.
         """
-        mirror = mirror_row()
+        found = mirror_corrected_row()
+        if found is None:
+            days = sorted((json.loads(MIRROR_PATH.read_text(encoding="utf-8"))
+                           .get("days") or {}))
+            self.skipTest(
+                "the committed mirror holds no corrected row: the 2026-10-26 "
+                "evening correction has been pruned from the rolling window "
+                "(present days: %s..%s), so there is nothing to compare"
+                % (days[0] if days else "empty", days[-1] if days else "empty"))
+        day, slot, mirror = found
 
-        # The contract, stated on the MIRROR (the record read from disk), so it
-        # holds whatever instant the repair ran at.
-        self.assertIs(True, mirror.get("corrected"), mirror)
-        self.assertEqual("failed", mirror.get("state"), mirror)
-        self.assertEqual("2026-10-26T12:34:19Z",
-                         mirror.get("original_ntfy_sent_at"), mirror)
-        self.assertNotIn("ntfy_sent_at", mirror,
-                         "the mirror still claims a push beside a record that "
-                         "says the push did not happen: %r" % (mirror,))
+        # Rebuild the pre-correction row from the mirror's own evidence, then
+        # let the SCRIPT correct it. Comparing to the mirror pins the contract
+        # for whichever row the correction touched, not one fixed date.
+        original = {key: value for key, value in mirror.items()
+                    if key not in R.CORRECTION_FIELDS and key != "ntfy_sent_at"}
+        original["state"] = mirror.get("original_state")
+        original["ntfy_sent_at"] = mirror.get("original_ntfy_sent_at")
+        if "original_kind" in mirror:
+            original["kind"] = mirror["original_kind"]
+        fixed = R.corrected_row(
+            original, {"reason": mirror.get("corrected_reason")},
+            mirror.get("corrected_at"))
+        self.assertEqual(fixed, mirror,
+                         "the script's correction of %s %s does not reproduce "
+                         "the committed mirror row" % (day, slot))
 
-        for key, value in mirror.items():
-            if key == "corrected_at":
-                continue
-            self.assertEqual(value, self.fixed.get(key),
-                             "the corrected row's %r is %r but the committed "
-                             "mirror says %r -- the two records disagree"
-                             % (key, self.fixed.get(key), value))
-        self.assertEqual(set(mirror) - {"corrected_at"},
-                         set(self.fixed) - {"corrected_at"},
-                         "the corrected row and the mirror do not carry the "
-                         "same fields: %r"
-                         % sorted(set(mirror) ^ set(self.fixed)))
+        # The original claim is the contradiction that made this row wrong: it
+        # must not fall in the slot its bucket names.
+        held = R.slot_holding_instant(
+            day, R.instant_or_none(mirror.get("original_ntfy_sent_at")))
+        self.assertNotEqual("%s %s" % (day, slot), held,
+                            "the mirror row was corrected but its original claim "
+                            "falls in the row's own slot: %r" % (mirror,))
 
         stamp = R.instant_or_none(mirror.get("corrected_at"))
         self.assertIsNotNone(stamp,
