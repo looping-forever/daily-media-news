@@ -52,6 +52,16 @@ not declared healthy merely because it did not run recently, since that is the
 same "a blank must never read like good news" rule the rest of this repository
 follows.
 
+HYSTERESIS
+----------
+A single healthy observation is not proof that an outage is over: on the
+breaking path one quiet, un-judged run used to clear a genuinely broken ladder,
+and the observed result was open/recover/open on alternate runs. Callers that
+have a real judgement signal pass ``required=HEALTHY_STREAK_REQUIRED`` (2), and
+then a recovery needs that many CONSECUTIVE healthy calls. Any failure recorded
+in between resets the streak to zero. The default of 1 keeps the original
+one-call contract for callers with no such signal (the digest arms).
+
 Stdlib only.
 """
 
@@ -63,6 +73,7 @@ __all__ = [
     "WINDOW_HOURS",
     "KEEP_HOURS",
     "MAX_CONDITIONS",
+    "HEALTHY_STREAK_REQUIRED",
     "LEDGER_PATH",
     "condition_key",
     "load",
@@ -78,6 +89,10 @@ __all__ = [
 
 #: How long one condition is silenced after it has alerted.
 WINDOW_HOURS = 6.0
+
+#: Consecutive healthy observations a caller with a real judgement signal
+#: requires before a recovery is announced. One quiet run is not evidence.
+HEALTHY_STREAK_REQUIRED = 2
 
 #: Entries untouched for a week are pruned. A week is far longer than any
 #: window here, so pruning can never resurrect a flood.
@@ -266,6 +281,9 @@ def record(state, key, now, cause, window_hours=WINDOW_HOURS):
 
     entry["runs"] = int(entry.get("runs") or 0) + 1
     entry["last_seen"] = stamp
+    # A failure breaks the healthy run: recovery must be N CONSECUTIVE healthy
+    # observations, so one bad run in between resets the count to zero.
+    entry["healthy_streak"] = 0
     if cause:
         entry["cause"] = cause
 
@@ -282,8 +300,13 @@ def record(state, key, now, cause, window_hours=WINDOW_HOURS):
         (now - alerted_at) >= datetime.timedelta(hours=float(window_hours))
 
     if not due:
-        return {"alert": False, "key": key, "runs": 0, "first": "", "last": stamp,
-                "cause": entry.get("cause", ""), "suppressed": 1,
+        # `runs` is the number of occurrences since the last alert, so the
+        # caller can print the real count instead of a constant 1. `suppressed`
+        # is the same number here: none of these runs posted on its own.
+        runs = int(entry.get("window_runs") or 1)
+        return {"alert": False, "key": key, "runs": runs,
+                "first": entry.get("window_first") or stamp, "last": stamp,
+                "cause": entry.get("cause", ""), "suppressed": runs,
                 "window_hours": float(window_hours)}
 
     runs = int(entry.get("window_runs") or 1)
@@ -312,17 +335,30 @@ def _close_window(entry, stamp):
 _NO_RECOVERY = {"recovery": False}
 
 
-def resolve(state, key, now):
+def resolve(state, key, now, required=1):
     """The condition behind `key` stopped. Recovery, exactly once.
 
-    The entry is deleted, so a second call for the same key is a no-op and the
-    recovery message cannot be sent twice.
+    With ``required`` > 1 the caller must call this on that many CONSECUTIVE
+    healthy observations before the recovery is announced; the count is kept on
+    the entry, so it survives the run boundary. Any failure recorded in between
+    resets it (see ``record``). Until the streak is met the entry stays put and
+    the return value says how far along it is.
+
+    When the recovery is finally announced the entry is deleted, so a later
+    call for the same key is a no-op and the message cannot be sent twice.
     """
     now = _utc(now)
+    required = max(1, int(required or 1))
     conditions = state.setdefault("conditions", {})
-    entry = conditions.pop(key, None)
+    entry = conditions.get(key)
     if not isinstance(entry, dict):
         return dict(_NO_RECOVERY)
+    streak = int(entry.get("healthy_streak") or 0) + 1
+    if streak < required:
+        entry["healthy_streak"] = streak
+        return {"recovery": False, "key": key, "healthy_streak": streak,
+                "healthy_required": required}
+    conditions.pop(key, None)
     first = _parse_stamp(entry.get("first_seen"))
     last = _parse_stamp(entry.get("last_seen"))
     seconds = (now - first).total_seconds() if first else 0
@@ -331,10 +367,11 @@ def resolve(state, key, now):
             "first": entry.get("first_seen", ""),
             "last": entry.get("last_seen", ""),
             "duration_seconds": seconds,
+            "healthy_runs": streak,
             "cause": entry.get("cause", "")}
 
 
-def resolve_prefix(state, prefix, now, keep_key=None):
+def resolve_prefix(state, prefix, now, keep_key=None, required=1):
     """Resolve every entry under `prefix` except `keep_key`.
 
     Used where the caller knows the condition class is over but not which date
@@ -346,7 +383,7 @@ def resolve_prefix(state, prefix, now, keep_key=None):
     for key in sorted(conditions):
         if not key.startswith(prefix) or key == keep_key:
             continue
-        recovery = resolve(state, key, now)
+        recovery = resolve(state, key, now, required=required)
         if recovery.get("recovery"):
             resolved.append(recovery)
     return resolved
@@ -384,6 +421,12 @@ def recovery_body(label, recovery):
             "occurring. %d run(s) were affected between %s and %s (%s)."
             % (label, runs, recovery.get("first") or "?", recovery.get("last") or "?",
                lasted))
+    healthy = int(recovery.get("healthy_runs") or 0)
+    if healthy > 1:
+        # The rule is stated where it changes what the owner reads: this
+        # "all clear" was not a single quiet run, it was a measured streak.
+        body += (" Confirmed by %d consecutive healthy runs; a single quiet "
+                 "run is never treated as a recovery." % healthy)
     if cause:
         body += "\n\nLast recorded cause: %s" % cause
     return body

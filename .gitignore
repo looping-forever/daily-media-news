@@ -85,20 +85,20 @@ state/mock_stories.json
 state/last-digest/
 docs/digests-test/
 
-# Dynamic model selection runtime memory (2026-10-13). Both are caches of
-# what the PROVIDER told us on this machine, not repository facts:
+# Dynamic model selection runtime memory (2026-10-13).
 #   model_cache.json -- the last live `opencode models` listing (6h TTL).
 #                       Committing it would freeze today's catalogue into the
 #                       repository, which is precisely the hardcoded-ladder
-#                       brittleness this replaced.
-#   model_health.json -- per-model success/failure counters and cooldowns,
-#                       measured on this machine's own runs. Committing it
-#                       would make one machine's provider luck another
-#                       machine's starting ranking.
-# Both are safe to delete: a missing file is a cold cache, and a cold cache
-# re-discovers live on the next run.
+#                       brittleness this replaced. Still ignored.
+#   model_health.json -- per-model success/failure counters and cooldowns.
+#                       COMMITTED from the breaking workflow: it is the
+#                       ordering memory the NEXT run reorders around, and while
+#                       it was ignored that promise was false in CI. See the
+#                       "Commit breaking state" step in breaking-monitor.yml.
+# A missing model_cache.json is a cold cache, and a cold cache re-discovers
+# live on the next run; a missing model_health.json just means nothing is known
+# yet, so the ladder starts from its configured order.
 state/model_cache.json
-state/model_health.json
 
 # U6. The ntfy payload a prebuild writes so digest-prebuild.yml's seal job can
 # build the artifact. It is a hand-over between two steps in one run, never a

@@ -273,20 +273,32 @@ def _reachable_only(models):
 #: a bad day look better.
 AI_PER_ATTEMPT_TIMEOUT_SEC = 60
 
-#: THE WHOLE AI STAGE IS BOUNDED, discovery included. Before this, the worst
-#: case was models x attempts x timeout = 3 x 2 x 60 = 360s of wall clock
-#: before a verdict was (or was not) reached. Now it cannot exceed this,
-#: because every attempt's timeout is min(60, remaining budget).
-AI_TOTAL_BUDGET_SEC = 150
-
 #: Depth cap. A dead ladder costs its share of the budget, not a fixed 60s
 #: each, so depth is bounded as well as time.
 #:
 #: RAISED 4 -> 6 on 2026-10-25, and 6 -> 8 on 2026-10-30, WITH the ladder each
 #: time: the cap must track the seed, because a cap below it means the tail
 #: rungs are configured and can never be reached -- a model that is silently
-#: never tried. The budget still trims the tail.
+#: never tried.
 AI_MAX_MODELS = 8
+
+#: An attempt CAP per model, not a multiplier on TIME: every attempt shares the
+#: model's ONE 60s window (see the loop in ai_classify). A transport failure that
+#: returns immediately is therefore retried inside the same window, while a real
+#: 60s timeout has already spent the window and is NOT re-asked. The old reading
+#: of this number made the arithmetic impossible -- 2 x 8 x 60 = 960s never fit
+#: any stage budget short of the job's own limit, so one model timing out twice
+#: ate 120s and the tail rungs were starved (observed 2026-11-01: cost_seconds
+#: 151.43, all six models attempted, ai_fail_safe).
+AI_ATTEMPTS_PER_MODEL = 2
+
+#: THE WHOLE AI STAGE IS BOUNDED, discovery included. The worst case is
+#: AI_MAX_MODELS x AI_PER_ATTEMPT_TIMEOUT_SEC = 8 x 60 = 480s, which EQUALS this
+#: budget: every configured rung gets its full 60s exactly once. Attempts are
+#: deliberately absent from this product -- a retry is paid for out of the same
+#: window, so it must never widen the bound.
+#: tests/breaking/test_honesty_gate_recovery.py fails if these stop summing.
+AI_TOTAL_BUDGET_SEC = AI_MAX_MODELS * AI_PER_ATTEMPT_TIMEOUT_SEC
 
 # Deterministic pre-gate (contract regex — do not reword casually;
 # groups are non-capturing so findall() returns whole-match strings).
@@ -1342,7 +1354,8 @@ def normalize_verdict(obj):
 
 
 def ai_classify(pending_path, runner=None, models=None,
-                prompt_path=PROMPT_PATH, attempts_per_model=2):
+                prompt_path=PROMPT_PATH,
+                attempts_per_model=AI_ATTEMPTS_PER_MODEL):
     """Returns (verdict|None, error). Any failure => (None, err) and the
     caller fails safe to level 1 (silence).
 
@@ -1352,13 +1365,18 @@ def ai_classify(pending_path, runner=None, models=None,
     AI_TOTAL_BUDGET_SEC. An explicit `models=[...]` bypasses selection
     entirely and is what the tests drive.
 
-    ONE extra attempt per model, and ONLY for a transport/timeout failure.
-    The 2026-10-13 incident was one model timing out and one returning junk --
-    provider flakiness, not a bad model, so a single immediate re-ask is the
-    honest response. An UNPARSEABLE verdict is deliberately NOT retried: that
-    is the model answering, and asking it the same question again is how a
-    broken classifier burns the job's whole time budget. Both outcomes are
-    recorded in health memory, so the NEXT run reorders around them.
+    ONE 60s WINDOW per model (AI_PER_ATTEMPT_TIMEOUT_SEC), so the worst case is
+    AI_MAX_MODELS x 60 = 480s = AI_TOTAL_BUDGET_SEC: every configured rung gets
+    its full allowance exactly once. A transport failure that returns fast is
+    retried inside that model's remaining window; a real timeout has already
+    spent it and gets no second attempt, which is what used to let one slow model
+    eat two minutes and starve the tail of the ladder.
+
+    An UNPARSEABLE verdict is deliberately NOT retried: that is the model
+    answering, and asking it the same question again is how a broken classifier
+    burns the job's whole time budget. Both outcomes are recorded in health
+    memory, which breaking-monitor.yml now COMMITS, so the NEXT run reorders
+    around them instead of retrying the same slow model first.
 
     Health memory can only REORDER the attempt list, never remove a model
     from it — see model_selector.select. Total failure still returns
@@ -1441,22 +1459,31 @@ def ai_classify(pending_path, runner=None, models=None,
             # account and a different allowance, and ending the walk on the
             # first provider's refusal is how a fallback gets wasted.
             continue
+        # This model's whole allowance, retries included. Bounded by the stage
+        # deadline too, so the last rung cannot overrun the budget.
+        model_deadline = min(deadline, time.monotonic()
+                             + AI_PER_ATTEMPT_TIMEOUT_SEC)
         for attempt in range(1, max(1, attempts_per_model) + 1):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
+            now = time.monotonic()
+            if now >= deadline:
                 out_of_time = True
                 break
-            # max(1, min(60, remaining)): an attempt never overruns the stage
-            # budget, and an attempt that still has budget keeps its full 60s.
+            if now >= model_deadline:
+                # The window is spent (a timeout, or a slow attempt): the next
+                # attempt would be outside this model's allowance.
+                break
+            # max(1, min(60, remaining)): an attempt never overruns its window,
+            # and the FIRST attempt of a model still has the full 60s.
             timeout = model_selector.attempt_timeout(
-                deadline, time.monotonic(), AI_PER_ATTEMPT_TIMEOUT_SEC)
+                model_deadline, now, AI_PER_ATTEMPT_TIMEOUT_SEC)
             try:
                 rc, out, err = runner(model, prompt_text, env, timeout)
             except subprocess.TimeoutExpired:
                 model_selector.record_failure(health, model, "timeout",
                                               at=time.time())
                 errors.append("%s: timed out after %ds" % (model, timeout))
-                if attempt < attempts_per_model:
+                if attempt < attempts_per_model \
+                        and time.monotonic() < model_deadline:
                     print("ai_classify: %s attempt %d timed out, retrying"
                           % (model, attempt))
                     continue
@@ -1466,7 +1493,8 @@ def ai_classify(pending_path, runner=None, models=None,
                                               at=time.time())
                 errors.append("%s: %s" % (model,
                                           collect_news.clean_ws(str(exc))[:120]))
-                if attempt < attempts_per_model:
+                if attempt < attempts_per_model \
+                        and time.monotonic() < model_deadline:
                     print("ai_classify: %s attempt %d failed transport, retrying"
                           % (model, attempt))
                     continue
@@ -2375,9 +2403,10 @@ def notify_telegram(verdict, confidence, label, paths, args, source_url,
                     cutoff_npt, detection_source, universal_override=False):
     """Best-effort Telegram push AFTER a successful email send/dry-run.
 
-    Returns "" on success/skip or ";telegram_failed:<err>" which the caller
-    appends to the log row's reason. NEVER raises; email/state semantics are
-    untouched regardless of Telegram outcome.
+    Returns "" on skip (no token, dry run), ";telegram_delivered" on a
+    confirmed 2xx, or ";telegram_failed:<err>" which the caller appends to the
+    log row's reason. NEVER raises; email/state semantics are untouched
+    regardless of Telegram outcome.
 
     When *universal_override* is True (CRITICAL items), the detailed
     bullet-point format is used instead of the standard one-liner.
@@ -2404,7 +2433,7 @@ def notify_telegram(verdict, confidence, label, paths, args, source_url,
     if not chat_id:
         return ";telegram_failed:no_chat_id"
     ok, err = tg_send(token, chat_id, text)
-    return "" if ok else ";telegram_failed:%s" % err
+    return ";telegram_delivered" if ok else ";telegram_failed:%s" % err
 
 
 # ---------------------------------------------------------------------------
@@ -2719,6 +2748,13 @@ def process_alert(verdict, matched_candidates, state, paths, args,
         except Exception as exc:
             tg_note = ";telegram_failed:%s" % collect_news.clean_ws(
                 "%s: %s" % (type(exc).__name__, exc))[:120]
+        # A confirmed Telegram push is a DELIVERY, so it clears the same
+        # pending marker the ntfy and SMTP successes clear above. Without this
+        # the marker written by an earlier failed run could outlive the alert
+        # it belongs to and leave a stale entry behind for ever.
+        if tg_note == ";telegram_delivered" and \
+                bstate["pending_alert"].pop(alert_id, None) is not None:
+            write_json_atomic(paths["breaking_state"], bstate)
     reason = "sent"
     if notes:
         reason += "; " + "; ".join(notes)
@@ -2830,7 +2866,11 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
     if not tripped:
         print("breaking_monitor: gate SUPPRESSED the classifier -- %s. No model "
               "call was made." % gate_reason)
-        log_row(tripped=False, gate="suppressed", gate_reason=gate_reason)
+        # judged=False is the FACT this row records: no model was asked, so
+        # this run is not evidence about whether the ladder works. The honesty
+        # gate's recovery branch must never treat it as one.
+        log_row(tripped=False, gate="suppressed", judged=False,
+                gate_reason=gate_reason)
         return 0
     print("breaking_monitor: gate passed -- %s. %s"
           % (gate_reason, "AI classification follows" if not args.no_model
@@ -2857,6 +2897,9 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         print("breaking_monitor: HARD-EVIDENCE FAST PATH (%s) -- the AI ladder "
               "was not consulted for this run" % fast_why)
         verdict, ai_err = fast_verdict, None
+        # A deterministic verdict, but NOT evidence that the ladder works: no
+        # model was consulted, so it cannot resolve an AI-ladder failure.
+        judged = False
     elif args.no_model:
         # A suppression, and a LOUD one: this run would otherwise have asked a
         # model, and the un-judged headlines ride the log row exactly as they do
@@ -2865,12 +2908,16 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
               "classifier was not consulted; %d gated candidate(s) are unjudged"
               % len(matched))
         log_row(tripped=True, level=1, confidence="", event_id="", sent=False,
-                pre_gate_why=pre_gate_why, gate="passed", gate_reason=gate_reason,
+                pre_gate_why=pre_gate_why, gate="passed", judged=False,
+                gate_reason=gate_reason,
                 unjudged_titles=[c.get("title", "") for c in matched][:5],
                 reason="model_call_suppressed: --no-model (diagnostic run)")
         return 0
     else:
         verdict, ai_err = ai_classify(paths["pending"], runner=ai_runner)
+        # A real model verdict IS the evidence: this is the only value of
+        # `judged` that may resolve an open honesty-gate failure.
+        judged = verdict is not None
 
     if verdict is None:
         # The un-judged headlines ride the log row so the honesty gate can
@@ -2881,7 +2928,7 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         # what it had failed on.
         log_row(tripped=True, level=1, confidence="", event_id="",
                 sent=False, pre_gate_why=pre_gate_why,
-                gate="passed", gate_reason=gate_reason,
+                gate="passed", judged=False, gate_reason=gate_reason,
                 unjudged_titles=[c.get("title", "") for c in matched][:5],
                 reason="ai_fail_safe: %s" % (ai_err or "unknown")[:200])
         return 0
@@ -2890,7 +2937,7 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         verdict, matched, state, paths, args, smtp_factory=smtp_factory)
     log_row(tripped=True, level=level, confidence=confidence,
             event_id=event_id, sent=sent, pre_gate_why=pre_gate_why,
-            gate="passed", gate_reason=gate_reason,
+            gate="passed", judged=judged, gate_reason=gate_reason,
             reason=reason[:200])
 
     if sent:

@@ -91,7 +91,11 @@ permissions:
 jobs:
   breaking-monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 15, not 10: the AI stage's worst case is now 480s
+    # (AI_MAX_MODELS x AI_ATTEMPTS_PER_MODEL x AI_PER_ATTEMPT_TIMEOUT_SEC), and
+    # a 600s job would leave only ~120s for collection and delivery. The stage
+    # budget itself is unchanged by this: it is what bounds the ladder.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -244,7 +248,14 @@ jobs:
           # state, so it is owned by "Persist model cooldowns" below, which runs
           # on `always()` -- this step is skipped whenever the sweep itself
           # fails, which is exactly the run that records a refusal.
-          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json; do
+          #
+          # state/model_health.json IS staged: it is the per-model success/
+          # failure record the ladder reorders around, and until it was
+          # committed the in-code promise that "the NEXT run reorders around
+          # slow models" was false in CI -- every run retried the same slow
+          # model first. It only changes on a run that actually attempted a
+          # model, so this cannot churn on a quiet hour.
+          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json state/model_health.json; do
             if [ -f "$f" ]; then
               git add "$f"
             fi
@@ -285,9 +296,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          # THE ONLY TRACKED MODEL-STATE FILE. state/model_health.json and
-          # state/model_cache.json sit beside it, but both are gitignored runtime
-          # caches and are never force-added. Staging is by explicit name --
+          # THE ONLY TRACKED POOL-WALL FILE. state/model_health.json is tracked
+          # too (it is committed with breaking state above), but it is a
+          # per-model record rather than the shared pool wall, so it is owned by
+          # that step and never force-added here. state/model_cache.json stays a
+          # gitignored runtime cache: committing it would freeze today's
+          # catalogue into the repository. Staging is by explicit name --
           # `git add -A` or `git add state/` would sweep in every preview file
           # this workspace holds.
           MODEL_STATE=state/model_cooldown.json
@@ -399,6 +413,16 @@ jobs:
           # ever turns the script's own recorded outcome into a visible signal.
           reason = (last or {}).get("reason") or ""
           ai_failed = reason.startswith("ai_fail_safe")
+
+          # DID THIS RUN ACTUALLY JUDGE ANYTHING? breaking_monitor.py writes
+          # judged=True ONLY when a model returned a verdict. A gate
+          # suppression, a --no-model diagnostic run and the deterministic
+          # hard-evidence fast path all write judged=False, and a row from an
+          # older build has no field at all -- absence is not evidence either.
+          # `gate == "passed"` is re-checked so a suppressed gate can never
+          # resolve, whatever the judged field says.
+          row_gate = (last or {}).get("gate") or ""
+          judged = bool((last or {}).get("judged")) and row_gate == "passed"
 
           # THE UN-JUDGED HEADLINES, read from the log row the script wrote.
           # `github.event.client_payload.title` (PAYLOAD_TITLE) alone is not
@@ -517,8 +541,10 @@ jobs:
                   ntfy_note = "ntfy_suppressed_duplicate"
                   print("honesty-gate notice NOT pushed: this condition already "
                         "alerted inside the last %gh (%d run(s) counted in the "
-                        "window). The ::error:: above still stands."
-                        % (alert_dedupe.WINDOW_HOURS, decision["suppressed"]))
+                        "window). Recovery needs %d consecutive judged-healthy "
+                        "runs. The ::error:: above still stands."
+                        % (alert_dedupe.WINDOW_HOURS, decision["runs"],
+                           alert_dedupe.HEALTHY_STREAK_REQUIRED))
               elif not (topic and server.startswith(("http://", "https://"))):
                   ntfy_note = "ntfy_not_configured"
                   print("::warning::ntfy secrets unset — the honesty-gate "
@@ -542,11 +568,17 @@ jobs:
                       ntfy_note = "ntfy_failed"
                       print("::warning::honesty-gate ntfy push failed: %s" % exc)
               lines.append("- Honesty-gate notice: %s" % ntfy_note)
-          elif last is not None:
-              # THE RECOVERY, ONCE. A later run that produced a verdict means the
-              # condition has stopped. resolve() deletes the entry, so a second
-              # healthy run cannot send a second "all clear".
-              recovery = alert_dedupe.resolve(_ledger, _key, _now)
+          elif last is not None and judged:
+              # THE RECOVERY, ONCE, AND ONLY ON EVIDENCE THAT THE LADDER
+              # WORKED. `judged` is true only when a model actually returned a
+              # verdict, so a suppressed run, a --no-model run or a fast-path run
+              # can no longer announce an "all clear". It ALSO takes TWO
+              # consecutive judged-healthy runs: one quiet run is not proof an
+              # outage is over, which is what produced the open/recover
+              # oscillation this branch used to send.
+              recovery = alert_dedupe.resolve(
+                  _ledger, _key, _now,
+                  required=alert_dedupe.HEALTHY_STREAK_REQUIRED)
               if recovery.get("recovery"):
                   label = "The breaking honesty gate (AI ladder)"
                   r_title = alert_dedupe.recovery_title(label)
@@ -578,6 +610,33 @@ jobs:
                       except Exception as exc:
                           print("::warning::honesty-gate recovery push failed: %s"
                                 % exc)
+              elif recovery.get("healthy_streak"):
+                  # Healthy, but NOT yet enough: say so rather than staying
+                  # silent, because this is where the owner would otherwise
+                  # wonder why the all-clear has not arrived.
+                  streak = int(recovery["healthy_streak"])
+                  required = int(recovery.get("healthy_required")
+                                 or alert_dedupe.HEALTHY_STREAK_REQUIRED)
+                  print("honesty-gate: judged-healthy run %d of %d -- no "
+                        "recovery notice yet (one good run never clears a "
+                        "real outage)." % (streak, required))
+                  lines.append("- Honesty-gate recovery: waiting for %d/%d "
+                               "consecutive judged-healthy runs"
+                               % (streak, required))
+
+          elif last is not None:
+              # NOT JUDGED -- SO NOT EVIDENCE, EITHER WAY. A suppressed sweep,
+              # a --no-model run and the fast path all land here. This must
+              # NEVER resolve an open failure: on 2026-11-01 a quiet news hour
+              # (gate suppressed, no model call) was reported to the owner as
+              # "the AI ladder is working again" by exactly this branch.
+              print("honesty-gate: this run produced NO model verdict "
+                    "(gate=%s, judged=%s, reason=%s); an open honesty-gate "
+                    "failure is left OPEN."
+                    % (row_gate or "?",
+                       bool((last or {}).get("judged")), reason[:120]))
+              lines.append("- Honesty-gate recovery: NOT resolved (this run "
+                           "judged nothing, so it is not evidence)")
 
           alert_dedupe.save(_ledger, now=_now)
 

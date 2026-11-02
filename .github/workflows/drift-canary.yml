@@ -925,6 +925,14 @@ jobs:
           # stay green while all three workflows went unguarded.
           run_suite "alerts" python3 -m unittest tests.alerts.test_alert_dedupe -v
 
+          # Registered 2026-11-02 with the honesty-gate fixes it guards, in the
+          # same change and the same order as tests/ci_local.py. A quiet hour used
+          # to be announced to the owner as "the ladder is working again", and the
+          # branch that did it lives in the workflow rather than in Python -- so
+          # this suite re-executes the summary step from breaking-monitor.yml
+          # itself instead of re-implementing it.
+          run_suite "honesty_gate_recovery" python3 tests/breaking/test_honesty_gate_recovery.py
+
           if [ -n "$FAILED" ]; then
             echo "::error::failing test suites:$FAILED"
             exit 1

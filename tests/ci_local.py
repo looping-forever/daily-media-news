@@ -155,6 +155,13 @@ SUITES = (
     # asserts the wiring and that both workflows commit the ledger.
     ("alerts", [sys.executable, "-m", "unittest",
                 "tests.alerts.test_alert_dedupe", "-v"]),
+    # Registered 2026-11-02 with the honesty-gate fixes it guards, in the same
+    # change and the same order as the `run_suite` block above. The branch that
+    # told the owner "the ladder is working again" on a quiet hour lives in the
+    # workflow, not in Python, so this suite re-executes breaking-monitor.yml's
+    # own summary step against a temp state/ rather than re-implementing it.
+    ("honesty_gate_recovery", [sys.executable,
+                               "tests/breaking/test_honesty_gate_recovery.py"]),
 )
 
 #: The other step of the same job, and the two suites the `live-parser-canary`
