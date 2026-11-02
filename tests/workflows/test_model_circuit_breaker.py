@@ -824,6 +824,11 @@ class ShippedWalkTests(AgentWalkHarness):
         `message=stream`, tokens.input=0) and six ids were refused inside 16s, so
         every further rung cost an attempt to hear one fact about the bucket. The
         walk now records that fact once and stops.
+
+        CHANGED AGAIN 2026-11-02: the FIRST attempt is retried ONCE on the same
+        model before the wall stops the walk -- the refusal is often seconds long
+        and the next slot is hours away. `opencode/live` still must never be
+        tried; it asks the same bucket.
         """
         proc, art = self.run_step(
             pool=["opencode/limited", "opencode/live"],
@@ -833,8 +838,9 @@ class ShippedWalkTests(AgentWalkHarness):
             "no digest was produced, so the step must fail. stdout:\n%s"
             % proc.stdout)
         self.assertEqual(
-            ["opencode/limited"], art["models"],
-            "the next model asks the same bucket, so it must not be tried: %r"
+            ["opencode/limited", "opencode/limited"], art["models"],
+            "the next model asks the same bucket, so it must not be tried: the "
+            "only second call is the one retry of the same rung. %r"
             % (art["models"],))
         self.assertIn("kind=quota_or_rate_limited", "\n".join(self.attempt_log()))
 

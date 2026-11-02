@@ -5,6 +5,12 @@ name: Daily Media News Digest
 # AND says so on stderr, because a digest that quietly renders "Example
 # College" reaches the owner's phone looking correct and is not.
 env:
+  # THE ONE STORY FLOOR, stated once. prompts/daily-digest.md asks the writer
+  # for at least 4; the walk's acceptance check and the derive gate both read
+  # this value, so a digest can never be "good enough" for one and too thin for
+  # the other. 2026-11-01 run 41369743596 shipped a 2-story edition because the
+  # acceptance check only asked whether the file parsed.
+  STORIES_FLOOR: 4
   BANK_NAME: ${{ secrets.BANK_NAME }}
   COLLEGE_NAME: ${{ secrets.COLLEGE_NAME }}
   BANK_URL: ${{ secrets.BANK_URL }}
@@ -1221,6 +1227,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -eo pipefail
+          # The floor comes from the workflow-level env, and a run that lost it
+          # must fail here rather than accept everything: an unset floor makes
+          # `[ "$count" -lt "" ]` false, i.e. every thin digest passes.
+          : "${STORIES_FLOOR:?the workflow-level STORIES_FLOOR is missing; the acceptance gate has no floor}"
           # ---- SIMULATED POOL REFUSAL: MANUAL DISPATCH ONLY -------------------
           # Stops BEFORE `resolve_ladder`, which is the first thing in this step
           # that would reach the network (the selector discovers the live pool)
@@ -1358,6 +1368,11 @@ jobs:
           # would multiply the walk by the ladder length, which is the burn this
           # whole change exists to remove.
           reduced_retry_used=0
+          # ONE quota retry per run, and only on the primary rung. The refusal is
+          # pre-generation and often seconds long, while the next run is hours
+          # away, so a single retry is the difference between a real digest and
+          # an unsummarised one. Bounded so it can never become a loop.
+          quota_retry_used=0
           # THE RETRY LADDER, and why these numbers are what they are now.
           #
           # MEASURED BURN, 2026-10-27: 112 model attempts in one day on this
@@ -1419,10 +1434,21 @@ jobs:
               run_rc=$?
             fi
           }
-          # Success is the FILE, not the exit code; see the note at the call.
+          # ACCEPTANCE IS THE FLOOR, NOT PARSEABILITY. Until 2026-11-02 this only
+          # asked whether the file parsed, so run 41369743596 logged "Agent wrote
+          # valid state/stories.json on attempt 1" over a payload with ZERO
+          # stories, and a 2-story edition shipped as a healthy one. The count is
+          # read through the same `stories` list the validator reads, and a
+          # rejected file is REMOVED so no later step can ship it.
           stories_ok() {
-            [ "$run_rc" = "0" ] && [ -f state/stories.json ] \
-              && python3 -c "import json,sys; json.load(open('state/stories.json'))"
+            [ "$run_rc" = "0" ] && [ -f state/stories.json ] || return 1
+            _count=$(python3 -c "import json,sys;d=json.load(open('state/stories.json'));s=d.get('stories') if isinstance(d,dict) else d;print(len(s)) if isinstance(s,list) else sys.exit(1)") || return 1
+            case "$_count" in ''|*[!0-9]*) return 1 ;; esac
+            if [ "$_count" -lt "$STORIES_FLOOR" ]; then
+              echo "Rejecting state/stories.json: ${_count} stories, below the shipped floor of ${STORIES_FLOOR}"
+              rm -f state/stories.json
+              return 1
+            fi
           }
           digest_success() {
             printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
@@ -1430,6 +1456,10 @@ jobs:
               >> state/agent-attempts.log
             echo "Agent wrote valid state/stories.json on attempt $tried ($1)"
             python3 scripts/model_selector.py --record "$1" ok || true
+            # WHICH RUNG WROTE IT. The artifact needs this: a digest from the
+            # primary rung is healthy, one from a later rung or a retry is a
+            # degraded edition and must never seal as fresh.
+            ATTEMPT="$tried" MODEL="$1" RUNG="${attempt_rung:-primary}" python3 -c "import json,os;a=int(os.environ['ATTEMPT']);json.dump({'rung':os.environ['RUNG'],'attempt':a,'model':os.environ['MODEL']},open('state/digest_writer.json','w',encoding='utf-8'))" || true
             ok=1
           }
           : > state/agent-attempts.log
@@ -1466,6 +1496,11 @@ jobs:
                 echo "Budget spent: ${remaining}s left, below the ${MIN}s one attempt needs. Stopping after ${tried} of ${#models[@]} models."
                 break
               fi
+              # WHICH RUNG THIS ATTEMPT IS. The ladder's FIRST model is the
+              # primary rung, any later one is a fallback, and the two one-shot
+              # retries below name themselves. This is what the seal reads, so a
+              # wrong label here is a thin edition sealed as healthy.
+              if [ "$tried" = "0" ]; then attempt_rung="primary"; else attempt_rung="fallback"; fi
               tried=$((tried+1))
               rm -f state/stories.json
               run_digest_attempt "$model" "$allow"
@@ -1498,6 +1533,7 @@ jobs:
                 cp state/candidates_limited.json state/candidates.json
                 tried=$((tried+1))
                 rm -f state/stories.json
+                attempt_rung="reduced"
                 echo "Attempt $tried re-tests $model on the reduced candidate set (one bounded retry per run; the full set is restored afterwards)"
                 run_digest_attempt "$model" "$allow"
                 mv -f state/candidates.full.json state/candidates.json
@@ -1519,6 +1555,43 @@ jobs:
               printf '%s attempt=%d model=%s kind=%s rc=%s allow=%s\n' \
                 "$(date -u +%FT%TZ)" "$tried" "$model" "$kind" "$run_rc" "$allow" \
                 >> state/agent-attempts.log
+              # ONE BOUNDED RETRY AFTER A QUOTA REFUSAL, BEFORE THE LADDER MOVES.
+              # Only the FIRST attempt of the run and only on the shared pool: a
+              # provider's own allowance (handled below) is that provider's plan,
+              # not a bucket that clears in seconds. Exactly once per run, and
+              # only while the budget can still pay for a full attempt. If the
+              # retry fails it is re-classified and FALLS THROUGH to the ladder
+              # handling below unchanged -- no second retry, no nap, no new cycle.
+              if [ "$kind" = "quota_or_rate_limited" ] \
+                && [ "$quota_retry_used" = "0" ] && [ "$tried" = "1" ] \
+                && [ "${model%%/*}" = "opencode" ]; then
+                quota_retry_used=1
+                remaining=$(( deadline - $(date +%s) ))
+                allow=$(( remaining < PER ? remaining : PER ))
+                if [ "$allow" -ge "$MIN" ]; then
+                  tried=$((tried+1))
+                  rm -f state/stories.json
+                  attempt_rung="retry"
+                  echo "Attempt $tried re-tries $model after one quota refusal (one bounded retry per run)"
+                  run_digest_attempt "$model" "$allow"
+                  if stories_ok; then
+                    digest_success "$model" "$allow"
+                    break
+                  fi
+                  kind=$(python3 scripts/model_selector.py --classify \
+                    --log state/agent-log.txt --rc "$run_rc" 2>/dev/null || echo other)
+                  case "$kind" in
+                    model_not_found|payment_required|quota_or_rate_limited|auth|provider_outage|slow_or_stalled|other) ;;
+                    *) kind="other" ;;
+                  esac
+                  printf '%s attempt=%d model=%s kind=%s rc=%s allow=%s\n' \
+                    "$(date -u +%FT%TZ)" "$tried" "$model" "$kind" "$run_rc" "$allow" \
+                    >> state/agent-attempts.log
+                  echo "Attempt $tried was refused again ($kind); falling through to the unchanged ladder handling."
+                else
+                  echo "Not retrying $model after the quota refusal: ${remaining}s left, below the ${MIN}s one attempt needs."
+                fi
+              fi
               if [ "$kind" = "model_not_found" ] || [ "$kind" = "quota_or_rate_limited" ]; then
                 echo "Circuit breaker: $model -> $kind. Skipping to the next model without spending the allowance."
                 last_err="$kind on $model"
@@ -1752,6 +1825,7 @@ jobs:
           DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
         run: |
           set -eo pipefail
+          : "${STORIES_FLOOR:?the workflow-level STORIES_FLOOR is missing; the derive gate has no floor}"
           # SURVIVORS, NOT "THE FILE EXISTS". On 2026-10-30 and again on
           # 2026-10-31 the model wrote three stories, the schema dropped all
           # three, and this step still saw a non-empty state/stories.json and
@@ -1793,10 +1867,18 @@ jobs:
           # past validation. Naming all three is what stops raw=3 being read as
           # a collection failure, which is how both empty editions were misread.
           echo "Digest provenance: candidates=${CANDIDATES} raw=${RAW} (model-written stories) schema-survivors=${SURVIVORS}"
-          if [ "$SURVIVORS" != "0" ]; then
-            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation); the unsummarised fallback is not used."
+          if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]; then
+            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation, floor ${STORIES_FLOOR}); the unsummarised fallback is not used."
             exit 0
           fi
+          if [ "$SURVIVORS" != "0" ]; then
+            echo "::warning::Only ${SURVIVORS} of ${RAW} model-written stories survive validation, below the ${STORIES_FLOOR}-story floor -- deriving the unsummarised edition instead."
+          fi
+          # The deriver writes state/stories.json only ABOVE ITS OWN floor, so a
+          # file still here is the too-thin model payload. Removing it first
+          # means a floor miss leaves NO payload and the empty-outcome path owns
+          # it, instead of a thin digest being sealed as an ordinary edition.
+          rm -f state/stories.json
           if [ "$RAW" != "0" ]; then
             echo "::warning::All ${RAW} model-written stories were rejected by schema validation -- the empty edition is not shipped; deriving the unsummarised edition instead."
           fi
@@ -1846,6 +1928,29 @@ jobs:
           if written != slot:
               print('Slot correction: the payload said %r, this run is %r' % (written, slot))
           payload['digest_time'] = slot
+          # WHICH RUNG WROTE THIS EDITION, carried into the payload so the seal
+          # can say a fallback edition is degraded. A derived edition has no
+          # model by definition; a model-written one names the attempt that
+          # wrote it, recorded by `digest_success`.
+          writer = None
+          if str(payload.get('edition_kind') or '') == 'unsummarised':
+              writer = {'rung': 'derived', 'attempt': None, 'model': None}
+          elif os.path.isfile('state/digest_writer.json'):
+              try:
+                  with open('state/digest_writer.json', encoding='utf-8') as fh:
+                      recorded = json.load(fh)
+              except (OSError, ValueError) as exc:
+                  print('WARNING: state/digest_writer.json could not be read (%s); '
+                        'this payload will not name its writer' % exc, file=sys.stderr)
+                  recorded = None
+              if isinstance(recorded, dict) and recorded.get('rung'):
+                  writer = {'rung': str(recorded.get('rung')),
+                            'attempt': recorded.get('attempt'),
+                            'model': recorded.get('model')}
+          if writer is not None:
+              payload['writer'] = writer
+              print('Digest writer: %s (attempt %r, model %r)'
+                    % (writer['rung'], writer['attempt'], writer['model']))
           with open(path + '.tmp', 'w', encoding='utf-8') as fh:
               json.dump(payload, fh, indent=2, ensure_ascii=False)
               fh.write('\n')
@@ -5385,7 +5490,7 @@ jobs:
         # immediately after the mirror is written, so nothing later sees it.
         run: |
           set -eo pipefail
-          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
+          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/digest_writer.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
 
       - name: Commit state changes
         # DRY_RUN guard: `git push` is an outward-facing side effect, so a dry

@@ -163,6 +163,77 @@ class TheStampRewritesWhatTheWriterSaidTests(unittest.TestCase):
                          "unrecognised digest_time")
 
 
+class TheStampCarriesTheWriterTests(unittest.TestCase):
+    """WHICH RUNG WROTE THE EDITION.
+
+    The seal needs this to mark a fallback digest degraded, and the stamp step is
+    the only place between the producer and the artifact where the payload and
+    the walk's own record can be joined. A derived edition has no model; a
+    model-written one names the attempt `digest_success` recorded.
+    """
+
+    def _run(self, payload, digest_time="morning", writer=None):
+        with tempfile.TemporaryDirectory() as root:
+            write_payload(root, payload)
+            if writer is not None:
+                with open(os.path.join(root, "state", "digest_writer.json"),
+                          "w", encoding="utf-8") as fh:
+                    json.dump(writer, fh)
+            result = W.run_bash_script(
+                stamp_script(), env_overrides={"DIGEST_TIME": digest_time}, cwd=root)
+            return result, read_payload(root)
+
+    def test_a_model_written_payload_names_the_rung_that_wrote_it(self):
+        result, payload = self._run(
+            {"digest_time": "morning", "stories": [{"title": "s"}]},
+            writer={"rung": "fallback", "attempt": 3, "model": "opencode/x"})
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertEqual(
+            {"rung": "fallback", "attempt": 3, "model": "opencode/x"},
+            payload.get("writer"),
+            "the artifact cannot say a fallback edition is degraded if the "
+            "payload never carries the rung. Payload: %r" % payload)
+        self.assertIn("Digest writer: fallback", result.stdout)
+
+    def test_a_derived_payload_names_the_deriver_and_no_model(self):
+        result, payload = self._run(
+            {"digest_time": "morning", "edition_kind": "unsummarised",
+             "stories": [{"title": "s"}]})
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertEqual(
+            {"rung": "derived", "attempt": None, "model": None},
+            payload.get("writer"),
+            "an unsummarised edition must name the deriver, not inherit a "
+            "writer record from an earlier step")
+
+    def test_a_primary_rung_is_carried_unchanged(self):
+        result, payload = self._run(
+            {"digest_time": "morning"}, writer={"rung": "primary", "attempt": 1,
+                                                "model": "opencode/y"})
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertEqual("primary", payload["writer"]["rung"])
+
+    def test_no_writer_record_leaves_the_payload_shape_alone(self):
+        result, payload = self._run({"digest_time": "morning"})
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertNotIn("writer", payload,
+                         "the stamp invented a writer for a payload that has no "
+                         "record of one; an older artifact shape stays unchanged")
+
+    def test_an_unreadable_writer_record_is_not_fatal(self):
+        with tempfile.TemporaryDirectory() as root:
+            write_payload(root, {"digest_time": "morning"})
+            with open(os.path.join(root, "state", "digest_writer.json"), "w",
+                      encoding="utf-8") as fh:
+                fh.write("{not json")
+            result = W.run_bash_script(
+                stamp_script(), env_overrides={"DIGEST_TIME": "morning"}, cwd=root)
+            self.assertEqual(0, result.returncode,
+                             "an unreadable writer record must not fail the slot "
+                             "stamp: %s" % (result.stderr or result.stdout))
+            self.assertIn("WARNING", result.stderr + result.stdout)
+
+
 class TheStampRefusesRatherThanGuessesTests(unittest.TestCase):
     def _run(self, payload, digest_time, write_file=True):
         with tempfile.TemporaryDirectory() as root:

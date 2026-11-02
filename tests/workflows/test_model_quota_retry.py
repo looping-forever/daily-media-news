@@ -28,8 +28,10 @@ one) and ends the walk; the refire slot (+5/+10/+15/+20 min) retries the edition
 with a fresh 1800s budget instead of spending this one on sleep.
 
 WHAT IS PINNED HERE, AND WHAT MUST NEVER CHANGE
-  * a quota refusal stops the ladder after ONE attempt: no nap, no second cycle,
-    and the pool row is written so the next run starts from the fact;
+  * a quota refusal stops the ladder: at most ONE retry of the primary rung
+    (2026-11-02 -- the refusal is seconds long and the next slot is hours away),
+    no nap, no second cycle, and the pool row is written so the next run starts
+    from the fact;
   * a cycle in which a model ANSWERS is not contention: no wait, no pool row;
   * a NON-quota class -- a wrong id, a 401, a timeout, a 5xx -- never writes a
     pool row, because the pool is not what refused;
@@ -50,11 +52,13 @@ from tests.workflows.test_agent_walk_step import AgentWalkHarness
 
 class StopOnPoolWallTests(AgentWalkHarness):
     def test_a_quota_refusal_ends_the_walk_after_one_attempt(self):
-        """THE WHOLE REDUCTION. One refusal, one recorded fact, no ladder walk.
+        """THE WHOLE REDUCTION. One refusal, ONE retry, one recorded fact, no
+        ladder walk.
 
         `opencode/live` answers, so a walk that continued would have produced a
         digest. It must not get the chance: the pool is the thing that refused,
-        and the next model asks the same bucket.
+        and the next model asks the same bucket. The one retry is of the SAME
+        model (2026-11-02), so the pool is asked exactly twice and never walked.
         """
         proc, art = self.run_step(
             pool=["opencode/a", "opencode/b"],
@@ -66,9 +70,9 @@ class StopOnPoolWallTests(AgentWalkHarness):
             "no digest was produced, so the step must fail rather than finish "
             "green. stdout:\n%s" % proc.stdout)
         self.assertEqual(
-            ["opencode/a"], art["models"],
-            "the walk must stop at the FIRST shared-pool refusal: %r"
-            % (art["models"],))
+            ["opencode/a", "opencode/a"], art["models"],
+            "the walk must stop at the FIRST shared-pool refusal after one "
+            "retry of that same model: %r" % (art["models"],))
         self.assertEqual([], art["naps"],
                          "a pool wall must not be slept off inside the step: %r"
                          % (art["naps"],))

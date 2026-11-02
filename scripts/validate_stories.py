@@ -1865,6 +1865,17 @@ def main(argv=None):
     # model-written run, so the payload keeps its old shape there.
     if data.get("edition_kind"):
         payload["edition_kind"] = str(data["edition_kind"])
+    # The writer rung is the producer's claim about WHICH model (or the no-AI
+    # deriver) wrote this edition. Passthrough only: the seal needs it to mark a
+    # fallback edition degraded, and a model-written payload predating the field
+    # keeps its old shape.
+    writer = data.get("writer")
+    if isinstance(writer, dict) and writer.get("rung"):
+        payload["writer"] = {
+            "rung": str(writer.get("rung")),
+            "attempt": writer.get("attempt"),
+            "model": writer.get("model"),
+        }
     out_dir = os.path.dirname(os.path.abspath(args.out_path))
     if out_dir and not os.path.isdir(out_dir):
         os.makedirs(out_dir, exist_ok=True)

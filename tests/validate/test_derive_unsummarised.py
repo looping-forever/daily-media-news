@@ -286,6 +286,20 @@ class FloorAndPayload(unittest.TestCase):
             self.assertEqual(story["summary"], "")
             self.assertNotIn("for_you", story)
 
+    def test_payload_names_the_deriver_as_the_writer(self):
+        """No model wrote this edition, and the artifact must be able to say so."""
+        candidates = [cand(DISTINCT[n], "https://a.example/%d" % n,
+                           category=("world_major" if n < 3 else "local_city"))
+                      for n in range(5)]
+        rc, out = self.run_main(candidates)
+        self.assertEqual(rc, 0)
+        with open(out, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        self.assertEqual({"rung": "derived", "attempt": None, "model": None},
+                         payload.get("writer"),
+                         "the derived edition does not name its writer, so the "
+                         "seal cannot mark it degraded")
+
     def test_missing_candidates_file_is_not_a_silent_success(self):
         rc = dut.main(["--candidates", os.path.join(self.tmp, "absent.json"),
                        "--out", os.path.join(self.tmp, "stories.json")])

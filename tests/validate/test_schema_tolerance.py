@@ -427,5 +427,61 @@ class TheIncidentRunTests(unittest.TestCase):
         self.assertEqual([], payload.get("stories") or [])
 
 
+class TheWriterRecordSurvivesValidationTests(unittest.TestCase):
+    """WHICH RUNG WROTE IT must reach the seal.
+
+    The stamp step writes `writer` into state/stories.json; the seal in
+    digest-prebuild.yml reads it off the VALIDATED payload and marks a
+    fallback or derived edition partial. A validator that rebuilds the payload
+    without that key silently erases the only evidence the edition is
+    degraded.
+    """
+
+    def _run(self, extra):
+        tmp = tempfile.mkdtemp(prefix="writer-passthrough-")
+        in_path = os.path.join(tmp, "stories.json")
+        out_path = os.path.join(tmp, "stories.validated.json")
+        body = {"digest_time": "morning", "date": "2026-10-30",
+                "research_status": "full",
+                "stories": [story(title="TU Publishes Revised Exam Schedule",
+                                  source_url="https://tuexam.example.edu.np/schedule")]}
+        body.update(extra)
+        with open(in_path, "w", encoding="utf-8") as fh:
+            json.dump(body, fh)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            vs.main([
+                "--in", in_path, "--out", out_path,
+                "--history", os.path.join(tmp, "none.json"),
+                "--today", "2026-10-30",
+                "--config-dir", FIXTURE_CONFIG,
+                "--state", os.path.join(tmp, "active_stories.json"),
+                "--candidates", os.path.join(tmp, "candidates.json"),
+            ])
+
+        with open(out_path, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def test_a_fallback_writer_record_reaches_the_validated_payload(self):
+        payload = self._run({"writer": {"rung": "fallback", "attempt": 3,
+                                        "model": "opencode/x"}})
+
+        self.assertEqual({"rung": "fallback", "attempt": 3,
+                          "model": "opencode/x"}, payload.get("writer"),
+                         "the validator dropped the writer record, so the seal "
+                         "cannot tell a fallback edition from a primary one")
+
+    def test_a_corrupt_writer_record_is_dropped_not_copied(self):
+        payload = self._run({"writer": "primary"})
+
+        self.assertNotIn("writer", payload,
+                         "a non-record writer value was copied through")
+
+    def test_no_writer_record_leaves_the_payload_shape_alone(self):
+        payload = self._run({})
+
+        self.assertNotIn("writer", payload)
+
+
 if __name__ == "__main__":
     unittest.main()

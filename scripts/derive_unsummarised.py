@@ -225,6 +225,9 @@ def main(argv=None):
     payload = {
         "date": args.today,
         "edition_kind": "unsummarised",
+        # No model wrote this edition; naming the deriver as the writer is what
+        # lets the seal report how the digest was produced.
+        "writer": {"rung": "derived", "attempt": None, "model": None},
         "notes": NOTE,
         "stories": stories,
     }

@@ -151,6 +151,8 @@ class TheFlagCannotBeHonouredWithoutAManualDispatchTests(unittest.TestCase):
             "STUB_OPENCODE_LOG": str(self.log),
             "TODAY": "2026-10-28",
             "DIGEST_TIME": "morning",
+            # Workflow-level env, supplied the same way a real job supplies it.
+            "STORIES_FLOOR": "4",
             "CANDIDATES_PATH": str(self.tmp / "state" / "candidates.json"),
         }
 

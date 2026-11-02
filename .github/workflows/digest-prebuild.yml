@@ -564,7 +564,18 @@ jobs:
           # change knows only `is_partial`, and a labelled partial is a far
           # better failure than an unlabelled "fresh".
           edition_kind = str(validated.get('edition_kind') or '').strip()
-          is_partial = state != 'ok' or edition_kind == 'unsummarised'
+          # WHICH RUNG WROTE IT. A digest from the primary rung is healthy, and
+          # so is a `retry`: the same model, the same full inputs, one quota
+          # refusal apart. A later rung, a reduced-input retry or the no-AI
+          # deriver IS degraded, and a degraded edition that seals as fresh is
+          # the thin digest masquerading as a normal one.
+          writer = validated.get('writer')
+          writer = writer if isinstance(writer, dict) else {}
+          writer_rung = str(writer.get('rung') or '').strip().lower()
+          writer_degraded = (bool(writer_rung)
+                             and writer_rung not in ('primary', 'retry'))
+          is_partial = (state != 'ok' or edition_kind == 'unsummarised'
+                        or writer_degraded)
 
           if not built_at:
               die('built_at was not carried through from the dispatched run, so the '
@@ -585,6 +596,9 @@ jobs:
               'page_url': page_url,
               'is_partial': bool(is_partial),
               'edition_kind': edition_kind,
+              'writer': {'rung': writer_rung or 'unknown',
+                         'attempt': writer.get('attempt'),
+                         'model': writer.get('model')},
               'source_health_state': state,
               'stories': count,
               'html_sha256': hashlib.sha256(html.encode('utf-8')).hexdigest(),
@@ -595,6 +609,9 @@ jobs:
               json.dump(artifact, fh, ensure_ascii=False)
           print('artifact: %d stories, source_health=%s, is_partial=%s, built_at=%s'
                 % (count, state, is_partial, artifact['built_at']))
+          print('writer: rung=%s attempt=%r model=%r degraded=%s'
+                % (writer_rung or 'unknown', writer.get('attempt'),
+                   writer.get('model'), writer_degraded))
           print('markup asserted: %s' % (', '.join(REQUIRED_MARKUP),))
           print('html_sha256: %s' % artifact['html_sha256'])
           PY

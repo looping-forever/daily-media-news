@@ -83,25 +83,53 @@ def good_story(**overrides):
 
 
 class TheGateIsTheSurvivorCountTests(unittest.TestCase):
-    def test_the_gate_reads_the_survivor_count(self):
+    def test_the_gate_reads_the_survivor_count_against_the_floor(self):
+        """CHANGED 2026-11-02: any survivors used to be enough.
+
+        Run 41369743596 wrote TWO stories, both valid, and this gate skipped the
+        fallback because the count was not zero -- so a 2-story edition shipped
+        as a healthy digest. The gate is the same `STORIES_FLOOR` (4) the prompt
+        states and the walk's acceptance check enforces.
+        """
         body = step_body()
 
         self.assertIn("read RAW SURVIVORS < state/digest_survivors.txt", body,
                       "the derive step no longer reads the survivor count")
-        self.assertIn('if [ "$SURVIVORS" != "0" ]', body,
-                      "the 'a digest exists' branch is not keyed on survivors")
+        self.assertIn('if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]', body,
+                      "the 'a digest exists' branch is not keyed on the floor")
         self.assertNotRegex(
             body, r"HAVE=1",
             "the gate is back to 'state/stories.json is non-empty', which is "
             "true of a payload whose every story was rejected")
-        self.assertLess(body.index('if [ "$SURVIVORS" != "0" ]'),
+        self.assertLess(body.index('if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]'),
                         body.index(DERIVER),
-                        "the survivor gate sits AFTER the deriver, so it can "
-                        "never prevent an empty edition")
+                        "the floor gate sits AFTER the deriver, so it can never "
+                        "prevent a thin edition")
+
+    def test_the_floor_is_one_number_and_a_missing_one_is_loud(self):
+        body = step_body()
+        self.assertIn(': "${STORIES_FLOOR:?', body,
+                      "the derive step does not refuse to run without the "
+                      "workflow-level floor; an unset floor makes every "
+                      "comparison false and the gate meaningless")
+        self.assertIn("below the ${STORIES_FLOOR}-story floor", body,
+                      "a payload below the floor is not reported with the "
+                      "number it missed")
+
+    def test_a_thin_payload_is_removed_before_the_deriver_runs(self):
+        """The deriver writes nothing below ITS OWN floor, so a file left here
+        would be the too-thin model payload being sealed as an ordinary one."""
+        body = step_body()
+        gate = body.index('if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]')
+        remove_at = body.index("rm -f state/stories.json", gate)
+        self.assertLess(
+            remove_at, body.index(DERIVER),
+            "the thin payload is not removed before the deriver, so a floor "
+            "miss leaves it in place for validation to seal")
 
     def test_nothing_between_the_gate_and_the_deriver_can_skip_the_fallback(self):
         body = step_body()
-        gate = body.index('if [ "$SURVIVORS" != "0" ]')
+        gate = body.index('if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]')
         # Skip the survivors branch's own `exit 0`: it is the branch that RAN
         # only when survivors were non-zero, so it is not a path out of a
         # zero-survivor run.

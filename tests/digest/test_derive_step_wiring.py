@@ -126,7 +126,7 @@ class TheFallbackIsWiredTests(unittest.TestCase):
         self.assertIn("exit 0", run[guard_at:derive_at],
                       "the stories-exist branch does not exit before the "
                       "deriver runs")
-        self.assertIn('if [ "$SURVIVORS" != "0" ]', run,
+        self.assertIn('if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]', run,
                       "the step has no 'usable digest already exists' branch")
 
     def test_the_step_defers_to_the_empty_outcome_path_with_no_candidates(self):

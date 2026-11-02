@@ -98,7 +98,11 @@ def agent_step_run_block():
 #: `run --auto --model <m>` is answered according to `$STUB_OPENCODE_PLAN`, a
 #: space-separated list of `<model>:<outcome>` pairs:
 #:
-#:   ok       write a VALID state/stories.json and exit 0
+#:   ok       write a VALID state/stories.json AT the floor (4) and exit 0
+#:   zero     write a valid-but-EMPTY stories list and exit 0 -- the 2026-11-01
+#:            shape that the old parse-only check accepted
+#:   three    write three stories, one below the floor
+#:   quota_once  first call 429, second call ok -- the retry's own case
 #:   garbage  write INVALID JSON and exit 0 -- an exit code is not evidence
 #:   nofile   write nothing and exit 0
 #:   notfound the REAL measured shape: UnknownError on the surface and
@@ -136,13 +140,34 @@ for entry in ${STUB_OPENCODE_PLAN:-}; do
   if [ "${entry%%:*}" = "$model" ]; then outcome="${entry#*:}"; fi
 done
 if [ -z "$outcome" ]; then outcome="1"; fi
+# AT THE SHIPPED FLOOR. The acceptance check requires STORIES_FLOOR (4) stories,
+# so a one-story success would now be rejected -- correctly. This is what a
+# healthy writer produces.
+four='{"id":"s1"},{"id":"s2"},{"id":"s3"},{"id":"s4"}'
 case "$outcome" in
-  ok)      printf '{"stories": [{"id": "stub"}]}\n' > state/stories.json ; exit 0 ;;
+  ok)      printf '{"stories": [%s]}\n' "$four" > state/stories.json ; exit 0 ;;
+  zero)    printf '{"stories": []}\n' > state/stories.json ; exit 0 ;;
+  three)   printf '{"stories": [{"id":"s1"},{"id":"s2"},{"id":"s3"}]}\n' > state/stories.json ; exit 0 ;;
+  quota_once)
+    # THE MEASURED SHAPE THE SINGLE RETRY EXISTS FOR: the first call is refused
+    # pre-generation, the second on the SAME model answers. A walk that never
+    # retries leaves no file and these tests go red.
+    counter="${STUB_OPENCODE_LOG:?}.quota_once"
+    n=0
+    if [ -f "$counter" ]; then n=$(cat "$counter"); fi
+    n=$((n+1))
+    printf '%s' "$n" > "$counter"
+    if [ "$n" -ge 2 ]; then
+      printf '{"stories": [%s]}\n' "$four" > state/stories.json
+      exit 0
+    fi
+    printf '429 Too Many Requests (Retry-After: 30)\n' >&2
+    exit 1 ;;
   ok_prose)
     # A SUCCESSFUL digest whose article text contains the classifier's own
     # vocabulary. The walk must call this a success: classifying a finished
     # attempt would throw it away as a quota skip.
-    printf '{"stories": [{"id": "stub"}]}\n' > state/stories.json
+    printf '{"stories": [%s]}\n' "$four" > state/stories.json
     printf 'Draft note: the exchange kept the rate limit and the quota unchanged.\n'
     exit 0 ;;
   garbage) printf '{"stories": [ not json\n' > state/stories.json ; exit 0 ;;
@@ -158,7 +183,7 @@ case "$outcome" in
     n=$((n+1))
     printf '%s' "$n" > "$counter"
     if [ "$n" -ge 2 ] && grep -q candidates_per_category state/candidates.json 2>/dev/null; then
-      printf '{"stories": [{"id": "stub"}]}\n' > state/stories.json
+      printf '{"stories": [%s]}\n' "$four" > state/stories.json
       exit 0
     fi
     exit 0 ;;
@@ -411,6 +436,15 @@ class AgentWalkHarness(unittest.TestCase):
             "TZ": "Asia/Kathmandu",
             "CANDIDATES_PATH": "%s/state/candidates.json" % self.tmp,
         }
+        # Workflow-level `env:` reaches every step, so the harness must supply it
+        # too. STORIES_FLOOR lives there -- one line defines the floor for the
+        # walk and the derive step alike -- and the step refuses to run without
+        # it. Only plain scalars are merged; an expression would need resolving
+        # by the caller, and the step's own env is resolved below and wins.
+        for key, raw in (W.load_workflow(WORKFLOW).get("env") or {}).items():
+            text = str(raw)
+            if "${{" not in text:
+                resolved.setdefault(key, text)
         for _job, step, _run, st in W.iter_run_blocks(WORKFLOW):
             if step != STEP_NAME:
                 continue
@@ -696,7 +730,7 @@ class ContinuationTests(AgentWalkHarness):
 
 
 class QuotaEndsTheWalkTests(AgentWalkHarness):
-    """A shared-pool refusal ends the walk after ONE attempt, with no nap.
+    """A shared-pool refusal ends the walk after ONE bounded retry, with no nap.
 
     WHY. The provider refuses before generation -- 312ms after `message=stream`
     with tokens.input=0 -- and refuses six different ids inside 16 seconds. So a
@@ -707,6 +741,12 @@ class QuotaEndsTheWalkTests(AgentWalkHarness):
 
     The replacement is a fact on disk: one shared-pool row, which the next run
     and the refire slot read before naming a model at all.
+
+    CHANGED 2026-11-02: the FIRST attempt of a run is retried ONCE on the same
+    model before the wall ends the walk. The refusal is measured as
+    pre-generation and often seconds long, while the next slot is hours away, so
+    one retry is the difference between a real digest and an unsummarised one.
+    It is bounded per run, so this is still two calls, never a ladder.
     """
 
     def test_one_refusal_stops_the_ladder_and_records_the_pool(self):
@@ -718,10 +758,14 @@ class QuotaEndsTheWalkTests(AgentWalkHarness):
             "no digest was produced, so the step must fail rather than report "
             "success. stdout:\n%s" % proc.stdout)
         self.assertEqual(
-            ["opencode/a"], art["models"],
-            "the walk must stop at the FIRST shared-pool refusal -- opencode/b "
-            "and opencode/c exist only to prove they were never tried. "
-            "Invoked: %r\nstdout:\n%s" % (art["models"], proc.stdout))
+            ["opencode/a", "opencode/a"], art["models"],
+            "the walk must end on the FIRST shared-pool refusal after exactly "
+            "one retry of the same model -- opencode/b and opencode/c exist only "
+            "to prove they were never tried. Invoked: %r\nstdout:\n%s"
+            % (art["models"], proc.stdout))
+        self.assertIn("re-tries opencode/a", proc.stdout,
+                      "the retry did not say it was a retry, so the two attempt "
+                      "rows look like a duplicated call:\n%s" % proc.stdout)
         self.assertEqual(
             [], art["naps"],
             "a pool wall must not be slept off inside the step: the refire slot "
@@ -736,6 +780,173 @@ class QuotaEndsTheWalkTests(AgentWalkHarness):
                       "provider's own reset")
         self.assertIn("shared pool", proc.stdout.lower())
         self.assertIn("Digest not built", proc.stdout)
+
+
+class QuotaRetryTests(AgentWalkHarness):
+    """ONE retry of the primary rung, then the unchanged ladder handling.
+
+    Every claim below is a bound: the retry happens, it happens once, it is not
+    offered to a later rung, and a budget that cannot pay for it is not spent.
+    """
+
+    def test_the_first_refusal_is_retried_once_and_wins(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:quota_once opencode/b:ok")
+        self.assertGreen(proc, "quota-retry-wins")
+        self.assertEqual(
+            ["opencode/a", "opencode/a"], art["models"],
+            "the second call must be the SAME model that was refused; a "
+            "different model proves nothing about whether the refusal was "
+            "momentary. Invoked: %r\nstdout:\n%s"
+            % (art["models"], proc.stdout))
+        self.assertNotIn("opencode/b", art["models"],
+                         "the walk moved past a retried primary rung that "
+                         "answered")
+        self.assertEqual([["opencode/a", "ok"]], art["records"],
+                         "the winning retry must record its rung healthy")
+        self.assertTrue(art["stories"].is_file(),
+                        "the retry succeeded but its payload is missing")
+        self.assertEqual(
+            4, len(json.loads(art["stories"].read_text(encoding="utf-8"))["stories"]),
+            "the retry's payload must be the writer's, untouched")
+        writer = json.loads((art["stories"].parent / "digest_writer.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual({"rung": "retry", "attempt": 2, "model": "opencode/a"},
+                         writer,
+                         "the retry's success recorded the wrong rung, so the "
+                         "seal cannot tell a same-model retry from a fallback")
+
+    def test_a_failed_retry_is_bounded_and_the_wall_still_ends_the_walk(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:quota opencode/b:ok")
+        self.assertEqual(
+            1, proc.returncode,
+            "a second refusal is still a shared-pool wall, so the walk must end "
+            "rather than report a digest. stdout:\n%s" % proc.stdout)
+        self.assertEqual(
+            ["opencode/a", "opencode/a"], art["models"],
+            "the same model must be tried exactly twice and no further: the "
+            "retry is bounded to one, and opencode/b is on the same refused "
+            "bucket. Invoked: %r\nstdout:\n%s"
+            % (art["models"], proc.stdout))
+        self.assertIn("refused again (quota_or_rate_limited)", proc.stdout,
+                      "the failed retry's class was not reported, so the second "
+                      "row cannot be attributed:\n%s" % proc.stdout)
+        self.assertIn("Shared pool refused", proc.stdout,
+                      "the unchanged wall handling did not run after the retry, "
+                      "so the refusal was not recorded for the next run:\n%s"
+                      % proc.stdout)
+        self.assertEqual([], art["naps"],
+                         "the retry must not introduce a nap")
+        self.assertNotIn("Attempt 3 re-tries", proc.stdout,
+                         "the retry ran a second time; it is bounded to one per "
+                         "run")
+
+    def test_a_later_rung_is_not_retried(self):
+        """Only the PRIMARY rung is retried: attempt 2 is already a fallback."""
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b", "opencode/c"],
+            plan="opencode/a:notfound opencode/b:quota opencode/c:ok")
+        self.assertEqual(
+            ["opencode/a", "opencode/b"], art["models"],
+            "a quota refusal on attempt 2 was retried; the one retry belongs to "
+            "the primary rung, or a quota-heavy ladder doubles. Invoked: %r\n"
+            "stdout:\n%s" % (art["models"], proc.stdout))
+        self.assertNotIn("re-tries opencode/b", proc.stdout,
+                         "the fallback rung was retried:\n%s" % proc.stdout)
+
+    def test_a_budget_that_cannot_pay_for_the_retry_is_not_spent(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:quota opencode/b:ok",
+            budget=400, per=360, min_attempt=90, clock_step=250)
+        self.assertEqual(
+            ["opencode/a"], art["models"],
+            "the retry was attempted with less than one attempt's allowance "
+            "left. Invoked: %r\nstdout:\n%s" % (art["models"], proc.stdout))
+        self.assertIn("Not retrying opencode/a", proc.stdout,
+                      "the skipped retry is silent, so a missing digest on a "
+                      "small budget looks like a missing retry:\n%s" % proc.stdout)
+
+
+class AcceptanceFloorTests(AgentWalkHarness):
+    """A payload below the floor is not a digest, however valid its JSON.
+
+    THE DEFECT THIS PINS. Run 41369743596 wrote ZERO stories, the acceptance
+    check asked only whether the file parsed, the walk logged "Agent wrote valid
+    state/stories.json on attempt 1" and stopped, and the derive step was skipped
+    because a file existed. A 2-story edition shipped as a healthy one.
+
+    The floor is one number, `STORIES_FLOOR` (4), the same one the prompt states
+    and the derive gate reads. Below it the attempt FAILS, the file is REMOVED,
+    and the walk continues.
+    """
+
+    def test_an_empty_stories_list_is_not_a_success(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:zero opencode/b:ok")
+        self.assertGreen(proc, "empty-then-real")
+        self.assertEqual(
+            ["opencode/a", "opencode/b"], art["models"],
+            "an empty stories list was accepted as a success, so the walk "
+            "stopped on it. Invoked: %r\nstdout:\n%s"
+            % (art["models"], proc.stdout))
+        self.assertIn(
+            "Rejecting state/stories.json: 0 stories, below the shipped floor "
+            "of 4", proc.stdout,
+            "the rejection is not reported with its count and the floor, so a "
+            "thin attempt is invisible in the log:\n%s" % proc.stdout)
+        self.assertNotIn("on attempt 1 (opencode/a)", proc.stdout,
+                         "the empty payload was called a valid digest")
+
+    def test_three_stories_is_below_the_floor(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:three opencode/b:ok")
+        self.assertGreen(proc, "three-then-real")
+        self.assertEqual(["opencode/a", "opencode/b"], art["models"],
+                         "a 3-story payload was accepted; the floor is 4. "
+                         "Invoked: %r" % (art["models"],))
+        self.assertIn("Rejecting state/stories.json: 3 stories", proc.stdout)
+        writer = json.loads((art["stories"].parent / "digest_writer.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual("fallback", writer["rung"],
+                         "the second model's payload was recorded as the primary "
+                         "rung, so the seal would call a fallback edition fresh")
+
+    def test_four_stories_is_accepted_at_the_floor(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"], plan="opencode/a:ok")
+        self.assertGreen(proc, "four-is-at-the-floor")
+        self.assertEqual(["opencode/a"], art["models"],
+                         "a 4-story payload is AT the floor and must be "
+                         "accepted; Invoked: %r\nstdout:\n%s"
+                         % (art["models"], proc.stdout))
+        self.assertNotIn("Rejecting state/stories.json", proc.stdout)
+        self.assertEqual(
+            4, len(json.loads(art["stories"].read_text(encoding="utf-8"))["stories"]))
+        self.assertIn("on attempt 1 (opencode/a)", proc.stdout)
+        writer = json.loads((art["stories"].parent / "digest_writer.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual({"rung": "primary", "attempt": 1, "model": "opencode/a"},
+                         writer,
+                         "a first-attempt digest must name the primary rung, or "
+                         "the seal has nothing healthy to compare against")
+
+    def test_a_rejected_payload_is_removed_not_left_for_later_steps(self):
+        proc, art = self.run_step(
+            pool=["opencode/a"], plan="opencode/a:zero")
+        self.assertNotEqual(0, proc.returncode,
+                            "a floor miss with nothing else to try is a failed "
+                            "walk. stdout:\n%s" % proc.stdout)
+        self.assertFalse(
+            art["stories"].exists(),
+            "the rejected payload survived the walk. A later step would seal it "
+            "as a normal edition, which is the 2-story digest all over again.")
+
 
 
 # ==========================================================================

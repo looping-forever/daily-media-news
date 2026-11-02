@@ -2238,6 +2238,75 @@ class SealMarkupIsTheArchiveScrapersMarkup(TempDirCase):
         self.assertIs(normal["is_partial"], False,
                       "a healthy digest sealed as partial")
 
+    def test_a_fallback_writer_seals_as_degraded(self):
+        """WHICH RUNG WROTE IT, SEALED INTO THE ARTIFACT.
+
+        A digest written by a later rung, a reduced-input retry or the no-AI
+        deriver is a degraded edition: the primary rung never answered, or the
+        writer was told less than the primary is told. The Worker reads only the
+        artifact, so the rung has to be in it -- and `is_partial` has to be true,
+        or a thin fallback digest seals as fresh. A quota retry that answers on
+        the same model and the same inputs is NOT degraded; it is the retry
+        doing its job.
+        """
+        body = python_heredocs(
+            step_named(PREBUILD_WORKFLOW, "seal",
+                       "Assert the rendered page and build the artifact record")["run"])[0]
+
+        def seal(writer):
+            d = Path(tempfile.mkdtemp(prefix="seal-writer-"))
+            self.addCleanup(shutil.rmtree, str(d), True)
+            validated = {
+                "stories": [{"title": "s"}], "stories_outcome": "produced",
+                "digest_time": "morning", "date": "2026-10-09",
+                "generated_at_npt": "2026-10-09 06:41",
+                "source_health": {"state": "ok"}}
+            if writer is not None:
+                validated["writer"] = writer
+            stage_artifact(d, page_html=self.page, validated=validated)
+            code, out = exec_heredoc(body, {
+                "SLOT": "morning", "TODAY": "2026-10-09",
+                "BUILT_AT": "2026-10-09T01:35:00Z"}, d)
+            self.assertEqual(0, code, out)
+            return json.loads(
+                (d / "prebuild" / "artifact.json").read_text(encoding="utf-8"))
+
+        fallback = seal({"rung": "fallback", "attempt": 3, "model": "opencode/x"})
+        self.assertIs(
+            fallback["is_partial"], True,
+            "an edition from a fallback rung sealed as fresh. Sealed: %r"
+            % fallback)
+        self.assertEqual({"rung": "fallback", "attempt": 3,
+                          "model": "opencode/x"}, fallback["writer"],
+                         "the artifact does not name the rung that wrote it")
+
+        derived = seal({"rung": "derived", "attempt": None, "model": None})
+        self.assertIs(derived["is_partial"], True,
+                      "a derived edition sealed as fresh. Sealed: %r" % derived)
+
+        retried = seal({"rung": "retry", "attempt": 2, "model": "opencode/a"})
+        self.assertIs(retried["is_partial"], False,
+                      "a quota retry that answered on the SAME model and the "
+                      "same full inputs is a normal edition; sealing it partial "
+                      "would label the day the retry saved as degraded")
+
+        reduced = seal({"rung": "reduced", "attempt": 2, "model": "opencode/a"})
+        self.assertIs(reduced["is_partial"], True,
+                      "an edition written from the REDUCED candidate set sealed "
+                      "as fresh, which is the thin digest this exists to catch")
+
+        primary = seal({"rung": "primary", "attempt": 1, "model": "opencode/y"})
+        self.assertIs(primary["is_partial"], False,
+                      "a PRIMARY rung digest was marked degraded, which would "
+                      "label every healthy edition partial")
+        self.assertEqual("primary", primary["writer"]["rung"])
+
+        unknown = seal(None)
+        self.assertIs(unknown["is_partial"], False,
+                      "a payload with no writer record changed the verdict")
+        self.assertEqual("unknown", unknown["writer"]["rung"],
+                         "a missing writer record must be visible, not guessed")
+
     def test_the_seal_refuses_a_page_that_dropped_a_load_bearing_marker(self):
         body = python_heredocs(
             step_named(PREBUILD_WORKFLOW, "seal",
