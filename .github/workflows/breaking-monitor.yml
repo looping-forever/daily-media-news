@@ -444,11 +444,14 @@ jobs:
                            "and nothing else.")
               # WHOSE FAULT IS THE SILENCE. `verdict: none` alone cannot tell a
               # stopped-up free tier from a runner that never shows model
-              # output; the control rung and the measured first byte are what
-              # separate them. Printed as a raw record, not as a conclusion the
-              # probe is not entitled to draw.
+              # output; the control rung and the liveness line are what separate
+              # them. Printed as a raw record, not as a conclusion the probe is
+              # not entitled to draw.
               lines.append("- Attribution: %s" % probe.get("attribution"))
-              lines.append("- Control rung: %s in %ss%s, first output deadline %ss"
+              lines.append("- Liveness signal: %s"
+                           % probe.get("liveness_signal"))
+              lines.append("- Control rung: %s in %ss%s, first liveness "
+                           "deadline %ss"
                            % (probe.get("control"),
                               probe.get("control_seconds"),
                               "" if not probe.get("control_model")
@@ -457,11 +460,17 @@ jobs:
                                  probe.get("control_env")),
                               probe.get("first_output_sec")))
               for a in probe.get("attempts") or []:
+                  # LIVENESS AND THE FIRST BYTE ARE DIFFERENT FACTS. `live` is
+                  # when stderr proved the call went out (what the deadline
+                  # watches); `first byte` is when stdout answered, normally at
+                  # completion. A row with live but no byte is a rung that
+                  # worked and did not finish, not a dead one.
                   lines.append("  * %s%s attempt %s: granted %ss, measured %ss, "
-                               "first byte %s, outcome %s"
+                               "live %s, first byte %s, outcome %s"
                                % ("control " if a.get("control") else "",
                                   a.get("model"), a.get("attempt"),
                                   a.get("granted_sec"), a.get("wall_sec"),
+                                  a.get("first_liveness_sec"),
                                   a.get("first_byte_sec"), a.get("outcome")))
               if probe.get("error"):
                   lines.append("- Classifier detail: %s"

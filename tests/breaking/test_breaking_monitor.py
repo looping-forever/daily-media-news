@@ -2919,6 +2919,7 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
         "the probe must record the REAL walk, one row per attempt, in order: %r"
         % (doc["attempts"],))
     wanted = {"model", "attempt", "granted_sec", "wall_sec", "first_byte_sec",
+              "first_byte_source", "first_liveness_sec", "first_liveness_source",
               "outcome", "control", "tail_excerpt"}
     for row in doc["attempts"]:
         assert set(row) == wanted, row
@@ -2928,6 +2929,13 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
         assert row["first_byte_sec"] is None, (
             "this stub runner cannot measure a first byte, so a number here "
             "would be invented rather than observed: %r" % (row,))
+        assert row["first_byte_source"] == "", (
+            "an unmeasured timing must not name a stream: %r" % (row,))
+        assert row["first_liveness_sec"] is None, (
+            "this stub runner never went live, so a liveness number here would "
+            "be invented: %r" % (row,))
+        assert row["first_liveness_source"] == "", (
+            "an unmeasured liveness must not name a stream: %r" % (row,))
     assert doc["attempts"][0]["outcome"] == "timeout", doc["attempts"][0]
     assert doc["attempts"][-1]["outcome"] == "verdict", doc["attempts"][-1]
     assert "sk-abcdefghijklmnopqrstuvwx" not in json.dumps(doc), (
@@ -3022,6 +3030,10 @@ def test_67_a_silent_rung_is_abandoned_at_the_first_output_deadline():
     made the probe cost 600s and a real sweep lose ten minutes of dead time.
     Abandonment must be honest about what it saw: first_byte_sec stays null
     (nothing was invented) and the banner it did write is kept as evidence.
+
+    THE DEADLINE WATCHES STDERR LIVENESS. This child writes nothing at all on
+    stderr, so it never went live and is abandoned -- which is the same verdict
+    the old stdout-only deadline reached here, but for the stated reason.
     """
     code = ("import sys,time;"
             "sys.stdout.write('> build - p/silent\\n');sys.stdout.flush();"
@@ -3036,30 +3048,42 @@ def test_67_a_silent_rung_is_abandoned_at_the_first_output_deadline():
         reported = exc.waited_sec
         seen_stdout = exc.stdout
         first_seen = bm._stream_child.last_first_byte_sec
+        live_seen = bm._stream_child.last_first_liveness_sec
     else:
         raise AssertionError(
-            "a rung that never emitted model output was allowed to run to its "
-            "whole 60s grant; the first-output deadline did not fire")
+            "a rung that never went live was allowed to run to its whole 60s "
+            "grant; the liveness deadline did not fire")
     assert waited < 10, ("abandonment must be fast, not 'soon': waited %.1fs"
                          % waited)
     assert reported < 10, reported
     assert first_seen is None, (
         "no model byte ever arrived, so a first-output TIME would be invented: "
         "%r" % (first_seen,))
+    assert live_seen is None, (
+        "nothing was written on stderr, so a liveness TIME would be invented: "
+        "%r" % (live_seen,))
     assert "> build" in seen_stdout, (
         "the banner the rung DID write is the evidence for 'stalled, not "
         "failed'; it was thrown away: %r" % (seen_stdout,))
 
 
-def test_68_a_rung_that_emits_at_five_seconds_is_allowed_to_finish():
-    """The deadline must not cut a rung that simply takes a few seconds."""
+def test_68_a_rung_that_goes_live_at_two_seconds_is_allowed_to_finish():
+    """The deadline must not cut a rung that simply takes a few seconds.
+
+    THE SHAPE OF A REAL CHILD: liveness on STDERR early, the answer on STDOUT
+    later. With a 4s deadline and an answer at 5s this rung must survive -- the
+    deadline is about going live, not about how long the answer takes.
+    """
     code = ("import sys,time;"
             "sys.stdout.write('> build - p/fast\\n');sys.stdout.flush();"
             "time.sleep(2);"
+            "sys.stderr.write('time=0 level=INFO msg=\"x\" "
+            "message=stream model=p/fast\\n');sys.stderr.flush();"
+            "time.sleep(3);"
             "sys.stdout.write('{\"level\": 1}\\n');sys.stdout.flush()")
     rc, out, err = bm._stream_child([sys.executable, "-c", code], "",
                                    dict(os.environ), timeout_sec=30,
-                                   first_output_sec=10)
+                                   first_output_sec=4)
     assert rc == 0, rc
     assert '{"level": 1}' in out, (
         "a completed run must still hand the parser its FULL stdout: %r"
@@ -3067,6 +3091,9 @@ def test_68_a_rung_that_emits_at_five_seconds_is_allowed_to_finish():
     assert out.startswith("> build"), (
         "the banner is part of the real output; dropping it would change what "
         "the parser sees: %r" % (out,))
+    assert bm._stream_child.last_first_liveness_sec is not None, (
+        "the rung went live on stderr at 2s, inside the 4s deadline, so it must "
+        "have been seen as live")
     assert bm._stream_child.last_first_byte_sec is not None, (
         "the rung DID emit model output, so the first-output time is known "
         "and must be reported")
@@ -3076,6 +3103,8 @@ def test_69_first_byte_time_is_recorded_for_a_slow_but_streaming_rung():
     """`first_byte_sec` is measured, not inferred from the wall clock."""
     code = ("import sys,time;"
             "sys.stdout.write('> build - p/slow\\n');sys.stdout.flush();"
+            "sys.stderr.write('time=0 level=INFO msg=\"x\" "
+            "message=stream model=p/slow\\n');sys.stderr.flush();"
             "time.sleep(1.5);"
             "sys.stdout.write('{\"level\": 1}\\n');sys.stdout.flush()")
     bm._stream_child([sys.executable, "-c", code], "", dict(os.environ),
@@ -3160,8 +3189,12 @@ def test_70_the_control_rung_is_labelled_and_excluded_from_the_free_verdict():
 
 def test_71_every_attribution_value_comes_from_its_stated_condition():
     """Exactly one of four values, by a rule that is stated, not implied."""
-    silent = [{"first_byte_sec": None}]
-    streamed = [{"first_byte_sec": 5.0}]
+    silent = [{"first_byte_sec": None, "first_liveness_sec": None}]
+    streamed = [{"first_byte_sec": 5.0, "first_liveness_sec": 1.0}]
+    # LIVE BUT UNANSWERED: the call went out and no answer came back. That is
+    # evidence the harness can stream, and it is NOT the harness's fault, so
+    # `harness_no_stream` must not be reachable from here.
+    live_only = [{"first_byte_sec": None, "first_liveness_sec": 2.0}]
     cases = [
         ("no_output", silent, "harness_no_stream"),
         ("failed", silent, "inconclusive"),
@@ -3171,6 +3204,16 @@ def test_71_every_attribution_value_comes_from_its_stated_condition():
         ("unparseable", streamed, "free_tier_answered"),
         ("no_output", streamed, "free_tier_answered"),
         ("ANSWERED", silent, "inconclusive"),
+        # The new signal. A free rung that went live proves the harness can see
+        # a stream, so a silent CONTROL can no longer indict the harness.
+        ("no_output", live_only, "inconclusive"),
+        ("unconfigured", live_only, "inconclusive"),
+        ("answered", live_only, "free_tier_stalled"),
+        ("unparseable", live_only, "free_tier_stalled"),
+        # NO CONTROL MEANS NO ATTRIBUTION, whatever the free rungs did: that
+        # precedence is unchanged by the liveness rework, and `verdict` is what
+        # records a free answer in that case.
+        ("unconfigured", streamed, "inconclusive"),
     ]
     for control, rows, want in cases:
         got = bm._probe_attribution(control, rows)
@@ -3214,6 +3257,190 @@ def test_72_the_silent_probe_is_bounded_by_the_new_arithmetic():
     assert all(a["outcome"] == "no_output" for a in free), free
     assert all(a["first_byte_sec"] is None for a in free), free
     assert doc["verdict"] == "none", doc
+
+
+def test_73_a_rung_that_goes_live_on_stderr_is_not_abandoned():
+    """THE DEFECT THIS TASK EXISTS TO FIX.
+
+    `opencode run` writes its narration to STDERR and the assistant message to
+    STDOUT exactly once, at completion (measured 2026-11-02: one stdout line at
+    37.57s, the banner on stderr at 9.00s). A deadline that watches stdout alone
+    therefore kills a child that is answering normally, and records the corpse
+    as `no_output` -- which is what the last probe did to five rungs.
+    """
+    line = ("timestamp=2026-11-02T10:00:01.000Z level=INFO run=abc "
+            "message=stream providerID=opencode modelID=p/live")
+    code = ("import sys,time;"
+            "sys.stdout.write('> build - p/live\\n');sys.stdout.flush();"
+            "sys.stderr.write(%r);sys.stderr.flush();"
+            "time.sleep(3);"
+            "sys.stdout.write('{\"level\": 1}\\n');sys.stdout.flush()"
+            % (line + "\n"))
+    rc, out, err = bm._stream_child([sys.executable, "-c", code], "",
+                                    dict(os.environ), timeout_sec=30,
+                                    first_output_sec=1)
+    assert rc == 0, ("a rung that proved it was alive on stderr was killed at "
+                     "the stdout deadline: rc=%r out=%r err=%r"
+                     % (rc, out[:200], err[:200]))
+    assert '{"level": 1}' in out, out
+    live = bm._stream_child.last_first_liveness_sec
+    assert live is not None, (
+        "the stderr `message=stream` line was never recognised as liveness, so "
+        "the deadline still watches the wrong stream: %r" % (live,))
+    assert live < 2, ("liveness arrived well before the 3s answer; recorded %r"
+                      % (live,))
+    byte = bm._stream_child.last_first_byte_sec
+    assert byte is not None and byte >= 2.5, (
+        "`first_byte_sec` must still mean the first STDOUT byte (the answer), "
+        "not the log line: %r" % (byte,))
+
+
+def test_74_a_rung_silent_on_both_streams_is_still_abandoned():
+    """The deadline must still fire: a boot line is not proof the call went out."""
+    line = "timestamp=2026-11-02T10:00:00.500Z level=INFO run=abc message=init"
+    code = ("import sys,time;"
+            "sys.stderr.write(%r);sys.stderr.flush();"
+            "time.sleep(60)" % (line + "\n"))
+    started = time.monotonic()
+    try:
+        bm._stream_child([sys.executable, "-c", code], "", dict(os.environ),
+                         timeout_sec=60, first_output_sec=2)
+    except bm.NoFirstOutput as exc:
+        waited = time.monotonic() - started
+        reported = exc.waited_sec
+    else:
+        raise AssertionError(
+            "a rung that only printed a startup line ran to its whole 60s "
+            "grant; the deadline no longer fires at all")
+    assert waited < 10 and reported < 10, (waited, reported)
+    assert bm._stream_child.last_first_liveness_sec is None, (
+        "a startup line is not the main model call opening, so there is no "
+        "liveness time to report: %r"
+        % (bm._stream_child.last_first_liveness_sec,))
+    assert bm._stream_child.last_first_byte_sec is None
+
+
+def test_75_a_liveness_only_row_is_accepted_and_explains_itself():
+    """Null `first_byte_sec` beside a present `first_liveness_sec` must read as
+    one fact, not as a contradiction: the call went out, no answer came back."""
+    good = json.dumps({"level": 1, "confidence": "LOW", "event_key": "",
+                       "title": "", "summary": "", "why_urgent": "",
+                       "escalated_from_previous": False, "sources": [],
+                       "category_suggestion": "nepal"})
+
+    def runner(model, prompt_text, env, timeout_sec):
+        # Live at 2s, answered at 9s -- but this stub cannot measure stdout, so
+        # the byte stays unmeasured rather than being approximated.
+        runner.last_first_liveness_sec = 2.0
+        return 0, good, ""
+
+    runner.last_first_liveness_sec = None
+    runner.last_first_byte_sec = None
+    sd = fresh_dir()
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert bm.run_ladder_probe(sd, runner=runner, models=["p/live"],
+                                   config_dir=fresh_dir()) == 0
+    doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+    free = [a for a in doc["attempts"] if not a.get("control")]
+    assert len(free) == 1, doc["attempts"]
+    row = free[0]
+    assert row["first_byte_sec"] is None, row
+    assert row["first_liveness_sec"] == 2.0, row
+    assert row["first_liveness_source"] == "stderr", (
+        "the file must say WHICH stream produced each time: %r" % (row,))
+    assert row["first_byte_source"] == "", row
+    assert "message=stream" in doc["liveness_signal"], (
+        "the committed file must state what counted as liveness: %r"
+        % (doc.get("liveness_signal"),))
+    assert doc["verdict"] == "parseable", doc
+    assert doc["attribution"] in bm.LADDER_PROBE_ATTRIBUTIONS, doc
+
+
+def test_76_the_verdict_is_parsed_from_stdout_only():
+    """stderr carries the CLI's log and must never become the answer."""
+    real = json.dumps({"level": 3, "confidence": "HIGH", "event_key": "k",
+                       "title": "t", "summary": "s", "why_urgent": "w",
+                       "escalated_from_previous": False, "sources": [],
+                       "category_suggestion": "nepal"})
+    decoy = json.dumps({"level": 1, "confidence": "LOW", "event_key": "decoy",
+                        "title": "decoy", "summary": "", "why_urgent": "",
+                        "escalated_from_previous": False, "sources": [],
+                        "category_suggestion": "nepal"})
+
+    def runner(model, prompt_text, env, timeout_sec):
+        return 0, real, "level=INFO message=stream\n" + decoy
+
+    sd = fresh_dir()
+    pending = os.path.join(sd, "breaking_pending.json")
+    with open(pending, "w", encoding="utf-8") as fh:
+        json.dump({"candidates": []}, fh)
+    with contextlib.redirect_stdout(io.StringIO()):
+        verdict, err = bm.ai_classify(pending, runner=runner, models=["p/one"])
+    assert verdict is not None, err
+    assert verdict.get("level") == 3, (
+        "a JSON object on STDERR was allowed to answer for the model: %r"
+        % (verdict,))
+
+    def stderr_only(model, prompt_text, env, timeout_sec):
+        return 0, "> build - p/one\n", "level=INFO message=stream\n" + real
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        verdict, err = bm.ai_classify(pending, runner=stderr_only,
+                                      models=["p/one"], attempts_per_model=1)
+    assert verdict is None, (
+        "an answer found only on stderr was accepted; the parser must read "
+        "stdout alone: %r" % (verdict,))
+
+
+def test_77_a_live_rung_that_is_slow_gets_its_whole_grant():
+    """The 40s deadline measures SILENCE, never a slow answer."""
+    line = ("timestamp=2026-11-02T10:00:01.000Z level=INFO run=abc "
+            "message=stream providerID=opencode modelID=p/slow")
+    code = ("import sys,time;"
+            "sys.stderr.write(%r);sys.stderr.flush();"
+            "time.sleep(6)" % (line + "\n"))
+    try:
+        bm._stream_child([sys.executable, "-c", code], "", dict(os.environ),
+                         timeout_sec=2, first_output_sec=1)
+    except bm.subprocess.TimeoutExpired as exc:
+        assert exc.timeout == 2, (
+            "a live rung must be bounded by its GRANT, not the 40s deadline: "
+            "%r" % (exc.timeout,))
+    else:
+        raise AssertionError("the child outlived its own 2s grant")
+    assert bm._stream_child.last_first_liveness_sec is not None, (
+        "the grant killed a rung that had gone live, and the liveness time was "
+        "not recorded, so the two deaths cannot be told apart")
+    assert bm._stream_child.last_first_byte_sec is None
+
+
+def test_78_the_breaking_child_asks_the_cli_for_its_log():
+    """Without `--print-logs --log-level INFO` there is no liveness to read."""
+    seen = {}
+
+    def fake_stream(argv, prompt_text, env, timeout_sec, first_output_sec=None):
+        seen["argv"] = list(argv)
+        seen["deadline"] = first_output_sec
+        return 0, "{}", ""
+
+    fake_stream.last_first_byte_sec = None
+    fake_stream.last_first_liveness_sec = None
+    real_which, real_stream = bm.shutil.which, bm._stream_child
+    bm.shutil.which = lambda name: "opencode"
+    bm._stream_child = fake_stream
+    try:
+        bm.default_ai_runner("p/one", "prompt", {}, 10)
+    finally:
+        bm.shutil.which, bm._stream_child = real_which, real_stream
+    argv = seen["argv"]
+    assert "--print-logs" in argv, (
+        "the child was not asked to print its own log, so stderr carries no "
+        "liveness and the deadline is back to watching stdout: %r" % (argv,))
+    assert "--log-level" in argv, argv
+    assert argv[argv.index("--log-level") + 1] == "INFO", (
+        "INFO is the level that carries `message=stream`; DEBUG is unnecessary "
+        "volume: %r" % (argv,))
+    assert seen["deadline"] == bm.AI_FIRST_OUTPUT_SEC, seen
 
 
 def main():
@@ -3285,11 +3512,17 @@ def main():
         test_65_the_attempt_record_keeps_the_measured_wall_not_just_the_window,
         test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote,
         test_67_a_silent_rung_is_abandoned_at_the_first_output_deadline,
-        test_68_a_rung_that_emits_at_five_seconds_is_allowed_to_finish,
+        test_68_a_rung_that_goes_live_at_two_seconds_is_allowed_to_finish,
         test_69_first_byte_time_is_recorded_for_a_slow_but_streaming_rung,
         test_70_the_control_rung_is_labelled_and_excluded_from_the_free_verdict,
         test_71_every_attribution_value_comes_from_its_stated_condition,
         test_72_the_silent_probe_is_bounded_by_the_new_arithmetic,
+        test_73_a_rung_that_goes_live_on_stderr_is_not_abandoned,
+        test_74_a_rung_silent_on_both_streams_is_still_abandoned,
+        test_75_a_liveness_only_row_is_accepted_and_explains_itself,
+        test_76_the_verdict_is_parsed_from_stdout_only,
+        test_77_a_live_rung_that_is_slow_gets_its_whole_grant,
+        test_78_the_breaking_child_asks_the_cli_for_its_log,
     ]
     failures = []
     for test in tests:

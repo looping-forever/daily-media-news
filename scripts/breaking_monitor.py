@@ -278,18 +278,40 @@ def _reachable_only(models):
 #: not even start, and at 60s the 2026-11-01 sweep timed out on every rung.
 AI_PER_ATTEMPT_TIMEOUT_SEC = 150
 
-#: THE FIRST-OUTPUT DEADLINE. A rung that has written no model output -- only
-#: its own `> build · <model>` banner -- in this long is abandoned instead of
-#: being paid for to the end of its 150s grant. Measured 2026-11-02: a probe of
-#: all four free rungs produced ZERO model output in 150s each, 602.59s total,
-#: so without this the probe cost ten minutes to learn "nothing".
-#: The 150s ceiling is UNCHANGED for a rung that has started producing output:
-#: this shortens silence, never a slow answer.
-#: KNOWN TENSION, recorded rather than hidden: one free rung once took 137.63s
-#: to its FIRST token (see AI_PER_ATTEMPT_TIMEOUT_SEC). If a probe now shows a
-#: rung streaming after 40s, this number is what abandoned a working rung and
-#: must be raised -- `first_byte_sec` in state/ladder_probe.json is the evidence.
+#: THE FIRST-LIVENESS DEADLINE. A rung that has produced no CLI log line proving
+#: its model call went out within this long is abandoned instead of being paid
+#: for to the end of its 150s grant.
+#:
+#: IT WATCHES STDERR, NOT STDOUT, and that is the whole correction. Measured
+#: 2026-11-02 on our exact argv with the prompt `Reply with exactly: OK`:
+#: `opencode run` wrote the banner and its narration to STDERR (3 lines, banner
+#: at 9.00s) and the assistant message to STDOUT exactly ONCE, at completion
+#: (one line at 37.57s). A stdout-only deadline therefore sees silence for the
+#: entire generation and kills healthy children at 40s -- which is what the
+#: 2026-11-02 probe recorded as `harness_no_stream` for five rungs, including a
+#: keyed one. The digest walk never had this bug because it reads the CLI's log
+#: stream for liveness (scripts/model_watchdog.py).
+#:
+#: The 150s ceiling is UNCHANGED for a rung that has gone live: this shortens
+#: SILENCE, never a slow answer. `first_byte_sec` still means the first STDOUT
+#: byte; `first_liveness_sec` means the first stderr line that proves the call
+#: went out (see is_liveness_line). Two signals, never conflated.
 AI_FIRST_OUTPUT_SEC = 40
+
+#: HOW A LIVE CHILD IS RECOGNISED, and why the pattern is this narrow.
+#: A CLI log line is `timestamp=… level=… run=… message=…`. `message=stream`
+#: means a model call was opened -- but the CLI opens a SMALL one first (title
+#: generation, `small=true`, a different model) a few seconds in, measured
+#: 2026-10-27, and counting that would move the clock before the model we chose
+#: was contacted at all. `llm runtime selected` is the other line that means
+#: dispatch is actually happening. Startup chatter proves the process booted,
+#: NOT that our request went out, so it is deliberately not liveness.
+#: These are the same three patterns scripts/model_watchdog.py uses for the
+#: digest walk; this is the breaking stage's own copy so the two stages can be
+#: tuned apart, and the shapes must stay in step with that file.
+CLI_LOG_RE = re.compile(r"\blevel=(?:DEBUG|INFO|WARN|ERROR)\b.*\bmessage=")
+CLI_STREAM_RE = re.compile(r"\bmessage=stream\b")
+CLI_RUNTIME_MARK = "llm runtime selected"
 
 #: HOW MANY RUNGS THIS STAGE CAN AFFORD -- the only place the number lives.
 #: 4 x 150 = 600s, which leaves 120s of the 720s wall for discovery and slack.
@@ -1273,17 +1295,20 @@ def _strip_internals(cand):
 
 
 class NoFirstOutput(RuntimeError):
-    """The child wrote nothing but its own banner inside the first-output window.
+    """The child never proved its model call went out inside the liveness window.
 
     DISTINCT from TimeoutExpired on purpose. A timeout means the rung was given
-    a full window and used it; this means it never started answering, and the
-    two are different facts about the ladder. `stdout`/`stderr` carry what the
-    child DID write, which is the evidence that it was alive and silent rather
-    than dead.
+    a full window and used it; this means no CLI log line ever showed the call
+    being dispatched, and the two are different facts about the ladder.
+    `stdout`/`stderr` carry what the child DID write, which is the evidence that
+    it was alive and silent rather than dead -- and because the window now
+    watches stderr, an empty `stderr` here is itself the finding.
     """
 
     def __init__(self, waited_sec, stdout_text="", stderr_text=""):
-        super().__init__("no model output within %.1fs" % waited_sec)
+        super().__init__(
+            "no CLI liveness (message=stream / llm runtime selected) on stderr "
+            "within %.1fs" % waited_sec)
         self.waited_sec = waited_sec
         self.stdout = _as_text(stdout_text)
         self.stderr = _as_text(stderr_text)
@@ -1294,9 +1319,11 @@ class _FirstModelByte:
 
     The CLI opens with `> build · <model>` and, on the free tier, sometimes
     never says anything else. A banner is not an answer, so counting it as
-    "output" would defeat the first-output deadline exactly when the deadline
-    matters. Leading blank lines and leading `>`-prefixed lines are skipped;
+    "output" would make `first_byte_sec` claim an answer that never came. Leading blank lines and leading `>`-prefixed lines are skipped;
     the first other byte is the model speaking.
+
+    THIS IS THE ANSWER SIGNAL, NOT THE LIVENESS SIGNAL: stdout arrives once, at
+    completion, so a null here beside a live child is normal.
     """
 
     __slots__ = ("_in_banner", "first_sec")
@@ -1320,6 +1347,46 @@ class _FirstModelByte:
         self.first_sec = at_sec
 
 
+def is_liveness_line(line):
+    """True when a CLI log line proves the model call actually went out.
+
+    Deliberately narrower than "any log line": startup chatter proves the
+    process booted, which is not the question. The title call (`small=true`) is
+    a different, quicker model and not ours either.
+    """
+    if not CLI_LOG_RE.search(line):
+        return False
+    if CLI_STREAM_RE.search(line):
+        return "small=true" not in line
+    return CLI_RUNTIME_MARK in line
+
+
+class _FirstLiveness:
+    """Seconds to the first stderr line proving the call went out.
+
+    `_stream_child` reads stderr one CHARACTER at a time, so a line only exists
+    once its newline arrives; testing fragments would miss the pattern or match
+    a half-written id.
+    """
+
+    __slots__ = ("_buf", "first_sec")
+
+    def __init__(self):
+        self._buf = ""
+        self.first_sec = None
+
+    def feed(self, ch, at_sec):
+        if self.first_sec is not None:
+            return
+        if ch == "\n":
+            if is_liveness_line(self._buf):
+                self.first_sec = at_sec
+            self._buf = ""
+            return
+        if len(self._buf) < 4000:      # one CLI log line, never a whole log
+            self._buf += ch
+
+
 #: Set by `_stream_child` on every call: seconds from child start to its first
 #: model byte, or None when only the banner ever arrived. A module-level
 #: attribute on a plain function keeps the (rc, stdout, stderr) contract every
@@ -1330,18 +1397,22 @@ def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
 
     WHY NOT `subprocess.run(capture_output=True)`. That call hands back the
     buffers only when the child EXITS, so a 150s silent rung was indistinguish-
-    able from a 150s working one until the very end, and `first_byte_sec` could
-    only ever be null. Reading incrementally makes the first model byte
-    observable, which is the measurement that separates "queue-stalled" from
-    "the CLI never streams here".
+    able from a 150s working one until the very end, and neither first-byte
+    time could ever be observed.
 
-    FIRST-OUTPUT DEADLINE. A rung that has produced no model output in
-    `first_output_sec` is abandoned (`NoFirstOutput`) rather than paid for to
-    the end of its grant. The grant still caps a rung that HAS started: once
-    output flows, the rung gets its whole window.
+    TWO SIGNALS FROM TWO STREAMS, and the deadline reads the RIGHT one:
 
-    Only STDOUT counts as model output: the answer is parsed from stdout, and a
-    stderr warning is not the model speaking.
+      * stdout -> the ANSWER. `opencode run` writes the assistant message there
+        exactly once, at completion (measured 37.57s for a one-word reply), so
+        `last_first_byte_sec` is normally NULL until the child is finished.
+      * stderr -> LIVENESS. With `--print-logs` the CLI narrates the model call
+        opening on stderr within seconds. `last_first_liveness_sec` is what the
+        liveness deadline watches; watching stdout killed healthy children.
+
+    FIRST-LIVENESS DEADLINE. A rung with no liveness line in `first_output_sec`
+    is abandoned (`NoFirstOutput`) rather than paid for to the end of its grant.
+    The grant still caps a rung that HAS gone live: once liveness arrives, the
+    rung gets its whole window, however long its answer takes.
 
     Two daemon threads drain the pipes (a select() loop would not run on
     Windows, and a single-threaded read of one pipe deadlocks when the child
@@ -1357,6 +1428,7 @@ def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
         errors="replace")
     out_chunks, err_chunks = [], []
     first = _FirstModelByte()
+    live = _FirstLiveness()
 
     def drain(pipe, sink, tracker):
         try:
@@ -1378,7 +1450,7 @@ def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
     readers = [
         threading.Thread(target=drain, args=(proc.stdout, out_chunks, first),
                          daemon=True),
-        threading.Thread(target=drain, args=(proc.stderr, err_chunks, None),
+        threading.Thread(target=drain, args=(proc.stderr, err_chunks, live),
                          daemon=True),
     ]
     for thread in readers:
@@ -1397,8 +1469,10 @@ def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
         if now >= deadline:
             timed_out = True
             break
+        # LIVENESS, NOT OUTPUT. A rung that has printed its log line is working;
+        # killing it here is what made a healthy child look stalled.
         if first_deadline is not None and now >= first_deadline \
-                and first.first_sec is None:
+                and live.first_sec is None:
             stalled = True
             break
         time.sleep(0.05)
@@ -1418,6 +1492,7 @@ def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
     out = "".join(out_chunks)
     err = "".join(err_chunks)
     _stream_child.last_first_byte_sec = first.first_sec
+    _stream_child.last_first_liveness_sec = live.first_sec
     if stalled:
         raise NoFirstOutput(time.monotonic() - started, out, err)
     if timed_out:
@@ -1427,29 +1502,41 @@ def _stream_child(argv, prompt_text, env, timeout_sec, first_output_sec=None):
 
 
 _stream_child.last_first_byte_sec = None
+_stream_child.last_first_liveness_sec = None
 
 
 def default_ai_runner(model, prompt_text, env, timeout_sec):
-    """`cat prompt | opencode run --auto --model <model>`, streamed.
+    """`cat prompt | opencode run --auto --print-logs --log-level INFO …`.
 
     NOTE: --standalone is v2/opencode2-only; v1 run is already in-process.
-    `last_first_byte_sec` is set on every call (None when only the banner
-    arrived) and read back by `ai_classify`; `ai_classify` also enforces the
-    first-output deadline via this runner's `AI_FIRST_OUTPUT_SEC`.
+
+    `--print-logs --log-level INFO` IS LOAD-BEARING, not debugging decoration.
+    Without it stderr carries only the banner, there is no liveness signal at
+    all, and the deadline is back to watching stdout -- the defect. INFO is the
+    level that carries `message=stream`; DEBUG was measured to work too and
+    carries nothing this stage reads, so it is not asked for.
+
+    Both measurements are copied back on every call (a runner that cannot say
+    reports an honest null): `last_first_byte_sec` for the answer,
+    `last_first_liveness_sec` for the log line.
     """
     exe = shutil.which("opencode")
     if not exe:
         raise RuntimeError("opencode binary not found on PATH")
     try:
-        return _stream_child([exe, "run", "--auto", "--model", model],
+        return _stream_child([exe, "run", "--auto", "--model", model,
+                              "--print-logs", "--log-level", "INFO"],
                              prompt_text, env, timeout_sec,
                              first_output_sec=AI_FIRST_OUTPUT_SEC)
     finally:
         default_ai_runner.last_first_byte_sec = \
             _stream_child.last_first_byte_sec
+        default_ai_runner.last_first_liveness_sec = \
+            _stream_child.last_first_liveness_sec
 
 
 default_ai_runner.last_first_byte_sec = None
+default_ai_runner.last_first_liveness_sec = None
 
 
 def extract_verdict_json(stdout_text):
@@ -1598,12 +1685,18 @@ def record_attempt(state_dir, model, attempt, timeout_sec, reason,
 
 
 def _emit_attempt(on_attempt, model, attempt, granted_sec, wall_sec, outcome,
-                  stdout_text="", stderr_text="", first_byte_sec=None):
+                  stdout_text="", stderr_text="", first_byte_sec=None,
+                  first_liveness_sec=None):
     """Report ONE attempt to an observer. The ladder probe is the only caller.
 
     An observer must never be able to end the walk: it is diagnosis, and
     diagnosis failing is not a reason to stop deciding. Nothing here changes
     behaviour when no observer is attached (`on_attempt is None`).
+
+    `first_byte_sec` and `first_liveness_sec` travel separately and stay
+    separate all the way to the record: the first is the answer starting to
+    arrive on stdout, the second is the CLI proving on stderr that the call went
+    out. They answer different questions and one is routinely null.
     """
     if on_attempt is None:
         return
@@ -1612,23 +1705,32 @@ def _emit_attempt(on_attempt, model, attempt, granted_sec, wall_sec, outcome,
                    wall_sec=wall_sec, outcome=outcome,
                    stdout_text=_as_text(stdout_text),
                    stderr_text=_as_text(stderr_text),
-                   first_byte_sec=first_byte_sec)
+                   first_byte_sec=first_byte_sec,
+                   first_liveness_sec=first_liveness_sec)
     except Exception as exc:
         print("ai_classify: attempt observer failed (%s: %s)"
               % (type(exc).__name__, exc))
 
 
-def _runner_first_byte(runner):
-    """The runner's own measured first model byte, or None when it cannot say.
+def _runner_time(runner, attr):
+    """A runner's own measured timestamp, or None when it cannot say.
 
-    A stubbed runner never sets it, which is why the probe's `first_byte_sec`
-    is null under test and real in production: absent evidence stays absent.
+    A stubbed runner never sets them, which is why the probe's timings are null
+    under test and real in production: absent evidence stays absent.
     """
-    value = getattr(runner, "last_first_byte_sec", None)
+    value = getattr(runner, attr, None)
     try:
         return None if value is None else round(float(value), 2)
     except (TypeError, ValueError):
         return None
+
+
+def _runner_first_byte(runner):
+    return _runner_time(runner, "last_first_byte_sec")
+
+
+def _runner_first_liveness(runner):
+    return _runner_time(runner, "last_first_liveness_sec")
 
 
 def ai_classify(pending_path, runner=None, models=None,
@@ -1786,17 +1888,18 @@ def ai_classify(pending_path, runner=None, models=None,
             timeout = model_selector.attempt_timeout(
                 model_deadline, now, AI_PER_ATTEMPT_TIMEOUT_SEC)
             attempt_started = time.monotonic()
-            # Cleared first: a previous attempt's first-byte number must never
-            # be read back as this attempt's.
-            if hasattr(runner, "last_first_byte_sec"):
-                runner.last_first_byte_sec = None
+            # Cleared first: a previous attempt's timings must never be read
+            # back as this attempt's. Both signals, because they are separate.
+            for attr in ("last_first_byte_sec", "last_first_liveness_sec"):
+                if hasattr(runner, attr):
+                    setattr(runner, attr, None)
             try:
                 rc, out, err = runner(model, prompt_text, env, timeout)
             except NoFirstOutput as exc:
-                # NO MODEL OUTPUT INSIDE THE DEADLINE. Not a timeout: the rung
-                # was alive and wrote its banner, then never spoke. Recorded as
-                # its own outcome so the probe can attribute the silence, and
-                # NOT retried -- the second attempt would buy the same silence.
+                # NEVER WENT LIVE. Not a timeout: no CLI log line ever proved
+                # the call was dispatched, so the rung was alive and silent.
+                # Recorded as its own outcome so the probe can attribute the
+                # silence, and NOT retried -- a second attempt buys the same.
                 wall_sec = time.monotonic() - attempt_started
                 model_selector.record_failure(health, model, "slow_or_stalled",
                                               at=time.time())
@@ -1805,15 +1908,17 @@ def ai_classify(pending_path, runner=None, models=None,
                                stdout_text=out_tail, stderr_text=err_tail,
                                wall_sec=wall_sec)
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
-                              "no_output", out_tail, err_tail)
+                              "no_output", out_tail, err_tail,
+                              first_liveness_sec=_runner_first_liveness(runner))
                 evidence = collect_news.clean_ws(
                     _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
                 errors.append(
-                    "%s: no model output within %ds of its %ds window%s"
+                    "%s: no CLI liveness within %ds of its %ds window%s"
                     % (model, AI_FIRST_OUTPUT_SEC, timeout,
                        (" -- %s" % evidence[-200:]) if evidence else ""))
-                print("ai_classify: %s wrote no model output within %ds, so it "
-                      "is abandoned instead of spending its %ds window."
+                print("ai_classify: %s never went live (no message=stream on "
+                      "stderr) within %ds, so it is abandoned instead of "
+                      "spending its %ds window."
                       % (model, AI_FIRST_OUTPUT_SEC, timeout))
                 break
             except subprocess.TimeoutExpired as exc:
@@ -1830,7 +1935,8 @@ def ai_classify(pending_path, runner=None, models=None,
                                wall_sec=wall_sec)
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                               "timeout", out_tail, err_tail,
-                              first_byte_sec=_runner_first_byte(runner))
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
                 evidence = collect_news.clean_ws(
                     _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
                 errors.append("%s: timed out after %ds%s"
@@ -1869,7 +1975,8 @@ def ai_classify(pending_path, runner=None, models=None,
                                wall_sec=wall_sec)
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                               "verdict", out, err,
-                              first_byte_sec=_runner_first_byte(runner))
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
                 return verdict, None
             # A QUOTA REFUSAL IS THE WHOLE WALK'S INDICTMENT, not this model's.
             # The provider refuses pre-generation and every free id shares the
@@ -1896,7 +2003,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               % (model, hours))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                               "model_not_found", out, err,
-                              first_byte_sec=_runner_first_byte(runner))
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
                 print("ai_classify: %s -> model_not_found. The provider does "
                       "not serve this id, so it is cooled for %dh and the walk "
                       "moves to the next rung." % (model, hours))
@@ -1917,7 +2025,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               "provider" % (model, provider_prefix))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                               "payment_required", out, err,
-                              first_byte_sec=_runner_first_byte(runner))
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
                 print("ai_classify: %s -> payment_required. The plan refuses the "
                       "'%s' provider, not this model id, so re-asking it is "
                       "pointless; trying the next rung."
@@ -1939,7 +2048,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               "written" % (model, provider_prefix))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                               "quota_or_rate_limited", out, err,
-                              first_byte_sec=_runner_first_byte(runner))
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
                 print("ai_classify: %s -> quota_or_rate_limited on the '%s' "
                       "provider's own allowance, so the shared pool row is NOT "
                       "written; trying the next rung."
@@ -1961,7 +2071,8 @@ def ai_classify(pending_path, runner=None, models=None,
                               % (model, row.get("until")))
                 _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                               "quota_or_rate_limited", out, err,
-                              first_byte_sec=_runner_first_byte(runner))
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
                 model_selector.record_failure(health, model, "transport",
                                               at=time.time())
                 pool_walled = True
@@ -1973,7 +2084,8 @@ def ai_classify(pending_path, runner=None, models=None,
                            stdout_text=out, stderr_text=err, wall_sec=wall_sec)
             _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
                           "unparseable", out, err,
-                          first_byte_sec=_runner_first_byte(runner))
+                          first_byte_sec=_runner_first_byte(runner),
+                          first_liveness_sec=_runner_first_liveness(runner))
             # The model answered; it answered unusably. Do not re-ask, but DO
             # remember it: this is the 2026-10-13 mimo failure, and the next
             # run must not pay for it again.
@@ -2048,16 +2160,22 @@ def _ladder_probe_pending(window_min=90, now_utc=None):
 
 def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
                       stdout_text="", stderr_text="", first_byte_sec=None,
-                      control=False):
+                      first_liveness_sec=None, control=False):
     """One attempt, in the stable shape the committed file documents.
 
     `granted_sec` is the window GRANTED and `wall_sec` is what it took -- the
-    pair is what sizes AI_PER_ATTEMPT_TIMEOUT_SEC. `first_byte_sec` is measured
-    by the streaming runner and is NULL, never estimated, when only the banner
-    arrived or the runner cannot say. `control` marks the keyed rung: it proves
-    the harness can stream and is never counted in the free verdict. The tail is
-    redacted and whitespace-collapsed so a credential can never ride into a
-    committed file.
+    pair is what sizes AI_PER_ATTEMPT_TIMEOUT_SEC.
+
+    TWO TIMINGS, and the pair is the evidence the liveness rework turns on:
+    `first_liveness_sec` is when a stderr CLI log line proved the call went out
+    (this is what the 40s deadline watches), `first_byte_sec` is when the first
+    answer byte appeared on stdout (normally only at completion). Each carries
+    its own `_source` string so a reader can tell a measured null from one the
+    runner could not report -- unknown is recorded as unknown, never estimated.
+
+    `control` marks the keyed rung: it proves the harness can stream and is
+    never counted in the free verdict. The tail is redacted and
+    whitespace-collapsed so a credential can never ride into a committed file.
     """
     tail = collect_news.clean_ws("%s %s" % (_as_text(stdout_text),
                                             _as_text(stderr_text)))
@@ -2067,6 +2185,11 @@ def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
             "wall_sec": None if wall_sec is None else round(wall_sec, 2),
             "first_byte_sec": (None if first_byte_sec is None
                                else round(first_byte_sec, 2)),
+            "first_byte_source": "stdout" if first_byte_sec is not None else "",
+            "first_liveness_sec": (None if first_liveness_sec is None
+                                   else round(first_liveness_sec, 2)),
+            "first_liveness_source": ("stderr" if first_liveness_sec is not None
+                                      else ""),
             "outcome": outcome,
             "control": bool(control),
             "tail_excerpt": _redact_secrets(tail)[-160:]}
@@ -2130,20 +2253,36 @@ def _probe_attribution(control, free_rows):
     runner", and every sizing change is wasted until it can. Only a KEYED rung
     answering the same prompt in the same window separates them:
 
-      * control emitted nothing AND no free rung emitted one model byte
-        -> `harness_no_stream`. The harness cannot see output from ANY provider,
-           so the free tier is not what was measured.
-      * control answered (or answered unusably) AND no free rung emitted a byte
-        -> `free_tier_stalled`. The harness works; the tier is what is silent.
-      * any free rung emitted model output -> `free_tier_answered`, whatever the
-        control did; whether the answer PARSES is the `verdict` field's job.
+      * NOTHING WENT LIVE anywhere -- control wrote no liveness line AND no free
+        rung did -> `harness_no_stream`. The harness cannot see the CLI's log
+        stream from ANY provider, so the free tier is not what was measured.
+      * control answered (or answered unusably) AND no free rung produced an
+        answer byte -> `free_tier_stalled`. The harness works; the tier is what
+        is silent.
+      * any free rung produced model output -> `free_tier_answered`, whatever
+        the control did; whether the answer PARSES is the `verdict` field's job.
       * anything else -- no credential, a control that never ran, an
         unrecognised state -- -> `inconclusive`. Never guessed upward.
+
+    THE LIVENESS LINE IS WHAT MAKES THE FIRST ARM HONEST. A free rung that went
+    live proves the harness CAN read that stream, so its later silence can no
+    longer be blamed on the harness even when the control never spoke. Before
+    the signal existed, "control silent + free silent" was the only evidence
+    available and it indicted the harness by default.
     """
     free_emitted = any(r.get("first_byte_sec") is not None
                        for r in (free_rows or []))
+    free_live = any(r.get("first_liveness_sec") is not None
+                    for r in (free_rows or []))
     if control == "unconfigured":
         return "inconclusive"
+    if free_emitted:
+        return "free_tier_answered"
+    if control in ("answered", "unparseable"):
+        return "free_tier_stalled"
+    if control == "no_output" and not free_live:
+        return "harness_no_stream"
+    return "inconclusive"
     if control == "no_output" and not free_emitted:
         return "harness_no_stream"
     if control in ("answered", "unparseable") and not free_emitted:
@@ -2265,6 +2404,11 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
            "trigger": "ladder_probe",
            "per_attempt_sec": AI_PER_ATTEMPT_TIMEOUT_SEC,
            "first_output_sec": AI_FIRST_OUTPUT_SEC,
+           # WHAT THE DEADLINE ABOVE ACTUALLY WATCHES. Without this the number
+           # is ambiguous: 40s of stdout silence is normal, 40s of stderr
+           # silence is the finding.
+           "liveness_signal": ("stderr CLI log line containing message=stream "
+                               "(small=true excluded) or llm runtime selected"),
            "attempt_budget_sec": AI_TOTAL_BUDGET_SEC,
            "pool": list(AI_LADDER),
            "attempts": attempts,
@@ -2284,10 +2428,12 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
 
     for a in attempts:
         print("ladder_probe: %s%s attempt %d granted=%ss wall=%ss "
-              "first_byte=%s outcome=%s"
+              "live=%s first_byte=%s outcome=%s"
               % ("control " if a["control"] else "", a["model"],
                  a["attempt"], a["granted_sec"],
                  "n/a" if a["wall_sec"] is None else a["wall_sec"],
+                 "n/a" if a["first_liveness_sec"] is None
+                 else a["first_liveness_sec"],
                  "n/a" if a["first_byte_sec"] is None else a["first_byte_sec"],
                  a["outcome"]))
     print("ladder_probe: verdict=%s in %.2fs over %d attempt(s)%s"

@@ -270,12 +270,34 @@ workflow is the only manual shape that can send a real alert, and
 `ladder_probe=true` never sends regardless of `dry_run`.
 
 **What a probe run records, and what it cannot conclude.** `state/ladder_probe.json`
-holds one row per attempt — granted window, measured wall, **first model byte**,
-outcome — plus a top-level `attribution` field. A rung that has written no model
-output after `AI_FIRST_OUTPUT_SEC` (40 s) is abandoned rather than left to burn
-its whole 150 s window, and `no_output` is recorded instead of a guessed timeout,
-so the free walk's worst case is `4 × 40 + 40 = 200 s` rather than 600 s. The
-probe also walks **one control rung** against the keyed provider
+holds one row per attempt — granted window, measured wall, **time to the first
+liveness line**, **time to the first model byte**, outcome — plus a top-level
+`attribution` field. The two timings are different facts and the file keeps them
+apart, each with its own `_source`:
+
+- `first_liveness_sec` / `first_liveness_source` (`stderr`) — when a CLI log line
+  (`message=stream` without `small=true`, or `llm runtime selected`) proved the
+  model call actually went out. **This is what the deadline watches.**
+- `first_byte_sec` / `first_byte_source` (`stdout`) — when the first answer byte
+  appeared. `opencode run` writes the assistant message to stdout once, at
+  completion, so a null here beside a live rung is normal, not a fault.
+
+A rung that has produced no liveness line after `AI_FIRST_OUTPUT_SEC` (40 s) is
+abandoned rather than left to burn its whole 150 s window, and `no_output` is
+recorded instead of a guessed timeout, so the free walk's worst case is
+`4 × 40 + 40 = 200 s` rather than 600 s. A rung that **has** gone live keeps its
+full window however slow the answer is. The deadline inherits its signal from
+`scripts/model_watchdog.py`, which already narrates a live digest walk this way;
+the child is invoked with `--print-logs --log-level INFO` so that stream exists.
+
+> Before this, the deadline watched **stdout** only. Since stdout carries nothing
+> until the child exits, a healthy rung looked silent for its entire generation
+> and was killed at 40 s — the 2026-11-02 probe recorded exactly that as
+> `harness_no_stream` for five rungs, one of them keyed. Boot chatter
+> (`message=init`) and the title call (`small=true`) are deliberately **not**
+> liveness, so a process that started but never dispatched is still abandoned.
+
+The probe also walks **one control rung** against the keyed provider
 (`config/opencode-cli.json`, credential `GEMINI_API_KEY`) in its own state
 directory, labelled `"control": true` and excluded from the free `verdict`. That
 is the only way to tell a stalled free tier from a runner that never shows model
@@ -283,18 +305,17 @@ output at all:
 
 | `attribution` | Means |
 |---|---|
-| `harness_no_stream` | The control rung also emitted nothing. Nothing about the free pool can be learned from this run; fix the invocation first. |
-| `free_tier_stalled` | The control answered, no free rung ever produced a byte. The free pool is the fault. |
+| `harness_no_stream` | Nothing went live anywhere: the control and every free rung wrote no liveness line. Nothing about the free pool can be learned from this run; fix the invocation first. |
+| `free_tier_stalled` | The control answered (or answered unusably) and no free rung produced a byte. The free pool is the fault. |
 | `free_tier_answered` | At least one free rung produced model output. The ladder is reachable; `verdict` then says whether the answer parsed. |
-| `inconclusive` | The control is unconfigured (`control: unconfigured`, no `GEMINI_API_KEY`) or neither side produced evidence either way. |
+| `inconclusive` | The control is unconfigured (`control: unconfigured`, no `GEMINI_API_KEY`), so nothing is attributed whatever the free rungs did (`verdict` still records any answer), or a free rung went live while the control stayed silent — the harness demonstrably works, so the silence cannot be pinned on the tier either. |
 
 The credential reaches the **control child only** — `ai_classify` is given an
 `OPENCODE_CONFIG` that the sweep never sees, so probe mode cannot change which
 models a real run walks. The variable's name is recorded; its value never is.
-Two honest limits: the 40 s deadline would abandon a free rung that is merely
-slow to its first token (one measured 137.6 s once), and the probe still cannot
-show whether a *real* sweep would have answered — it shows what the invocation
-did on this run.
+Two honest limits: the probe still cannot show whether a *real* sweep would have
+answered — it shows what the invocation did on this run — and liveness proves the
+call was dispatched, not that the provider will ever answer it.
 
 #### `digest-prebuild.yml` — seals an already-built digest into the Worker
 
