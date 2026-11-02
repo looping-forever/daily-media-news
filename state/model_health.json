@@ -3,23 +3,23 @@
   "models": {
     "opencode/deepseek-v4.1-flash-free": {
       "success": 0,
-      "timeout": 4,
+      "timeout": 5,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "timeout",
-      "last_fail_at": 1793608509.070678,
-      "cooldown_until": 1793694909.070678
+      "last_fail_at": 1793633760.0321362,
+      "cooldown_until": 1793720160.0321362
     },
     "opencode/beam-free": {
       "success": 0,
-      "timeout": 4,
+      "timeout": 5,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "timeout",
-      "last_fail_at": 1793629939.4103863,
-      "cooldown_until": 1793716339.4103863
+      "last_fail_at": 1793633910.1321943,
+      "cooldown_until": 1793720310.1321943
     },
     "opencode/mimo-v2.6-flash-free": {
       "success": 0,
@@ -104,22 +104,22 @@
     "opencode/mimo-v2.5-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 0,
+      "transport": 1,
       "garbage": 3,
-      "consecutive_failures": 3,
-      "last_failure": "garbage",
-      "last_fail_at": 1793629703.4434695,
-      "cooldown_until": 1793694503.4434695
+      "consecutive_failures": 4,
+      "last_failure": "transport",
+      "last_fail_at": 1793633459.8367124,
+      "cooldown_until": 1793719859.8367124
     },
     "opencode/big-pickle": {
       "success": 0,
-      "timeout": 3,
+      "timeout": 4,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 3,
+      "consecutive_failures": 4,
       "last_failure": "timeout",
-      "last_fail_at": 1793629899.3183894,
-      "cooldown_until": 1793694699.3183894
+      "last_fail_at": 1793633609.9181902,
+      "cooldown_until": 1793720009.9181902
     }
   }
 }
