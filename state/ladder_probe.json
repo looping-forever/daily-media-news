@@ -1,9 +1,10 @@
 {
-  "run_at": "2026-11-02T14:02:38+00:00",
-  "head_sha": "08e70f1b8673dd0a03adf61b853481be3c2eb719",
+  "run_at": "2026-11-02T14:55:53+00:00",
+  "head_sha": "4e6daa0001b9c7316756a1ec582ab3dc80b98985",
   "trigger": "ladder_probe",
   "per_attempt_sec": 150,
   "first_output_sec": 40,
+  "liveness_signal": "stderr CLI log line containing message=stream (small=true excluded) or llm runtime selected",
   "attempt_budget_sec": 720,
   "pool": [
     "opencode/deepseek-v4.1-flash-free",
@@ -16,59 +17,74 @@
       "model": "opencode/deepseek-v4.1-flash-free",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.09,
+      "wall_sec": 150.06,
       "first_byte_sec": null,
-      "outcome": "no_output",
+      "first_byte_source": "",
+      "first_liveness_sec": 1.99,
+      "first_liveness_source": "stderr",
+      "outcome": "timeout",
       "control": false,
-      "tail_excerpt": "\u001b[0m > build · deepseek-v4.1-flash-free \u001b[0m"
+      "tail_excerpt": "ode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go\" timestamp=2026-11-02T14:46:48.733Z level=INFO run=1f40272e message=cleanup prune=7.days"
     },
     {
       "model": "opencode/beam-free",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.13,
+      "wall_sec": 150.08,
       "first_byte_sec": null,
-      "outcome": "no_output",
+      "first_byte_source": "",
+      "first_liveness_sec": 1.97,
+      "first_liveness_source": "stderr",
+      "outcome": "timeout",
       "control": false,
-      "tail_excerpt": "\u001b[0m > build · beam-free \u001b[0m"
+      "tail_excerpt": "ode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go\" timestamp=2026-11-02T14:49:18.668Z level=INFO run=afea53e5 message=cleanup prune=7.days"
     },
     {
       "model": "opencode/mimo-v2.6-flash-free",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.08,
+      "wall_sec": 150.07,
       "first_byte_sec": null,
-      "outcome": "no_output",
+      "first_byte_source": "",
+      "first_liveness_sec": 2.05,
+      "first_liveness_source": "stderr",
+      "outcome": "timeout",
       "control": false,
-      "tail_excerpt": "\u001b[0m > build · mimo-v2.6-flash-free \u001b[0m"
+      "tail_excerpt": "ode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go\" timestamp=2026-11-02T14:51:48.786Z level=INFO run=64944c42 message=cleanup prune=7.days"
     },
     {
       "model": "opencode/nemotron-3.5-lightning-free",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.08,
+      "wall_sec": 150.08,
       "first_byte_sec": null,
-      "outcome": "no_output",
+      "first_byte_source": "",
+      "first_liveness_sec": 2.01,
+      "first_liveness_source": "stderr",
+      "outcome": "timeout",
       "control": false,
-      "tail_excerpt": "\u001b[0m > build · nemotron-3.5-lightning-free \u001b[0m"
+      "tail_excerpt": "ode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go\" timestamp=2026-11-02T14:54:18.808Z level=INFO run=48f636c8 message=cleanup prune=7.days"
     },
     {
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.08,
-      "first_byte_sec": null,
-      "outcome": "no_output",
+      "wall_sec": 5.67,
+      "first_byte_sec": 5.49,
+      "first_byte_source": "stdout",
+      "first_liveness_sec": 2.01,
+      "first_liveness_source": "stderr",
+      "outcome": "verdict",
       "control": true,
-      "tail_excerpt": "\u001b[0m > build · gemini-3.5-flash-lite \u001b[0m"
+      "tail_excerpt": "tx1weDmhPO timestamp=2026-11-02T14:55:53.318Z level=INFO run=39f7c8e0 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     }
   ],
   "verdict": "none",
-  "control": "no_output",
+  "control": "answered",
   "control_model": "gemini/gemini-3.5-flash-lite",
   "control_env": "GEMINI_API_KEY",
-  "attribution": "harness_no_stream",
-  "ladder_seconds": 162.61,
-  "control_seconds": 40.08,
-  "error": "models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/deepseek-v4.1-flash-free: no model output within 40s of its 150s window -- \u001b[0m > build · deepseek-v4.1-flash-free \u001b[0m; opencode/beam-free: no model output within 40s of its 150s window -- \u001b[0m > build · beam-free \u001b[0m; opencode/mimo-v2.6-flash-free:"
+  "attribution": "free_tier_stalled",
+  "ladder_seconds": 602.22,
+  "control_seconds": 5.67,
+  "error": "models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/deepseek-v4.1-flash-free: timed out after 150s -- e models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go\" timestamp=2026-11-02T14:46:48.733Z level=INFO run=1f40272e message=cleanup prune=7.days;"
 }
