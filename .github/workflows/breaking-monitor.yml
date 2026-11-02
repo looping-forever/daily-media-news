@@ -91,10 +91,11 @@ permissions:
 jobs:
   breaking-monitor:
     runs-on: ubuntu-latest
-    # 15, not 10: the AI stage's worst case is now 480s
-    # (AI_MAX_MODELS x AI_ATTEMPTS_PER_MODEL x AI_PER_ATTEMPT_TIMEOUT_SEC), and
-    # a 600s job would leave only ~120s for collection and delivery. The stage
-    # budget itself is unchanged by this: it is what bounds the ladder.
+    # 15, not 10: the AI stage's wall is now 720s
+    # (AI_TOTAL_BUDGET_SEC -- six live rungs x a 120s window), and collection,
+    # delivery and the state commit take roughly 63s more. 720 + 63 = 783s, so
+    # a 900s job keeps ~117s of headroom. The stage budget itself is what
+    # bounds the ladder; this is the backstop behind it.
     timeout-minutes: 15
 
     steps:
@@ -193,11 +194,17 @@ jobs:
           set -eo pipefail
           ARGS=""
           if [ "$DRY_RUN" = "true" ]; then
-            ARGS="--dry-run"
+            # A DRY-RUN DISPATCH IS A DIAGNOSTIC, NOT A CLASSIFIER PROBE.
+            # --dry-run alone still calls the model (that contract is pinned in
+            # tests/breaking/test_breaking_gate.py), so every manual dispatch
+            # spent the free pool to prove nothing. --no-model still runs the
+            # real importance gate and the hard-evidence fast path; it only
+            # suppresses the ladder call.
+            ARGS="--dry-run --no-model"
           fi
           echo "Breaking monitor: dry_run=${DRY_RUN:-false} day=${TODAY_NPT} (NPT)"
           # $ARGS is intentionally unquoted: it is only ever empty or the
-          # literal "--dry-run" built above, never external input.
+          # literal "--dry-run --no-model" built above, never external input.
           python3 scripts/breaking_monitor.py \
             --state-dir state \
             --config-dir config \
@@ -218,6 +225,20 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Upload model attempt evidence
+        # THE HONESTY-GATE NOTICE POINTS HERE. state/breaking_log.json is
+        # gitignored and the run console is not attached to the notice, so
+        # "the classifier output is in this run's log" was false. This artifact
+        # carries the per-attempt stdout/stderr tail (secrets redacted) that
+        # breaking_monitor.py now records for every failed or timed-out call.
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: breaking-attempts
+          path: state/breaking_attempts.jsonl
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Commit breaking state
         # Bot identity + scoped staging mirror daily-news.yml's commit step.
         # Only the durable monitor-owned state files are staged, and only
@@ -234,16 +255,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # DEFECT 2: the checkout persists no credentials, so the token is
-          # injected here, for the network commands only, via `git -c`.
-          auth=()
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
-          else
-            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
-          fi
+          # THE RACE IS FIXED IN ONE PLACE. This step, `Persist model cooldowns`
+          # and `Commit the alert ledger` all had the same shape: commit, then
+          # `pull --rebase -X theirs`, which takes the REMOTE copy of a
+          # conflicting state file and throws this run's change away -- the
+          # 08:14/08:27 race silently dropped the model_health increments this
+          # step exists to persist. scripts/commit_state.sh commits, pushes and
+          # retries; on a conflicting rebase it re-applies THIS run's files on
+          # the fresh remote tip instead of discarding them.
           # state/model_cooldown.json is NOT staged here: the pool wall is shared
           # state, so it is owned by "Persist model cooldowns" below, which runs
           # on `always()` -- this step is skipped whenever the sweep itself
@@ -255,29 +274,12 @@ jobs:
           # slow models" was false in CI -- every run retried the same slow
           # model first. It only changes on a run that actually attempted a
           # model, so this cannot churn on a quiet hour.
-          for f in state/active_stories.json state/breaking_state.json state/breaking_delivery.json state/model_health.json; do
-            if [ -f "$f" ]; then
-              git add "$f"
-            fi
-          done
-          if git diff --staged --quiet; then
-            echo "No breaking-state changes to commit"
-          else
-            git commit -m "chore: update breaking monitor state [skip ci]"
-            # Attempt fast-forward pull; if it fails, try rebase; if that also fails, warn and continue
-            if ! git "${auth[@]}" pull --ff-only; then
-              echo "Fast-forward pull failed, attempting rebase..."
-              # -X theirs for the same reason daily-news.yml uses it: the state
-              # files here are deterministic generated records, so a concurrent
-              # digest commit touching the same paths leaves a conflict that a
-              # plain rebase stalls on and this step would then push nothing.
-              # The remote's copy wins; the next sweep rewrites its own rows.
-              if ! git "${auth[@]}" pull --rebase -X theirs; then
-                echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
-              fi
-            fi
-            git "${auth[@]}" push
-          fi
+          bash scripts/commit_state.sh \
+            "chore: update breaking monitor state [skip ci]" \
+            state/active_stories.json \
+            state/breaking_state.json \
+            state/breaking_delivery.json \
+            state/model_health.json
 
       - name: Persist model cooldowns
         # THE COOLDOWN HAS TO OUTLIVE THE FAILURE THAT CREATED IT. Same defect as
@@ -326,31 +328,12 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          auth=()
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
-          else
-            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
-          fi
-          git add -- "$MODEL_STATE"
-          if git diff --staged --quiet -- "$MODEL_STATE"; then
-            echo "$MODEL_STATE unchanged; nothing to persist"
-            exit 0
-          fi
-          git commit -m "chore: persist model cooldown state [skip ci]" -- "$MODEL_STATE"
-          if ! git "${auth[@]}" pull --ff-only; then
-            echo "Fast-forward pull failed, attempting rebase (theirs wins on the shared cooldown file)..."
-            if ! git "${auth[@]}" pull --rebase -X theirs; then
-              git rebase --abort >/dev/null 2>&1 || true
-              echo "::warning::LOST THE COOLDOWN REBASE RACE: the rebase failed, so this run's cooldown was NOT pushed -- the next run re-learns it"
-              exit 0
-            fi
-          fi
-          if ! git "${auth[@]}" push; then
-            echo "::warning::LOST THE COOLDOWN PUSH RACE: the push was rejected, so this run's cooldown was NOT pushed -- the next run re-learns it"
-            exit 0
-          fi
-          echo "model cooldown state pushed"
+          # Same bounded-retry commit as the two other state writers. This one
+          # used `pull --rebase -X theirs` too, so a concurrent digest commit
+          # could win the file and drop the refusal this step was created to
+          # preserve. The script re-applies this run's cooldown on conflict.
+          bash scripts/commit_state.sh \
+            "chore: persist model cooldown state [skip ci]" "$MODEL_STATE"
 
       - name: Summarize run outcome
         # Reads the last row the script appended to state/breaking_log.json:
@@ -526,12 +509,13 @@ jobs:
                       "If something is breaking right now it is being missed: "
                       "detection tripped the gate, the classifier failed, and no "
                       "verdict was reached. That is a fault, not a quiet news day.")
-              body = "%s\n\n%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). The ladder " \
-                     "is tried across its model list; every attempt failed or " \
-                     "timed out. The classifier output is in this run's log." % (
+              _secs = last.get("ai_seconds")
+              _wall = ("%ss" % _secs if isinstance(_secs, (int, float))
+                       else "not recorded (older run)")
+              body = "%s\n\n%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). No model produced a verdict and the ladder spent %s of wall clock. Per-model attempt detail (timeout, stderr and output tail) is in the `breaking-attempts` artifact for this run." % (
                          lead, alert_dedupe.describe_window(decision),
                          unjudged_block, reason[:200], last.get("level", ""),
-                         last.get("confidence", ""), last.get("sent"))
+                         last.get("confidence", ""), last.get("sent"), _wall)
               print("::error::%s %s" % (title, reason[:200]))
               topic = (os.environ.get("NTFY_TOPIC") or "").strip()
               server = (os.environ.get("NTFY_SERVER") or "").strip()
@@ -667,22 +651,9 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          auth=()
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
-          else
-            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
-          fi
-          git add -- state/alert_ledger.json
-          if git diff --staged --quiet; then
-            echo "alert ledger unchanged"
-            exit 0
-          fi
-          git commit -m "chore: update breaking monitor state [skip ci]"
-          if ! git "${auth[@]}" pull --ff-only; then
-            echo "Fast-forward pull failed, attempting rebase..."
-            if ! git "${auth[@]}" pull --rebase; then
-              echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
-            fi
-          fi
-          git "${auth[@]}" push
+          # Same bounded-retry commit: the 6h window the ledger exists to make
+          # survive a run is worthless if a concurrent commit can make this
+          # push fail and lose it.
+          bash scripts/commit_state.sh \
+            "chore: update breaking monitor state [skip ci]" \
+            state/alert_ledger.json

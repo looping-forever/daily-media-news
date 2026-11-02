@@ -5744,33 +5744,13 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # The checkout persists no credentials, so the token is injected for
-          # the network commands only, exactly as `Commit state changes` does.
-          auth=()
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
-          else
-            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
-          fi
-          git add -- "$MODEL_STATE"
-          if git diff --staged --quiet -- "$MODEL_STATE"; then
-            echo "$MODEL_STATE unchanged; nothing to persist"
-            exit 0
-          fi
-          git commit -m "chore: persist model cooldown state [skip ci]" -- "$MODEL_STATE"
-          if ! git "${auth[@]}" pull --ff-only origin master; then
-            echo "Fast-forward pull failed, attempting rebase (theirs wins on the shared cooldown file)..."
-            if ! git "${auth[@]}" pull --rebase -X theirs origin master; then
-              git rebase --abort >/dev/null 2>&1 || true
-              echo "::warning::LOST THE COOLDOWN REBASE RACE: the rebase failed, so this run's cooldown was NOT pushed -- the next run re-learns it"
-              exit 0
-            fi
-          fi
-          if ! git "${auth[@]}" push; then
-            echo "::warning::LOST THE COOLDOWN PUSH RACE: the push was rejected, so this run's cooldown was NOT pushed -- the next run re-learns it"
-            exit 0
-          fi
-          echo "model cooldown state pushed"
+          # SAME BOUNDED-RETRY COMMIT AS THE BREAKING MONITOR'S WRITERS. This
+          # step used `pull --rebase -X theirs` too, so a concurrent commit
+          # could win the file and drop the refusal this step exists to
+          # preserve. The script re-applies this run's cooldown on conflict and
+          # builds the `git -c` auth argument for the network commands.
+          bash scripts/commit_state.sh \
+            "chore: persist model cooldown state [skip ci]" "$MODEL_STATE"
 
       - name: Assert digest is not empty
         # The last step, deliberately AFTER "Commit state changes".

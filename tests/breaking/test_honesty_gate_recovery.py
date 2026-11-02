@@ -279,21 +279,27 @@ class FallbackDelivery(unittest.TestCase):
 
 
 class BudgetArithmetic(unittest.TestCase):
-    """The declared budget must contain the worst case it claims to cap."""
+    """The declared budget must be USABLE and still fit the job's clock."""
 
-    def test_worst_case_is_inside_the_declared_total(self):
-        # ONE 60s window per model. Attempts are capped inside that window, so a
-        # retry can never widen the bound -- that is the whole change.
-        worst_case = bm.AI_MAX_MODELS * bm.AI_PER_ATTEMPT_TIMEOUT_SEC
-        self.assertEqual(worst_case, 480,
-                         "8 models x one 60s window each is the production shape")
-        self.assertEqual(bm.AI_TOTAL_BUDGET_SEC, worst_case,
-                         "the budget must SUM the ladder it bounds; a total "
-                         "smaller than the worst case bounds nothing")
+    def test_the_window_and_the_total_are_the_agreed_numbers(self):
+        # A free rung needs 120s to answer. At the old 60s window the whole
+        # 2026-11-01 ladder timed out and produced no verdict.
+        self.assertEqual(bm.AI_PER_ATTEMPT_TIMEOUT_SEC, 120,
+                         "the free models do not answer inside 60s")
+        self.assertEqual(bm.AI_TOTAL_BUDGET_SEC, 720,
+                         "the stage wall is 720s (six live rungs x 120s)")
         self.assertGreaterEqual(bm.AI_ATTEMPTS_PER_MODEL, 2,
                                 "a fast transport failure must still get its "
                                 "contracted retry inside the same window")
-        self.assertLess(bm.AI_TOTAL_BUDGET_SEC, 15 * 60,
+        # The total is a FIXED wall, not AI_MAX_MODELS x per-attempt: that
+        # product is 960s and does not fit the 900s job, so the walk stops when
+        # the 720s is spent whatever the catalogue offers.
+        self.assertNotEqual(
+            bm.AI_TOTAL_BUDGET_SEC,
+            bm.AI_MAX_MODELS * bm.AI_PER_ATTEMPT_TIMEOUT_SEC,
+            "a product-shaped budget cannot fit the 15-minute job")
+        # 720s of ladder + ~63s of collection/delivery/commit < the job's 900s.
+        self.assertLess(bm.AI_TOTAL_BUDGET_SEC + 63, 15 * 60,
                         "the workflow's 15-minute job timeout must still have "
                         "room for collection and delivery after the ladder")
 

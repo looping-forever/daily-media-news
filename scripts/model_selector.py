@@ -107,6 +107,7 @@ Two things keep the veto honest, and both are load-bearing:
 """
 
 import json
+import math
 import os
 import re
 import shutil
@@ -1532,8 +1533,8 @@ def attempt_timeout(deadline, now, per_attempt):
     THE TIME MATHS, in one place, because it is the whole claim this file has
     to defend:
 
-        timeout = max(1, min(per_attempt, deadline - now))   if budget remains
-        timeout = 0                                           if it does not
+        timeout = max(1, ceil(min(per_attempt, deadline - now)))  if budget remains
+        timeout = 0                                                if it does not
 
     Two consequences, both the point:
       * an attempt never overruns the stage budget, so worst-case time-to-
@@ -1543,13 +1544,18 @@ def attempt_timeout(deadline, now, per_attempt):
         allowance -- the budget trims the tail, it never shortens a working
         model's allowance to make a bad day look better.
 
+    CEILING, NOT TRUNCATION. int(59.6) granted 59s, so a 120s window became
+    119s on the second pass for no reason, and int(0.4) granted 0 -- a rung
+    skipped with time still on the clock. Round UP: 59.6s of budget left is a
+    full 60s attempt, and only a genuinely spent deadline returns 0.
+
     Before this, the worst case was models x attempts x timeout, unbounded by
-    anything: 3 x 2 x 60 = 360s before any verdict could be reached.
+    anything: 6 x 2 x 120 = 1440s before any verdict could be reached.
     """
     remaining = float(deadline) - float(now)
     if remaining <= 0:
         return 0
-    return max(1, int(min(float(per_attempt), remaining)))
+    return max(1, int(math.ceil(min(float(per_attempt), remaining))))
 
 
 # ---------------------------------------------------------------------------

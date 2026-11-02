@@ -193,6 +193,9 @@ OPENCODE_CONFIG_PATH = os.path.join(REPO_ROOT, "config", "opencode.json")
 #: Filenames are fixed; their contents are owned by model_selector.
 MODEL_HEALTH_FILENAME = "model_health.json"
 MODEL_CACHE_FILENAME = "model_cache.json"
+#: Per-attempt evidence (timeout/stdout/stderr), uploaded as an artifact. Never
+#: committed: it is telemetry about one run, not durable state.
+ATTEMPTS_FILENAME = "breaking_attempts.jsonl"
 
 
 def _opencode_config():
@@ -269,11 +272,12 @@ def _reachable_only(models):
     return kept
 
 
-#: Unchanged at 60s: a working model's allowance is never shortened to make
-#: a bad day look better.
-AI_PER_ATTEMPT_TIMEOUT_SEC = 60
+#: 120s per attempt. The free rungs this ladder actually runs on need longer
+#: than 60s to answer; at 60s the 2026-11-01 sweep timed out on every one of
+#: six models and produced no verdict at all.
+AI_PER_ATTEMPT_TIMEOUT_SEC = 120
 
-#: Depth cap. A dead ladder costs its share of the budget, not a fixed 60s
+#: Depth cap. A dead ladder costs its share of the budget, not a fixed 120s
 #: each, so depth is bounded as well as time.
 #:
 #: RAISED 4 -> 6 on 2026-10-25, and 6 -> 8 on 2026-10-30, WITH the ladder each
@@ -283,22 +287,24 @@ AI_PER_ATTEMPT_TIMEOUT_SEC = 60
 AI_MAX_MODELS = 8
 
 #: An attempt CAP per model, not a multiplier on TIME: every attempt shares the
-#: model's ONE 60s window (see the loop in ai_classify). A transport failure that
-#: returns immediately is therefore retried inside the same window, while a real
-#: 60s timeout has already spent the window and is NOT re-asked. The old reading
-#: of this number made the arithmetic impossible -- 2 x 8 x 60 = 960s never fit
-#: any stage budget short of the job's own limit, so one model timing out twice
-#: ate 120s and the tail rungs were starved (observed 2026-11-01: cost_seconds
-#: 151.43, all six models attempted, ai_fail_safe).
+#: model's ONE 120s window (see the loop in ai_classify). A transport failure
+#: that returns immediately is therefore retried inside the same window, while
+#: a real timeout has already spent the window and is NOT re-asked. The old
+#: reading of this number made the arithmetic impossible -- 2 x 8 x 60 = 960s
+#: never fit any stage budget short of the job's own limit, so one model
+#: timing out twice ate 120s and the tail rungs were starved (observed
+#: 2026-11-01: cost_seconds 151.43, all six models attempted, ai_fail_safe).
 AI_ATTEMPTS_PER_MODEL = 2
 
-#: THE WHOLE AI STAGE IS BOUNDED, discovery included. The worst case is
-#: AI_MAX_MODELS x AI_PER_ATTEMPT_TIMEOUT_SEC = 8 x 60 = 480s, which EQUALS this
-#: budget: every configured rung gets its full 60s exactly once. Attempts are
-#: deliberately absent from this product -- a retry is paid for out of the same
-#: window, so it must never widen the bound.
-#: tests/breaking/test_honesty_gate_recovery.py fails if these stop summing.
-AI_TOTAL_BUDGET_SEC = AI_MAX_MODELS * AI_PER_ATTEMPT_TIMEOUT_SEC
+#: THE WHOLE AI STAGE IS BOUNDED, discovery included. 720s is a FIXED wall, not
+#: AI_MAX_MODELS x AI_PER_ATTEMPT_TIMEOUT_SEC: that product is 960s and does
+#: not fit the workflow's 15-minute job. 720s is six live rungs x 120s, and the
+#: walk simply stops when the wall is spent -- collection, delivery and the
+#: state commit take roughly 63s, so 720 + 63 = 783s stays inside 900s.
+#: Attempts are deliberately absent from this product -- a retry is paid for
+#: out of the same window, so it must never widen the bound.
+#: tests/breaking/test_honesty_gate_recovery.py fails if these drift apart.
+AI_TOTAL_BUDGET_SEC = 720
 
 # Deterministic pre-gate (contract regex — do not reword casually;
 # groups are non-capturing so findall() returns whole-match strings).
@@ -1353,6 +1359,54 @@ def normalize_verdict(obj):
     }
 
 
+#: Values that must never reach a committed artifact or a log row. The child's
+#: stderr is the CLI's own output, and the CLI echoes the credential it was
+#: given: redaction happens HERE, before either sink sees the text.
+_SECRET_RE = re.compile(
+    r"gh[pousr]_[A-Za-z0-9]{16,}"
+    r"|github_pat_[A-Za-z0-9_]{20,}"
+    r"|sk-[A-Za-z0-9_.-]{16,}"
+    r"|xox[baprs]-[A-Za-z0-9-]{10,}"
+    r"|(?i:bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
+
+
+def _as_text(value):
+    """TimeoutExpired carries bytes on some Python builds, str on others."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return str(value)
+
+
+def _redact_secrets(text):
+    return _SECRET_RE.sub("[REDACTED]", _as_text(text))
+
+
+def record_attempt(state_dir, model, attempt, timeout_sec, reason,
+                   stdout_text="", stderr_text=""):
+    """Append one attempt's evidence to state/breaking_attempts.jsonl.
+
+    A record that cannot be written must never end the walk: losing the file
+    costs diagnosis, not the verdict. 4000 chars per stream is the whole of a
+    normal CLI failure and keeps a runaway log from becoming the artifact.
+    """
+    limit = 4000
+    row = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "model": model, "attempt": attempt, "timeout_sec": timeout_sec,
+           "reason": reason,
+           "stdout_tail": _redact_secrets(stdout_text)[-limit:],
+           "stderr_tail": _redact_secrets(stderr_text)[-limit:],
+           "stdout_chars": len(_as_text(stdout_text)),
+           "stderr_chars": len(_as_text(stderr_text))}
+    try:
+        with open(os.path.join(state_dir, ATTEMPTS_FILENAME), "a",
+                  encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        print("ai_classify: could not write the attempt record (%s)" % exc)
+
+
 def ai_classify(pending_path, runner=None, models=None,
                 prompt_path=PROMPT_PATH,
                 attempts_per_model=AI_ATTEMPTS_PER_MODEL):
@@ -1365,12 +1419,19 @@ def ai_classify(pending_path, runner=None, models=None,
     AI_TOTAL_BUDGET_SEC. An explicit `models=[...]` bypasses selection
     entirely and is what the tests drive.
 
-    ONE 60s WINDOW per model (AI_PER_ATTEMPT_TIMEOUT_SEC), so the worst case is
-    AI_MAX_MODELS x 60 = 480s = AI_TOTAL_BUDGET_SEC: every configured rung gets
-    its full allowance exactly once. A transport failure that returns fast is
+    ONE 120s WINDOW per model (AI_PER_ATTEMPT_TIMEOUT_SEC). The stage deadline
+    is the wall: 720s (AI_TOTAL_BUDGET_SEC) is what bounds the ladder, however
+    many rungs the catalogue offers. A transport failure that returns fast is
     retried inside that model's remaining window; a real timeout has already
     spent it and gets no second attempt, which is what used to let one slow model
     eat two minutes and starve the tail of the ladder.
+
+    A TIMEOUT IS DIAGNOSABLE. `subprocess.run(capture_output=True)` raises
+    TimeoutExpired with the child's partial stdout and stderr, and those were
+    read by nobody: the run could not say which model produced what before it
+    was killed. They are now recorded (secrets redacted) in
+    `state/breaking_attempts.jsonl`, which the workflow uploads as the
+    `breaking-attempts` artifact.
 
     An UNPARSEABLE verdict is deliberately NOT retried: that is the model
     answering, and asking it the same question again is how a broken classifier
@@ -1411,7 +1472,7 @@ def ai_classify(pending_path, runner=None, models=None,
             selected, info = model_selector.select(
                 _opencode_config(), health,
                 cache_path=os.path.join(state_dir, MODEL_CACHE_FILENAME),
-                max_models=AI_MAX_MODELS, now=time.time())
+                max_models=AI_MAX_MODELS, now=time.time(), cooldown=cool)
         except Exception as exc:  # selection must never end the run
             # DEGRADED, NOT SILENT. Falling back to the static seed here is
             # exactly the state the 2026-10-13 incident happened in -- a fixed
@@ -1472,16 +1533,27 @@ def ai_classify(pending_path, runner=None, models=None,
                 # The window is spent (a timeout, or a slow attempt): the next
                 # attempt would be outside this model's allowance.
                 break
-            # max(1, min(60, remaining)): an attempt never overruns its window,
-            # and the FIRST attempt of a model still has the full 60s.
+            # max(1, ceil(remaining)): an attempt never overruns its window,
+            # and the FIRST attempt of a model still has the full 120s.
             timeout = model_selector.attempt_timeout(
                 model_deadline, now, AI_PER_ATTEMPT_TIMEOUT_SEC)
             try:
                 rc, out, err = runner(model, prompt_text, env, timeout)
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired as exc:
                 model_selector.record_failure(health, model, "timeout",
                                               at=time.time())
-                errors.append("%s: timed out after %ds" % (model, timeout))
+                # THE EVIDENCE THE OLD HANDLER THREW AWAY. TimeoutExpired
+                # carries whatever the child wrote before the kill; without it
+                # the log could only say "timed out", never why.
+                out_tail = _as_text(getattr(exc, "stdout", ""))
+                err_tail = _as_text(getattr(exc, "stderr", ""))
+                record_attempt(state_dir, model, attempt, timeout, "timeout",
+                               stdout_text=out_tail, stderr_text=err_tail)
+                evidence = collect_news.clean_ws(
+                    _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
+                errors.append("%s: timed out after %ds%s"
+                              % (model, timeout,
+                                 (" -- %s" % evidence[-200:]) if evidence else ""))
                 if attempt < attempts_per_model \
                         and time.monotonic() < model_deadline:
                     print("ai_classify: %s attempt %d timed out, retrying"
@@ -1512,6 +1584,25 @@ def ai_classify(pending_path, runner=None, models=None,
             # and stop.
             failure = model_selector.classify_failure(
                 "%s\n%s" % (out or "", err or ""), rc)
+            if failure == "model_not_found":
+                # A DEAD ID IS A FACT ABOUT THE ID, NOT THE PROVIDER. Before
+                # this arm it fell through to the unparseable tail and was
+                # remembered as `garbage` -- which never removed it from the
+                # ladder, so every later run paid another 120s window to
+                # rediscover that the id does not exist.
+                model_selector.record_cooldown(cool, model, "model_not_found",
+                                               at=time.time())
+                model_selector.save_cooldown(cooldown_path, cool)
+                model_selector.record_failure(health, model, "model_not_found",
+                                              at=time.time())
+                hours = model_selector.COOLDOWN_SEC["model_not_found"] // 3600
+                errors.append("%s: model_not_found -- the provider does not "
+                              "serve this id; cooled for %dh and skipped"
+                              % (model, hours))
+                print("ai_classify: %s -> model_not_found. The provider does "
+                      "not serve this id, so it is cooled for %dh and the walk "
+                      "moves to the next rung." % (model, hours))
+                break
             if failure == "payment_required":
                 # A PLAN REFUSAL BELONGS TO THE PROVIDER, NOT TO THIS MODEL.
                 # Before this arm existed it fell through to the unparseable
@@ -2893,10 +2984,12 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         "candidates": [_strip_internals(c) for c in candidates],
     })
 
+    ai_seconds = None
     if fast_verdict is not None:
         print("breaking_monitor: HARD-EVIDENCE FAST PATH (%s) -- the AI ladder "
               "was not consulted for this run" % fast_why)
         verdict, ai_err = fast_verdict, None
+        ai_seconds = None
         # A deterministic verdict, but NOT evidence that the ladder works: no
         # model was consulted, so it cannot resolve an AI-ladder failure.
         judged = False
@@ -2914,7 +3007,9 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
                 reason="model_call_suppressed: --no-model (diagnostic run)")
         return 0
     else:
+        _ai_started = time.perf_counter()
         verdict, ai_err = ai_classify(paths["pending"], runner=ai_runner)
+        ai_seconds = round(time.perf_counter() - _ai_started, 2)
         # A real model verdict IS the evidence: this is the only value of
         # `judged` that may resolve an open honesty-gate failure.
         judged = verdict is not None
@@ -2930,6 +3025,7 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
                 sent=False, pre_gate_why=pre_gate_why,
                 gate="passed", judged=False, gate_reason=gate_reason,
                 unjudged_titles=[c.get("title", "") for c in matched][:5],
+                ai_seconds=ai_seconds,
                 reason="ai_fail_safe: %s" % (ai_err or "unknown")[:200])
         return 0
 
@@ -2938,7 +3034,7 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
     log_row(tripped=True, level=level, confidence=confidence,
             event_id=event_id, sent=sent, pre_gate_why=pre_gate_why,
             gate="passed", judged=judged, gate_reason=gate_reason,
-            reason=reason[:200])
+            ai_seconds=ai_seconds, reason=reason[:200])
 
     if sent:
         print("breaking_monitor: ALERT sent level=%s confidence=%s (%s)"

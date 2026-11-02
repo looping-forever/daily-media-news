@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import smtplib
+import subprocess
 import sys
 import tempfile
 import threading
@@ -2720,6 +2721,92 @@ def test_62_selftest_payload_matches_tg_send_exactly():
         "delivery_selftest's Telegram payload drifted from tg_send's"
 
 
+def test_63_timeout_evidence_is_captured_redacted_and_kept():
+    """A real killed child, not a fabricated exception.
+
+    TimeoutExpired carries whatever the process wrote before the kill; the old
+    handler read neither stdout nor stderr, so the run could not say which model
+    failed or why. This drives the REAL handler with the REAL evidence a
+    timed-out child leaves behind.
+    """
+    marker = "Z" * 300
+    token = "ghp_" + "A" * 36
+    child = ("import sys, time\n"
+             "sys.stderr.write('auth failed for %s\\n')\n"
+             "sys.stderr.write('%s\\n')\n"
+             "sys.stderr.flush()\n"
+             "time.sleep(5)\n" % (token, marker))
+    timed_out = None
+    try:
+        subprocess.run([sys.executable, "-c", child],
+                       capture_output=True, text=True, timeout=0.5)
+    except subprocess.TimeoutExpired as exc:
+        timed_out = exc
+    assert timed_out is not None, "the child was expected to time out"
+    assert marker in (timed_out.stderr or ""), (
+        "the real child's stderr did not survive the kill, so this test cannot "
+        "prove the handler keeps it")
+
+    sd = fresh_dir()
+    pending = os.path.join(sd, "breaking_pending.json")
+    with open(pending, "w", encoding="utf-8") as fh:
+        fh.write("{}")
+
+    def runner(model, prompt_text, env, timeout_sec):
+        raise timed_out
+
+    verdict, err = bm.ai_classify(pending, runner=runner, models=["p/dead"],
+                                  attempts_per_model=1)
+    assert verdict is None
+    path = os.path.join(sd, "breaking_attempts.jsonl")
+    assert os.path.isfile(path), (
+        "no breaking_attempts.jsonl was written: the timeout evidence is still "
+        "being discarded")
+    with open(path, encoding="utf-8") as fh:
+        row = json.loads(fh.readline())
+    assert row["model"] == "p/dead", row
+    assert row["timeout_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, row
+    body = json.dumps(row)
+    assert marker in body, (
+        "the whole stderr must be recorded, not a 160-char tail: %r" % body)
+    assert token not in body, "a token was written to the attempt record"
+    assert "[REDACTED]" in body, body
+    assert token not in err, "a token reached the reason string (and the log row)"
+    assert "timed out" in err, err
+
+
+def test_64_a_model_not_found_is_cooled_not_called_garbage():
+    """A dead id is a fact about the ID, not an unusable ANSWER.
+
+    Before this arm `model_not_found` fell through to the unparseable tail: it
+    was remembered as `garbage`, never entered the hard cooldown, and every
+    later run paid the same window to rediscover that the id does not exist.
+    """
+    sd = fresh_dir()
+    pending = os.path.join(sd, "breaking_pending.json")
+    with open(pending, "w", encoding="utf-8") as fh:
+        fh.write("{}")
+
+    def runner(model, prompt_text, env, timeout_sec):
+        return 1, "", "ProviderModelNotFoundError: Model not found: p/gone"
+
+    verdict, err = bm.ai_classify(pending, runner=runner, models=["p/gone"],
+                                  attempts_per_model=1)
+    assert verdict is None
+    assert "model_not_found" in err, err
+
+    cool_path = bm.model_selector.cooldown_path_for(
+        os.path.join(sd, bm.MODEL_HEALTH_FILENAME))
+    cool = bm.model_selector.load_cooldown(cool_path)
+    assert bm.model_selector.on_hard_cooldown(cool, "p/gone"), (
+        "a not-found id must be cooled down, or every later run pays the same "
+        "dead rung: %r" % cool)
+
+    health = read_json(os.path.join(sd, bm.MODEL_HEALTH_FILENAME))
+    assert health["models"]["p/gone"].get("last_failure") != "garbage", (
+        "a dead id was recorded as an unusable ANSWER: %r" % health)
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -2784,6 +2871,8 @@ def main():
         test_60_chat_id_discovery_skips_a_chat_whose_sender_is_a_bot,
         test_61_smtp_factory_sets_a_connect_timeout,
         test_62_selftest_payload_matches_tg_send_exactly,
+        test_63_timeout_evidence_is_captured_redacted_and_kept,
+        test_64_a_model_not_found_is_cooled_not_called_garbage,
     ]
     failures = []
     for test in tests:

@@ -1455,6 +1455,182 @@ class AiFailSafeIsVisible(unittest.TestCase):
             "the topic must be read by name through .get(), never indexed "
             "and never interpolated into printed output")
 
+    def test_the_notice_does_not_point_at_a_log_that_cannot_hold_the_evidence(self):
+        """It used to end 'The classifier output is in this run's log.'
+        state/breaking_log.json is gitignored, carries one summary row, and is
+        not attached to the notice. The per-attempt stdout/stderr now rides in
+        the `breaking-attempts` artifact, and the wall clock comes from the
+        row's ai_seconds field."""
+        code = yaml_heredoc(BREAKING_WF, "ai_fail_safe")
+        self.assertNotIn(
+            "classifier output is in this run's log", code,
+            "the notice still claims evidence that is not in the log")
+        self.assertIn("breaking-attempts", code,
+                      "the notice must name the artifact that carries the "
+                      "per-model attempt detail")
+        self.assertIn("ai_seconds", code,
+                      "the notice's wall-clock figure must come from the log "
+                      "row, not from a guess")
+
+
+class DryRunDispatchSpendsNoLadderTime(unittest.TestCase):
+    """workflow_dispatch's dry_run input defaults to true.
+
+    It is a diagnostic, not a classifier probe: the 2026-11 drift-canary
+    measurement was 29 of a week's 292 model attempts, all proving nothing a
+    unit test cannot. --dry-run ALONE still calls the model by design (pinned
+    in test_breaking_gate.py), so the suppression belongs at the dispatch site.
+    """
+
+    def test_the_dispatch_dry_run_branch_adds_no_model(self):
+        src = _read(BREAKING_WF)
+        m = re.search(
+            r'if \[ "\$DRY_RUN" = "true" \]; then(.*?)\n\s*fi', src, re.S)
+        self.assertIsNotNone(
+            m, "the DRY_RUN -> ARGS guard is gone from breaking-monitor.yml")
+        branch = m.group(1)
+        self.assertIn('ARGS="--dry-run --no-model"', branch,
+                      "a dry-run dispatch would still spend the free pool: "
+                      "%r" % branch)
+
+
+# ==========================================================================
+# (E) STATE COMMITS SURVIVE A CONCURRENT RUN
+# ==========================================================================
+
+def bash_exe():
+    """A real bash for scripts/commit_state.sh, or "" when the host has none."""
+    for candidate in (shutil.which("bash"),
+                      r"C:\Program Files\Git\bin\bash.exe",
+                      r"C:\Program Files\Git\usr\bin\bash.exe"):
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    return ""
+
+
+class StateCommitNeverDropsAConcurrentRun(unittest.TestCase):
+    """scripts/commit_state.sh against a bare remote, run for real.
+
+    THE RED-BEFORE, quoted: the old steps resolved the 08:14/08:27 race with
+
+        git pull --ff-only || git pull --rebase -X theirs
+
+    and `-X theirs` takes the REMOTE copy of state/model_health.json, so the
+    local increment -- the record this repository commits so the next run stops
+    retrying a slow model -- was silently thrown away.
+    """
+
+    def setUp(self):
+        self.git = shutil.which("git")
+        self.bash = bash_exe()
+        if not (self.git and self.bash):
+            self.skipTest("bash and git are required to exercise the commit step")
+        self.tmp = tempfile.mkdtemp(prefix="state-race-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.remote = os.path.join(self.tmp, "remote.git")
+        self._git("init", "--bare", "-b", "master", self.remote)
+        self.work = os.path.join(self.tmp, "work")
+        self._git("clone", self.remote, self.work)
+        self._git("config", "user.name", "t", cwd=self.work)
+        self._git("config", "user.email", "t@example.invalid", cwd=self.work)
+        os.makedirs(os.path.join(self.work, "state"))
+        os.makedirs(os.path.join(self.work, "scripts"), exist_ok=True)
+        shutil.copy2(os.path.join(SCRIPTS, "commit_state.sh"),
+                     os.path.join(self.work, "scripts", "commit_state.sh"))
+        self._write_work({"models": {"p/a": {"timeout": 1}}})
+        self._git("add", "scripts/commit_state.sh",
+                  "state/model_health.json", cwd=self.work)
+        self._git("commit", "-m", "base", cwd=self.work)
+        self._git("push", "origin", "HEAD:master", cwd=self.work)
+
+    # -- fixture helpers ---------------------------------------------------
+
+    def _git(self, *args, cwd=None, check=True):
+        proc = subprocess.run([self.git] + list(args), cwd=cwd,
+                              capture_output=True, text=True)
+        if check and proc.returncode:
+            raise AssertionError("git %s failed:\n%s\n%s"
+                                 % (" ".join(args), proc.stdout, proc.stderr))
+        return proc
+
+    def _write_work(self, doc):
+        with io.open(os.path.join(self.work, "state", "model_health.json"),
+                     "w", encoding="utf-8") as fh:
+            json.dump(doc, fh, indent=1)
+
+    def _concurrent(self, doc):
+        """A second run pushes its own state before this one pushes."""
+        other = os.path.join(self.tmp, "other")
+        self._git("clone", self.remote, other)
+        self._git("config", "user.name", "o", cwd=other)
+        self._git("config", "user.email", "o@example.invalid", cwd=other)
+        with io.open(os.path.join(other, "state", "model_health.json"),
+                     "w", encoding="utf-8") as fh:
+            json.dump(doc, fh, indent=1)
+        self._git("add", "state/model_health.json", cwd=other)
+        self._git("commit", "-m", "concurrent run", cwd=other)
+        self._git("push", "origin", "HEAD:master", cwd=other)
+
+    def _run_step(self, doc):
+        self._write_work(doc)
+        env = dict(os.environ)
+        env.update({"GITHUB_REF_NAME": "master", "GITHUB_TOKEN": ""})
+        proc = subprocess.run(
+            [self.bash, "scripts/commit_state.sh",
+             "chore: update breaking monitor state [skip ci]",
+             "state/model_health.json"],
+            cwd=self.work, env=env, capture_output=True, text=True)
+        self.assertEqual(0, proc.returncode, proc.stdout + proc.stderr)
+        return (proc.stdout or "") + (proc.stderr or "")
+
+    def _remote_state(self):
+        check = os.path.join(self.tmp, "check")
+        if os.path.isdir(check):
+            shutil.rmtree(check)
+        self._git("clone", self.remote, check)
+        with io.open(os.path.join(check, "state", "model_health.json"),
+                     encoding="utf-8") as fh:
+            return json.load(fh)
+
+    # -- the two shapes ----------------------------------------------------
+
+    def test_a_concurrent_commit_does_not_drop_this_runs_increment(self):
+        self._concurrent({"models": {"p/a": {"timeout": 1},
+                                     "p/b": {"timeout": 5}}})
+        out = self._run_step({"models": {"p/a": {"timeout": 2},
+                                         "p/b": {"timeout": 5}}})
+        state = self._remote_state()
+        self.assertEqual(2, state["models"]["p/a"]["timeout"],
+                         "this run's health increment was dropped: %r\n%s"
+                         % (state, out))
+        self.assertEqual(5, state["models"]["p/b"]["timeout"],
+                         "the concurrent run's row must survive too: %r" % state)
+
+    def test_a_conflicting_change_re_applies_this_runs_state(self):
+        self._concurrent({"models": {"p/a": {"timeout": 9}}})
+        out = self._run_step({"models": {"p/a": {"timeout": 2}}})
+        state = self._remote_state()
+        self.assertEqual(2, state["models"]["p/a"]["timeout"],
+                         "the conflicting resolution discarded this run's "
+                         "state again: %r\n%s" % (state, out))
+        self.assertIn("re-applying", out,
+                      "the step must SAY it re-applied rather than discard: %s"
+                      % out)
+
+    def test_the_workflow_no_longer_uses_theirs_anywhere(self):
+        """Comments may describe the old resolution; no COMMAND may use it."""
+        src = _read(BREAKING_WF)
+        offenders = [line for line in src.splitlines()
+                     if "-X theirs" in line
+                     and not line.lstrip().startswith("#")]
+        self.assertEqual(
+            [], offenders,
+            "the race is still resolved by discarding this run's state file")
+        self.assertGreaterEqual(
+            src.count("scripts/commit_state.sh"), 3,
+            "all three state writers (breaking state, cooldowns, ledger) must "
+            "use the retrying commit")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

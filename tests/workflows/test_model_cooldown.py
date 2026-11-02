@@ -44,6 +44,11 @@ from unittest import mock
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+#: The shared commit helper every state step now calls. It is read statically
+#: here and copied into each executed fixture, because a step that names a
+#: repository path only works when the checkout actually carries it.
+COMMIT_STATE = REPO_ROOT / "scripts" / "commit_state.sh"
+
 import model_selector as ms  # noqa: E402
 
 try:
@@ -633,10 +638,14 @@ class PersistedCooldownStepTests(unittest.TestCase):
         self._must(work, "config", "user.name", "cooldown")
         self._must(work, "config", "user.email", "cooldown@example.invalid")
         self._must(work, "config", "commit.gpgsign", "false")
+        (work / "scripts").mkdir()
+        shutil.copy2(str(COMMIT_STATE),
+                     str(work / "scripts" / "commit_state.sh"))
         (work / "state").mkdir()
         self._write(work, {"schema_version": 1, "models": {}})
         (work / "notes.txt").write_text("seed\n", encoding="utf-8")
-        self._must(work, "add", self.STATE, "notes.txt")
+        self._must(work, "add", "scripts/commit_state.sh", self.STATE,
+                   "notes.txt")
         self._must(work, "commit", "-q", "-m", "seed")
         self._must(work, "push", "-q", "origin", "master")
         return origin, work
@@ -701,8 +710,15 @@ class PersistedCooldownStepTests(unittest.TestCase):
                     str((st.get("env") or {}).get("GITHUB_TOKEN") or ""),
                     "the checkout persists no credentials, so this step needs "
                     "the token in its own env: block")
-                self.assertIn("auth=(", run,
-                              "the step must build the `git -c` auth argument")
+                self.assertIn(
+                    "scripts/commit_state.sh", run,
+                    "the step must publish through the shared bounded-retry "
+                    "commit: it is what builds the `git -c` auth argument and "
+                    "what re-applies this run's copy instead of the remote's")
+                self.assertIn(
+                    "auth=(", COMMIT_STATE.read_text(encoding="utf-8"),
+                    "the shared commit script must build the `git -c` auth "
+                    "argument, or the push runs unauthenticated in Actions")
 
     def test_the_persisting_step_comes_after_the_walk_that_writes_it(self):
         for wf in self.WORKFLOWS:
@@ -725,6 +741,10 @@ class PersistedCooldownStepTests(unittest.TestCase):
                     % (wf, self.STEP))
 
     def test_staging_is_by_explicit_name_only(self):
+        script_lines = [
+            line for line in COMMIT_STATE.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")]
+        script = "\n".join(script_lines)
         for wf in self.WORKFLOWS:
             with self.subTest(workflow=wf):
                 _job, run, _st = self._step(wf)
@@ -733,18 +753,13 @@ class PersistedCooldownStepTests(unittest.TestCase):
                 commands = "\n".join(
                     line for line in run.splitlines()
                     if line.strip() and not line.strip().startswith("#"))
-                adds = [line.strip() for line in commands.splitlines()
-                        if re.match(r"git add\b", line.strip())]
-                self.assertEqual(
-                    1, len(adds),
-                    "expected exactly one `git add`, found %r. Staging is by "
-                    "explicit name or it is a sweep." % (adds,))
-                self.assertEqual(
-                    'git add -- "$MODEL_STATE"', adds[0],
-                    "the single staging command must name the cooldown path")
                 self.assertIn(
                     "MODEL_STATE=%s" % self.STATE, commands,
                     "the step must name the one tracked model-state file")
+                self.assertIn(
+                    "scripts/commit_state.sh", commands,
+                    "staging moved into the shared helper, which stages only "
+                    "the paths it is given")
                 for forbidden in ("git add -A", "git add --all", "git add -u",
                                   "git add .", "git add state/",
                                   "git add state ", "git commit -a",
@@ -754,6 +769,19 @@ class PersistedCooldownStepTests(unittest.TestCase):
                         "%s: %r would sweep in whatever the workspace holds "
                         "(including state/email.html), not just the cooldown"
                         % (wf, forbidden))
+                    self.assertNotIn(
+                        forbidden, script,
+                        "the shared commit script must never sweep: %r"
+                        % forbidden)
+        self.assertIn(
+            'git add -- "$f"', script,
+            "the shared commit script must stage each named path, nothing else")
+        self.assertIn(
+            '"$MODEL_STATE"', "\n".join(
+                line for _job, run, _st in
+                (self._step(wf) for wf in self.WORKFLOWS)
+                for line in run.splitlines()),
+            "the path the step names must be the path it hands to the script")
 
     # -- the step, executed ------------------------------------------------
 
@@ -853,7 +881,18 @@ class PersistedCooldownStepTests(unittest.TestCase):
                     .split()[0],
                     "%s: the step must touch nothing but the cooldown path" % wf)
 
-    def test_a_lost_rebase_race_logs_and_does_not_red_the_step(self):
+    def test_a_dirty_tree_does_not_cost_the_run_its_cooldown(self):
+        """A file another step left dirty must not swallow this run's cooldown.
+
+        THE OLD SHAPE, quoted: `git pull --ff-only || git pull --rebase
+        -X theirs`. `git pull --rebase` refuses to start on a dirty tree, so
+        the step printed a loss and exited without pushing -- the recorded
+        cooldown never reached master, and every other workflow went on
+        burning the bucket. The shared helper re-applies through the INDEX,
+        so the earlier step's uncommitted work survives AND the cooldown is
+        published. The supersession it performs is named in the log rather
+        than left to be discovered later.
+        """
         for wf in self.WORKFLOWS:
             with self.subTest(workflow=wf):
                 origin, work = self._repo(wf.replace(".yml", "") + "-race")
@@ -867,31 +906,41 @@ class PersistedCooldownStepTests(unittest.TestCase):
                 self._must(other, "add", "concurrent.txt")
                 self._must(other, "commit", "-q", "-m", "concurrent push")
                 self._must(other, "push", "-q", "origin", "master")
-                seed = self._remote(origin)
 
                 self._write(work, {
                     "schema_version": 1, "models": {},
                     "pool": {"until": "2026-10-28T08:56:56+00:00",
                              "reason": "quota_or_rate_limited"},
                 })
-                # A dirty tracked file is what makes the rebase itself refuse;
-                # the remote commit above is the race it is refusing over.
+                # An earlier step's uncommitted edit. The step must save its
+                # own file without discarding this one.
                 with open(work / "notes.txt", "a", encoding="utf-8") as fh:
                     fh.write("touched by an earlier step\n")
 
                 proc = self._run(wf, work)
                 self.assertEqual(
                     0, proc.returncode,
-                    "%s: losing a race must be neutral, not a red run (exit %d)"
+                    "%s: a dirty tree must be neutral, not a red run (exit %d)"
                     "\n%s\n%s" % (wf, proc.returncode, proc.stdout, proc.stderr))
                 self.assertIn(
-                    "LOST THE COOLDOWN REBASE RACE", proc.stdout,
-                    "%s: the loss must be VISIBLE in the log; a silent loss is "
-                    "the defect this step exists to remove" % wf)
+                    "re-applying", proc.stdout,
+                    "%s: the supersession must be VISIBLE in the log; a silent "
+                    "loss is the defect this step exists to remove" % wf)
+                pushed = self._remote(origin)
                 self.assertEqual(
-                    seed, self._remote(origin),
-                    "%s: the refused cooldown must not appear on origin/master "
-                    "by accident" % wf)
+                    "quota_or_rate_limited", pushed["pool"].get("reason"),
+                    "%s: the recorded cooldown never reached origin/master -- "
+                    "one dirty file cost the whole pool wall" % wf)
+                self.assertIn(
+                    "touched by an earlier step",
+                    (work / "notes.txt").read_text(encoding="utf-8"),
+                    "%s: saving our state discarded another step's uncommitted "
+                    "edit, which a `reset --hard` re-apply would do" % wf)
+                tip = self._must(origin, "log", "-1", "--format=%s", "master")
+                self.assertIn(
+                    "persist model cooldown state", tip.stdout,
+                    "%s: the cooldown was not pushed as its own commit (tip: %r)"
+                    % (wf, tip.stdout.strip()))
 
 
 class SharedPoolTests(unittest.TestCase):

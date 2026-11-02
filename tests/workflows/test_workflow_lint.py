@@ -72,6 +72,10 @@ except ImportError:  # pragma: no cover - direct execution of this file
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from tests import workflows as W
 
+#: The shared commit/push helper. A step that names it is a state-commit step
+#: even though the `git commit` text lives in the script instead of the `run:`.
+DELEGATED_COMMIT = "scripts/commit_state.sh"
+
 
 # ==========================================================================
 # Check 2 helpers (shared with the regression test that proves they fail)
@@ -3407,14 +3411,17 @@ class CheckoutCredentialTests(WorkflowLintBase):
 
     def test_every_commit_step_injects_its_own_token(self):
         commit_steps = []
+        delegated = []
         for wf in W.WORKFLOW_NAMES:
             for job, step, run, st in W.iter_run_blocks(wf):
                 if "git commit" in run:
                     commit_steps.append((wf, job, step, run, st))
+                elif DELEGATED_COMMIT in run:
+                    delegated.append((wf, job, step, run, st))
         self.assertGreaterEqual(
-            len(commit_steps), 4,
+            len(commit_steps) + len(delegated), 4,
             "expected the four `[skip ci]` state commits, found %d"
-            % len(commit_steps))
+            % (len(commit_steps) + len(delegated)))
         offenders = []
         for wf, job, step, run, st in commit_steps:
             env_token = (st.get("env") or {}).get("GITHUB_TOKEN") or ""
@@ -3438,12 +3445,30 @@ class CheckoutCredentialTests(WorkflowLintBase):
                         "%s / %s / %r: unauthenticated network command %r -- it "
                         "must use the `git -c` auth argument"
                         % (wf, job, step, stripped))
+        # A step that hands the push to the shared script still has to provide
+        # the token, and the script still has to turn it into `-c` arguments.
+        script = (W.REPO_ROOT / "scripts" / "commit_state.sh").read_text(
+            encoding="utf-8")
+        for wf, job, step, run, st in delegated:
+            env_token = (st.get("env") or {}).get("GITHUB_TOKEN") or ""
+            if "secrets.GITHUB_TOKEN" not in env_token:
+                offenders.append(
+                    "%s / %s / %r: publishes through %s but has no "
+                    "GITHUB_TOKEN in its own env:"
+                    % (wf, job, step, DELEGATED_COMMIT))
+        if delegated and "auth=(" not in script:
+            offenders.append(
+                "%s does not build the `git -c` auth argument, so every "
+                "delegated commit would push unauthenticated"
+                % DELEGATED_COMMIT)
         self.assertEqual(
             [], offenders,
             "state commits that cannot authenticate after "
             "persist-credentials: false:\n  " + "\n  ".join(offenders))
-        print("check 14: %d state commit steps each inject their own token"
-              % len(commit_steps))
+        print("check 14: %d state commit steps each inject their own token "
+              "(%d inline, %d through %s)"
+              % (len(commit_steps) + len(delegated), len(commit_steps),
+                 len(delegated), DELEGATED_COMMIT))
 
     def test_the_auto_agent_job_does_not_persist_credentials(self):
         """Targeted: the job that actually runs `opencode run --auto`."""
