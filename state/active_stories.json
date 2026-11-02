@@ -8714,6 +8714,36 @@
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
       "updated_at": "2026-11-02T07:21:30+05:45"
+    },
+    {
+      "event_id": "evt-db4899fdc78b",
+      "event_key": null,
+      "canonical_title": "Ilam’s recovery remains incomplete a year after 39 people were killed, despite reconstruction promises - Nepalnews.com",
+      "category": "local_city",
+      "first_seen": "2026-11-02",
+      "last_seen": "2026-11-02",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmi1wfbvv95cuxqmddcaunjn0trn2tvsgnwtxdqdei3ymfwrf9drxhyym5unedtr2fjefq5ovlwzlfsoe9cnxy0medftgjketnzzzb2a1ewws1rdxb6txhzswlec25xykf6vnlzbtlxqlbxr0txvdu2rwnbx1dazvzmwe11ulvdb05rnk13rupdckhfz1bmlxdzedlhcfzkzvfjvgrregthahfldwn4x3lab3g3uwrbnwztc3ytnvpbq3r5a3vuvfpvc00zdgt2uljuv1bon2i3nelva0rqzkn0yw"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-02T17:01:05+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-02T17:01:05+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []
