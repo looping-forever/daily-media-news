@@ -181,13 +181,31 @@ performs no access decision. It can stay as it is.
 
 ## 5. Manual operations cheat-sheet (`gh` CLI)
 
+All nine workflows in `.github/workflows/` carry a `workflow_dispatch` trigger, so
+every one can be started by hand. The inputs below are transcribed from each
+file's `workflow_dispatch.inputs` block (verified 2026-11-02); two workflows take
+no inputs at all.
+
+**The operational risk is uneven.** Most manual dispatches are safe at their
+defaults: `breaking-monitor.yml`, `academic-result.yml` and `ledger-repair.yml`
+default to a dry run, and `digest-prebuild.yml` has no safe defaults because it
+never invents a slot. `daily-news.yml` is the exception — its defaults
+**publish and deliver**. `delivery-selftest.yml` sends by design, and
+`digest-watchdog.yml`, `budget-sentinel.yml` and `drift-canary.yml` can notify
+(or, in the watchdog's case, trigger a delivery) when their own condition says
+something is wrong.
+
+### Trigger examples
+
 ```bash
-# Trigger a digest manually (dry run first is recommended):
+# Digest: -f digest_time=... is mandatory (it has no default).
 gh workflow run daily-news.yml -f digest_time=morning -f dry_run=true
 gh workflow run daily-news.yml -f digest_time=evening -f dry_run=false
 
-# Trigger a breaking scan manually (dry_run defaults to true):
-gh workflow run breaking-monitor.yml -f dry_run=true
+# Breaking scan: dry_run defaults to true, which also suppresses the model call.
+gh workflow run breaking-monitor.yml
+# Probe the AI ladder once: spends free-tier quota, never sends.
+gh workflow run breaking-monitor.yml -f ladder_probe=true
 
 # Force one full detection pass on the Worker right now (browser or curl):
 open https://breaking-monitor.<your-subdomain>.workers.dev/?run=1
@@ -202,8 +220,31 @@ gh run list --limit 10
 #    each run's summary appears in the Actions step summary.
 ```
 
+### Dispatch inputs
+
+#### `daily-news.yml` — builds, publishes and delivers a digest
+
+| Input | Default | Effect |
+|---|---|---|
+| `digest_time` | **none — required** (`morning` \| `evening`) | Which slot to build. Omitting it fails the dispatch outright. |
+| `dry_run` | `false` | `true` runs collection, validation, render and artifact upload only: no Pages deploy, no state commit, no notification. |
+| `trigger_source` | `manual` | Origin label for this run. The Worker sends `worker`, `prebuild` or `supersede`; a human dispatch stays `manual`. It is also what decides whether a `phase=prebuild` dispatch may publish (see `publish`). |
+| `retry_slot` | `""` | Slot being retried. Must equal `digest_time` or the first step exits fatally. Set by `digest-watchdog.yml`. |
+| `retry_of` | `""` | NPT date of the empty digest being retried; recorded and printed by the empty-digest assertion. |
+| `slot_date` | `""` | NPT date `YYYY-MM-DD` of the slot. Empty derives it: today in Nepal for a manual dispatch, the actual firing for a scheduled run. |
+| `phase` | `full` | `full` builds for delivery; `prebuild` builds ahead of the slot, forces the notification path dry, and seals an artifact for `digest-prebuild.yml`. |
+| `publish` | `false` | Only affects a manual `phase=prebuild` run: unless `true`, it is build-and-upload only — no page deploy, no state/archive commit, no KV ledger write, no seal hand-off. Ignored when `phase=full`. |
+| `simulate_pool_refusal` | `false` | Fails the model walk as a shared-pool refusal with **zero model calls**, to exercise the degraded path. Manual dispatch only; ignored on `schedule`. |
+
+**Can it publish or notify?** Yes. A default dispatch (`phase=full`,
+`dry_run=false`) deploys the page, commits the archive/state and sends the digest
+notification. `phase=prebuild` always suppresses the notification; add
+`publish=true` only when a page/archive/KV write is actually intended. Note that
+`phase=prebuild` **with** `trigger_source=prebuild` is treated as the Worker's own
+arm and publishes without `publish=true`.
+
 > ⚠️ **`gh workflow run daily-news.yml` is not a bare dispatch, and it can silently
-> publish nothing.** Discovered while deploying the origin auth control (§4a).
+> publish nothing.**
 >
 > - **It requires `-f digest_time=…`.** Without it the dispatch fails outright with
 >   `HTTP 422: Required input 'digest_time' not provided`.
@@ -217,6 +258,126 @@ gh run list --limit 10
 > confirm the deploy step actually ran in the run's step log — do not trust the
 > green tick alone.
 
+#### `breaking-monitor.yml` — classifies and can send a breaking alert
+
+| Input | Default | Effect |
+|---|---|---|
+| `dry_run` | `true` | `true` runs `--dry-run --no-model`: the importance gate and hard-evidence path run, previews are written, nothing is sent and no model quota is spent. `false` takes the live path (ntfy first, email/Telegram as fallbacks). |
+| `ladder_probe` | `false` | Walks the configured AI ladder once on a fixed synthetic candidate (up to four 150 s windows). Never sends, cannot promote a rung or mark the ladder healthy, and writes `state/ladder_probe.json`, which the state commit persists. Honoured only on `workflow_dispatch`; it overrides the `dry_run` argument even if `dry_run=false`. |
+
+**Can it publish or notify?** Not at its defaults. `dry_run=false` on this
+workflow is the only manual shape that can send a real alert, and
+`ladder_probe=true` never sends regardless of `dry_run`.
+
+**What a probe run records, and what it cannot conclude.** `state/ladder_probe.json`
+holds one row per attempt — granted window, measured wall, **first model byte**,
+outcome — plus a top-level `attribution` field. A rung that has written no model
+output after `AI_FIRST_OUTPUT_SEC` (40 s) is abandoned rather than left to burn
+its whole 150 s window, and `no_output` is recorded instead of a guessed timeout,
+so the free walk's worst case is `4 × 40 + 40 = 200 s` rather than 600 s. The
+probe also walks **one control rung** against the keyed provider
+(`config/opencode-cli.json`, credential `GEMINI_API_KEY`) in its own state
+directory, labelled `"control": true` and excluded from the free `verdict`. That
+is the only way to tell a stalled free tier from a runner that never shows model
+output at all:
+
+| `attribution` | Means |
+|---|---|
+| `harness_no_stream` | The control rung also emitted nothing. Nothing about the free pool can be learned from this run; fix the invocation first. |
+| `free_tier_stalled` | The control answered, no free rung ever produced a byte. The free pool is the fault. |
+| `free_tier_answered` | At least one free rung produced model output. The ladder is reachable; `verdict` then says whether the answer parsed. |
+| `inconclusive` | The control is unconfigured (`control: unconfigured`, no `GEMINI_API_KEY`) or neither side produced evidence either way. |
+
+The credential reaches the **control child only** — `ai_classify` is given an
+`OPENCODE_CONFIG` that the sweep never sees, so probe mode cannot change which
+models a real run walks. The variable's name is recorded; its value never is.
+Two honest limits: the 40 s deadline would abandon a free rung that is merely
+slow to its first token (one measured 137.6 s once), and the probe still cannot
+show whether a *real* sweep would have answered — it shows what the invocation
+did on this run.
+
+#### `digest-prebuild.yml` — seals an already-built digest into the Worker
+
+Normally dispatched by `daily-news.yml` (which passes its own run id), not by hand.
+
+| Input | Default | Effect |
+|---|---|---|
+| `run_id` | **none — required** | Run id of the `daily-news.yml` prebuild whose uploaded artifact this run must seal. The seal refuses a missing, in-progress or failed run. |
+| `digest_time` | **none — required** (`morning` \| `evening`) | Which slot to seal. |
+| `slot_date` | `""` | Nepal date `YYYY-MM-DD` of the slot; empty derives it from the named slot's own firing. |
+
+**Can it publish or notify?** It does not build or deploy a digest; it verifies
+the named prebuild failed-or-not, downloads its artifact, checks the page answers
+anonymously, seals the artifact into the Worker's KV, commits the delivery-ledger
+mirror, and — only when the ledger says that slot's push was degraded
+(`partial`, `fallback_last_good`, `unavailable`) — dispatches a `daily-news.yml`
+supersede at `phase=full`, which **does** push. So it can cause a notification,
+but only on that repair path.
+
+#### `digest-watchdog.yml` — missing/empty digest checks and the retry ladder
+
+| Input | Default | Effect |
+|---|---|---|
+| `ladder_only` | `false` | `false` runs both jobs: the slot delivery check and the empty-digest retry ladder. `true` runs only the retry ladder and skips the slot check. The Worker sets `true` when a retry is due. |
+
+**Can it publish or notify?** Yes, indirectly and by design. The slot check files
+a GitHub issue and sends an ntfy alert when a digest is missing; the retry job
+re-dispatches `daily-news.yml`, whose run can deliver a real digest.
+
+#### `academic-result.yml` — TU result monitor
+
+| Input | Default | Effect |
+|---|---|---|
+| `dry_run` | `true` | `true` writes `state/academic_notify_preview.json` instead of delivering. `false` takes the live path (ntfy + website) for a detected result. |
+
+**Can it publish or notify?** Only with `dry_run=false`.
+
+#### `delivery-selftest.yml` — one labelled test message per channel
+
+| Input | Default | Effect |
+|---|---|---|
+| `channel` | `both` | Which channel(s) to exercise: `both`, `telegram` or `gmail`. Narrow this on a retry so the channel that already passed is not messaged twice. |
+
+**Can it publish or notify?** Yes — by design it sends exactly one test message
+per selected channel and no digest content. That is its whole purpose.
+
+#### `ledger-repair.yml` — one-off repair of the KV delivery ledger
+
+| Input | Default | Effect |
+|---|---|---|
+| `dry_run` | `true` (required) | `true` reads KV and prints the planned diff without writing. `false` applies the declared correction, PUTs it back and re-reads it to verify. |
+
+**Can it publish or notify?** No. It never sends, deploys or commits; its only
+write is the single gated KV PUT.
+
+#### `budget-sentinel.yml` — takes no inputs
+
+Reads `config/actions-budget.json` and the month's run durations, then files an
+issue and sends an ntfy message at 80% of the ceiling, again at 90% with a
+`budget-freeze` label, and at 100% fails the job on purpose. **It can notify**
+(issue and ntfy) when a threshold is crossed; it never publishes a digest.
+
+#### `drift-canary.yml` — takes no inputs
+
+Runs the CLI/ladder/flag drift checks and the anonymous probes of both Pages
+hostnames, and fails on a gated or non-2xx archive. **It can notify**: its live
+canary passes `--notify`, so a persistent failure escalates to an ntfy page at
+strike 2 and above. It publishes nothing.
+
+### Reading a run when the artifact host is flaky
+
+`gh run view <run-id>` renders a web page and can fail or truncate while the
+Actions artifact/log host is unhealthy. Two fallbacks do not depend on it:
+`gh run view <run-id> --log` prints the whole run's log (add `--job <job-id>` to
+narrow it), and the per-job raw endpoint
+`gh api repos/<owner>/<repo>/actions/jobs/<job-id>/logs --allow-escape-sequences`
+returns the same text without the rendered view. Beyond the logs, the durable
+record is committed state: the bot commits `state/last_digest_sent.json`,
+`state/digest_retry.json`, `state/breaking_state.json`,
+`state/breaking_delivery.json`, `state/model_health.json` and
+`state/ladder_probe.json` with `[skip ci]`, so `git log` / `git show` on `master`
+shows exactly what a run recorded even when the artifact cannot be downloaded.
+
 ## 6. Enable / disable the system
 
 ```bash
@@ -225,9 +386,11 @@ gh workflow disable daily-news.yml
 gh workflow enable  daily-news.yml
 ```
 
-The breaking monitor has **no schedule anymore** (it is event-driven from the
-Worker), so disabling it is not needed. To pause breaking detection entirely,
-pause/disable the Cloudflare Worker's cron trigger instead.
+The breaking monitor is event-driven from the Worker, plus one scheduled
+dead-man's-switch run a day at `20 1 * * *` UTC (07:05 NPT) so a dead Worker is
+noticed within ~24 hours. Disabling it therefore also removes that backstop. To
+pause breaking detection entirely, pause/disable the Cloudflare Worker's cron
+trigger instead.
 
 ## 7. Free-tier limits
 
