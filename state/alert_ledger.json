@@ -2,14 +2,14 @@
   "conditions": {
     "breaking.honesty_gate||": {
       "alerted_at": "2026-11-02T14:15:07Z",
-      "cause": "ai_fail_safe: models=opencode/muse-spark-1.3-contributor-free,opencode/ling-3.0-flash-fin-free,opencode/muse-spark-1.2-contributor-free,opencode/nemotron-3-ultra-free source=live; opencode/muse-spark-1.3-contributo",
+      "cause": "ai_fail_safe: models=opencode/mimo-v2.5-free,opencode/big-pickle,opencode/deepseek-v4.1-flash-free,opencode/beam-free source=live; opencode/mimo-v2.5-free: model_not_found -- the provider does not serve this id; co",
       "first_seen": "2026-11-02T01:24:21Z",
       "healthy_streak": 0,
-      "last_seen": "2026-11-02T14:56:33Z",
-      "runs": 31,
+      "last_seen": "2026-11-02T15:38:36Z",
+      "runs": 32,
       "window_first": "2026-11-02T14:28:26Z",
-      "window_last": "2026-11-02T14:56:33Z",
-      "window_runs": 3
+      "window_last": "2026-11-02T15:38:36Z",
+      "window_runs": 4
     }
   },
   "schema_version": 1
