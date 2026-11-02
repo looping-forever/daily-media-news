@@ -64,42 +64,42 @@
     "opencode/muse-spark-1.3-contributor-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 0,
+      "transport": 1,
       "garbage": 3,
-      "consecutive_failures": 3,
-      "last_failure": "garbage",
-      "last_fail_at": 1793628904.02456,
-      "cooldown_until": 1793693704.02456
+      "consecutive_failures": 4,
+      "last_failure": "transport",
+      "last_fail_at": 1793631383.2278621,
+      "cooldown_until": 1793717783.2278621
     },
     "opencode/ling-3.0-flash-fin-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 0,
+      "transport": 1,
       "garbage": 3,
-      "consecutive_failures": 3,
-      "last_failure": "garbage",
-      "last_fail_at": 1793629698.3567479,
-      "cooldown_until": 1793694498.3567479
+      "consecutive_failures": 4,
+      "last_failure": "transport",
+      "last_fail_at": 1793631385.340091,
+      "cooldown_until": 1793717785.340091
     },
     "opencode/muse-spark-1.2-contributor-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 0,
+      "transport": 1,
       "garbage": 3,
-      "consecutive_failures": 3,
-      "last_failure": "garbage",
-      "last_fail_at": 1793629700.1265006,
-      "cooldown_until": 1793694500.1265006
+      "consecutive_failures": 4,
+      "last_failure": "transport",
+      "last_fail_at": 1793631387.5049891,
+      "cooldown_until": 1793717787.5049891
     },
     "opencode/nemotron-3-ultra-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 0,
+      "transport": 1,
       "garbage": 3,
-      "consecutive_failures": 3,
-      "last_failure": "garbage",
-      "last_fail_at": 1793629701.7883093,
-      "cooldown_until": 1793694501.7883093
+      "consecutive_failures": 4,
+      "last_failure": "transport",
+      "last_fail_at": 1793631389.7179255,
+      "cooldown_until": 1793717789.7179255
     },
     "opencode/mimo-v2.5-free": {
       "success": 0,
