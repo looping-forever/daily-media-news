@@ -3,13 +3,13 @@
   "models": {
     "opencode/deepseek-v4.1-flash-free": {
       "success": 0,
-      "timeout": 2,
+      "timeout": 4,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 2,
+      "consecutive_failures": 4,
       "last_failure": "timeout",
-      "last_fail_at": 1793607450.1019537,
-      "cooldown_until": 1793650650.1019537
+      "last_fail_at": 1793608509.070678,
+      "cooldown_until": 1793694909.070678
     },
     "opencode/beam-free": {
       "success": 0,
@@ -65,51 +65,51 @@
       "success": 0,
       "timeout": 0,
       "transport": 0,
-      "garbage": 1,
-      "consecutive_failures": 1,
+      "garbage": 2,
+      "consecutive_failures": 2,
       "last_failure": "garbage",
-      "last_fail_at": 1793608086.8830624,
-      "cooldown_until": 1793629686.8830624
+      "last_fail_at": 1793608440.6939108,
+      "cooldown_until": 1793651640.6939108
     },
     "opencode/ling-3.0-flash-fin-free": {
       "success": 0,
       "timeout": 0,
       "transport": 0,
-      "garbage": 1,
-      "consecutive_failures": 1,
+      "garbage": 2,
+      "consecutive_failures": 2,
       "last_failure": "garbage",
-      "last_fail_at": 1793608088.5240734,
-      "cooldown_until": 1793629688.5240734
+      "last_fail_at": 1793608442.7424932,
+      "cooldown_until": 1793651642.7424932
     },
     "opencode/muse-spark-1.2-contributor-free": {
       "success": 0,
       "timeout": 0,
       "transport": 0,
-      "garbage": 1,
-      "consecutive_failures": 1,
+      "garbage": 2,
+      "consecutive_failures": 2,
       "last_failure": "garbage",
-      "last_fail_at": 1793608090.1260786,
-      "cooldown_until": 1793629690.1260786
+      "last_fail_at": 1793608444.7943377,
+      "cooldown_until": 1793651644.7943377
     },
     "opencode/nemotron-3-ultra-free": {
       "success": 0,
       "timeout": 0,
       "transport": 0,
-      "garbage": 1,
-      "consecutive_failures": 1,
+      "garbage": 2,
+      "consecutive_failures": 2,
       "last_failure": "garbage",
-      "last_fail_at": 1793608091.742642,
-      "cooldown_until": 1793629691.742642
+      "last_fail_at": 1793608446.8523777,
+      "cooldown_until": 1793651646.8523777
     },
     "opencode/mimo-v2.5-free": {
       "success": 0,
       "timeout": 0,
       "transport": 0,
-      "garbage": 1,
-      "consecutive_failures": 1,
+      "garbage": 2,
+      "consecutive_failures": 2,
       "last_failure": "garbage",
-      "last_fail_at": 1793608093.4679565,
-      "cooldown_until": 1793629693.4679565
+      "last_fail_at": 1793608448.9419546,
+      "cooldown_until": 1793651648.9419546
     },
     "opencode/big-pickle": {
       "success": 0,
