@@ -285,9 +285,9 @@ def test_cooling_models_are_deprioritised_not_dropped_from_the_report():
 # ---------------------------------------------------------------------------
 
 def test_worst_case_time_is_bounded_by_the_budget_not_by_the_ladder():
-    """Old worst case: models x attempts x per-attempt -- 6 x 2 x 120 = 1440s
-    on the live six-rung ladder. New worst case: the stage budget, whatever the
-    catalogue offers.
+    """Old worst case: models x attempts x per-attempt -- 6 x 2 x 150 = 1800s
+    on the live six-rung shared ladder. New worst case: the stage budget,
+    whatever the catalogue offers.
 
     Simulated on a synthetic clock that CONSUMES the time each attempt is
     granted, which is what a real timeout does. The deadline is fixed once,
@@ -319,14 +319,14 @@ def test_worst_case_time_is_bounded_by_the_budget_not_by_the_ladder():
         "the new worst case (%ds) is not lower than today's (%ds)"
         % (bm.AI_TOTAL_BUDGET_SEC, old))
     # And the bound is a BINDING bound: without it the same ladder shape burns
-    # the whole 1440s the old arithmetic allowed.
+    # the whole 1800s the old arithmetic allowed.
     unconstrained = 50 * 2 * bm.AI_PER_ATTEMPT_TIMEOUT_SEC
     assert unconstrained > bm.AI_TOTAL_BUDGET_SEC, unconstrained
 
 
 def test_a_fractional_remainder_is_rounded_up_not_truncated_away():
-    """int() had two lies. int(59.6) = 59, so a 120s window silently became
-    119s on the second pass; int(0.4) = 0, so max(1, 0) then granted a 1s stub
+    """int() had two lies. int(59.6) = 59, so a 150s window silently became
+    149s on the second pass; int(0.4) = 0, so max(1, 0) then granted a 1s stub
     (or a rung was skipped with time still on the clock). Round UP, and only a
     genuinely spent deadline is 0."""
     assert ms.attempt_timeout(60.0, 0.4, 60) == 60
@@ -880,8 +880,8 @@ def test_a_broken_selector_degrades_LOUDLY_never_silently_to_the_seed():
         assert "selector exploded" in err, (
             "the selector failure must reach the error string that feeds the "
             "log row and the honesty gate: %r" % (err,))
-        assert bm.ai_classify.last_models == list(bm.AI_MODELS), (
-            "the documented fallback is the config seed: %r"
+        assert bm.ai_classify.last_models == list(bm.AI_LADDER), (
+            "the documented fallback is the stage's four-rung pool: %r"
             % (bm.ai_classify.last_models,))
     finally:
         shutil.rmtree(sd, ignore_errors=True)

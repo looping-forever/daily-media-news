@@ -1074,13 +1074,22 @@ class LadderPurityTests(unittest.TestCase):
         self.assertFalse(dead & set(cfg.get("ladder") or []),
                          cfg.get("ladder"))
 
-    def test_the_breaking_depth_cap_can_reach_every_rung(self):
-        """A cap below the ladder silently makes the tail unreachable: the
-        model is configured, reported in the seed, and never tried."""
+    def test_the_breaking_depth_cap_matches_its_own_pool(self):
+        """The breaking stage walks FOUR rungs because 4 x 150s is what fits
+        its 720s wall. A cap below that pool silently makes its tail untried;
+        a cap above it lets discovery spend the wall on an uncounted rung.
+
+        The pool is DERIVED from the ladder (its first four, in order), never a
+        second copy of model IDs -- the 2026-10-13 rot was exactly that copy.
+        """
         import breaking_monitor as bm
-        self.assertGreaterEqual(bm.AI_MAX_MODELS, len(self.EXPECTED),
-                                "AI_MAX_MODELS (%d) < ladder (%d)"
-                                % (bm.AI_MAX_MODELS, len(self.EXPECTED)))
+        self.assertEqual(4, len(bm.AI_LADDER), bm.AI_LADDER)
+        self.assertEqual(bm.AI_MAX_MODELS, len(bm.AI_LADDER),
+                         "AI_MAX_MODELS (%d) != pool (%d)"
+                         % (bm.AI_MAX_MODELS, len(bm.AI_LADDER)))
+        self.assertEqual(tuple(bm.AI_LADDER), tuple(bm.AI_MODELS[:4]),
+                         "the pool must be the head of the reachable ladder, "
+                         "in the ladder's own order")
         # The breaking walk CANNOT resolve a provider whose config it was never
         # handed (OPENCODE_CONFIG is unset here, as it is in the canary), so its
         # seed is the reachable subset -- and an unreachable rung would earn a
@@ -1089,6 +1098,9 @@ class LadderPurityTests(unittest.TestCase):
         self.assertEqual([m for m in self.EXPECTED
                           if m.startswith("opencode/")],
                          list(bm.AI_MODELS))
+        # Narrowing the BREAKING stage must not shrink the shared ladder the
+        # digest walk seeds from.
+        self.assertEqual(len(bm.AI_MODELS), 6)
 
     def test_one_attempt_may_never_exceed_its_whole_walk(self):
         """--no-work states a 300s walk; the per-attempt cap must be clamped to

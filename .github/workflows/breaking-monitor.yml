@@ -92,10 +92,10 @@ jobs:
   breaking-monitor:
     runs-on: ubuntu-latest
     # 15, not 10: the AI stage's wall is now 720s
-    # (AI_TOTAL_BUDGET_SEC -- six live rungs x a 120s window), and collection,
-    # delivery and the state commit take roughly 63s more. 720 + 63 = 783s, so
-    # a 900s job keeps ~117s of headroom. The stage budget itself is what
-    # bounds the ladder; this is the backstop behind it.
+    # (AI_TOTAL_BUDGET_SEC -- four rungs x a 150s window = 600s, plus 120s for
+    # discovery and slack), and collection, delivery and the state commit take
+    # roughly 63s more. 720 + 63 = 783s, so a 900s job keeps ~117s of headroom.
+    # The stage budget itself is what bounds the walk; this is the backstop.
     timeout-minutes: 15
 
     steps:
@@ -512,7 +512,7 @@ jobs:
               _secs = last.get("ai_seconds")
               _wall = ("%ss" % _secs if isinstance(_secs, (int, float))
                        else "not recorded (older run)")
-              body = "%s\n\n%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). No model produced a verdict and the ladder spent %s of wall clock. Per-model attempt detail (timeout, stderr and output tail) is in the `breaking-attempts` artifact for this run." % (
+              body = "%s\n\n%s\n\nUN-JUDGED HEADLINE(S) — check these by hand now:\n%s\n\nDetail: %s (level=%s confidence=%s sent=%s). No model produced a verdict and the ladder spent %s of wall clock. A model that used its whole 150s window is not asked again: the retry only covers a connection that failed fast, so a timeout here is not a skipped second attempt. Per-model attempt detail (window granted, measured wall, stderr and output tail) is in the `breaking-attempts` artifact for this run." % (
                          lead, alert_dedupe.describe_window(decision),
                          unjudged_block, reason[:200], last.get("level", ""),
                          last.get("confidence", ""), last.get("sent"), _wall)

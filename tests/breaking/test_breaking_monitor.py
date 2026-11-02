@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest.mock
 from datetime import datetime, timedelta, timezone
 
@@ -2807,6 +2808,52 @@ def test_64_a_model_not_found_is_cooled_not_called_garbage():
         "a dead id was recorded as an unusable ANSWER: %r" % health)
 
 
+def test_65_the_attempt_record_keeps_the_measured_wall_not_just_the_window():
+    """The artifact recorded the window it GRANTED and never how long the
+    attempt actually ran, so it could not answer "how close is this rung to the
+    150s wall?" -- the one number that sizes the wall. Both are in the row now,
+    for a timeout AND for a winning verdict.
+    """
+    sd = fresh_dir()
+    pending = os.path.join(sd, "breaking_pending.json")
+    with open(pending, "w", encoding="utf-8") as fh:
+        fh.write("{}")
+
+    def slow(model, prompt_text, env, timeout_sec):
+        time.sleep(0.2)
+        raise subprocess.TimeoutExpired(cmd="opencode", timeout=timeout_sec)
+
+    verdict, _err = bm.ai_classify(pending, runner=slow, models=["p/slow"],
+                                   attempts_per_model=1)
+    assert verdict is None
+    path = os.path.join(sd, "breaking_attempts.jsonl")
+    with open(path, encoding="utf-8") as fh:
+        row = json.loads(fh.readline())
+    assert row["timeout_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, row
+    assert isinstance(row["wall_sec"], (int, float)), row
+    assert 0.15 <= row["wall_sec"] < row["timeout_sec"], (
+        "the measured wall must be the real 0.2s spent, not the granted "
+        "window: %r" % (row,))
+
+    def answers(model, prompt_text, env, timeout_sec):
+        time.sleep(0.05)
+        return 0, json.dumps({
+            "level": 3, "confidence": "HIGH", "event_key": "e",
+            "title": "t", "summary": "s", "why_urgent": "w",
+            "sources": [], "category_suggestion": ""}), ""
+
+    verdict, _err = bm.ai_classify(pending, runner=answers, models=["p/ok"],
+                                   attempts_per_model=1)
+    assert verdict is not None, "the canned verdict was not accepted"
+    with open(path, encoding="utf-8") as fh:
+        rows = [json.loads(line) for line in fh if line.strip()]
+    won = rows[-1]
+    assert won["reason"] == "verdict", won
+    assert won["wall_sec"] is not None and won["wall_sec"] < won["timeout_sec"], (
+        "a winning attempt's latency is the measurement, so it must be "
+        "recorded: %r" % (won,))
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -2873,6 +2920,7 @@ def main():
         test_62_selftest_payload_matches_tg_send_exactly,
         test_63_timeout_evidence_is_captured_redacted_and_kept,
         test_64_a_model_not_found_is_cooled_not_called_garbage,
+        test_65_the_attempt_record_keeps_the_measured_wall_not_just_the_window,
     ]
     failures = []
     for test in tests:

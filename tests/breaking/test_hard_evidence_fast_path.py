@@ -399,9 +399,9 @@ def test_an_unparseable_verdict_is_NOT_retried():
         assert info["source"] in ("live", "memo", "cache", "pin"), (
             "the attempt ladder did not come from the provider catalogue, so "
             "nothing dynamic happened at all: %r" % (info,))
-        assert len(selected) >= len(bm.AI_MODELS), (
-            "the resolved ladder (%d) is smaller than the config seed (%d): %r"
-            % (len(selected), len(bm.AI_MODELS), info))
+        assert len(selected) >= len(bm.AI_LADDER), (
+            "the resolved ladder (%d) is smaller than the stage pool (%d): %r"
+            % (len(selected), len(bm.AI_LADDER), info))
         assert len(selected) <= bm.AI_MAX_MODELS, (
             "the resolved ladder is not depth-capped: %r" % (info,))
         assert rows[-1]["sent"] is False, rows[-1]

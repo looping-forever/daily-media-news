@@ -282,18 +282,19 @@ class BudgetArithmetic(unittest.TestCase):
     """The declared budget must be USABLE and still fit the job's clock."""
 
     def test_the_window_and_the_total_are_the_agreed_numbers(self):
-        # A free rung needs 120s to answer. At the old 60s window the whole
-        # 2026-11-01 ladder timed out and produced no verdict.
-        self.assertEqual(bm.AI_PER_ATTEMPT_TIMEOUT_SEC, 120,
-                         "the free models do not answer inside 60s")
+        # A free rung needs ~150s: measured 127.53s to a whole answer and
+        # 137.63s to a FIRST token. At 60s the 2026-11-01 ladder timed out on
+        # every rung; at 120s the slower rung could not start.
+        self.assertEqual(bm.AI_PER_ATTEMPT_TIMEOUT_SEC, 150,
+                         "the free models do not answer inside 120s")
         self.assertEqual(bm.AI_TOTAL_BUDGET_SEC, 720,
-                         "the stage wall is 720s (six live rungs x 120s)")
+                         "the stage wall is 720s (four rungs x 150s + slack)")
         self.assertGreaterEqual(bm.AI_ATTEMPTS_PER_MODEL, 2,
                                 "a fast transport failure must still get its "
                                 "contracted retry inside the same window")
-        # The total is a FIXED wall, not AI_MAX_MODELS x per-attempt: that
-        # product is 960s and does not fit the 900s job, so the walk stops when
-        # the 720s is spent whatever the catalogue offers.
+        # The total is a FIXED wall, not AI_MAX_MODELS x per-attempt: a
+        # product-shaped budget would have to grow with the catalogue, and the
+        # job's 900s cannot.
         self.assertNotEqual(
             bm.AI_TOTAL_BUDGET_SEC,
             bm.AI_MAX_MODELS * bm.AI_PER_ATTEMPT_TIMEOUT_SEC,
@@ -303,9 +304,30 @@ class BudgetArithmetic(unittest.TestCase):
                         "the workflow's 15-minute job timeout must still have "
                         "room for collection and delivery after the ladder")
 
+    def test_four_windows_fit_the_wall_and_the_nine_hundred_second_job(self):
+        """4 x 150 = 600 < 720 < 900.
+
+        The pool size is what makes the wall honest: with six rungs the fifth
+        and sixth could never get a full window, so the arithmetic would be a
+        coincidence rather than a bound.
+        """
+        self.assertEqual(len(bm.AI_LADDER), 4, bm.AI_LADDER)
+        self.assertEqual(bm.AI_MAX_MODELS, 4,
+                         "the cap must equal the pool the wall was sized for")
+        self.assertEqual(tuple(bm.AI_LADDER), tuple(bm.AI_MODELS[:4]),
+                         "the pool must be the head of the reachable ladder")
+        spent = len(bm.AI_LADDER) * bm.AI_PER_ATTEMPT_TIMEOUT_SEC
+        self.assertEqual(spent, 600)
+        self.assertLess(spent, bm.AI_TOTAL_BUDGET_SEC,
+                        "four full windows must fit inside the stage wall")
+        self.assertLess(bm.AI_TOTAL_BUDGET_SEC, 15 * 60,
+                        "the stage wall must fit inside the job")
+        self.assertGreaterEqual(bm.AI_TOTAL_BUDGET_SEC - spent, 60,
+                                "discovery and slack need room after the pool")
+
 
 class ModelWindow(unittest.TestCase):
-    """A retry is paid for out of the model's own 60s, never on top of it."""
+    """A retry is paid for out of the model's own 150s, never on top of it."""
 
     def test_a_real_timeout_is_not_re_asked_and_the_next_rung_is_reached(self):
         import time as _time
@@ -334,6 +356,34 @@ class ModelWindow(unittest.TestCase):
                          "must not be re-asked -- and the next rung must still "
                          "be reached")
         self.assertTrue(all(t <= 1 for _m, t in calls), calls)
+
+    def test_a_fast_transport_failure_still_gets_its_retry(self):
+        """The retry is for a dropped connection, and it must still happen.
+
+        A model that fails in a second has 149s of its window left, so the
+        second attempt is affordable and gets the FULL allowance. This is the
+        half of the contract the timeout test cannot show -- and the half a
+        future "simplify the loop" edit would quietly delete.
+        """
+        calls = []
+
+        def flaky(model, prompt_text, env, timeout_sec):
+            calls.append((model, timeout_sec))
+            raise ConnectionResetError("connection reset by peer")
+
+        sd = tempfile.mkdtemp(prefix="brk-fastfail-")
+        self.addCleanup(shutil.rmtree, sd, True)
+        pending = os.path.join(sd, "breaking_pending.json")
+        with open(pending, "w", encoding="utf-8") as fh:
+            fh.write("{}")
+
+        bm.ai_classify(pending, runner=flaky, models=["p/only"],
+                       attempts_per_model=2)
+        self.assertEqual([m for m, _t in calls], ["p/only", "p/only"],
+                         "a fast transport failure must be retried once")
+        self.assertEqual([t for _m, t in calls],
+                         [bm.AI_PER_ATTEMPT_TIMEOUT_SEC] * 2,
+                         "both attempts are inside the same 150s window")
 
 
 if __name__ == "__main__":

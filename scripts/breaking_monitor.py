@@ -272,37 +272,42 @@ def _reachable_only(models):
     return kept
 
 
-#: 120s per attempt. The free rungs this ladder actually runs on need longer
-#: than 60s to answer; at 60s the 2026-11-01 sweep timed out on every one of
-#: six models and produced no verdict at all.
-AI_PER_ATTEMPT_TIMEOUT_SEC = 120
+#: 150s per attempt. Measured on the free rungs this ladder actually runs on:
+#: one completed its whole answer in 127.53s (14.59s to first token) and
+#: another took 137.63s to produce its FIRST token. At 120s the second could
+#: not even start, and at 60s the 2026-11-01 sweep timed out on every rung.
+AI_PER_ATTEMPT_TIMEOUT_SEC = 150
 
-#: Depth cap. A dead ladder costs its share of the budget, not a fixed 120s
-#: each, so depth is bounded as well as time.
-#:
-#: RAISED 4 -> 6 on 2026-10-25, and 6 -> 8 on 2026-10-30, WITH the ladder each
-#: time: the cap must track the seed, because a cap below it means the tail
-#: rungs are configured and can never be reached -- a model that is silently
-#: never tried.
-AI_MAX_MODELS = 8
+#: HOW MANY RUNGS THIS STAGE CAN AFFORD -- the only place the number lives.
+#: 4 x 150 = 600s, which leaves 120s of the 720s wall for discovery and slack.
+#: The digest walk still seeds from the WHOLE config ladder (AI_MODELS); this
+#: is the subset the breaking stage has time to try, sized to its own wall.
+AI_POOL_SIZE = 4
+
+#: The pool, in ladder order. The two measured-fast models lead because the
+#: config ladder puts them first -- the order stays config's, not a second copy
+#: here (an embedded copy of the ladder is what rotted on 2026-10-13).
+AI_LADDER = tuple(AI_MODELS[:AI_POOL_SIZE])
+
+#: Depth cap == the pool this stage sizes its wall for. A cap below the pool
+#: makes its tail rungs configured and never tried; a cap above it lets
+#: discovery spend the wall on a rung the arithmetic never counted.
+AI_MAX_MODELS = len(AI_LADDER)
 
 #: An attempt CAP per model, not a multiplier on TIME: every attempt shares the
-#: model's ONE 120s window (see the loop in ai_classify). A transport failure
-#: that returns immediately is therefore retried inside the same window, while
-#: a real timeout has already spent the window and is NOT re-asked. The old
-#: reading of this number made the arithmetic impossible -- 2 x 8 x 60 = 960s
-#: never fit any stage budget short of the job's own limit, so one model
-#: timing out twice ate 120s and the tail rungs were starved (observed
-#: 2026-11-01: cost_seconds 151.43, all six models attempted, ai_fail_safe).
+#: model's ONE 150s window, so this number is reachable only by a FAST failure.
+#: A transport error that returns in a second leaves ~149s and the retry fits;
+#: a real timeout has spent the whole window by definition, so the loop's
+#: `now >= model_deadline` check ends that model with NO second attempt. That
+#: is the contract, not a bug to widen: 4 x 150 = 600s is already the wall.
+#: The retry exists for a dropped connection, never for a slow model.
 AI_ATTEMPTS_PER_MODEL = 2
 
 #: THE WHOLE AI STAGE IS BOUNDED, discovery included. 720s is a FIXED wall, not
-#: AI_MAX_MODELS x AI_PER_ATTEMPT_TIMEOUT_SEC: that product is 960s and does
-#: not fit the workflow's 15-minute job. 720s is six live rungs x 120s, and the
-#: walk simply stops when the wall is spent -- collection, delivery and the
-#: state commit take roughly 63s, so 720 + 63 = 783s stays inside 900s.
-#: Attempts are deliberately absent from this product -- a retry is paid for
-#: out of the same window, so it must never widen the bound.
+#: AI_MAX_MODELS x AI_PER_ATTEMPT_TIMEOUT_SEC: the four-rung pool costs 600s,
+#: the remaining 120s covers discovery and slack, and the walk stops the moment
+#: the wall is spent. Collection, delivery and the state commit take ~63s, so
+#: 720 + 63 = 783s stays inside the workflow's 900s (15-minute) job cap.
 #: tests/breaking/test_honesty_gate_recovery.py fails if these drift apart.
 AI_TOTAL_BUDGET_SEC = 720
 
@@ -1384,16 +1389,22 @@ def _redact_secrets(text):
 
 
 def record_attempt(state_dir, model, attempt, timeout_sec, reason,
-                   stdout_text="", stderr_text=""):
+                   stdout_text="", stderr_text="", wall_sec=None):
     """Append one attempt's evidence to state/breaking_attempts.jsonl.
 
     A record that cannot be written must never end the walk: losing the file
     costs diagnosis, not the verdict. 4000 chars per stream is the whole of a
     normal CLI failure and keeps a runaway log from becoming the artifact.
+
+    `timeout_sec` is the window GRANTED; `wall_sec` is what the attempt
+    actually took. Without both, the artifact can say a rung used its whole
+    window but never how far past (or short of) the free tier's real latency it
+    ran -- which is the number that sizes AI_PER_ATTEMPT_TIMEOUT_SEC.
     """
     limit = 4000
     row = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "model": model, "attempt": attempt, "timeout_sec": timeout_sec,
+           "wall_sec": (None if wall_sec is None else round(wall_sec, 2)),
            "reason": reason,
            "stdout_tail": _redact_secrets(stdout_text)[-limit:],
            "stderr_tail": _redact_secrets(stderr_text)[-limit:],
@@ -1414,17 +1425,18 @@ def ai_classify(pending_path, runner=None, models=None,
     caller fails safe to level 1 (silence).
 
     `models=None` (the production default) means RESOLVE DYNAMICALLY: the
-    config seed, extended by what the provider actually serves right now,
-    reordered by measured health, capped to AI_MAX_MODELS and bounded by
-    AI_TOTAL_BUDGET_SEC. An explicit `models=[...]` bypasses selection
-    entirely and is what the tests drive.
+    stage's four-rung pool (AI_LADDER), extended by what the provider actually
+    serves right now, reordered by measured health, capped to AI_MAX_MODELS and
+    bounded by AI_TOTAL_BUDGET_SEC. An explicit `models=[...]` bypasses
+    selection entirely and is what the tests drive.
 
-    ONE 120s WINDOW per model (AI_PER_ATTEMPT_TIMEOUT_SEC). The stage deadline
-    is the wall: 720s (AI_TOTAL_BUDGET_SEC) is what bounds the ladder, however
-    many rungs the catalogue offers. A transport failure that returns fast is
-    retried inside that model's remaining window; a real timeout has already
-    spent it and gets no second attempt, which is what used to let one slow model
-    eat two minutes and starve the tail of the ladder.
+    FOUR RUNGS, ONE 150s WINDOW EACH (AI_LADDER / AI_PER_ATTEMPT_TIMEOUT_SEC).
+    4 x 150 = 600s; the stage deadline is the wall, 720s
+    (AI_TOTAL_BUDGET_SEC), so discovery and slack get the remaining 120s.
+    A transport failure that returns fast is retried inside that model's
+    remaining window; a real timeout has already spent it and gets NO second
+    attempt. The retry covers a dropped connection, not a slow model: a rung
+    that used its whole window has proved it is too slow for this wall.
 
     A TIMEOUT IS DIAGNOSABLE. `subprocess.run(capture_output=True)` raises
     TimeoutExpired with the child's partial stdout and stderr, and those were
@@ -1468,24 +1480,31 @@ def ai_classify(pending_path, runner=None, models=None,
         print("ai_classify: %s" % pool["note"])
 
     if models is None:
+        # THE STAGE'S OWN POOL, NOT THE WHOLE SHARED LADDER. `select` seeds from
+        # config's `ladder`; the six-rung shared seed cannot fit 4 x 150 = 600s
+        # of wall, so this stage hands it the four it can afford, in ladder
+        # order. The config file itself is untouched -- the digest walk still
+        # uses every rung.
+        cfg = dict(_opencode_config())
+        cfg["ladder"] = list(AI_LADDER)
         try:
             selected, info = model_selector.select(
-                _opencode_config(), health,
+                cfg, health,
                 cache_path=os.path.join(state_dir, MODEL_CACHE_FILENAME),
                 max_models=AI_MAX_MODELS, now=time.time(), cooldown=cool)
         except Exception as exc:  # selection must never end the run
-            # DEGRADED, NOT SILENT. Falling back to the static seed here is
+            # DEGRADED, NOT SILENT. Falling back to the static pool here is
             # exactly the state the 2026-10-13 incident happened in -- a fixed
             # list that can name a model the provider no longer serves -- so a
             # broken selector is named in the error string that reaches the log
             # row and the honesty gate, not swallowed.
-            selected = list(AI_MODELS)
+            selected = list(AI_LADDER)
             info = {"source": "seed",
                     "select_error": "%s: %s"
                                     % (type(exc).__name__,
                                        collect_news.clean_ws(str(exc))[:120])}
             print("ai_classify: SELECTOR FAILED (%s) -- falling back to the "
-                  "config seed %r" % (info["select_error"], selected))
+                  "stage's pool %r" % (info["select_error"], selected))
         selected = _reachable_only(selected)
     else:
         selected, info = list(models), {"source": "explicit"}
@@ -1534,12 +1553,14 @@ def ai_classify(pending_path, runner=None, models=None,
                 # attempt would be outside this model's allowance.
                 break
             # max(1, ceil(remaining)): an attempt never overruns its window,
-            # and the FIRST attempt of a model still has the full 120s.
+            # and the FIRST attempt of a model still has the full 150s.
             timeout = model_selector.attempt_timeout(
                 model_deadline, now, AI_PER_ATTEMPT_TIMEOUT_SEC)
+            attempt_started = time.monotonic()
             try:
                 rc, out, err = runner(model, prompt_text, env, timeout)
             except subprocess.TimeoutExpired as exc:
+                wall_sec = time.monotonic() - attempt_started
                 model_selector.record_failure(health, model, "timeout",
                                               at=time.time())
                 # THE EVIDENCE THE OLD HANDLER THREW AWAY. TimeoutExpired
@@ -1548,7 +1569,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 out_tail = _as_text(getattr(exc, "stdout", ""))
                 err_tail = _as_text(getattr(exc, "stderr", ""))
                 record_attempt(state_dir, model, attempt, timeout, "timeout",
-                               stdout_text=out_tail, stderr_text=err_tail)
+                               stdout_text=out_tail, stderr_text=err_tail,
+                               wall_sec=wall_sec)
                 evidence = collect_news.clean_ws(
                     _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
                 errors.append("%s: timed out after %ds%s"
@@ -1561,20 +1583,28 @@ def ai_classify(pending_path, runner=None, models=None,
                     continue
                 break
             except Exception as exc:
+                wall_sec = time.monotonic() - attempt_started
                 model_selector.record_failure(health, model, "transport",
                                               at=time.time())
                 errors.append("%s: %s" % (model,
                                           collect_news.clean_ws(str(exc))[:120]))
+                record_attempt(state_dir, model, attempt, timeout, "transport",
+                               stdout_text="", stderr_text=str(exc),
+                               wall_sec=wall_sec)
                 if attempt < attempts_per_model \
                         and time.monotonic() < model_deadline:
                     print("ai_classify: %s attempt %d failed transport, retrying"
                           % (model, attempt))
                     continue
                 break
+            wall_sec = time.monotonic() - attempt_started
             verdict = normalize_verdict(extract_verdict_json(out))
             if verdict is not None:
                 model_selector.record_success(health, model, at=time.time())
                 model_selector.save_health(health_path, health)
+                record_attempt(state_dir, model, attempt, timeout, "verdict",
+                               stdout_text=out, stderr_text=err,
+                               wall_sec=wall_sec)
                 return verdict, None
             # A QUOTA REFUSAL IS THE WHOLE WALK'S INDICTMENT, not this model's.
             # The provider refuses pre-generation and every free id shares the
@@ -1588,7 +1618,7 @@ def ai_classify(pending_path, runner=None, models=None,
                 # A DEAD ID IS A FACT ABOUT THE ID, NOT THE PROVIDER. Before
                 # this arm it fell through to the unparseable tail and was
                 # remembered as `garbage` -- which never removed it from the
-                # ladder, so every later run paid another 120s window to
+                # ladder, so every later run paid another 150s window to
                 # rediscover that the id does not exist.
                 model_selector.record_cooldown(cool, model, "model_not_found",
                                                at=time.time())
@@ -1662,6 +1692,8 @@ def ai_classify(pending_path, runner=None, models=None,
             tail = collect_news.clean_ws(out)[-160:]
             errors.append("%s: unparseable verdict (rc=%s) %r"
                           % (model, rc, tail))
+            record_attempt(state_dir, model, attempt, timeout, "unparseable",
+                           stdout_text=out, stderr_text=err, wall_sec=wall_sec)
             # The model answered; it answered unusably. Do not re-ask, but DO
             # remember it: this is the 2026-10-13 mimo failure, and the next
             # run must not pay for it again.

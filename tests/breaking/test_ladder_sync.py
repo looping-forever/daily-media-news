@@ -340,6 +340,30 @@ def test_breaking_ladder_matches_config():
     print("  PASS: test_breaking_ladder_matches_config")
 
 
+def test_the_breaking_pool_is_four_measured_rungs_in_order():
+    """THE BREAKING STAGE CAN AFFORD FOUR, and the measured-fast models lead.
+
+    Measured 2026-10-26 on the full ~65k-token prompt: one rung finished in
+    127.53s (14.59s to first token), the next needed 137.63s to reach its FIRST
+    token. 4 x 150 = 600s fits the 720s wall; a fifth rung would only get a
+    truncated window it cannot answer inside, so the pool is four and the wall
+    is sized for exactly those four.
+    """
+    import breaking_monitor as bm  # noqa: E402
+
+    assert len(bm.AI_LADDER) == 4, bm.AI_LADDER
+    assert bm.AI_LADDER[0] == "opencode/deepseek-v4.1-flash-free", bm.AI_LADDER
+    assert bm.AI_LADDER[1] == "opencode/beam-free", bm.AI_LADDER
+    assert tuple(bm.AI_LADDER) == tuple(bm.AI_MODELS[:4]), (
+        "the breaking pool must be the HEAD of the reachable ladder, in that "
+        "order -- never a second, independently ordered list: %r vs %r"
+        % (bm.AI_LADDER, bm.AI_MODELS))
+    assert bm.AI_MAX_MODELS == len(bm.AI_LADDER), (
+        "a cap that disagrees with the pool either hides a rung or spends the "
+        "wall on one the arithmetic never counted")
+    print("  PASS: test_the_breaking_pool_is_four_measured_rungs_in_order")
+
+
 def test_classifier_ladder_matches_config():
     """ai_classifier PROVIDERS resolve to the config ladder it can SERVE.
 
@@ -451,6 +475,7 @@ ALL_TESTS = [
     test_no_hardcoded_models_in_workflows,
     test_breaking_workflow_reads_config,
     test_breaking_ladder_matches_config,
+    test_the_breaking_pool_is_four_measured_rungs_in_order,
     test_classifier_ladder_matches_config,
     test_run_flags_present,
     test_no_model_id_is_hardcoded_in_the_ladder_consumers,
