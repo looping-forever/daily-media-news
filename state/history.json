@@ -1791,6 +1791,20 @@
       "title": "MF DOOM's Estate Teams With Sanford Greene for Capsule Collection - Yahoo",
       "category": "gaming",
       "date_sent": "2026-11-02"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c51kdy1ew7zvo",
+      "title_hash": "f1f2221c0f40f8190a21b23a62735b52ad2aa728",
+      "title": "Ukraine Air Raid App Hacked; False Radiation Warnings Reported",
+      "category": "world_major",
+      "date_sent": "2026-11-02"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/nation/mid-april-to-1st-november-17688-disaster-incidents-across-nation",
+      "title_hash": "6e60ff147c46c7180f12e3e4b4396e102dff2d09",
+      "title": "7,688 Disaster Incidents Reported Nationwide Since Mid-April",
+      "category": "nepal",
+      "date_sent": "2026-11-02"
     }
   ]
 }
