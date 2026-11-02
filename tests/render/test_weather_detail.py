@@ -370,6 +370,55 @@ class TestEmailSurface(unittest.TestCase):
         self.assertNotIn("Weather", text)
 
 
+class TestAirQualityLine(unittest.TestCase):
+    """Air quality is a line only when the adapter produced it."""
+
+    AQI = {"aqi": 83, "aqi_band": "moderate", "pm2_5": 17.5,
+           "aqi_note": "Air quality moderate (AQI 83) - fine for most people."}
+
+    def test_present_renders_the_band_and_the_line(self):
+        html = render_digest.render_weather_detail(weather_block(**self.AQI))
+        self.assertIn("Air quality moderate (AQI 83)", html)
+        self.assertIn("fine for most people", html)
+        self.assertEqual(html.count('class="weather-aqi"'), 1)
+
+    def test_email_plain_text_gets_the_same_line(self):
+        line = build_email.weather_detail_lines(weather_block(**self.AQI))[0]
+        self.assertIn("Air quality moderate (AQI 83)", line)
+        self.assertIn("- Rain 78% 14:00-17:59", line)
+
+    def test_email_html_gets_the_same_line(self):
+        html = build_email.weather_detail_html(weather_block(**self.AQI))
+        self.assertIn("Air quality moderate (AQI 83)", html)
+
+    def test_null_omits_the_line_entirely(self):
+        for render in (render_digest.render_weather_detail,
+                       build_email.weather_detail_html):
+            html = render(weather_block())
+            self.assertNotIn("Air quality", html)
+            self.assertNotIn("AQI", html)
+            self.assertNotIn("\u2014", html)
+        line = build_email.weather_detail_lines(weather_block())[0]
+        self.assertNotIn("AQI", line)
+        self.assertNotIn("\u2014", line)
+
+    def test_no_renderer_computes_a_band(self):
+        """A bare number with no adapter text must render nothing."""
+        hollow = weather_block(aqi=350, aqi_band=None, pm2_5=210.0,
+                               aqi_note=None)
+        html = render_digest.render_weather_detail(hollow)
+        self.assertNotIn("hazardous", html.lower())
+        self.assertNotIn("Air quality", html)
+        self.assertNotIn("AQI", build_email.weather_detail_lines(hollow)[0])
+
+    def test_the_line_sits_below_the_rain_and_above_the_outlook(self):
+        html = render_digest.render_weather_detail(weather_block(**self.AQI))
+        self.assertLess(html.find('class="weather-rain"'),
+                        html.find('class="weather-aqi"'))
+        self.assertLess(html.find('class="weather-aqi"'),
+                        html.find('class="weather-outlook"'))
+
+
 class TestNoFormatLeakAndLandmarks(unittest.TestCase):
     def setUp(self):
         self.page = render_digest.render_page(

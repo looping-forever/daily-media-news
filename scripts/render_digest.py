@@ -2353,6 +2353,9 @@ def _weather_detail_html(weather, cells, label):
     rain = _weather_rain_line(weather.get("next12h"))
     if rain:
         parts.append('<p class="weather-rain">%s</p>' % esc(rain))
+    aqi = weather.get("aqi_note")
+    if isinstance(aqi, str) and aqi.strip():
+        parts.append('<p class="weather-aqi">%s</p>' % esc(aqi.strip()))
     outlook = _weather_outlook_items(weather.get("outlook"))
     if outlook:
         parts.append('<ul class="weather-outlook">%s</ul>'
@@ -2665,6 +2668,7 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
       overflow-wrap: break-word;
     }
     .weather-rain,
+    .weather-aqi,
     .weather-sun {
       color: #9BA1AC;
       font-size: 12px;

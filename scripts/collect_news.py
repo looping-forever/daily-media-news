@@ -438,6 +438,19 @@ WEATHER_CURRENT_FIELDS = (
 )
 WEATHER_HOURLY_DAYS = 3
 
+# The air-quality request. A SEPARATE keyless host (no key, no new secret), and
+# a separate fetch from the weather call, so an outage on one cannot empty the
+# other. The coordinates are the same generic default as WEATHER_URL; a
+# profile's own location replaces them.
+WEATHER_AQI_URL = (
+    "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=27.7"
+    "&longitude=85.3&current=us_aqi,pm2_5&timezone=Asia%2FKathmandu"
+)
+WEATHER_AQI_HOST = "air-quality-api.open-meteo.com"
+WEATHER_AQI_CURRENT_FIELDS = "us_aqi,pm2_5"
+# Its own SHORT timeout: a dead AQI host must never hold the weather pass open.
+WEATHER_AQI_TIMEOUT_SEC = 4
+
 # Which hourly arrays the normalized payload cannot be built without.
 #   time                     -- the axis everything else is indexed by
 #   precipitation_probability-- weather_advice returns [] without it anyway;
@@ -483,6 +496,17 @@ WEATHERCODE_TEXT = {
 # WHO ladder: <3 low, 3-5 moderate, 6-7 high, 8-10 very high, 11+ extreme.
 UV_BANDS = ((3, "low"), (6, "moderate"), (8, "high"), (11, "very high"),
             (None, "extreme"))
+
+# US AQI -> band: (upper_bound, name). The ONLY AQI ladder in the tree:
+# renderers receive `aqi_band` as text and never re-derive it. Bounds are the
+# US EPA ladder: 0-50 good, 51-100 moderate, 101-150 unhealthy for sensitive
+# groups, 151-200 unhealthy, 201-300 very unhealthy, 301+ hazardous.
+AQI_BANDS = ((50, "good"), (100, "moderate"),
+             (150, "unhealthy-for-sensitive"), (200, "unhealthy"),
+             (300, "very-unhealthy"), (None, "hazardous"))
+#: Bands that change the plan. `air_is_unsafe()` is the ONE test both the note
+#: and the advice read, so the two can never disagree about the same day.
+AQI_UNSAFE_BANDS = ("unhealthy", "very-unhealthy", "hazardous")
 
 # Best-effort official notice pages: (page URL, domain_category). The two
 # institution-specific entries come from the environment (private_values), so a
@@ -1551,6 +1575,15 @@ def weather_task(url, timeout, retry=None, on_attempt=None,
             max_days=WEATHER_HOURLY_DAYS)
         box["payload"] = norm
         box["error"] = err
+        # The AQI half of the same pass. Its own short timeout and its own
+        # catch: a dead air-quality host costs these four fields, never the
+        # weather block. The warning names the reason exactly once.
+        try:
+            box["aqi"] = fetch_air_quality(box.get("place"))
+        except Exception as exc:
+            box["aqi"] = None
+            print("WARNING: air quality unavailable (%s: %s) - AQI omitted"
+                  % (type(exc).__name__, clean_ws(str(exc))[:160]))
     return [candidate], summary
 
 
@@ -1624,7 +1657,7 @@ def new_weather_box(profile=None, fetched_at_npt=None):
     the next one's advice.
     """
     return {"place": weather_place(profile), "fetched_at_npt": fetched_at_npt,
-            "payload": None, "error": "", "raw": None}
+            "payload": None, "error": "", "raw": None, "aqi": None}
 
 
 def _num(value):
@@ -1804,6 +1837,107 @@ def uv_band(uv_max):
     return None
 
 
+def aqi_band(aqi):
+    """US AQI -> band name, or None. The ladder itself is AQI_BANDS."""
+    value = _wnum(aqi)
+    if value is None:
+        return None
+    for bound, name in AQI_BANDS:
+        if bound is None or value <= bound:
+            return name
+    return None
+
+
+def air_is_unsafe(aqi_band):
+    """The ONE "is the air bad enough to change the plan" test.
+
+    The note and the advice both read this, so a day cannot be described as
+    safe in one place and unsafe in the other. A moderate day is NOT unsafe:
+    it must keep the ordinary advice wording.
+    """
+    return (isinstance(aqi_band, str)
+            and aqi_band.strip().lower() in AQI_UNSAFE_BANDS)
+
+
+def aqi_advice_text(aqi, aqi_band):
+    """The action line for unsafe air, or None. Same predicate as the note."""
+    value = _wnum(aqi)
+    if value is None or not air_is_unsafe(aqi_band):
+        return None
+    return ("Limit outdoor exposure - air quality is %s (AQI %d)."
+            % (aqi_band.strip(), int(round(value))))
+
+
+def aqi_note(aqi, aqi_band):
+    """One line naming the band and what to do about it, or None."""
+    value = _wnum(aqi)
+    if value is None or not isinstance(aqi_band, str) or not aqi_band.strip():
+        return None
+    band = aqi_band.strip()
+    if air_is_unsafe(band):
+        advice = "limit outdoor exposure"
+    elif band == "unhealthy-for-sensitive":
+        advice = "sensitive groups should limit outdoor exposure"
+    elif band == "moderate":
+        advice = "fine for most people"
+    else:
+        advice = "no restriction"
+    return "Air quality %s (AQI %d) - %s." % (band, int(round(value)), advice)
+
+
+def build_aqi_url(place=None):
+    """The air-quality URL for a place dict, or WEATHER_AQI_URL unchanged.
+
+    Same fallback rule as build_weather_url(): unusable coordinates mean the
+    generic default, never an invented location. The timezone is percent-encoded
+    so the response comes back in Nepal wall time.
+    """
+    lat = lon = tz = None
+    if isinstance(place, dict):
+        lat, lon, tz = (place.get("latitude"), place.get("longitude"),
+                        place.get("timezone"))
+    for value in (lat, lon):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return WEATHER_AQI_URL
+    if not isinstance(tz, str) or not tz.strip():
+        return WEATHER_AQI_URL
+    return ("https://air-quality-api.open-meteo.com/v1/air-quality"
+            "?latitude=%s&longitude=%s&current=%s&timezone=%s"
+            % (lat, lon, WEATHER_AQI_CURRENT_FIELDS, quote(tz, safe="")))
+
+
+def parse_air_quality(payload):
+    """open-meteo air-quality JSON -> the four frozen AQI fields.
+
+    Null when the response carries no usable `us_aqi`: a band is a claim about
+    a number, so it is never invented from a missing one.
+    """
+    out = {"aqi": None, "aqi_band": None, "pm2_5": None, "aqi_note": None}
+    if not isinstance(payload, dict):
+        return out
+    current = payload.get("current")
+    if not isinstance(current, dict):
+        return out
+    raw = _wnum(current.get("us_aqi"))
+    if raw is not None:
+        out["aqi"] = int(round(raw))
+        out["aqi_band"] = aqi_band(out["aqi"])
+    out["pm2_5"] = _wnum(current.get("pm2_5"))
+    out["aqi_note"] = aqi_note(out["aqi"], out["aqi_band"])
+    return out
+
+
+def fetch_air_quality(place, timeout=None):
+    """Fetch and parse the AQI half of the weather pass. Raises on failure.
+
+    Called only from weather_task(), which catches it: this source being down
+    must cost the AQI fields and nothing else.
+    """
+    data = fetch_bytes(build_aqi_url(place),
+                       timeout or WEATHER_AQI_TIMEOUT_SEC, MAX_BYTES_HTML)
+    return parse_air_quality(json.loads(data.decode("utf-8", errors="replace")))
+
+
 def _wnum(value):
     """A finite real number, or None. bool and NaN/inf are not numbers here."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -1868,12 +2002,14 @@ def build_weather_block(box, profile):
     try:
         return _assemble_weather_block(raw, box.get("place"),
                                        box.get("fetched_at_npt"),
-                                       getattr(profile, "thresholds", None)) or {}
+                                       getattr(profile, "thresholds", None),
+                                       box.get("aqi")) or {}
     except Exception:
         return {}
 
 
-def _assemble_weather_block(raw, place, fetched_at_npt, thresholds=None):
+def _assemble_weather_block(raw, place, fetched_at_npt, thresholds=None,
+                            aqi=None):
     if not isinstance(fetched_at_npt, str) or len(fetched_at_npt) < 10:
         return {}
     today = fetched_at_npt[:10]
@@ -1983,8 +2119,30 @@ def _assemble_weather_block(raw, place, fetched_at_npt, thresholds=None):
                     "precip_mm": precip_mm, "window": window},
         "outlook": outlook,
     }
+    block.update(_aqi_fields(aqi))
     block["narrative"] = weather_narrative(block)
     return block
+
+
+def _aqi_fields(aqi):
+    """The four frozen AQI fields, normalized. Never a guessed band.
+
+    The band and the note are dropped when there is no AQI number to stand
+    behind them; pm2_5 is kept when the source measured it, independently.
+    """
+    values = aqi if isinstance(aqi, dict) else {}
+    number = _wnum(values.get("aqi"))
+    number = int(round(number)) if number is not None else None
+    band = values.get("aqi_band")
+    note = values.get("aqi_note")
+    return {
+        "aqi": number,
+        "aqi_band": (band.strip() if number is not None
+                     and isinstance(band, str) and band.strip() else None),
+        "pm2_5": _wnum(values.get("pm2_5")),
+        "aqi_note": (note.strip() if number is not None
+                     and isinstance(note, str) and note.strip() else None),
+    }
 
 
 def weather_narrative(block):
@@ -2244,12 +2402,34 @@ def compute_weather_advice(box, profile, now=None):
         return [], reason
     payload = _with_wet_verdict(box, payload, profile)
     try:
-        return _wa.weather_advice(payload, profile, advice_blockers(profile),
-                                  now=now), ""
+        lines = _wa.weather_advice(payload, profile, advice_blockers(profile),
+                                   now=now)
     except _wa.ProfileError as exc:
         return [], "profile rejected by the advice engine: %s" % exc
     except Exception as exc:  # never fatal; weather is not worth a digest
         return [], "advice engine failed: %s: %s" % (type(exc).__name__, exc)
+    lines = _with_air_advice(box, profile, lines)
+    return lines, ""
+
+
+def _with_air_advice(box, profile, lines):
+    """The engine's lines plus the AQI verdict when the air is unsafe.
+
+    Air quality reuses the same single-predicate style as `day_is_wet()`: one
+    test decides, and every surface that speaks about it reads that decision.
+    The calm line is removed rather than kept beside a health warning -- "nothing
+    to plan for" and "limit outdoor exposure" cannot both be true. A moderate
+    day changes nothing.
+    """
+    values = box.get("aqi") if isinstance(box, dict) else None
+    values = values if isinstance(values, dict) else {}
+    text = aqi_advice_text(values.get("aqi"), values.get("aqi_band"))
+    if not text or not lines:
+        return lines
+    kept = [line for line in lines if line.get("id") != "C"]
+    kept.append({"id": "AQI", "text": text, "priority": 0})
+    kept.sort(key=lambda line: line.get("priority", 0))
+    return kept[:max(0, getattr(profile, "max_lines", 0))]
 
 
 def _notice_published_dt(text):

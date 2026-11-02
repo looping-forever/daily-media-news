@@ -125,6 +125,14 @@ def wet_body(dates=None, start=7, end=20, pop=70, apparent=8.0, mm=2.4):
                        apparent_temperature=appar, precipitation=mms)
 
 
+def aqi_body(us_aqi=83, pm2_5=17.5):
+    """A captured air-quality response (live shape, verified 2026-11-02)."""
+    return {"latitude": 27.7, "longitude": 85.3, "timezone": "Asia/Kathmandu",
+            "current": {"time": "2026-11-02T16:45", "interval": 3600,
+                        "us_aqi": us_aqi, "pm2_5": pm2_5},
+            "current_units": {"us_aqi": "USAQI", "pm2_5": "\u03bcg/m\u00b3"}}
+
+
 def weather_body(dates=None, drop=(), current=None, **overrides):
     """hourly_body() plus the pass-1a `current` block and the new arrays.
 
@@ -217,12 +225,18 @@ def rss_doc(items=1, hours_ago=1):
 class WeatherFixture(object):
     """Install a fake fetch_bytes and run the collector end to end."""
 
-    def __init__(self, weather, tmpdir):
+    def __init__(self, weather, tmpdir, aqi=None):
         self.weather = weather
         self.tmpdir = tmpdir
+        self.aqi = aqi
 
     def __enter__(self):
         def fake(url, timeout, max_bytes):
+            if "air-quality" in url:
+                if isinstance(self.aqi, BaseException):
+                    raise self.aqi
+                return json.dumps(self.aqi if self.aqi is not None
+                                  else aqi_body()).encode("utf-8")
             if "open-meteo" in url:
                 if isinstance(self.weather, BaseException):
                     raise self.weather
@@ -809,15 +823,18 @@ class TestCollectorEmission(unittest.TestCase):
         self.assertIn("W1-blocked", ids)
         self.assertNotIn("W1", ids)
 
-    def test_no_second_network_call_is_made_for_the_advice(self):
-        """One fetch, one open-meteo request: the budget does not move."""
+    def test_the_weather_pass_makes_one_request_each_for_weather_and_air(self):
+        """Two requests, two hosts: the AQI source is not a second weather call."""
         day = cn.kathmandu_now_str()[:10]
-        calls = []
+        weather_calls, aqi_calls = [], []
         saved = cn.fetch_bytes
 
         def counting(url, timeout, max_bytes):
+            if "air-quality" in url:
+                aqi_calls.append((url, timeout))
+                return json.dumps(aqi_body()).encode("utf-8")
             if "open-meteo" in url:
-                calls.append(url)
+                weather_calls.append(url)
                 return json.dumps(wet_body([day])).encode("utf-8")
             return rss_doc(1)
 
@@ -838,8 +855,11 @@ class TestCollectorEmission(unittest.TestCase):
         finally:
             cn.fetch_bytes = saved
         self.assertEqual(rc, 0)
-        self.assertEqual(len(calls), 1)
-        self.assertIn("hourly=", calls[0])
+        self.assertEqual(len(weather_calls), 1)
+        self.assertIn("hourly=", weather_calls[0])
+        self.assertEqual(len(aqi_calls), 1)
+        self.assertIn(cn.WEATHER_AQI_HOST, aqi_calls[0][0])
+        self.assertEqual(aqi_calls[0][1], cn.WEATHER_AQI_TIMEOUT_SEC)
 
     def test_kathmandu_now_str_is_delegated_not_reimplemented(self):
         """The +05:45 shift is not hand-rolled a fifth time."""
@@ -894,7 +914,10 @@ class TestRecordWeatherAdvice(unittest.TestCase):
 BLOCK_KEYS = {"fetched_at_npt", "place", "temperature_c", "apparent_c",
               "humidity_pct", "dew_point_c", "wind_kmh", "gust_kmh",
               "cloud_pct", "precip_now_mm", "condition", "today", "next12h",
-              "outlook", "narrative"}
+              "outlook", "narrative",
+              # Added 2026-11-02: the air-quality pass. Always present; null
+              # when the source is unavailable, never a guessed value.
+              "aqi", "aqi_band", "pm2_5", "aqi_note"}
 PLACE_KEYS = {"city", "latitude", "longitude", "timezone"}
 TODAY_KEYS = {"tmax_c", "tmin_c", "pop_max_pct", "precip_sum_mm", "condition",
               "sunrise", "sunset", "uv_max", "uv_band"}
@@ -910,7 +933,7 @@ NUMERIC_PATHS = ("temperature_c", "apparent_c", "humidity_pct", "dew_point_c",
                  "today.tmax_c", "today.tmin_c", "today.pop_max_pct",
                  "today.precip_sum_mm", "today.uv_max",
                  "next12h.pop_peak_pct", "next12h.pop_peak_hour",
-                 "next12h.precip_mm")
+                 "next12h.precip_mm", "aqi", "pm2_5")
 OUTLOOK_NUMERIC = ("tmax_c", "tmin_c", "pop_pct", "precip_mm", "gust_max_kmh")
 # Never a stand-in for a number: a null stays null.
 PLACEHOLDER_TOKENS = ("none", "n/a", "?", "nan", "unknown")
@@ -1287,6 +1310,130 @@ class TestWeatherBlock(unittest.TestCase):
         self.assertEqual(fresh, rich)
         self.assertEqual(wa.weather_advice(fresh, self.profile, []),
                          wa.weather_advice(rich, self.profile, []))
+
+
+class TestAirQuality(unittest.TestCase):
+    """The air-quality half of the weather pass: keyless host, band in adapter."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="wx-aqi-")
+        self.profile, _ = cn.load_weather_profile(REPO_PROFILE)
+        self.place = cn.weather_place(self.profile)
+
+    def block_for(self, body, aqi=None, fetched=NPT0):
+        box = {"place": self.place, "fetched_at_npt": fetched,
+               "payload": None, "error": "", "raw": body, "aqi": aqi}
+        return cn.build_weather_block(box, self.profile)
+
+    def test_url_uses_the_air_quality_host_and_the_profile_point(self):
+        url = cn.build_aqi_url(self.place)
+        self.assertIn(cn.WEATHER_AQI_HOST, url)
+        self.assertIn("latitude=27.7", url)
+        self.assertIn("longitude=85.3", url)
+        self.assertIn("current=us_aqi,pm2_5", url)
+        self.assertIn("timezone=Asia%2FKathmandu", url)
+        # No usable place -> the generic default, never invented coordinates.
+        for place in (None, {}, {"latitude": "27.7"}, {"latitude": 27.7}):
+            self.assertEqual(cn.build_aqi_url(place), cn.WEATHER_AQI_URL)
+
+    def test_band_ladder_is_the_us_epa_ladder(self):
+        cases = {0: "good", 50: "good", 51: "moderate", 100: "moderate",
+                 101: "unhealthy-for-sensitive", 150: "unhealthy-for-sensitive",
+                 151: "unhealthy", 200: "unhealthy", 201: "very-unhealthy",
+                 300: "very-unhealthy", 301: "hazardous", 500: "hazardous"}
+        for value, band in cases.items():
+            self.assertEqual(cn.aqi_band(value), band, value)
+        for absent in (None, "", "83", True, float("nan")):
+            self.assertIsNone(cn.aqi_band(absent), absent)
+
+    def test_the_live_response_shape_parses(self):
+        fields = cn.parse_air_quality(aqi_body(83, 17.5))
+        self.assertEqual(fields["aqi"], 83)
+        self.assertEqual(fields["aqi_band"], "moderate")
+        self.assertEqual(fields["pm2_5"], 17.5)
+        self.assertIn("moderate", fields["aqi_note"])
+        self.assertIn("AQI 83", fields["aqi_note"])
+
+    def test_missing_numbers_never_produce_a_guessed_band(self):
+        fields = cn.parse_air_quality({"current": {"pm2_5": 5.0}})
+        self.assertIsNone(fields["aqi"])
+        self.assertIsNone(fields["aqi_band"])
+        self.assertIsNone(fields["aqi_note"])
+        self.assertEqual(fields["pm2_5"], 5.0)
+        for junk in (None, [], "x", {}, {"current": []}):
+            self.assertIsNone(cn.parse_air_quality(junk)["aqi"], junk)
+
+    def test_aqi_present_reaches_the_block(self):
+        fields = cn.parse_air_quality(aqi_body(83, 17.5))
+        block = self.block_for(weather_body(), aqi=fields)
+        self.assertEqual(set(block), BLOCK_KEYS)
+        self.assertEqual(block["aqi"], 83)
+        self.assertIsInstance(block["aqi"], int)
+        self.assertEqual(block["aqi_band"], "moderate")
+        self.assertEqual(block["pm2_5"], 17.5)
+        self.assertIn("moderate", block["aqi_note"])
+
+    def test_a_dead_aqi_source_leaves_the_block_complete(self):
+        day = cn.kathmandu_now_str()[:10]
+        with WeatherFixture(json.dumps(weather_body([day])).encode("utf-8"),
+                            self.tmp,
+                            aqi=RuntimeError("simulated outage")) as fx:
+            rc, payload, log = fx.run()
+        self.assertEqual(rc, 0)
+        block = payload["weather"]
+        self.assertEqual(set(block), BLOCK_KEYS)
+        for key in ("aqi", "aqi_band", "pm2_5", "aqi_note"):
+            self.assertIsNone(block[key], key)
+        # The weather half is untouched and still complete.
+        self.assertEqual(block["temperature_c"], 21.4)
+        self.assertTrue(block["narrative"])
+        self.assertIn("weather_advice", payload)
+        # The reason is stated once, and only once.
+        self.assertEqual(log.count("air quality unavailable"), 1)
+        self.assertIn("simulated outage", log)
+
+    def test_aqi_present_reaches_candidates_json_end_to_end(self):
+        day = cn.kathmandu_now_str()[:10]
+        with WeatherFixture(json.dumps(weather_body([day])).encode("utf-8"),
+                            self.tmp) as fx:
+            rc, payload, _log = fx.run()
+        self.assertEqual(rc, 0)
+        block = payload["weather"]
+        self.assertEqual(block["aqi"], 83)
+        self.assertEqual(block["aqi_band"], "moderate")
+        self.assertEqual(block["pm2_5"], 17.5)
+        self.assertIn("moderate", block["aqi_note"])
+
+    def test_only_unsafe_air_changes_the_advice_wording(self):
+        body = wet_body(pop=0, mm=0.0, apparent=18.6)
+        body["daily"]["precipitation_probability_max"] = [5] * len(DAYS)
+        body["daily"]["precipitation_sum"] = [0.0] * len(DAYS)
+        payload, err = cn.normalize_hourly_forecast(body, self.place, NPT0)
+        self.assertEqual(err, "")
+
+        def advice(aqi_fields):
+            box = {"payload": payload, "error": "", "raw": body,
+                   "place": self.place, "fetched_at_npt": NPT0,
+                   "aqi": aqi_fields}
+            lines, advice_err = cn.compute_weather_advice(
+                box, self.profile, now=NPT0)
+            self.assertEqual(advice_err, "")
+            return lines
+
+        calm = advice(None)
+        self.assertEqual([line["id"] for line in calm], ["C"])
+        self.assertNotIn("limit outdoor exposure",
+                         " ".join(line["text"] for line in calm).lower())
+
+        moderate = advice(cn.parse_air_quality(aqi_body(83, 17.5)))
+        self.assertEqual([line["id"] for line in moderate], ["C"])
+        self.assertNotIn("limit outdoor exposure",
+                         " ".join(line["text"] for line in moderate).lower())
+
+        hazardous = advice(cn.parse_air_quality(aqi_body(320, 210.0)))
+        self.assertEqual([line["id"] for line in hazardous], ["AQI"])
+        self.assertIn("limit outdoor exposure", hazardous[0]["text"].lower())
+        self.assertNotIn("Nothing to plan for", hazardous[0]["text"])
 
 
 class TestWetVerdictAndOutlookRowCannotDisagree(unittest.TestCase):

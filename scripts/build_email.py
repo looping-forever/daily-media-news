@@ -866,6 +866,9 @@ def weather_detail_lines(weather, now=None):
         rain = _w_rain(block.get("next12h"))
         if rain:
             parts.append(rain)
+        aqi = block.get("aqi_note")
+        if isinstance(aqi, str) and aqi.strip():
+            parts.append(aqi.strip())
         if not parts:
             return []
         return [" - ".join(parts)]
@@ -913,6 +916,10 @@ def weather_detail_html(weather, now=None):
         if rain:
             parts.append('<p style="margin:0 0 0 0;font-size:13px;'
                          'color:#374151;">%s</p>' % esc(rain))
+        aqi = block.get("aqi_note")
+        if isinstance(aqi, str) and aqi.strip():
+            parts.append('<p style="margin:6px 0 0 0;font-size:13px;'
+                         'color:#374151;">%s</p>' % esc(aqi.strip()))
         outlook = _w_outlook(block.get("outlook"))
         if outlook:
             parts.append('<ul style="margin:6px 0 0 16px;padding:0;font-size:12px;'
