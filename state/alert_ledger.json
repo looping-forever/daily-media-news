@@ -2,14 +2,14 @@
   "conditions": {
     "breaking.honesty_gate||": {
       "alerted_at": "2026-11-02T14:15:07Z",
-      "cause": "ai_fail_safe: models=opencode/big-pickle,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/big-pickle: no model output within 40s of its 150s window -- \u001b[0m",
+      "cause": "ai_fail_safe: models=opencode/muse-spark-1.3-contributor-free,opencode/ling-3.0-flash-fin-free,opencode/muse-spark-1.2-contributor-free,opencode/nemotron-3-ultra-free source=live; opencode/muse-spark-1.3-contributo",
       "first_seen": "2026-11-02T01:24:21Z",
       "healthy_streak": 0,
-      "last_seen": "2026-11-02T14:33:42Z",
-      "runs": 30,
+      "last_seen": "2026-11-02T14:56:33Z",
+      "runs": 31,
       "window_first": "2026-11-02T14:28:26Z",
-      "window_last": "2026-11-02T14:33:42Z",
-      "window_runs": 2
+      "window_last": "2026-11-02T14:56:33Z",
+      "window_runs": 3
     }
   },
   "schema_version": 1
