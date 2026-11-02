@@ -1418,9 +1418,31 @@ def record_attempt(state_dir, model, attempt, timeout_sec, reason,
         print("ai_classify: could not write the attempt record (%s)" % exc)
 
 
+def _emit_attempt(on_attempt, model, attempt, granted_sec, wall_sec, outcome,
+                  stdout_text="", stderr_text="", first_byte_sec=None):
+    """Report ONE attempt to an observer. The ladder probe is the only caller.
+
+    An observer must never be able to end the walk: it is diagnosis, and
+    diagnosis failing is not a reason to stop deciding. Nothing here changes
+    behaviour when no observer is attached (`on_attempt is None`).
+    """
+    if on_attempt is None:
+        return
+    try:
+        on_attempt(model=model, attempt=attempt, granted_sec=granted_sec,
+                   wall_sec=wall_sec, outcome=outcome,
+                   stdout_text=_as_text(stdout_text),
+                   stderr_text=_as_text(stderr_text),
+                   first_byte_sec=first_byte_sec)
+    except Exception as exc:
+        print("ai_classify: attempt observer failed (%s: %s)"
+              % (type(exc).__name__, exc))
+
+
 def ai_classify(pending_path, runner=None, models=None,
                 prompt_path=PROMPT_PATH,
-                attempts_per_model=AI_ATTEMPTS_PER_MODEL):
+                attempts_per_model=AI_ATTEMPTS_PER_MODEL,
+                on_attempt=None):
     """Returns (verdict|None, error). Any failure => (None, err) and the
     caller fails safe to level 1 (silence).
 
@@ -1454,6 +1476,11 @@ def ai_classify(pending_path, runner=None, models=None,
     Health memory can only REORDER the attempt list, never remove a model
     from it — see model_selector.select. Total failure still returns
     (None, err), still decides nothing, and still raises the honesty gate.
+
+    `on_attempt` is a READ-ONLY observer (see _emit_attempt). It is how
+    `--ladder-probe` turns ONE real walk into per-model evidence without paying
+    for a second walk; it cannot alter the walk, and `None` is the production
+    default.
     """
     started = time.monotonic()
     deadline = started + AI_TOTAL_BUDGET_SEC
@@ -1571,6 +1598,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 record_attempt(state_dir, model, attempt, timeout, "timeout",
                                stdout_text=out_tail, stderr_text=err_tail,
                                wall_sec=wall_sec)
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "timeout", out_tail, err_tail)
                 evidence = collect_news.clean_ws(
                     _redact_secrets("%s\n%s" % (out_tail, err_tail))).strip()
                 errors.append("%s: timed out after %ds%s"
@@ -1591,6 +1620,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 record_attempt(state_dir, model, attempt, timeout, "transport",
                                stdout_text="", stderr_text=str(exc),
                                wall_sec=wall_sec)
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "transport", "", str(exc))
                 if attempt < attempts_per_model \
                         and time.monotonic() < model_deadline:
                     print("ai_classify: %s attempt %d failed transport, retrying"
@@ -1605,6 +1636,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 record_attempt(state_dir, model, attempt, timeout, "verdict",
                                stdout_text=out, stderr_text=err,
                                wall_sec=wall_sec)
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "verdict", out, err)
                 return verdict, None
             # A QUOTA REFUSAL IS THE WHOLE WALK'S INDICTMENT, not this model's.
             # The provider refuses pre-generation and every free id shares the
@@ -1629,6 +1662,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 errors.append("%s: model_not_found -- the provider does not "
                               "serve this id; cooled for %dh and skipped"
                               % (model, hours))
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "model_not_found", out, err)
                 print("ai_classify: %s -> model_not_found. The provider does "
                       "not serve this id, so it is cooled for %dh and the walk "
                       "moves to the next rung." % (model, hours))
@@ -1647,6 +1682,8 @@ def ai_classify(pending_path, runner=None, models=None,
                                               at=time.time())
                 errors.append("%s: payment_required -- the plan refuses the %r "
                               "provider" % (model, provider_prefix))
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "payment_required", out, err)
                 print("ai_classify: %s -> payment_required. The plan refuses the "
                       "'%s' provider, not this model id, so re-asking it is "
                       "pointless; trying the next rung."
@@ -1666,6 +1703,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 errors.append("%s: quota_or_rate_limited -- the '%s' provider's "
                               "own allowance, not the shared pool; no pool row "
                               "written" % (model, provider_prefix))
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "quota_or_rate_limited", out, err)
                 print("ai_classify: %s -> quota_or_rate_limited on the '%s' "
                       "provider's own allowance, so the shared pool row is NOT "
                       "written; trying the next rung."
@@ -1685,6 +1724,8 @@ def ai_classify(pending_path, runner=None, models=None,
                 errors.append("%s: quota_or_rate_limited -- shared pool refused "
                               "until %s; walk stopped"
                               % (model, row.get("until")))
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "quota_or_rate_limited", out, err)
                 model_selector.record_failure(health, model, "transport",
                                               at=time.time())
                 pool_walled = True
@@ -1694,6 +1735,8 @@ def ai_classify(pending_path, runner=None, models=None,
                           % (model, rc, tail))
             record_attempt(state_dir, model, attempt, timeout, "unparseable",
                            stdout_text=out, stderr_text=err, wall_sec=wall_sec)
+            _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                          "unparseable", out, err)
             # The model answered; it answered unusably. Do not re-ask, but DO
             # remember it: this is the 2026-10-13 mimo failure, and the next
             # run must not pay for it again.
@@ -1716,6 +1759,152 @@ def ai_classify(pending_path, runner=None, models=None,
             break
     model_selector.save_health(health_path, health)
     return None, "; ".join(errors) or "no AI attempts made"
+
+
+# ---------------------------------------------------------------------------
+# The ladder probe: a manual, on-demand proof that the rungs ANSWER
+# ---------------------------------------------------------------------------
+#
+# WHY THIS EXISTS. Every suite here drives `ai_classify` with a stubbed runner,
+# which proves the CODE, not the LADDER: whether the four configured ids are
+# served, whether a provider's plan still allows them, and whether an answer
+# comes back inside 150s on the free tier. Those three facts can only be learned
+# by asking once, and until now the only way to ask was a live sweep -- whose
+# result was indistinguishable from a quiet news hour (the honesty gate's whole
+# premise). The probe asks on purpose, with a fixed input, and writes the answer
+# down.
+
+LADDER_PROBE_FILENAME = "ladder_probe.json"
+LADDER_PROBE_DIRNAME = "ladder_probe"
+
+# ONE fixed candidate, built in code, chosen so the CORRECT answer is the
+# minimal level-1 object: a calm local story covered by two outlets. No death
+# toll (that would trip the deterministic fast path, which is a different
+# mechanism), no duplicate marker, nothing alert-worthy -- so a level above 1
+# here is a MODEL fault, not a news event. The `.example` TLD is reserved and
+# non-routable: no real outlet is named, and nothing in the probe can be
+# mistaken for a real source.
+LADDER_PROBE_CANDIDATE = {
+    "title": "Example City library extends weekend opening hours for exam season",
+    "url": "https://example-news.example/example-city-library-weekend-hours",
+    "source": "Example News",
+    "snippet": "Example News and Example Herald both report the same schedule "
+               "change at the central library; no other details were given.",
+    "domain_category": "local_city",
+}
+
+
+def _ladder_probe_pending(window_min=90, now_utc=None):
+    """The one candidate the probe ever sends, in the payload shape a real run
+    writes -- same keys, same types, so the model cannot tell a probe from a
+    sweep. `published` is recent so it is not filtered as stale."""
+    now_utc = now_utc or datetime.now(timezone.utc)
+    cand = dict(LADDER_PROBE_CANDIDATE)
+    cand["published"] = (now_utc - timedelta(minutes=30)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ")
+    return {"generated_at": now_utc.isoformat(timespec="seconds"),
+            "window_min": window_min,
+            "pre_gate_matched": [cand["title"]],
+            "pre_gate_why": ["ladder_probe: fixed synthetic candidate"],
+            "candidates": [cand]}
+
+
+def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
+                      stdout_text="", stderr_text="", first_byte_sec=None):
+    """One attempt, in the stable shape the committed file documents.
+
+    `granted_sec` is the window GRANTED and `wall_sec` is what it took -- the
+    pair is what sizes AI_PER_ATTEMPT_TIMEOUT_SEC. `first_byte_sec` is null
+    because `subprocess.run(capture_output=True)` cannot observe the first
+    token; it is never estimated. The tail is redacted and whitespace-collapsed
+    so a credential can never ride into a committed file.
+    """
+    tail = collect_news.clean_ws("%s %s" % (_as_text(stdout_text),
+                                            _as_text(stderr_text)))
+    return {"model": model,
+            "attempt": int(attempt),
+            "granted_sec": int(granted_sec),
+            "wall_sec": None if wall_sec is None else round(wall_sec, 2),
+            "first_byte_sec": (None if first_byte_sec is None
+                               else round(first_byte_sec, 2)),
+            "outcome": outcome,
+            "tail_excerpt": _redact_secrets(tail)[-160:]}
+
+
+def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
+                     window_min=90):
+    """Walk the ladder ONCE on the fixed candidate and write the result.
+
+    ISOLATED ON PURPOSE. Health, cooldown, cache and attempt files live in
+    `state/ladder_probe/`, so a probe can neither promote a rung in the
+    committed pool memory nor record a shared-pool refusal that would silence
+    the real monitor for hours. It also returns before the pre-gate, the
+    fast path, dedupe, delivery and the honesty-gate log row: a probe decides
+    nothing, sends nothing and is never evidence about a news hour.
+
+    The result file is COMMITTED by the workflow. Artifacts expire in 7 days,
+    so an artifact-only answer would be the same unrecoverable evidence the
+    honesty gate was fixed to stop producing.
+
+    Returns a process exit code: 0 when the probe ran and wrote its result
+    (whatever the verdict -- "the ladder is broken" IS a result), 1 when the
+    result could not be written.
+    """
+    probe_dir = os.path.join(state_dir, LADDER_PROBE_DIRNAME)
+    os.makedirs(probe_dir, exist_ok=True)
+    pending_path = os.path.join(probe_dir, "breaking_pending.json")
+    write_json_atomic(pending_path, _ladder_probe_pending(window_min))
+
+    rows = {}
+
+    def collect(**attempt):
+        # LAST WRITE WINS per (model, attempt): a refusal arm reports the
+        # attempt after its generic branch would have, and the specific one is
+        # the useful one.
+        rows[(attempt["model"], attempt["attempt"])] = _ladder_probe_row(
+            **attempt)
+
+    started = time.perf_counter()
+    verdict, err = ai_classify(pending_path, runner=runner, models=models,
+                               on_attempt=collect)
+    ladder_seconds = time.perf_counter() - started
+    attempts = list(rows.values())
+
+    # DID IT ANSWER, AND WAS THE ANSWER USABLE? "parseable" needs a verdict;
+    # "unparseable" means a model answered and the answer did not parse;
+    # "none" means no answer came back at all (timeout, transport, refusal).
+    if verdict is not None:
+        state = "parseable"
+    elif any(a["outcome"] == "unparseable" for a in attempts):
+        state = "unparseable"
+    else:
+        state = "none"
+
+    doc = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "head_sha": head_sha or "",
+           "trigger": "ladder_probe",
+           "per_attempt_sec": AI_PER_ATTEMPT_TIMEOUT_SEC,
+           "attempt_budget_sec": AI_TOTAL_BUDGET_SEC,
+           "pool": list(AI_LADDER),
+           "attempts": attempts,
+           "verdict": state,
+           "ladder_seconds": round(ladder_seconds, 2),
+           "error": (err or "")[:400]}
+    try:
+        write_json_atomic(os.path.join(state_dir, LADDER_PROBE_FILENAME), doc)
+    except OSError as exc:
+        print("ladder_probe: COULD NOT WRITE THE RESULT (%s)" % exc)
+        return 1
+
+    for a in attempts:
+        print("ladder_probe: %s attempt %d granted=%ss wall=%ss outcome=%s"
+              % (a["model"], a["attempt"], a["granted_sec"],
+                 "n/a" if a["wall_sec"] is None else a["wall_sec"],
+                 a["outcome"]))
+    print("ladder_probe: verdict=%s in %.2fs over %d attempt(s)%s"
+          % (state, ladder_seconds, len(attempts),
+             "" if not err else " -- %s" % collect_news.clean_ws(err)[:300]))
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -2910,6 +3099,15 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
     ap.add_argument("--max-candidates", dest="max_candidates", type=int,
                     default=40)
     ap.add_argument("--sources-json", dest="sources_json", default="")
+    # SPENDS THE FREE POOL ON PURPOSE, so it is never a default and never a
+    # scheduled trigger: it exists to answer "do the four rungs actually
+    # answer?" once, by hand, and write the answer down.
+    ap.add_argument("--ladder-probe", dest="ladder_probe", action="store_true",
+                    help="walk the model ladder once on a fixed synthetic "
+                         "candidate, write state/ladder_probe.json and return; "
+                         "decides nothing, sends nothing, spends quota")
+    ap.add_argument("--head-sha", dest="head_sha",
+                    default=os.environ.get("GITHUB_SHA", ""))
     args = ap.parse_args(argv)
 
     try:
@@ -2922,6 +3120,16 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
 
     state_dir = args.state_dir
     os.makedirs(state_dir, exist_ok=True)
+
+    # PROBE MODE, BEFORE ANYTHING ELSE. It precedes the story state, sources
+    # and the pre-gate on purpose: a probe must be structurally unable to reach
+    # the fast path, dedupe, delivery or the honesty-gate log row, and a corrupt
+    # story file must not be able to stop the one check that proves the ladder
+    # answers.
+    if args.ladder_probe:
+        return run_ladder_probe(state_dir, head_sha=args.head_sha,
+                                runner=ai_runner, window_min=args.window_min)
+
     paths = {
         "active": os.path.join(state_dir, "active_stories.json"),
         "log": os.path.join(state_dir, "breaking_log.json"),

@@ -80,6 +80,25 @@ on:
         required: false
         type: boolean
         default: true
+      # THE ONLY SUPPORTED WAY TO PROVE THE LADDER WORKS. Every suite in
+      # tests/ drives `ai_classify` with a stubbed runner, which proves the
+      # CODE, not the ladder: whether the four configured ids are still served,
+      # whether a provider's plan still allows them, and whether an answer comes
+      # back inside the 150s window on the free tier. Those three facts can only
+      # be learned by asking once, and asking by hand used to be impossible
+      # without a live sweep whose result a quiet news hour could hide.
+      #
+      # IT SPENDS FREE-TIER QUOTA ON PURPOSE -- one walk, at most four 150s
+      # windows -- so it is default-OFF and reachable only by hand. It writes
+      # state/ladder_probe.json, which the state commit below COMMITS: the
+      # artifact expires in 7 days, and an answer that expires is the same
+      # unrecoverable evidence the honesty gate was fixed to stop producing.
+      # It decides nothing, sends nothing, and writes no honesty-gate row.
+      ladder_probe:
+        description: 'Probe the AI ladder on a fixed synthetic candidate (up to four 150s windows; spends free quota; never sends)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: breaking-monitor
@@ -164,6 +183,9 @@ jobs:
         # the monitor runs live.
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          # Probe mode reaches the shell the same way DRY_RUN does: env var
+          # only, never interpolated into the command string.
+          LADDER_PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.ladder_probe || false }}
           # Headline that tripped the Cloudflare Worker tripwire
           # (repository_dispatch only; empty string otherwise). Surfaced in
           # the step summary below — never interpolated into a shell command.
@@ -202,12 +224,19 @@ jobs:
             # suppresses the ladder call.
             ARGS="--dry-run --no-model"
           fi
-          echo "Breaking monitor: dry_run=${DRY_RUN:-false} day=${TODAY_NPT} (NPT)"
-          # $ARGS is intentionally unquoted: it is only ever empty or the
-          # literal "--dry-run --no-model" built above, never external input.
+          # THE PROBE OVERRIDES THE DRY-RUN ARGS. It carries --dry-run as
+          # belt-and-braces even though the probe returns before rendering: if
+          # that early return ever moves, the flag still prevents a send.
+          if [ "$LADDER_PROBE" = "true" ]; then
+            ARGS="--ladder-probe --dry-run"
+          fi
+          echo "Breaking monitor: dry_run=${DRY_RUN:-false} ladder_probe=${LADDER_PROBE:-false} day=${TODAY_NPT} (NPT)"
+          # $ARGS is intentionally unquoted: it is only ever empty or one of the
+          # literals built above, never external input.
           python3 scripts/breaking_monitor.py \
             --state-dir state \
             --config-dir config \
+            --head-sha "${GITHUB_SHA:-}" \
             $ARGS
 
       - name: Upload alert preview artifact
@@ -235,7 +264,13 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: breaking-attempts
-          path: state/breaking_attempts.jsonl
+          # The probe's walk is written into state/ladder_probe/ (isolated so it
+          # cannot promote a rung or record a shared-pool refusal), and its
+          # durable copy is the committed state/ladder_probe.json. Both paths
+          # are listed so the artifact carries the same rows either way.
+          path: |
+            state/breaking_attempts.jsonl
+            state/ladder_probe/breaking_attempts.jsonl
           retention-days: 7
           if-no-files-found: ignore
 
@@ -274,12 +309,20 @@ jobs:
           # slow models" was false in CI -- every run retried the same slow
           # model first. It only changes on a run that actually attempted a
           # model, so this cannot churn on a quiet hour.
+          FILES=(
+            state/active_stories.json
+            state/breaking_state.json
+            state/breaking_delivery.json
+            state/model_health.json
+          )
+          # The probe's result, when this run was one. It is COMMITTED on
+          # purpose: it is the durable answer to "do the rungs still answer?".
+          if [ -f state/ladder_probe.json ]; then
+            FILES+=(state/ladder_probe.json)
+          fi
           bash scripts/commit_state.sh \
             "chore: update breaking monitor state [skip ci]" \
-            state/active_stories.json \
-            state/breaking_state.json \
-            state/breaking_delivery.json \
-            state/model_health.json
+            "${FILES[@]}"
 
       - name: Persist model cooldowns
         # THE COOLDOWN HAS TO OUTLIVE THE FAILURE THAT CREATED IT. Same defect as
@@ -347,6 +390,10 @@ jobs:
         continue-on-error: true
         env:
           PAYLOAD_TITLE: ${{ github.event.client_payload.title || '' }}
+          # A probe run is summarized from its own file, never from
+          # state/breaking_log.json (which it does not write) and never through
+          # the honesty-gate block below.
+          LADDER_PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.ladder_probe || false }}
           # Reused for the honesty-gate failure notice below. Same topic, same
           # secrets as the alert itself; NTFY_TOPIC is never printed.
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
@@ -357,6 +404,54 @@ jobs:
             echo "Last breaking_log rows (raw tail):"
             tail -n 14 state/breaking_log.json || true
           fi
+
+          # A PROBE RUN IS SUMMARIZED FROM state/ladder_probe.json, ON ITS OWN.
+          # It must never enter the sweep summary below: that block reads
+          # breaking_log.json, reports the honesty gate and SAVES the
+          # alert-dedupe ledger, and a probe is neither a sweep nor evidence
+          # about a news hour. No ntfy, no ledger, no status claim.
+          if [ "$LADDER_PROBE" = "true" ]; then
+          python3 - <<'PROBE_PY'
+          import json, os
+
+          lines = ["## Breaking News Monitor — ladder probe"]
+          probe = None
+          try:
+              with open("state/ladder_probe.json", encoding="utf-8") as fh:
+                  probe = json.load(fh)
+          except Exception as exc:
+              print("::warning::could not read state/ladder_probe.json: %s" % exc)
+
+          if probe is None:
+              lines.append("- No probe result was written; the run log has the "
+                           "reason. This run is NOT evidence about the ladder.")
+          else:
+              lines.append("- Verdict: %s in %ss over %d attempt(s) at %s"
+                           % (probe.get("verdict"), probe.get("ladder_seconds"),
+                              len(probe.get("attempts") or []),
+                              probe.get("head_sha") or "unknown head"))
+              lines.append("- Confirmed answer, no answer, or garbage? "
+                           "`parseable` / `none` / `unparseable` are those three "
+                           "and nothing else.")
+              for a in probe.get("attempts") or []:
+                  lines.append("  * %s attempt %s: granted %ss, measured %ss, "
+                               "outcome %s"
+                               % (a.get("model"), a.get("attempt"),
+                                  a.get("granted_sec"), a.get("wall_sec"),
+                                  a.get("outcome")))
+              if probe.get("error"):
+                  lines.append("- Classifier detail: %s"
+                               % str(probe["error"])[:300])
+          report = "\n".join(lines)
+          print(report)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY", "")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write(report + "\n")
+          PROBE_PY
+          fi
+
+          if [ "$LADDER_PROBE" != "true" ]; then
           python3 - <<'PY'
           import datetime as _dt
           import json, os, sys
@@ -631,6 +726,7 @@ jobs:
               with open(summary, "a", encoding="utf-8") as fh:
                   fh.write(report + "\n")
           PY
+          fi
 
       - name: Commit the alert ledger
         # The 6h window is real only if it outlives the run that opened it. This

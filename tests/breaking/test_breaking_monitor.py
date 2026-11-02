@@ -12,6 +12,8 @@ strict-JSON verdicts; SMTP is replaced by a fake factory (raising or
 recording). All state lives in per-test temp dirs.
 """
 
+import contextlib
+import io
 import json
 import os
 import re
@@ -2854,6 +2856,155 @@ def test_65_the_attempt_record_keeps_the_measured_wall_not_just_the_window():
         "recorded: %r" % (won,))
 
 
+def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
+    """The probe is the ONLY supported way to prove the four rungs answer.
+
+    Every other suite drives `ai_classify` with a stubbed runner, which proves
+    the code, not the ladder: whether the ids are still served, whether a plan
+    still allows them, whether an answer makes it back inside the 150s window.
+    So the probe has to (a) actually walk, (b) write a durable, redacted answer,
+    and (c) be structurally unable to reach the pre-gate, the fast path, dedupe,
+    delivery or the honesty-gate log row -- a probe that could send or that
+    promoted a rung in the committed health memory would be a monitor action
+    wearing a diagnostic's name.
+    """
+    good = json.dumps({"level": 1, "confidence": "LOW", "event_key": "",
+                       "title": "", "summary": "", "why_urgent": "",
+                       "escalated_from_previous": False, "sources": [],
+                       "category_suggestion": "nepal"})
+
+    def runner(model, prompt_text, env, timeout_sec):
+        if "slow" in model:
+            raise subprocess.TimeoutExpired(
+                cmd="opencode", timeout=timeout_sec,
+                output="partial sk-abcdefghijklmnopqrstuvwx")
+        return 0, good, ""
+
+    sd = fresh_dir()
+
+    def unreachable(name):
+        return unittest.mock.patch.object(
+            bm, name,
+            side_effect=AssertionError("the probe reached %s" % name))
+
+    with unreachable("pre_gate"), unreachable("hard_evidence_fast_path"), \
+            unreachable("collect_candidates"), unreachable("load_sources"), \
+            unreachable("process_alert"), \
+            unittest.mock.patch.object(bm.story_state, "load_state",
+                                       side_effect=AssertionError(
+                                           "the probe read the story ledger")), \
+            unittest.mock.patch.object(
+                bm.model_selector, "select",
+                return_value=(["p/slow", "p/fast"], {"source": "probe"})):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = bm.main(["--ladder-probe", "--state-dir", sd,
+                            "--head-sha", "deadbeef"], ai_runner=runner)
+
+    assert code == 0, ("the probe ran but did not report success once it had "
+                       "written its answer")
+    doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+    assert doc["verdict"] == "parseable", doc
+    assert doc["head_sha"] == "deadbeef", doc
+    assert doc["per_attempt_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, doc
+    assert doc["pool"] == list(bm.AI_LADDER), doc
+    assert isinstance(doc["ladder_seconds"], (int, float)), doc
+    assert [a["model"] for a in doc["attempts"]] == ["p/slow", "p/slow",
+                                                     "p/fast"], (
+        "the probe must record the REAL walk, one row per attempt, in order: %r"
+        % (doc["attempts"],))
+    wanted = {"model", "attempt", "granted_sec", "wall_sec", "first_byte_sec",
+              "outcome", "tail_excerpt"}
+    for row in doc["attempts"]:
+        assert set(row) == wanted, row
+        assert row["granted_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, row
+        assert row["first_byte_sec"] is None, (
+            "subprocess.run(capture_output=True) cannot see the first token, "
+            "so a number here would be invented: %r" % (row,))
+    assert doc["attempts"][0]["outcome"] == "timeout", doc["attempts"][0]
+    assert doc["attempts"][-1]["outcome"] == "verdict", doc["attempts"][-1]
+    assert "sk-abcdefghijklmnopqrstuvwx" not in json.dumps(doc), (
+        "a credential-shaped token reached the committed probe file: %s"
+        % json.dumps(doc))
+
+    # ISOLATION. Health, cooldown, attempts and the pending payload live in
+    # state/ladder_probe/ so the shared memory the NEXT sweep reorders around
+    # cannot be touched by a diagnostic.
+    assert os.path.isdir(os.path.join(sd, bm.LADDER_PROBE_DIRNAME))
+    for name in ("breaking_log.json", "model_health.json", "model_cooldown.json",
+                 "active_stories.json", "breaking_attempts.jsonl",
+                 "breaking_state.json"):
+        assert not os.path.exists(os.path.join(sd, name)), (
+            "the probe wrote %r into the SHARED state dir -- it can then be "
+            "read as a judged sweep or promote a rung" % name)
+
+    text = out.getvalue()
+    assert text.count("ladder_probe: p/") == 3, text
+    assert "verdict=parseable" in text, text
+
+    # The payload must be INDISTINGUISHABLE from the one a real sweep writes:
+    # same keys, one candidate, a recent `published`. A probe the model can
+    # recognise (or one with window_min=0, which reads as "nothing is fresh")
+    # would not test the production prompt at all.
+    pending = read_json(os.path.join(sd, bm.LADDER_PROBE_DIRNAME,
+                                     "breaking_pending.json"))
+    assert set(pending) == {"generated_at", "window_min", "pre_gate_matched",
+                            "pre_gate_why", "candidates"}, sorted(pending)
+    assert pending["window_min"] == 90, pending
+    assert len(pending["candidates"]) == 1, pending
+    assert pending["candidates"][0]["title"] \
+        == bm.LADDER_PROBE_CANDIDATE["title"], pending
+    assert pending["candidates"][0].get("published"), pending
+
+    # AN ANSWER THAT DOES NOT PARSE IS ITS OWN VERDICT, not "none": those two
+    # mean opposite things when the ladder is being diagnosed.
+    bad = fresh_dir()
+    with contextlib.redirect_stdout(io.StringIO()):
+        bm.run_ladder_probe(bad, runner=lambda m, p, e, t: (0, "no json here", ""),
+                            models=["p/garbage"])
+    assert read_json(os.path.join(bad, bm.LADDER_PROBE_FILENAME))["verdict"] \
+        == "unparseable"
+
+    down = fresh_dir()
+
+    def unreachable_model(model, prompt_text, env, timeout_sec):
+        raise OSError("connection reset")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        bm.run_ladder_probe(down, runner=unreachable_model, models=["p/down"])
+    assert read_json(os.path.join(down, bm.LADDER_PROBE_FILENAME))["verdict"] \
+        == "none"
+
+    # NO RESULT FILE, NO SUCCESS. The file is the evidence; a probe that
+    # reported 0 without it would be the same lie the honesty gate exists for.
+    real_write = bm.write_json_atomic
+
+    def disk_full(path, payload):
+        if path.endswith(bm.LADDER_PROBE_FILENAME):
+            raise OSError("disk full")
+        return real_write(path, payload)
+
+    with unittest.mock.patch.object(bm, "write_json_atomic", disk_full), \
+            contextlib.redirect_stdout(io.StringIO()):
+        assert bm.run_ladder_probe(fresh_dir(), runner=runner,
+                                   models=["p/fast"]) == 1
+
+    # AND IT IS UNREACHABLE BY DEFAULT. A default-ON probe would spend the
+    # free pool on every scheduled sweep.
+    wf = os.path.join(REPO_ROOT, ".github", "workflows",
+                      "breaking-monitor.yml")
+    with open(wf, encoding="utf-8") as fh:
+        src = fh.read()
+    block = src.split("ladder_probe:", 1)[1].split("concurrency:", 1)[0]
+    assert "type: boolean" in block and "default: false" in block, block
+    assert "free quota" in block, (
+        "the input must say what it costs, or it will be dispatched casually: %r"
+        % block)
+    assert 'ARGS="--ladder-probe' in src, "the input never reaches the script"
+    assert "inputs.ladder_probe" in src, (
+        "the probe flag must come from the dispatch input, not a schedule")
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -2921,6 +3072,7 @@ def main():
         test_63_timeout_evidence_is_captured_redacted_and_kept,
         test_64_a_model_not_found_is_cooled_not_called_garbage,
         test_65_the_attempt_record_keeps_the_measured_wall_not_just_the_window,
+        test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote,
     ]
     failures = []
     for test in tests:

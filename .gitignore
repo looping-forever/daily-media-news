@@ -112,6 +112,15 @@ state/ntfy_payload.json
 state/email.txt
 pytest_output.txt
 
+# The ladder probe's WORKING DIRECTORY (--ladder-probe). The probe walks the
+# real ladder, so it writes pending/health/cooldown/attempts -- and it does that
+# HERE, never in state/, so a diagnostic can neither promote a rung in the
+# committed health memory nor record a shared-pool refusal that would silence
+# the real monitor. The RESULT is state/ladder_probe.json, deliberately NOT
+# matched by this pattern: it is committed, because an artifact expires in 7
+# days and the answer must outlive it.
+state/ladder_probe/
+
 # The academic monitor's state: it carries the owner's ROLL NUMBER, and this
 # repository is public. It is never committed by design -- academic-result.yml
 # restores it from the KV key `academic:state` and writes it back there, and the
