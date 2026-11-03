@@ -5,10 +5,10 @@
       "cause": "ai_fail_safe: models=opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/big-pickle source=live; opencode/beam-free: timed out after 150s -- e models work in OpenCode (htt",
       "first_seen": "2026-11-02T01:24:21Z",
       "healthy_streak": 0,
-      "last_seen": "2026-11-03T06:29:02Z",
+      "last_seen": "2026-11-03T06:39:23Z",
       "runs": 39,
       "window_first": "2026-11-03T04:07:51Z",
-      "window_last": "2026-11-03T06:29:02Z",
+      "window_last": "2026-11-03T06:39:23Z",
       "window_runs": 4
     }
   },
