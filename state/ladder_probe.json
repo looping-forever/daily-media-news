@@ -1,6 +1,6 @@
 {
-  "run_at": "2026-11-03T08:46:26+00:00",
-  "head_sha": "c10b9905a040962d34a07803dd3a9608ac9a0789",
+  "run_at": "2026-11-03T09:42:51+00:00",
+  "head_sha": "6d6170c2b2e79d9dd106fe406c6600fc15be1eb1",
   "trigger": "ladder_probe",
   "per_attempt_sec": 150,
   "first_output_sec": 40,
@@ -17,48 +17,57 @@
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 5.77,
-      "first_byte_sec": 5.64,
+      "wall_sec": 7.58,
+      "first_byte_sec": 7.42,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 2.08,
+      "first_liveness_sec": 2.17,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": false,
       "candidate": "unimportant",
-      "tail_excerpt": "l209wqE3fx timestamp=2026-11-03T08:46:12.632Z level=INFO run=7f15b524 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "tail_excerpt": "PSn9trRGNY timestamp=2026-11-03T09:42:36.306Z level=INFO run=5d9ccde7 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     },
     {
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 6.52,
-      "first_byte_sec": 6.36,
+      "wall_sec": 6.22,
+      "first_byte_sec": 6.08,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 2.05,
+      "first_liveness_sec": 2.03,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": true,
       "candidate": "unimportant",
-      "tail_excerpt": "jl3vyWmASd timestamp=2026-11-03T08:46:26.003Z level=INFO run=17b41ee4 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "tail_excerpt": "8D0OacraPx timestamp=2026-11-03T09:42:51.744Z level=INFO run=97bf23ba message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     },
     {
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 6.88,
-      "first_byte_sec": 6.69,
+      "wall_sec": 9.19,
+      "first_byte_sec": 9.02,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 2.22,
+      "first_liveness_sec": 2.15,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": true,
       "candidate": "important",
-      "tail_excerpt": "aOqlYP4SOK timestamp=2026-11-03T08:46:19.464Z level=INFO run=794c0df7 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "tail_excerpt": "zZ3SHNnhTH timestamp=2026-11-03T09:42:45.490Z level=INFO run=660fcd90 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     }
   ],
   "verdict": "parseable",
   "judged_content": false,
   "judged_rule": "judged_content is true only when a verdict's title AND summary are both non-empty; the minimal level-1 object judges nothing",
+  "free_verdict": {
+    "level": 1,
+    "confidence": "LOW",
+    "title": "",
+    "summary": "",
+    "why_urgent": "",
+    "category_suggestion": "nepal",
+    "event_key": ""
+  },
   "judgment_capable": true,
   "judgment_measured": true,
   "judgment_failed": [],
@@ -70,16 +79,34 @@
       "expect": "judged",
       "state": "answered",
       "judged_content": true,
+      "verdict": {
+        "level": 2,
+        "confidence": "MEDIUM",
+        "title": "National carrier suspends international fleet operations",
+        "summary": "Reported: The national airline has grounded its international fleet following a safety inspection and maintenance records review. Passengers are currently being rebooked by airline staff while inspections continue.",
+        "why_urgent": "Potential major disruption to international travel for regional passengers.",
+        "category_suggestion": "nepal",
+        "event_key": "national-carrier-grounds-international-fleet"
+      },
       "rung": "gemini/gemini-3.5-flash-lite",
-      "seconds": 6.88
+      "seconds": 9.19
     },
     "unimportant": {
       "label": "unimportant",
       "expect": "declined",
       "state": "answered",
       "judged_content": false,
+      "verdict": {
+        "level": 1,
+        "confidence": "LOW",
+        "title": "",
+        "summary": "",
+        "why_urgent": "",
+        "category_suggestion": "nepal",
+        "event_key": ""
+      },
       "rung": "gemini/gemini-3.5-flash-lite",
-      "seconds": 6.52
+      "seconds": 6.22
     }
   },
   "control_judged_content": false,
@@ -87,7 +114,7 @@
   "control_model": "gemini/gemini-3.5-flash-lite",
   "control_env": "GEMINI_API_KEY",
   "attribution": "free_tier_answered",
-  "ladder_seconds": 7.77,
-  "control_seconds": 6.52,
+  "ladder_seconds": 9.56,
+  "control_seconds": 6.22,
   "error": ""
 }
