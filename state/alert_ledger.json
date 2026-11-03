@@ -1,16 +1,4 @@
 {
-  "conditions": {
-    "breaking.honesty_gate||": {
-      "alerted_at": "2026-11-03T03:47:01Z",
-      "cause": "ai_fail_safe: models=opencode/big-pickle,opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free source=live; opencode/big-pickle: timed out after 150s -- e models work in OpenCode (https",
-      "first_seen": "2026-11-02T01:24:21Z",
-      "healthy_streak": 1,
-      "last_seen": "2026-11-03T07:37:59Z",
-      "runs": 41,
-      "window_first": "2026-11-03T04:07:51Z",
-      "window_last": "2026-11-03T07:37:59Z",
-      "window_runs": 6
-    }
-  },
+  "conditions": {},
   "schema_version": 1
 }
