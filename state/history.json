@@ -1,167 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "pashplus.jp/anime/500145",
-      "title_hash": "610a77401f8771b8572a64f374df062fbb1367ee",
-      "title": "Bleach: Thousand-Year Blood War releases 50th episode",
-      "category": "anime",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/10/2043880/nepals-government-websites-begin-to-open",
-      "title_hash": "c63167560a86ad3574a71d82ebc95c11170b98f6",
-      "title": "Nepal government websites start returning after PHP flaw outage",
-      "category": "nepal",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "polygon.com/phantom-blade-zero-review",
-      "title_hash": "555de30b5b222d2e74420d2a19dbde8201190d83",
-      "title": "Phantom Blade Zero reviews praise fast wuxia combat",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/sebon-tightens-anti-money-laundering-rules-for-stock-market",
-      "title_hash": "0d4700a2c266e36b32e50f79d70741cbca7a734c",
-      "title": "SEBON tightens stock-market anti-money-laundering rules",
-      "category": "nepal",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "english.ratopati.com/story/84501/identity-card-mandatory-to-enter-tu-campus-during-npl",
-      "title_hash": "c8ae0e26816951c12869266754374c5c1c5abe8a",
-      "title": "TU Kirtipur campus requires ID cards during Nepal Premier League",
-      "category": "education_tu",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/babarmahal-footbridge-to-come-into-operation-this-week.html",
-      "title_hash": "240634835b9fa64cb56da6c7d2475b5f5918645a",
-      "title": "Babarmahal footbridge to open this week",
-      "category": "local_city",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "techpowerup.com/354125/epic-games-makes-fortnite-x-one-piece-official-mini-season-starts-november-1",
-      "title_hash": "1893dd0c5f0ee39ebf589c761eaef50e611dcb3a",
-      "title": "Fortnite's One Piece crossover mini-season starts 1 November",
-      "category": "anime",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "shattered.io/microsoft-decision-1-qwen3-5-9b-model-2026",
-      "title_hash": "9b7631c314153d02d1adcdf1426616cc61463e50",
-      "title": "Microsoft 'Decision-1': 9B Qwen model launch explained",
-      "category": "tech_career",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/chicken-prices-fall-in-kathmandu-after-dashain-new-rates-announced.html",
-      "title_hash": "3b3f8c087e3916cce77152491a57595c7e647fc1",
-      "title": "Chicken prices fall in Kathmandu after Dashain, new rates announced",
-      "category": "local_city",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "pcgamer.com/gaming-industry/steam-week-in-review-ai-disclosures-enter-the-discourse-again-as-epic-ceo-calls-them-just-as-partisan-as-mandatory-political-essays",
-      "title_hash": "cf7897dba9fc400a282b5457594bae72891f1517",
-      "title": "Steam Week in Review: AI disclosures enter the discourse again",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74862294",
-      "title_hash": "e0943130a7ece9ae93efd48d6f841d08874bc935",
-      "title": "Houseki no Kuni creator launches new sci-fi manga 'Cosmic Mimimi'",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "train-it.eu/blog/cpp26-contracts-the-ballot-result",
-      "title_hash": "a926c02f30de7bde88a71a88e82874476d330d4b",
-      "title": "C++26 fails its ISO draft ballot over contracts",
-      "category": "tech_career",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "gamesradar.com/games/action/microsoft-extends-deadline-to-explore-options-for-dishonored-studio-arkanes-future-as-the-team-continues-work-on-marvels-blade",
-      "title_hash": "250a98d705c95c0ab7919c11c08dc5867f569360",
-      "title": "Microsoft extends Arkane review deadline as Dishonored studio seeks a buyer",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "support.apple.com/en-us/149555",
-      "title_hash": "000955f33a91076fcf992bb2414ca4e18fb28d42",
-      "title": "Apple blocks 12 compromised eMudhra intermediate CA certificates",
-      "category": "tech_career",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "videogameschronicle.com/news/save-mass-effect-petition-cracks-200000-signatures-as-fans-plead-for-the-series-to-continue",
-      "title_hash": "aa747eed430498f7102d52b4fe03e0b56b822647",
-      "title": "BioWare closure: 'Save Mass Effect' petition passes 200,000 signatures",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/nepal-oil-corporation-mandates-vat-invoices-for-cooking-gas-sales",
-      "title_hash": "767d734b0875e744ed12db949491c2eefa4badc8",
-      "title": "Nepal Oil Corporation requires VAT invoices for cooking gas sales",
-      "category": "nepal",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "in.ign.com/one-piece/275312/crunchyroll-finally-has-every-one-piece-episode-after-a-massive-catalog-update",
-      "title_hash": "94acf7193f5ed962d823f32f03c791cf807f68f7",
-      "title": "Crunchyroll adds complete One Piece catalog",
-      "category": "anime",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "in.ign.com/bleach-mirrors-high/275356/bleach-mirrors-high-confirms-launch-roster-13-returning-characters-and-5-kubo-originals",
-      "title_hash": "0ab1aa1a921ac6db94f5e52aa5a515b8c8f54178",
-      "title": "BLEACH Mirrors High confirms launch roster of 13 returning characters",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cq398p1wd1evo",
-      "title_hash": "0554998e716a044d5b4fa9a09abd3e16d6c2edbc",
-      "title": "Anthropic files S-1 for planned stock market listing",
-      "category": "tech_career",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "videogameschronicle.com/news/arkane-now-has-until-mid-december-to-find-a-buyer-as-microsoft-extends-its-deadline",
-      "title_hash": "b2f37d4a6c349a1f6c957bd101b2cc627fd63510",
-      "title": "UPDATE: Arkane gets until mid-December to find a buyer",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "eurogamer.net/steam-personal-calendar-full-release",
-      "title_hash": "7cad2637f813102d0723d846cae8ac826a20f783",
-      "title": "Steam's Personal Calendar exits beta for all users",
-      "category": "gaming",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/10/2044435/gas-shortage-solution-motihari-sarlahi-pipeline-and-50000-tons-of-storage-being-built",
-      "title_hash": "32a24c54694958cbcc7d836d03fd5488b9865158",
-      "title": "NOC accelerates LPG storage and cross-border pipeline work",
-      "category": "nepal",
-      "date_sent": "2026-10-26"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/nation/flood-damaged-bridge-threatens-road-connectivity-in-myagdi",
-      "title_hash": "e8913df10666ce0741bd10d2c256886f9c8f6b7e",
-      "title": "Flood-damaged bridge threatens Myagdi highway link",
-      "category": "nepal",
-      "date_sent": "2026-10-26"
-    },
-    {
       "url_normalized": "english.onlinekhabar.com/cyclone-arnab-bring-rain-snow.html",
       "title_hash": "acf6df19c0e1da53b4a52da0696d53abdb4cb2d5",
       "title": "Cyclone Arnab warning: heavy rain and snowfall possible across Nepal",
@@ -1938,6 +1777,111 @@
       "title": "RSP Questions Handling of Allegations Against MP Khagendra Sunar",
       "category": "nepal",
       "date_sent": "2026-11-02"
+    },
+    {
+      "url_normalized": "dev.to/erasmuspierce7981/accurate-audio-transcription-api-in-python-and-nodejs-game-saas-reliability-25j9",
+      "title_hash": "204f0669b3a53e97bf73168b6d2c4fb723277231",
+      "title": "Accurate Audio Transcription API in Python and Node.js Game SaaS — Reliability",
+      "category": "tech_career",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "cricketnmore.com/cricket-livescore/scorecard/13072010797/nepal-premier-league-t20-1",
+      "title_hash": "bf1207877ceeb9ab5df4f010cdc9f9b1b5b1a694",
+      "title": "Chitwan Rhinos Vs Sudur Paschim Royals - T20 Cricket Scorecard - Cricketnmore",
+      "category": "education_tu",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-02/drama-queen-manga-ends-in-4-chapters/.243455",
+      "title_hash": "e37aa5d1519962fa631f98ed12812b2cc57bc32b",
+      "title": "Drama Queen Manga Ends in 4 Chapters",
+      "category": "anime",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "gamespot.com/articles/epic-just-saved-fortnite-for-now-anyway",
+      "title_hash": "75a55169682483525e0ca438c305366b5423c346",
+      "title": "Epic Just Saved Fortnite–For Now, Anyway",
+      "category": "gaming",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "wmbfnews.com/2026/11/02/highway-closure-after-head-on-crash-florence-county",
+      "title_hash": "51adc094f7cddf647a6b672dcd8216e11d3633a8",
+      "title": "Highway closure after head-on crash in Florence County - WMBF",
+      "category": "local_city",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "dev.to/zisamglitch/how-we-eliminated-cache-stampedes-in-nodejs-bun-with-single-flight-coalescing-2h0i",
+      "title_hash": "2653b568e2b6e8d353df2b5f11f3e43f3ab331fc",
+      "title": "How We Eliminated Cache Stampedes in Node.js & Bun with Single-Flight Coalescing",
+      "category": "tech_career",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/videos/cmvg9w5w2p1no",
+      "title_hash": "023dce49f513c12151b553c3e5ee29fb794d4ea6",
+      "title": "Indian film star Ranbir Kapoor on AI, movies and fatherhood",
+      "category": "world_major",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "durangoherald.com/articles/news/la-plata-county-sheriff-lifts-road-closure",
+      "title_hash": "3406e2fd97984965fe3a15b481d19481ce0bab8c",
+      "title": "La Plata County sheriff lifts road closure - Durango Herald",
+      "category": "local_city",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "ktar.com/arizona-traffic/highways-closed-flooding-storms",
+      "title_hash": "334650cc8c28d3d152b8200a7d9675ee622fe3e6",
+      "title": "Multiple highways across Arizona remain closed after potent weekend storms - KTAR News 92.3 FM",
+      "category": "local_city",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "polygon.com/exclusive-look-the-art-of-the-mandalorian-and-grogu",
+      "title_hash": "eafa0c65c6fcf3a2bec3fb5bfc80d8b09fe89a1b",
+      "title": "New Star Wars Book Reveals the Surprising '90s Inspiration for an Iconic New Character",
+      "category": "gaming",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cm369yy7lw73o",
+      "title_hash": "4f6f51be7606e7bb953f528ddb04270e5ff5856a",
+      "title": "Plane may have broken apart ahead of deadly Florida jet crash, say investigators",
+      "category": "world_major",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cm3wv085ne6po",
+      "title_hash": "1d8fec17b6124a4634c05ee8d9e2ffacb3908774",
+      "title": "Thousands of European troops to rehearse Ukraine deployment in event of peace",
+      "category": "world_major",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "sportskeeda.com/wwe/news-top-star-sends-daunting-message-the-bloodline-ahead-return-match-after-91-days-wwe-raw",
+      "title_hash": "1e2027d1620ff372d8688156c9e69ad3297acc6c",
+      "title": "Top Star Sends Daunting Message to The Bloodline Ahead of Return Match After 91 Days on WWE RAW - Sportskeeda",
+      "category": "anime",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-02/urban-myth-dissolution-center-manga-ends/.243452",
+      "title_hash": "b38735d5aa5ecbcacf9ab79317a6993ed48ab6b2",
+      "title": "Urban Myth Dissolution Center Manga Ends",
+      "category": "anime",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "dev.to/dafili/why-your-cloud-monitoring-is-blind-to-ipv6-blackholes-and-how-to-fix-it-m8i",
+      "title_hash": "9f48d7dd54870522a31d99d65c11e563dcc90941",
+      "title": "Why your cloud monitoring is blind to IPv6 blackholes (and how to fix it)",
+      "category": "tech_career",
+      "date_sent": "2026-11-03"
     }
   ]
 }

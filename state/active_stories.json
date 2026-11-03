@@ -17,7 +17,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Government websites in Nepal that went offline on Thursday because of a PHP security vulnerability are beginning to come back online, Onlinekhabar reports. No full restoration timeline or official confirmation was stated.",
       "latest_development": "Reported: Government websites in Nepal that went offline on Thursday because of a PHP security vulnerability are beginning to come back online, Onlinekhabar reports. No full restoration timeline or official confirmation was stated.",
       "alerted": false,
@@ -27,7 +27,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T06:48:26+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-94bfafe12329",
@@ -45,7 +45,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Reviews of S-Game's wuxia action game Phantom Blade Zero praise its fast, cinematic combat while noting thinner storytelling elsewhere, according to Polygon, VGC and Eurogamer.",
       "latest_development": "Reported: Reviews of S-Game's wuxia action game Phantom Blade Zero praise its fast, cinematic combat while noting thinner storytelling elsewhere, according to Polygon, VGC and Eurogamer.",
       "alerted": false,
@@ -55,7 +55,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T06:48:26+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-feab1ebf4c92",
@@ -73,7 +73,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The 50th episode of Bleach: Thousand-Year Blood War has aired, concluding the anime's roughly 22-year run, according to Japanese anime press. No plot events or character outcomes are described here.",
       "latest_development": "Reported: The 50th episode of Bleach: Thousand-Year Blood War has aired, concluding the anime's roughly 22-year run, according to Japanese anime press. No plot events or character outcomes are described here.",
       "alerted": false,
@@ -83,7 +83,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T06:48:26+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-20960f7d85a9",
@@ -101,7 +101,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Securities Board of Nepal issued its Anti-Money Laundering and Countering the Financing of Terrorism Directive, 2083, on Oct 16, requiring investors with transactions of Rs 1 million or more to disclose additional information, Nepalnews reports.",
       "latest_development": "Reported: The Securities Board of Nepal issued its Anti-Money Laundering and Countering the Financing of Terrorism Directive, 2083, on Oct 16, requiring investors with transactions of Rs 1 million or more to disclose additional information, Nepalnews reports.",
       "alerted": false,
@@ -111,7 +111,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T06:48:26+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-7288dfe627b0",
@@ -129,7 +129,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Tribhuvan University's University Campus in Kirtipur has asked students, professors and staff to carry identity cards while entering during the Nepal Premier League, which runs from Kartik 9 to Mangsir 5 (26 October to 21 November 2026).",
       "latest_development": "Reported: Tribhuvan University's University Campus in Kirtipur has asked students, professors and staff to carry identity cards while entering during the Nepal Premier League, which runs from Kartik 9 to Mangsir 5 (26 October to 21 November 2026).",
       "alerted": false,
@@ -139,7 +139,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": "2026-10-26 to 2026-11-21",
-      "updated_at": "2026-10-26T12:27:21+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-53046d09d40a",
@@ -157,7 +157,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The under-construction footbridge at Babarmahal in Kathmandu is set to come into operation this week to ease pedestrian crossing and reduce road accidents.",
       "latest_development": "Reported: The under-construction footbridge at Babarmahal in Kathmandu is set to come into operation this week to ease pedestrian crossing and reduce road accidents.",
       "alerted": false,
@@ -167,7 +167,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": "this week",
-      "updated_at": "2026-10-26T12:27:21+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-388cd6e69fe4",
@@ -185,7 +185,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Epic Games has confirmed a One Piece crossover mini-season in Fortnite starting 1 November 2026, according to TechPowerUp.",
       "latest_development": "Reported: Epic Games has confirmed a One Piece crossover mini-season in Fortnite starting 1 November 2026, according to TechPowerUp.",
       "alerted": false,
@@ -195,7 +195,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": "2026-11-01",
-      "updated_at": "2026-10-26T12:27:21+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-3eb80180e01d",
@@ -213,7 +213,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Chicken prices in Kathmandu have fallen following Dashain, with the National Chicken Sales Business Association cutting prices for both live and dressed chicken, new rates effective Monday.",
       "latest_development": "Reported: Chicken prices in Kathmandu have fallen following Dashain, with the National Chicken Sales Business Association cutting prices for both live and dressed chicken, new rates effective Monday.",
       "alerted": false,
@@ -223,7 +223,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": "2026-10-26",
-      "updated_at": "2026-10-26T13:20:52+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-9e07d2d3f0ae",
@@ -241,7 +241,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: PC Gamer's weekly Steam roundup notes AI disclosure labels are again a talking point, with Epic's CEO calling them as partisan as mandatory political essays.",
       "latest_development": "Reported: PC Gamer's weekly Steam roundup notes AI disclosure labels are again a talking point, with Epic's CEO calling them as partisan as mandatory political essays.",
       "alerted": false,
@@ -251,7 +251,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T13:20:52+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-30f6d1c1f1e6",
@@ -269,7 +269,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A tech blog post explains Microsoft's 'Decision-1' launch of a 9B Qwen model.",
       "latest_development": "Reported: A tech blog post explains Microsoft's 'Decision-1' launch of a 9B Qwen model.",
       "alerted": false,
@@ -279,7 +279,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T13:20:52+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-654d16a7b123",
@@ -297,7 +297,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Anime News Network reports that Haruko Ichikawa, creator of Houseki no Kuni, will launch a new sci-fi manga titled Cosmic Mimimi in Monthly Afternoon's next issue, scheduled for 25 November.",
       "latest_development": "Reported: Anime News Network reports that Haruko Ichikawa, creator of Houseki no Kuni, will launch a new sci-fi manga titled Cosmic Mimimi in Monthly Afternoon's next issue, scheduled for 25 November.",
       "alerted": false,
@@ -307,7 +307,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T13:20:52+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-ddabad3e6149",
@@ -325,7 +325,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: C++26 failed its Draft International Standard ballot, the first C++ draft to do so, according to a post summarising the official SC22 result. The draft got 12 of 20 P-member yes votes (60%, short of two-thirds) and 9 of 22 negative votes (41%, above the 25% cap); the ballot closed on 23 October 2026. It is not yet known how long the delay will be or whether contracts will be removed.",
       "latest_development": "Reported: C++26 failed its Draft International Standard ballot, the first C++ draft to do so, according to a post summarising the official SC22 result. The draft got 12 of 20 P-member yes votes (60%, short of two-thirds) and 9 of 22 negative votes (41%, above the 25% cap); the ballot closed on 23 October 2026. It is not yet known how long the delay will be or whether contracts will be removed.",
       "alerted": false,
@@ -335,7 +335,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T14:00:44+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-1b6228715280",
@@ -353,7 +353,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Microsoft has extended the deadline for its review of Arkane, the studio behind Dishonored, while the team continues work on Marvel's Blade. Reports say the studio needs a buyer or partner to finish the game.",
       "latest_development": "Reported: Microsoft has extended the deadline for its review of Arkane, the studio behind Dishonored, while the team continues work on Marvel's Blade. Reports say the studio needs a buyer or partner to finish the game.",
       "alerted": false,
@@ -363,7 +363,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T18:19:03+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-549b90571e90",
@@ -381,7 +381,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: After EA announced it is closing BioWare, a 'Save Mass Effect' petition has passed 200,000 signatures as fans ask for the series to continue. The studio is the long-time Mass Effect developer.",
       "latest_development": "Reported: After EA announced it is closing BioWare, a 'Save Mass Effect' petition has passed 200,000 signatures as fans ask for the series to continue. The studio is the long-time Mass Effect developer.",
       "alerted": false,
@@ -391,7 +391,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T18:19:03+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-51eafe34aee5",
@@ -409,7 +409,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Apple is blocking 12 compromised eMudhra intermediate CA certificates that issue TLS certificates, after the private keys of eight intermediate CAs were compromised; eMudhra and Sectigo revoked the affected certificates. Apple says most users need do nothing, but Mac command-line tools that read /etc/ssl/cert.pem, including curl and git, may still accept them until a future update.",
       "latest_development": "Confirmed: Apple is blocking 12 compromised eMudhra intermediate CA certificates that issue TLS certificates, after the private keys of eight intermediate CAs were compromised; eMudhra and Sectigo revoked the affected certificates. Apple says most users need do nothing, but Mac command-line tools that read /etc/ssl/cert.pem, including curl and git, may still accept them until a future update.",
       "alerted": false,
@@ -419,7 +419,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": "2026-10-19",
-      "updated_at": "2026-10-26T18:19:03+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-5de9c68f3e4b",
@@ -437,7 +437,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Nepal Oil Corporation has directed cooking-gas sellers to issue mandatory VAT invoices on liquefied petroleum gas sales after complaints that some retailers were not providing bills to customers. The directive is reported by Onlinekhabar and Nepalnews; the official notice itself was not available.",
       "latest_development": "Reported: Nepal Oil Corporation has directed cooking-gas sellers to issue mandatory VAT invoices on liquefied petroleum gas sales after complaints that some retailers were not providing bills to customers. The directive is reported by Onlinekhabar and Nepalnews; the official notice itself was not available.",
       "alerted": false,
@@ -447,7 +447,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T18:43:49+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-4883b4b46bd5",
@@ -465,7 +465,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Anthropic has filed an S-1 registration statement with the US SEC for a planned initial public offering; BBC News reports it would be the first true AI company to go public.",
       "latest_development": "Confirmed: Anthropic has filed an S-1 registration statement with the US SEC for a planned initial public offering; BBC News reports it would be the first true AI company to go public.",
       "alerted": false,
@@ -475,7 +475,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T19:23:12+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-4d42ccdcc1a9",
@@ -493,7 +493,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Crunchyroll now carries every One Piece episode after a large catalog update, according to IGN India.",
       "latest_development": "Reported: Crunchyroll now carries every One Piece episode after a large catalog update, according to IGN India.",
       "alerted": false,
@@ -503,7 +503,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T19:23:12+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-35c1f89ff8c7",
@@ -521,7 +521,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: BLEACH Mirrors High has confirmed its launch roster, with 13 returning characters and five Kubo originals, according to IGN India.",
       "latest_development": "Reported: BLEACH Mirrors High has confirmed its launch roster, with 13 returning characters and five Kubo originals, according to IGN India.",
       "alerted": false,
@@ -531,7 +531,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T19:23:12+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-117dd1ecd105",
@@ -549,7 +549,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Valve has taken Steam's Personal Calendar out of beta, making the release-tracking feature available to all users.",
       "latest_development": "Reported: Valve has taken Steam's Personal Calendar out of beta, making the release-tracking feature available to all users.",
       "alerted": false,
@@ -559,7 +559,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T20:10:25+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-795980c3709b",
@@ -577,7 +577,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Microsoft has extended Arkane's deadline to secure a buyer to mid-December; the Dishonored and Deathloop studio still faces possible closure while working on Blade.",
       "latest_development": "Reported: Microsoft has extended Arkane's deadline to secure a buyer to mid-December; the Dishonored and Deathloop studio still faces possible closure while working on Blade.",
       "alerted": false,
@@ -587,7 +587,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": "mid-December 2026",
-      "updated_at": "2026-10-26T20:10:25+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-7fcc65067e97",
@@ -605,7 +605,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Erosion from the Kali Gandaki River has damaged the approach road of a bridge connecting Doba village to the Beni-Jomsom-Korala road in Myagdi, putting the route at risk.",
       "latest_development": "Reported: Erosion from the Kali Gandaki River has damaged the approach road of a bridge connecting Doba village to the Beni-Jomsom-Korala road in Myagdi, putting the route at risk.",
       "alerted": false,
@@ -615,7 +615,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T20:10:25+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-98c88a5a9f79",
@@ -633,7 +633,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Nepal Oil Corporation is speeding up construction of its own LPG storage and a cross-border gas pipeline to address supply shortages, with government storage capacity currently near zero.",
       "latest_development": "Reported: Nepal Oil Corporation is speeding up construction of its own LPG storage and a cross-border gas pipeline to address supply shortages, with government storage capacity currently near zero.",
       "alerted": false,
@@ -643,7 +643,7 @@
       "in_evening": "2026-10-26",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-26T20:10:25+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-ebcd058c51e1",
@@ -8469,7 +8469,7 @@
       "canonical_title": "Mark Bowman put the college football world on notice vs Ohio State - Yahoo Sports",
       "category": "college_local",
       "first_seen": "2026-11-02",
-      "last_seen": "2026-11-02",
+      "last_seen": "2026-11-03",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -8489,7 +8489,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-ec31d3d4c31c",
@@ -8497,7 +8497,7 @@
       "canonical_title": "North American Anime & Manga Releases for November",
       "category": "manga_manhwa_manhua",
       "first_seen": "2026-11-02",
-      "last_seen": "2026-11-02",
+      "last_seen": "2026-11-03",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -8517,7 +8517,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-03e4343539a9",
@@ -8581,7 +8581,7 @@
       "canonical_title": "South Carolina’s LaNorris Sellers Puts NFL Draft On Notice - Heavy.com",
       "category": "college_local",
       "first_seen": "2026-11-02",
-      "last_seen": "2026-11-02",
+      "last_seen": "2026-11-03",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -8601,7 +8601,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-03T06:41:45+05:45"
     },
     {
       "event_id": "evt-8290924056be",
@@ -8856,6 +8856,566 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-02T19:21:29+05:45"
+    },
+    {
+      "event_id": "evt-4115557820cf",
+      "event_key": null,
+      "canonical_title": "Why your cloud monitoring is blind to IPv6 blackholes (and how to fix it)",
+      "category": "tech_career",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/dafili/why-your-cloud-monitoring-is-blind-to-ipv6-blackholes-and-how-to-fix-it-m8i"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "TL;DR: your checker probably takes the first address the resolver hands back, and on a dual-stack host that is the AAAA record. If IPv6 is a blackhole — a route that exists and drops packets — every check waits for its full timeout and…",
+      "latest_development": "TL;DR: your checker probably takes the first address the resolver hands back, and on a dual-stack host that is the AAAA record. If IPv6 is a blackhole — a route that exists and drops packets — every check waits for its full timeout and…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-ef428802b0d5",
+      "event_key": null,
+      "canonical_title": "How We Eliminated Cache Stampedes in Node.js & Bun with Single-Flight Coalescing",
+      "category": "tech_career",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/zisamglitch/how-we-eliminated-cache-stampedes-in-nodejs-bun-with-single-flight-coalescing-2h0i"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Every engineer who has scaled a high-traffic backend has lived through this nightmare: You have an expensive endpoint (e.g., aggregating leaderboard data or rendering a personalized dashboard). To protect your database, you cache the…",
+      "latest_development": "Every engineer who has scaled a high-traffic backend has lived through this nightmare: You have an expensive endpoint (e.g., aggregating leaderboard data or rendering a personalized dashboard). To protect your database, you cache the…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-31fa510520e8",
+      "event_key": null,
+      "canonical_title": "Accurate Audio Transcription API in Python and Node.js Game SaaS — Reliability",
+      "category": "tech_career",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/erasmuspierce7981/accurate-audio-transcription-api-in-python-and-nodejs-game-saas-reliability-25j9"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Short answer: treat audio transcription as a reliability boundary, not a convenience API. For a game catalog that turns messy voice descriptions into searchable text, put an idempotent job contract in front of the speech provider, then…",
+      "latest_development": "Short answer: treat audio transcription as a reliability boundary, not a convenience API. For a game catalog that turns messy voice descriptions into searchable text, put an idempotent job contract in front of the speech provider, then…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-a97d22c4ec3f",
+      "event_key": null,
+      "canonical_title": "New Star Wars Book Reveals the Surprising '90s Inspiration for an Iconic New Character",
+      "category": "gaming",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/exclusive-look-the-art-of-the-mandalorian-and-grogu"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "'The Art of Star Wars: The Mandalorian' by Phillip Szostak traces the film's evolution from beginning to end — with a shock reveal.",
+      "latest_development": "'The Art of Star Wars: The Mandalorian' by Phillip Szostak traces the film's evolution from beginning to end — with a shock reveal.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-40f05b8bffb1",
+      "event_key": null,
+      "canonical_title": "Top Star Sends Daunting Message to The Bloodline Ahead of Return Match After 91 Days on WWE RAW - Sportskeeda",
+      "category": "anime",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiwafbvv95cuxpq1dsvmtbwldtslvpmhrhq0vtqjrmzxjua29zymlzt0vnbnlpt3pwa0yyaetwannqbvzqnu15ltg2v0myq0vtrfi5q0cwd2g1enhnww8zthc4d1lrc3ljtmdjnjzrufk1mzzgyuowzhdhagfadvjqv3hpcvhtthrpsvrlzffqyzjnndu2x0jkm25fylo0shztuhvwblvpzjzxumzuv0phmla0a1d3rwl6ytlhsjnhqnrqbnd6uhrmynq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Top Star Sends Daunting Message to The Bloodline Ahead of Return Match After 91 Days on WWE RAW Sportskeeda",
+      "latest_development": "Top Star Sends Daunting Message to The Bloodline Ahead of Return Match After 91 Days on WWE RAW Sportskeeda",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-e677ec1a333f",
+      "event_key": null,
+      "canonical_title": "मौसम खुलेसँगै धान थन्क्याउन व्यस्त छन् किसान",
+      "category": "nepal",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "onlinekhabar.com/2026/11/2049775/farmers-are-busy-storing-rice-as-the-weather-improves"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "१७ कात्तिक, भोजपुर । निरन्तर वर्षापछि मौसममा सुधार आएसँगै भोजपुरका किसानलाई धानबाली भित्र्याउने चटारो परेको छ । वर्षाका कारण रोकिएको धान काट्ने र थन्क्याउने काममा मौसम खुलेसँगै किसान बिहानैदेखि खेतबारीमा व्यस्त हुन थालेका हुन् । धान पाकेर…",
+      "latest_development": "१७ कात्तिक, भोजपुर । निरन्तर वर्षापछि मौसममा सुधार आएसँगै भोजपुरका किसानलाई धानबाली भित्र्याउने चटारो परेको छ । वर्षाका कारण रोकिएको धान काट्ने र थन्क्याउने काममा मौसम खुलेसँगै किसान बिहानैदेखि खेतबारीमा व्यस्त हुन थालेका हुन् । धान पाकेर…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-3272de6c6a49",
+      "event_key": null,
+      "canonical_title": "क्यालिफोर्नियाका २० हजार मत गणना नगर्न ट्रम्प प्रशासनले गरेको माग सर्वोच्च अदालतबाट अस्वीकार",
+      "category": "nepal",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "onlinekhabar.com/2026/11/2049766/supreme-court-rejects-trump-administrations-request-to-not-count-20000-california-votes"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "अमेरिकी न्याय मन्त्रालयले गत महिना क्यालिफोर्नियाको मतदाता नामावलीमा करिब २० हजार गैरनागरिक मतदाता हुन सक्ने दाबी गरेको थियो । उनीहरूको नागरिकता प्रमाणीकरण नभएसम्म मतदान गर्न नदिन र ती मतपत्र गणना नगर्न मन्त्रालयले माग गरेको थियो । तर…",
+      "latest_development": "अमेरिकी न्याय मन्त्रालयले गत महिना क्यालिफोर्नियाको मतदाता नामावलीमा करिब २० हजार गैरनागरिक मतदाता हुन सक्ने दाबी गरेको थियो । उनीहरूको नागरिकता प्रमाणीकरण नभएसम्म मतदान गर्न नदिन र ती मतपत्र गणना नगर्न मन्त्रालयले माग गरेको थियो । तर…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-b84a6a57d310",
+      "event_key": null,
+      "canonical_title": "Urban Myth Dissolution Center Manga Ends",
+      "category": "anime",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-02/urban-myth-dissolution-center-manga-ends/.243452"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Manga adaptation launched on April 2025",
+      "latest_development": "Manga adaptation launched on April 2025",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-5ffd1b77371e",
+      "event_key": null,
+      "canonical_title": "प्रमुख सिँचाइ नहर प्रणाली पूर्ण क्षमतामा सञ्चालन",
+      "category": "nepal",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "onlinekhabar.com/2026/11/2049768/major-irrigation-canal-system-operating-at-full-capacity"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "१७ कात्तिक, काठमाडौं । बाली उत्पादनको मुख्य सिजनमा मुलुकका प्रमुख सिँचाइ नहर प्रणाली पूर्ण क्षमतामा सञ्चालनमा आउने भएका छन् । किसानका खेतसम्म पर्याप्त पानी पुर्याउने उद्देश्यले ऊर्जा, जलस्रोत तथा सिँचाइ मन्त्रालयअन्तर्गतको जलस्रोत तथा…",
+      "latest_development": "१७ कात्तिक, काठमाडौं । बाली उत्पादनको मुख्य सिजनमा मुलुकका प्रमुख सिँचाइ नहर प्रणाली पूर्ण क्षमतामा सञ्चालनमा आउने भएका छन् । किसानका खेतसम्म पर्याप्त पानी पुर्याउने उद्देश्यले ऊर्जा, जलस्रोत तथा सिँचाइ मन्त्रालयअन्तर्गतको जलस्रोत तथा…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-35e7d1b76ff0",
+      "event_key": null,
+      "canonical_title": "Epic Just Saved Fortnite–For Now, Anyway",
+      "category": "gaming",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "gamespot.com/articles/epic-just-saved-fortnite-for-now-anyway"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "It's been a rough year for Fortnite , but Epic took a big swing with its new One Piece-themed Treasure Hunters season and, thankfully, it's paying off. Player counts are way up, with Fortnite's main Battle Royale mode averaging four times…",
+      "latest_development": "It's been a rough year for Fortnite , but Epic took a big swing with its new One Piece-themed Treasure Hunters season and, thankfully, it's paying off. Player counts are way up, with Fortnite's main Battle Royale mode averaging four times…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-32b9b53fa9b8",
+      "event_key": null,
+      "canonical_title": "WoW: Forever Excavation Site: Wetlands Dungeon Guide – Quests, Bosses, and Loot",
+      "category": "gaming",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "gamespot.com/articles/wow-forever-excavation-site-wetlands-dungeon-guide-quests-bosses-and-loot"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Of all of World of Warcraft : Forever’s new dungeons, Excavation Site: Wetlands could very well be the shortest. It’s also one of the sweetest for lore-heads, owing to its links to the Dragonmaw Clan, Titans, and more. This self-contained…",
+      "latest_development": "Of all of World of Warcraft : Forever’s new dungeons, Excavation Site: Wetlands could very well be the shortest. It’s also one of the sweetest for lore-heads, owing to its links to the Dragonmaw Clan, Titans, and more. This self-contained…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-1120fdd326cb",
+      "event_key": null,
+      "canonical_title": "Indian film star Ranbir Kapoor on AI, movies and fatherhood",
+      "category": "world_major",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/videos/cmvg9w5w2p1no"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The film star plays the leading role in a major new adaptation of the Indian epic Ramayana.",
+      "latest_development": "The film star plays the leading role in a major new adaptation of the Indian epic Ramayana.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-05b6eb08b6c6",
+      "event_key": null,
+      "canonical_title": "Plane may have broken apart ahead of deadly Florida jet crash, say investigators",
+      "category": "world_major",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/cm369yy7lw73o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The National Transportation Safety Board also believes weather could have been a factor in the crash, but warns it is too early to determine the cause.",
+      "latest_development": "The National Transportation Safety Board also believes weather could have been a factor in the crash, but warns it is too early to determine the cause.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-8129089b6b47",
+      "event_key": null,
+      "canonical_title": "Thousands of European troops to rehearse Ukraine deployment in event of peace",
+      "category": "world_major",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/cm3wv085ne6po"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Western officials stress that any force sent to Ukraine would not take part in any offensive operations.",
+      "latest_development": "Western officials stress that any force sent to Ukraine would not take part in any offensive operations.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-65cf91ce7692",
+      "event_key": null,
+      "canonical_title": "Drama Queen Manga Ends in 4 Chapters",
+      "category": "anime",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-02/drama-queen-manga-ends-in-4-chapters/.243455"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Kuraku Ichikawa debuted series in December 2024",
+      "latest_development": "Kuraku Ichikawa debuted series in December 2024",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-a6cdbfa9e319",
+      "event_key": null,
+      "canonical_title": "Highway closure after head-on crash in Florence County - WMBF",
+      "category": "local_city",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmikgfbvv95cuxpow52m2tqx2etcxrqmdfcv281wxu3c1zcvjdfbjjlyjvxm1jeq3jgvmxwmjfveeljqtrxtgf5mdb5x1y2wnfwzdvbnmpob2djwnuyzvfzd1zfntaxau5fy3bxd0rtzvheym0xzmrpyvg5vllpdgryyupeze9udkxtntffatdxtdzzofruc05gnedjuq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Highway closure after head-on crash in Florence County WMBF",
+      "latest_development": "Highway closure after head-on crash in Florence County WMBF",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-5911c8de5089",
+      "event_key": null,
+      "canonical_title": "La Plata County sheriff lifts road closure - Durango Herald",
+      "category": "local_city",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmikafbvv95cuxnsnvyuurxd05orezpd19jcvdzv1rwtnvxa01osmlzvg1ashhdoesxetbmehjpdznzsg9tulhlvlflzkj3ow4zx080m0llr1jhmm9gemvotlzonudmyvrjnevols0zoxnpmja0zkxiznd2b0vkvkl3z056mmwzakjivthbctlia0teyvlxtfzza0m"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "La Plata County sheriff lifts road closure Durango Herald",
+      "latest_development": "La Plata County sheriff lifts road closure Durango Herald",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-0ec5bc6a17f0",
+      "event_key": null,
+      "canonical_title": "Multiple highways across Arizona remain closed after potent weekend storms - KTAR News 92.3 FM",
+      "category": "local_city",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmickfvx3lxte14bvfbc3ziyxfotxbmvktcrfnvahzmmm42mlntnwxizeltqmznzja5skrqskpadmpmag1klwtvcdaxv0xruzbedzlcsmzqm0phwmvkwlvidwfwx200avk1buj1njn4lxq0d29pd1d1dhpjdw"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Multiple highways across Arizona remain closed after potent weekend storms KTAR News 92.3 FM",
+      "latest_development": "Multiple highways across Arizona remain closed after potent weekend storms KTAR News 92.3 FM",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-80378bcb47c8",
+      "event_key": null,
+      "canonical_title": "Chitwan Rhinos Vs Sudur Paschim Royals - T20 Cricket Scorecard - Cricketnmore",
+      "category": "education_tu",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": "2026-11-03",
+      "last_reported": "2026-11-03",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmimwfbvv95cuxoz2jyz3g4d1piatnmblc2dlp6s1n2yjrxcgxcalpycwpxrddjovrpovjrt2fnlxvoec1damvstnzbwm5nv0zkz0znvufxdthrngvztml5rmfldlrvd1dtbhduu1mxoghatm1wuzbiadrgdm16wefkqmd0nxbgmflcbjdadtrvbs01vennzfrmr2noamzcnmfaz0owoa"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Chitwan Rhinos Vs Sudur Paschim Royals - T20 Cricket Scorecard Cricketnmore",
+      "latest_development": "Chitwan Rhinos Vs Sudur Paschim Royals - T20 Cricket Scorecard Cricketnmore",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-03",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
+    },
+    {
+      "event_id": "evt-27355b5af7ec",
+      "event_key": null,
+      "canonical_title": "A Returner's Magic Should Be Special Season 2 Anime Shares Opening, Ending Song Music Videos - IMDb",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-03",
+      "last_seen": "2026-11-03",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiukfvx3lxte9vy2vhadezmwfnny1euwtdrejhd0prvlu1ugz1zgozawotcwczdwtqaedfmulncxhjd1kxm3njskhcqmffs3rlyk1lazhrtgryswc"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "A Returner's Magic Should Be Special Season 2 Anime Shares Opening, Ending Song Music Videos IMDb",
+      "latest_development": "A Returner's Magic Should Be Special Season 2 Anime Shares Opening, Ending Song Music Videos IMDb",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-03T06:41:45+05:45"
     }
   ],
   "archived": []
