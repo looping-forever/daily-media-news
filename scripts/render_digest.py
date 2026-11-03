@@ -1646,22 +1646,6 @@ def render_media(story):
     return "", ""
 
 
-def category_chip(category):
-    """The category chip MARKUP for a story, or '' if unknown.
-
-    DELIBERATELY NOT RENDERED on the card any more. Every card is rendered
-    inside the `<section>` whose `<h2>` is that same category's header, so the
-    chip repeated the section header verbatim on every article - the live page
-    printed "LOCAL & CITY" twice per story, once as the section and once as
-    a chip. The mapping is kept because it is the only place a category key
-    becomes a display header, and the badge row below still calls it.
-    """
-    for key, header, _color in SECTIONS:
-        if key == category:
-            return '<span class="chip chip-cat">%s</span>' % esc(header)
-    return ""
-
-
 def priority_badge(story):
     """The `★ P<n>` priority badge, or ''.
 
@@ -2865,7 +2849,6 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
       vertical-align: middle;
     }
     .chip-label { background: %s; color: %s; }
-    .chip-cat { background: %s; color: #eef; }
     .chip-deadline { background: #dc2626; color: #fff; }
     .chip-via { background: %s; color: #eef; }
     .badge {
@@ -3029,7 +3012,6 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     D_ACCENT,                            # .media-watch a color
     D_SURFACE_HI,                        # .chip-label background
     D_ACCENT,                            # .chip-label color
-    D_SURFACE_HI,                        # .chip-cat background
     D_SURFACE_HI,                        # .chip-via background
     D_ACCENT,                            # .badge background
     D_ACCENT,                            # .badge-high background

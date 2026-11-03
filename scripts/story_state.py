@@ -40,7 +40,6 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 
 STATE_VERSION = 1
-STATUSES = ("NEW", "DEVELOPING", "UPDATED", "STABLE", "RESOLVED", "STALE")
 MERGE_TITLE_JACCARD = 0.6
 MATERIAL_CHANGE_JACCARD = 0.85
 STALE_AFTER_DAYS = 7

@@ -82,7 +82,6 @@ DNS_FAILURE_REASONS = ("dns",)
 NON_DNS_FAILURE_THRESHOLD = 2
 #: Default for `min_items_per_source`: only a literal zero counts as empty.
 DEFAULT_MIN_ITEMS_PER_SOURCE = 1
-VALID_KINDS = ("gnews", "notice", "weather")
 
 GNEWS_HOST = "news.google.com"
 WEATHER_HOST = "api.open-meteo.com"

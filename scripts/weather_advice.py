@@ -269,11 +269,6 @@ class Window:
         return (self.start_hour < other.end_hour
                 and other.start_hour < self.end_hour)
 
-    def intersect_hours(self, other: "Window") -> list:
-        lo = max(self.start_hour, other.start_hour)
-        hi = min(self.end_hour, other.end_hour)
-        return list(range(lo, hi))
-
 
 @dataclass(frozen=True)
 class Thresholds:
@@ -518,10 +513,6 @@ def _wetting(record, floor) -> bool:
     """
     amount = record.get("precip_mm")
     return _is_number(amount) and amount >= floor
-
-
-def _hours_in_window(index, window):
-    return [h for h in sorted(index) if window.contains(h)]
 
 
 def _build_windows(windows, index, value_of, better, qualifiers):

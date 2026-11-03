@@ -251,22 +251,30 @@ All scripts are stdlib-only Python 3 (Ubuntu `python3` / Windows `py` 3.13).
 
 ## Local development & tests
 
-**410 tests across seven suites, enforced daily** by the `test-suite` job in `drift-canary.yml` (06:15 NPT, before the morning slot). Before that job existed, CI enforced exactly one file (`test_ladder_sync.py`); the rest of the suite could rot silently. All seven are stdlib-only and offline.
+**2,696 tests, measured locally on 2026-11-03** — 2,446 in eight `unittest` discovery suites and 250 in seven standalone `assert` runners — **enforced daily** by the `test-suite` job in `drift-canary.yml` (06:15 NPT, before the morning slot). Before that job existed, CI enforced exactly one file (`test_ladder_sync.py`); the rest of the suite could rot silently. All are stdlib-only and offline.
 
 **Environment notes:** use `py` not `python` (MS Store stub on Windows); set `PYTHONIOENCODING=utf-8` for emoji output; `pytest` is NOT installed.
 
 ```powershell
-# unittest-discover suites (3) — 298 tests
-py -m unittest discover -s tests\render     -t .   # 65
-py -m unittest discover -s tests\collection -t .   # 102
-py -m unittest discover -s tests\academic   -t .   # 131
+# unittest-discover suites (8) — 2,446 tests
+py -m unittest discover -s tests\render     -t .   # 496
+py -m unittest discover -s tests\collection -t .   # 262
+py -m unittest discover -s tests\validate   -t .   # 140
+py -m unittest discover -s tests\weather    -t .   # 135
+py -m unittest discover -s tests\academic   -t .   # 410
+py -m unittest discover -s tests\workflows  -t .   # 491
+py -m unittest discover -s tests\digest     -t .   # 400 (3 skipped)
+py -m unittest discover -s tests\breaking   -t .   # 112
 
-# custom `assert` runners (4) — 112 tests. These are NOT unittest modules
+# custom `assert` runners (7) — 250 tests. These are NOT unittest modules
 # and have no runner entry point: invoke them as scripts.
-py tests\ai\test_ai_classifier.py          # 12
-py tests\breaking\test_breaking_monitor.py  # 29
-py tests\breaking\test_ladder_sync.py      # 7
-py tests\media\test_media_extraction.py    # 64
+py tests\ai\test_ai_classifier.py                  # 14
+py tests\breaking\test_breaking_monitor.py         # 109
+py tests\breaking\test_ladder_sync.py              # 10
+py tests\breaking\test_breaking_fast_path.py       # 13
+py tests\breaking\test_dynamic_model_ladder.py     # 27
+py tests\media\test_media_extraction.py            # 64
+py tests\breaking\test_honesty_gate_recovery.py    # 13
 ```
 
 ⚠️ **`py -m unittest discover -s tests -t .` does not work** — there is no `tests/__init__.py` (only the subpackages have one), so discovery over the whole directory aborts. Discover **per subdirectory** as shown above.

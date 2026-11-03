@@ -47,7 +47,6 @@ PROVIDER_TIMEOUTS = (120, 180, 120)
 #: bound is the time waste this change exists to remove.
 MAX_RACE_PROVIDERS = 4
 
-MAX_RETRIES = 3
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB — cap per-provider response read
 
 API_BASE_URL = os.environ.get("OPENCODE_API_URL", "https://api.opencode.ai/v1")

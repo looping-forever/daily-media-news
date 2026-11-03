@@ -2537,44 +2537,6 @@ def _build_exam_notice_payload(state, semester, notice, notice_date):
     }
 
 
-def _build_degraded_payload(state_file, exit_code, reason):
-    """Degraded-run artifact payload (acceptance criterion 6). A failure must
-    reach the owner, not vanish."""
-    state = {}
-    try:
-        with open(state_file, "r", encoding="utf-8") as fh:
-            loaded = json.load(fh)
-        if isinstance(loaded, dict):
-            state = loaded
-    except (OSError, ValueError):
-        state = {}
-    date = _today_iso()
-    web_path = "docs/academic/%s-degraded.html" % date
-    ntfy_topic = os.environ.get("NTFY_TOPIC") or "<NTFY_TOPIC>"
-    message = (
-        "**Academic result monitor did not complete** (exit %s).\n\n%s\n\n"
-        "The monitor has NOT concluded anything about your result. It will "
-        "retry on the next scheduled run; the watchdog will escalate if the "
-        "gap persists."
-        % (exit_code, reason)
-    )
-    return {
-        "kind": "degraded",
-        "semester": state.get("current_semester"),
-        "roll_number": state.get("roll_number", ""),
-        "result_date": date,
-        "title": "Academic result monitor degraded (exit %s)" % exit_code,
-        "message": message,
-        "ntfy": _ntfy_block("⚠️ Academic monitor DEGRADED (exit %s)" % exit_code,
-                            message, ["warning", "rotating_light"], 5, "", [],
-                            ntfy_topic),
-        "website": {
-            "path": web_path,
-            "url": "%s/academic/%s" % (_worker_base(), os.path.basename(web_path)),
-        },
-    }
-
-
 # ---------------------------------------------------------------------------
 # State machine
 # ---------------------------------------------------------------------------

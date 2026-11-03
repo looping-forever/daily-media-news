@@ -198,14 +198,6 @@ def result_failure_already_notified(runs, fingerprint, now,
 # ---------------------------------------------------------------------------
 
 
-def _http_get(url, timeout):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": USER_AGENT,
-        "Accept": "text/html, */*",
-    })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.status, resp.read()
-
 def check_feed(feed, matchers, fetch_fn, timeout, max_notices):
     """Fetch one feed and report {id, live, parsed, matched, error}."""
     result = {"id": feed.get("id"), "url": feed.get("url"),

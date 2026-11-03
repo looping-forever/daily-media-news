@@ -164,9 +164,6 @@ CANARY_ERROR_STRIKES = 2
 #: How old a `state/canary_history.json` entry may be before "CANARY DEAD".
 CANARY_DEAD_DAYS = 4
 
-#: Reason codes that mean "the upstream is the problem", not "our parser is".
-NETWORK_REASONS = ("dns", "timeout", "tls", "connection", "throttled", "http_5xx")
-
 
 # ---------------------------------------------------------------------------
 # Small pure helpers. No clock, no IO.

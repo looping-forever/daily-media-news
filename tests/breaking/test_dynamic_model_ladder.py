@@ -40,6 +40,9 @@ import tempfile
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
+# Also on the path under `-m unittest discover -t .`, where this module is
+# imported as a package member and its own directory is NOT auto-added.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import breaking_monitor as bm  # noqa: E402
 import model_selector as ms  # noqa: E402
