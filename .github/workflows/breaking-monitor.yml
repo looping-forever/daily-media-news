@@ -499,6 +499,19 @@ jobs:
                   lines.append("- The pair was NOT ASKED in this run (no keyed "
                                "rung), so this is not evidence either way about "
                                "judging.")
+              # THE ANSWER ITSELF, not a boolean about the answer. The capability
+              # claim survives only if the title and summary that produced it are
+              # in the summary too; the full text is in state/ladder_probe.json.
+              important = (probe.get("candidates") or {}).get("important") or {}
+              answer = important.get("verdict") or {}
+              lines.append("- Important answer: level=%s, confidence=%s, "
+                           "judged_content=%s"
+                           % (answer.get("level"),
+                              answer.get("confidence") or "(empty)",
+                              important.get("judged_content")))
+              lines.append("  * title: %s" % (answer.get("title") or "(empty)"))
+              lines.append("  * summary: %s"
+                           % (answer.get("summary") or "(empty)"))
               lines.append("- Free-walk judged content: %s -- %s"
                            % (probe.get("judged_content"),
                               probe.get("judged_rule")))

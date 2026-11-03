@@ -4117,6 +4117,129 @@ def test_93_the_two_candidate_probe_still_commits_only_its_own_file():
         "the probe published its own copy of a concurrent run's health state")
 
 
+def _probe_summary_body():
+    """The workflow's probe-summary heredoc, dedented to column zero."""
+    path = os.path.join(REPO_ROOT, ".github", "workflows",
+                        "breaking-monitor.yml")
+    with open(path, encoding="utf-8") as fh:
+        raw = fh.read()
+    opener = re.search(r"python3 - <<'PROBE_PY'\s*\n", raw)
+    assert opener, "the probe summary is no longer a python3 heredoc"
+    rest = raw[opener.end():]
+    close = re.search(r"\n[ \t]*PROBE_PY[ \t]*\n", rest)
+    assert close, "the probe-summary heredoc has no PROBE_PY terminator"
+    lines = rest[:close.start()].split("\n")
+    first = next((ln for ln in lines if ln.strip()), "")
+    prefix = first[:len(first) - len(first.lstrip())]
+    return "\n".join(ln[len(prefix):] if ln.startswith(prefix) else ln
+                     for ln in lines)
+
+
+def _run_probe_summary(doc):
+    """Execute the real summary step against a real probe result file."""
+    body = _probe_summary_body()
+    work = fresh_dir()
+    os.makedirs(os.path.join(work, "state"), exist_ok=True)
+    with open(os.path.join(work, "state", "ladder_probe.json"), "w",
+              encoding="utf-8") as fh:
+        json.dump(doc, fh)
+    out = io.StringIO()
+    here = os.getcwd()
+    try:
+        os.chdir(work)
+        with unittest.mock.patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}):
+            with contextlib.redirect_stdout(out):
+                exec(compile(body, "<PROBE_PY>", "exec"),
+                     {"__name__": "__main__"})
+    finally:
+        os.chdir(here)
+    return out.getvalue()
+
+
+def test_94_the_judged_candidate_keeps_the_answer_it_gave():
+    """A BOOLEAN CANNOT BE AUDITED. The important story's own words are kept.
+
+    `judgment_capable: true` rests on the model having written a title and a
+    summary for a story nobody could see after the fact. The result file must
+    carry that text, or the claim is only as good as our memory of the run.
+    """
+    doc, text, _calls = _run_pair_probe()
+    rec = doc["candidates"]["important"]
+    answer = rec["verdict"]
+    assert rec["judged_content"] is True, rec
+    assert answer["title"] == ("National carrier grounds its international "
+                               "fleet"), (
+        "the judged candidate's title was not persisted: %r" % (answer,))
+    assert answer["summary"].startswith("Reported: the airline suspended"), (
+        "the judged candidate's summary was not persisted: %r" % (answer,))
+    assert answer["level"] == 2 and answer["confidence"] == "HIGH", answer
+    assert answer["why_urgent"], (
+        "the judge's reason is part of the answer and must survive too: %r"
+        % (answer,))
+    assert answer["category_suggestion"] == "nepal", answer
+    assert answer["event_key"] == "carrier-grounds-fleet", answer
+    # THE FILE MUST STAY READABLE THROUGH THE CONTENTS API: a few KB, not a log.
+    raw = json.dumps(doc)
+    assert len(raw) < 8000, (
+        "the probe result grew past a few KB (%d chars), which makes it "
+        "unreadable through the raw-contents API" % len(raw))
+    assert answer["title"] in text and answer["summary"] in text, (
+        "the run log must carry the answer too: %s" % text)
+    # REDACTED LIKE EVERY OTHER COMMITTED SINK: a model that echoes a token into
+    # its headline must not carry it into the file or the log.
+    secret = bm._probe_verdict({"level": 2, "confidence": "HIGH",
+                                "title": "quoted ghp_" + "a" * 24,
+                                "summary": "Bearer " + "b" * 24})
+    assert "[REDACTED]" in secret["title"] and "[REDACTED]" in secret["summary"], (
+        "a credential-shaped answer text reached the committed shape: %r"
+        % (secret,))
+
+
+def test_95_the_declined_candidate_keeps_the_empty_object():
+    """A DECLINE IS PERSISTED AS THE EMPTY OBJECT, NOT AS OMITTED TEXT.
+
+    The prompt's "nothing qualifies" answer is level 1 with an empty title and
+    summary. Recording that verbatim is what lets a reader tell a decline from a
+    field that was silently dropped by a later edit.
+    """
+    doc, text, _calls = _run_pair_probe(judge_important=True,
+                                        judge_unimportant=False)
+    rec = doc["candidates"]["unimportant"]
+    answer = rec["verdict"]
+    assert rec["judged_content"] is False, rec
+    assert answer["level"] == 1 and answer["confidence"] == "LOW", answer
+    assert answer["title"] == "" and answer["summary"] == "", (
+        "a decline must stay empty, never filled in: %r" % (answer,))
+    assert answer["why_urgent"] == "", answer
+    assert "candidate=unimportant title: (empty)" in text, (
+        "the log must show the decline as empty rather than hide it: %s" % text)
+
+
+def test_96_the_summary_step_prints_the_important_answer():
+    """A RUN LOG WITHOUT THE TEXT IS NOT SELF-SUFFICIENT.
+
+    Executed against the step's real heredoc, not a copy: the summary must print
+    the important candidate's level, confidence, title and summary, because the
+    JSON file is what a later reader needs but the log is what a run leaves.
+    """
+    doc, _text, _calls = _run_pair_probe()
+    out = _run_probe_summary(doc)
+    answer = doc["candidates"]["important"]["verdict"]
+    assert "Important answer: level=2, confidence=HIGH" in out, out
+    assert answer["title"] in out, (
+        "the summary step does not print the important title:\n%s" % out)
+    assert answer["summary"] in out, (
+        "the summary step does not print the important summary:\n%s" % out)
+    # AND A DECLINE IS PRINTED AS EMPTY, never as a blank that looks like a bug.
+    declined = dict(doc)
+    declined["candidates"] = dict(doc["candidates"])
+    declined["candidates"]["important"] = dict(
+        doc["candidates"]["unimportant"], label="important", expect="judged")
+    out = _run_probe_summary(declined)
+    assert "Important answer: level=1" in out, out
+    assert "  * title: (empty)" in out, out
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -4212,6 +4335,9 @@ def main():
         test_91_judging_the_unimportant_candidate_is_a_failed_half,
         test_92_a_decline_of_the_important_candidate_names_the_failing_half,
         test_93_the_two_candidate_probe_still_commits_only_its_own_file,
+        test_94_the_judged_candidate_keeps_the_answer_it_gave,
+        test_95_the_declined_candidate_keeps_the_empty_object,
+        test_96_the_summary_step_prints_the_important_answer,
     ]
     failures = []
     for test in tests:

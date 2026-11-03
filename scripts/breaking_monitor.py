@@ -2455,6 +2455,53 @@ def _verdict_judged(verdict):
                for k in ("title", "summary"))
 
 
+#: What of a verdict the probe keeps. THE ANSWER ITSELF, capped so the committed
+#: file stays a few KB: the finding is the text, not a transcript.
+PROBE_VERDICT_LIMITS = (("title", 200), ("summary", 600), ("why_urgent", 400),
+                        ("category_suggestion", 60), ("event_key", 120))
+
+
+def _probe_answer_text(value, limit):
+    """Redacted, whitespace-collapsed, capped -- safe for a committed file."""
+    return _redact_secrets(collect_news.clean_ws(_as_text(value)))[:limit]
+
+
+def _probe_verdict(verdict):
+    """The verdict's own words, so "it judged" is not a bare boolean.
+
+    A boolean cannot be audited: "the important story was judged" rests on the
+    title and summary that came back, so those are persisted verbatim (redacted
+    and capped) instead of being reduced to true/false. A missing or unparseable
+    verdict records empty strings and level None -- the file must never invent a
+    headline or a level for a rung that answered nothing. `judged_content` is not
+    copied in here: it sits beside this record, derived once by _verdict_judged,
+    so the two can never disagree.
+    """
+    if not isinstance(verdict, dict):
+        out = {"level": None, "confidence": ""}
+        out.update({field: "" for field, _limit in PROBE_VERDICT_LIMITS})
+        return out
+    level = verdict.get("level")
+    out = {"level": level if isinstance(level, int) else None,
+           "confidence": _probe_answer_text(verdict.get("confidence"), 20)}
+    for field, limit in PROBE_VERDICT_LIMITS:
+        out[field] = _probe_answer_text(verdict.get(field), limit)
+    return out
+
+
+def _print_probe_answer(tag, answer):
+    """The answer's own words in the run log, so a log is self-sufficient too.
+
+    Printed for the free walk and for each fixed candidate: the important story's
+    title and summary are the evidence the capability claim rests on, and a log
+    that carries only "judged_content=yes" cannot be audited after the fact.
+    """
+    print("ladder_probe: %s answer level=%s confidence=%s"
+          % (tag, answer["level"], answer["confidence"] or "(empty)"))
+    print("ladder_probe: %s title: %s" % (tag, answer["title"] or "(empty)"))
+    print("ladder_probe: %s summary: %s" % (tag, answer["summary"] or "(empty)"))
+
+
 def _probe_judgment(important, unimportant):
     """Can this rung TELL THE TWO STORIES APART? One rule, stated once.
 
@@ -2546,6 +2593,10 @@ def _walk_keyed_candidate(probe_dir, label, candidate, rung, runner,
             "rung": rung,
             "state": state,
             "judged_content": _verdict_judged(verdict),
+            # THE ANSWER THIS CANDIDATE GOT, so the capability claim can be read
+            # off the file instead of trusted: an important story that was judged
+            # carries its title and summary here, a decline carries empty ones.
+            "verdict": _probe_verdict(verdict),
             "seconds": seconds,
             "attempts": attempts}
 
@@ -2665,6 +2716,10 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
            "judged_rule": ("judged_content is true only when a verdict's title "
                            "AND summary are both non-empty; the minimal level-1 "
                            "object judges nothing"),
+           # THE FREE WALK'S OWN ANSWER, in the same shape as the pair below.
+           # It is not capability evidence (see judged_rule), but a run with no
+           # keyed credential must still leave the text it was given behind.
+           "free_verdict": _probe_verdict(verdict),
            # THE PAIR, AND WHAT IT PROVES. A decline is a correct answer to the
            # unimportant candidate and a failure on the important one, so only
            # the two together say whether this rung can judge at all.
@@ -2681,6 +2736,7 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
                label: {"label": rec["label"], "expect": rec["expect"],
                        "state": rec["state"],
                        "judged_content": rec["judged_content"],
+                       "verdict": rec["verdict"],
                        "rung": rec["rung"], "seconds": rec["seconds"]}
                for label, rec in walks.items()},
            "control_judged_content": control_judged,
@@ -2714,6 +2770,7 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
           % ("yes" if judged else "no",
              "title and summary present" if judged
              else "the verdict judged nothing"))
+    _print_probe_answer("free", doc["free_verdict"])
     if state == "parseable" and not judged:
         print("ladder_probe: the verdict is schema-valid but judged NOTHING "
               "(empty title and summary) -- a free-rung decline is not a "
@@ -2730,6 +2787,7 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
               % (label, expect, rec["state"],
                  "yes" if rec["judged_content"] else "no", rec["rung"],
                  rec["seconds"]))
+        _print_probe_answer("candidate=%s" % label, rec["verdict"])
     print("ladder_probe: judgment_capable=%s%s"
           % ("yes" if judgment["capable"] else "no",
              "" if judgment["capable"] else " -- " + judgment["reason"]))
