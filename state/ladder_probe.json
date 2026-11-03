@@ -1,6 +1,6 @@
 {
-  "run_at": "2026-11-03T08:30:43+00:00",
-  "head_sha": "ccd5ae576b16556fb70f9362614e3f2d71362caf",
+  "run_at": "2026-11-03T08:46:26+00:00",
+  "head_sha": "c10b9905a040962d34a07803dd3a9608ac9a0789",
   "trigger": "ladder_probe",
   "per_attempt_sec": 150,
   "first_output_sec": 40,
@@ -17,38 +17,77 @@
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 23.0,
-      "first_byte_sec": 22.87,
+      "wall_sec": 5.77,
+      "first_byte_sec": 5.64,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 1.38,
+      "first_liveness_sec": 2.08,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": false,
-      "tail_excerpt": "cn9LUA7Omw timestamp=2026-11-03T08:30:37.905Z level=INFO run=f01dbfe0 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "candidate": "unimportant",
+      "tail_excerpt": "l209wqE3fx timestamp=2026-11-03T08:46:12.632Z level=INFO run=7f15b524 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     },
     {
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 5.36,
-      "first_byte_sec": 5.21,
+      "wall_sec": 6.52,
+      "first_byte_sec": 6.36,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 1.29,
+      "first_liveness_sec": 2.05,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": true,
-      "tail_excerpt": "koHTKW12I1 timestamp=2026-11-03T08:30:43.252Z level=INFO run=c80f8ac9 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "candidate": "unimportant",
+      "tail_excerpt": "jl3vyWmASd timestamp=2026-11-03T08:46:26.003Z level=INFO run=17b41ee4 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+    },
+    {
+      "model": "gemini/gemini-3.5-flash-lite",
+      "attempt": 1,
+      "granted_sec": 150,
+      "wall_sec": 6.88,
+      "first_byte_sec": 6.69,
+      "first_byte_source": "stdout",
+      "first_liveness_sec": 2.22,
+      "first_liveness_source": "stderr",
+      "outcome": "verdict",
+      "control": true,
+      "candidate": "important",
+      "tail_excerpt": "aOqlYP4SOK timestamp=2026-11-03T08:46:19.464Z level=INFO run=794c0df7 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     }
   ],
   "verdict": "parseable",
   "judged_content": false,
-  "judged_rule": "judged_content is true only when the verdict's title AND summary are both non-empty; the minimal level-1 object judges nothing",
+  "judged_rule": "judged_content is true only when a verdict's title AND summary are both non-empty; the minimal level-1 object judges nothing",
+  "judgment_capable": true,
+  "judgment_measured": true,
+  "judgment_failed": [],
+  "judgment_reason": "",
+  "judgment_rule": "judgment_capable is true only when the important candidate is judged (non-empty title and summary) AND the unimportant candidate is declined (the minimal object); judgment_failed names every half that did not behave as required",
+  "candidates": {
+    "important": {
+      "label": "important",
+      "expect": "judged",
+      "state": "answered",
+      "judged_content": true,
+      "rung": "gemini/gemini-3.5-flash-lite",
+      "seconds": 6.88
+    },
+    "unimportant": {
+      "label": "unimportant",
+      "expect": "declined",
+      "state": "answered",
+      "judged_content": false,
+      "rung": "gemini/gemini-3.5-flash-lite",
+      "seconds": 6.52
+    }
+  },
   "control_judged_content": false,
   "control": "answered",
   "control_model": "gemini/gemini-3.5-flash-lite",
   "control_env": "GEMINI_API_KEY",
   "attribution": "free_tier_answered",
-  "ladder_seconds": 24.33,
-  "control_seconds": 5.36,
+  "ladder_seconds": 7.77,
+  "control_seconds": 6.52,
   "error": ""
 }
