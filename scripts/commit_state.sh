@@ -37,6 +37,28 @@ shift
 files=("$@")
 branch="${GITHUB_REF_NAME:-master}"
 
+# state/ladder_probe.json IS A PROBE'S RESULT, and only a probe run may write
+# it. On 2026-11-02 a concurrent run whose checkout still contained the
+# committed file staged it with the rest of its state and rewrote the probe's
+# answer 36s after the probe produced it. The caller already guards the flag;
+# this is the same rule at the only place that can stage anything, so a future
+# caller cannot re-introduce the clobber by adding the path back.
+if [ "${LADDER_PROBE:-false}" != "true" ]; then
+  kept=()
+  for f in "${files[@]}"; do
+    if [ "$f" = "state/ladder_probe.json" ]; then
+      echo "commit_state: refusing $f -- this run was not the ladder probe"
+    else
+      kept+=("$f")
+    fi
+  done
+  files=("${kept[@]+"${kept[@]}"}")
+  if [ "${#files[@]}" -eq 0 ]; then
+    echo "commit_state: nothing but the probe file was given; nothing to commit"
+    exit 0
+  fi
+fi
+
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 

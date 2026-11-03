@@ -198,14 +198,20 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           GMAIL_RECEIVER: ${{ secrets.GMAIL_RECEIVER }}
-          # READ BY THE PROBE'S CONTROL RUNG ONLY. A free-tier silence cannot be
-          # attributed from inside the free tier, so a probe run asks the KEYED
-          # provider once (see _ladder_probe_control_rung). The monitor passes
-          # this var to the control CHILD only, via ai_classify(extra_env=...),
-          # together with an OPENCODE_CONFIG that the free walk never sees -- so
-          # the real sweep's ladder and reachability are unchanged. Absent
-          # secret => the probe records `control: unconfigured`, never a guess.
-          # The variable NAME is recorded in the result; its value never is.
+          # THE KEYED PROVIDER IS A REAL LADDER RUNG NOW, not a probe-only
+          # control. config/opencode.json leads with its rungs and
+          # scripts/breaking_monitor.py filters the ladder to what THIS process
+          # can resolve, so both variables below are what make the leading
+          # rung reachable: without OPENCODE_CONFIG every gemini rung is
+          # "model not found", and without the secret the filter drops it
+          # rather than spending two attempts relearning that.
+          # Measured 2026-11-02: a keyed rung answered the probe in 5.49s while
+          # all four free rungs produced zero bytes in 150s and carried the
+          # CLI's "subscribe to OpenCode Go" notice.
+          # The variable NAME is recorded in the probe result; its value never
+          # is. Absent secret => the probe records `control: unconfigured`,
+          # never a guess.
+          OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # ntfy is the PRIMARY breaking channel; email and Telegram are
           # fallbacks that fire only when ntfy did not deliver. Reuses the
@@ -297,6 +303,9 @@ jobs:
         # judging delivery off the Cloudflare Worker's trigger leg instead.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The probe is the ONLY writer of state/ladder_probe.json, so it is
+          # the only run allowed to commit it (the guard is further down).
+          LADDER_PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.ladder_probe || false }}
         run: |
           set -eo pipefail
           # THE RACE IS FIXED IN ONE PLACE. This step, `Persist model cooldowns`
@@ -326,8 +335,22 @@ jobs:
           )
           # The probe's result, when this run was one. It is COMMITTED on
           # purpose: it is the durable answer to "do the rungs still answer?".
-          if [ -f state/ladder_probe.json ]; then
-            FILES+=(state/ladder_probe.json)
+          #
+          # AND ONLY WHEN THIS RUN WAS ONE (2026-11-02). The append used to be
+          # `[ -f state/ladder_probe.json ]` alone, so a concurrent run whose
+          # checkout still carried the committed file rewrote the probe's
+          # result 36s later with stale content -- the probe's own evidence,
+          # clobbered by a run that never probed. The flag is the guard, and
+          # scripts/commit_state.sh enforces the same rule for any caller.
+          if [ "$LADDER_PROBE" = "true" ]; then
+            if [ -f state/ladder_probe.json ]; then
+              FILES+=(state/ladder_probe.json)
+            fi
+          else
+            # Belt and braces: the file must not even be present in a workspace
+            # that cannot commit it, so a later `git add` in this job cannot
+            # pick up a stale copy.
+            rm -f state/ladder_probe.json
           fi
           bash scripts/commit_state.sh \
             "chore: update breaking monitor state [skip ci]" \

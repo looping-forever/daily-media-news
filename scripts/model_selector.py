@@ -528,12 +528,21 @@ COOLDOWN_MAX_SEC = 24 * 3600
 #: Bounded growth. The health file is state, not a log.
 HEALTH_MAX_MODELS = 64
 
-FAILURE_KINDS = ("timeout", "transport", "garbage")
+#: `quota_notice` joined on 2026-11-02, and it is a KIND rather than a mapping
+#: because the state file has to answer a question `transport` cannot: WHY the
+#: rung failed. Measured that day: all four free rungs produced zero bytes in
+#: 150s and their own logs carried the CLI's "subscribe to OpenCode Go" notice.
+#: Recorded as `transport`, that reads as a flaky connection and the next
+#: reader tunes timeouts at a pool that is simply dead for the month.
+FAILURE_KINDS = ("timeout", "transport", "garbage", "quota_notice")
 
 #: The classifier's vocabulary is wider than health memory's, and this is the
 #: bridge. A missing model, a pool-wide quota and a 5xx are all "this attempt
 #: produced no verdict", which is exactly what `transport` already meant, so
 #: health memory keeps behaving as it did before those classes existed.
+#: `payment_required` is the exception: it is the PLAN refusing the provider,
+#: a fact about the account that outlives the attempt, so it keeps its own
+#: kind instead of being flattened into `transport`.
 HEALTH_KIND_OF = {
     "model_not_found": "transport",
     "provider_outage": "transport",
@@ -541,7 +550,7 @@ HEALTH_KIND_OF = {
     "slow_or_stalled": "timeout",
     "other": "transport",
     "auth": "transport",
-    "payment_required": "transport",
+    "payment_required": "quota_notice",
 }
 
 
@@ -605,6 +614,7 @@ def _entry(doc, model):
     row.setdefault("timeout", 0)
     row.setdefault("transport", 0)
     row.setdefault("garbage", 0)
+    row.setdefault("quota_notice", 0)
     row.setdefault("consecutive_failures", 0)
     return row
 

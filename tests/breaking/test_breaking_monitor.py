@@ -3195,6 +3195,10 @@ def test_71_every_attribution_value_comes_from_its_stated_condition():
     # evidence the harness can stream, and it is NOT the harness's fault, so
     # `harness_no_stream` must not be reachable from here.
     live_only = [{"first_byte_sec": None, "first_liveness_sec": 2.0}]
+    # A REFUSAL IS NOT SILENCE. The row could only carry the plan's notice by
+    # reading stderr, so the harness demonstrably streams.
+    noticed = [{"first_byte_sec": None, "first_liveness_sec": None,
+                "outcome": "quota_notice"}]
     cases = [
         ("no_output", silent, "harness_no_stream"),
         ("failed", silent, "inconclusive"),
@@ -3214,6 +3218,9 @@ def test_71_every_attribution_value_comes_from_its_stated_condition():
         # precedence is unchanged by the liveness rework, and `verdict` is what
         # records a free answer in that case.
         ("unconfigured", streamed, "inconclusive"),
+        # A free rung that carried the plan's own refusal notice proves the
+        # stderr stream WAS read, so the harness cannot be indicted for it.
+        ("no_output", noticed, "free_tier_stalled"),
     ]
     for control, rows, want in cases:
         got = bm._probe_attribution(control, rows)
@@ -3443,6 +3450,189 @@ def test_78_the_breaking_child_asks_the_cli_for_its_log():
     assert seen["deadline"] == bm.AI_FIRST_OUTPUT_SEC, seen
 
 
+def test_79_the_keyed_rung_leads_the_ladder_when_its_credential_is_present():
+    """THE FREE POOL IS EXHAUSTED; THE KEYED RUNG IS A REAL RUNG, TRIED FIRST.
+
+    Measured 2026-11-02: a keyed rung answered the probe in 5.49s while all
+    four free rungs produced zero bytes in 150s and carried the CLI's
+    "subscribe to OpenCode Go" notice. No free-tier tuning can fix that, so the
+    order a walk actually tries rungs in is the fix.
+
+    The order is NOT a second list: it is config/opencode.json's ladder, and
+    the pool is its head. What changed is that the keyed provider is now
+    REACHABLE for this process (OPENCODE_CONFIG declares it and its credential
+    is present), so its leading rungs survive the reachability filter instead
+    of being dropped at import.
+    """
+    with open(os.path.join(REPO_ROOT, "config", "opencode.json"),
+              encoding="utf-8") as fh:
+        ladder = json.load(fh)["ladder"]
+
+    both = bm._ladder_for(ladder, {"opencode/", "gemini/"})
+    assert both[:2] == ("gemini/gemini-3.5-flash-lite",
+                        "gemini/gemini-3.1-flash-lite"), both
+    pool = both[:bm.AI_POOL_SIZE]
+    assert len(pool) == bm.AI_POOL_SIZE, pool
+    assert pool[0].startswith("gemini/"), (
+        "a working rung must be tried FIRST while the free pool is exhausted; "
+        "the pool leads with %r" % (pool[0],))
+    assert "opencode/deepseek-v4.1-flash-free" in pool, (
+        "the free rungs must stay in the table even while exhausted: %r" % (pool,))
+
+    # WITHOUT the keyed provider this CLI can resolve, the same filter yields
+    # the free pool in its own order -- the graceful degradation, unchanged.
+    only_free = bm._ladder_for(ladder, {"opencode/"})
+    assert only_free[0].startswith("opencode/"), only_free
+    assert "gemini/" not in "".join(only_free), only_free
+
+    # And the module's own ladder is exactly config + whatever THIS process
+    # can resolve -- never a third opinion.
+    assert tuple(bm.AI_MODELS) == bm._ladder_for(ladder, bm._reachable_prefixes())
+
+
+def test_80_a_quota_notice_is_its_own_class_not_a_timeout_or_garbage():
+    """PLAN EXHAUSTION IS NOT SLOWNESS, and the state file must say so.
+
+    The notice is the CLI's own wording. It OVERLAPS quota ("usage limit"), so
+    the payment arm has to win, and it must not collapse into `timeout` (the
+    full window was never used) or `garbage` (the model never answered).
+    """
+    ms = bm.model_selector
+    notice = ("level=ERROR message=Free usage limit reached. To keep going, "
+              "subscribe to OpenCode Go to keep going.")
+    assert ms.classify_failure(notice, 0) == "payment_required", (
+        "the plan notice must keep its own class, got %r"
+        % (ms.classify_failure(notice, 0),))
+    assert ms.classify_failure(ms.WATCHDOG_MARKER, 0) == "slow_or_stalled"
+    assert ms.classify_failure(notice, 0) != ms.classify_failure(
+        ms.WATCHDOG_MARKER, 0), "a quota notice is not a timeout"
+    assert ms.classify_failure(notice, 0) != ms.classify_failure(
+        "rc=1 and nothing useful", 1), "a quota notice is not garbage"
+    assert ms.classify_failure("rc=1 and nothing useful", 1) == "other"
+
+    assert "quota_notice" in ms.FAILURE_KINDS, (
+        "health memory must be able to record the class it is given: %r"
+        % (ms.FAILURE_KINDS,))
+    assert ms.HEALTH_KIND_OF["payment_required"] == "quota_notice", (
+        "a plan refusal recorded as `transport` is a lie about why the rung "
+        "failed, and a reader cannot tell a dead pool from a slow one: %r"
+        % (ms.HEALTH_KIND_OF["payment_required"],))
+    assert ms.HEALTH_KIND_OF["slow_or_stalled"] == "timeout", (
+        "the timeout kind stays its own kind: %r"
+        % (ms.HEALTH_KIND_OF["slow_or_stalled"],))
+
+    row = ms.record_failure(ms.load_health(None), "free/a", "payment_required")
+    assert row["quota_notice"] == 1, row
+    assert row["timeout"] == 0 and row["transport"] == 0, row
+    assert row["last_failure"] == "quota_notice", row
+
+
+def test_81_a_quota_notice_before_liveness_is_recorded_and_stops_the_provider():
+    """THE NOTICE ARRIVES WITHOUT A LIVENESS LINE, so the no-output arm must
+    read the stderr it captured instead of calling it a slow rung.
+
+    Before this, a refused free pool was recorded as `slow_or_stalled` and
+    every rung of the provider was asked in turn -- 40s each -- to hear the
+    same paragraph again.
+    """
+    notice = ("level=ERROR message=Free usage limit reached. To keep going, "
+              "subscribe to OpenCode Go to keep going.")
+    sd = fresh_dir()
+    pending = os.path.join(sd, "breaking_pending.json")
+    with open(pending, "w", encoding="utf-8") as fh:
+        fh.write("{}")
+
+    calls = []
+
+    def refused(model, prompt_text, env, timeout_sec):
+        calls.append(model)
+        raise bm.NoFirstOutput(1.0, "", notice)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        verdict, err = bm.ai_classify(pending, runner=refused,
+                                      models=["free/a", "free/b", "free/c"],
+                                      attempts_per_model=2)
+    assert verdict is None
+    assert "quota_notice" in err, err
+
+    health = read_json(os.path.join(sd, bm.MODEL_HEALTH_FILENAME))
+    row = health["models"]["free/a"]
+    assert row.get("quota_notice") == 1, (
+        "the refusal was not recorded as a quota notice: %r" % (row,))
+    assert row.get("timeout") == 0 and row.get("transport") == 0, row
+    assert row.get("last_failure") == "quota_notice", row
+
+    with open(os.path.join(sd, "breaking_attempts.jsonl"), encoding="utf-8") as fh:
+        reasons = [json.loads(line)["reason"] for line in fh if line.strip()]
+    assert reasons and reasons[0] == "quota_notice", reasons
+
+    assert calls == ["free/a", "free/b"], (
+        "the provider is refused, not these two ids: after the second notice "
+        "the remaining rungs must be skipped, got %r" % (calls,))
+
+
+def test_82_a_non_probe_run_cannot_commit_the_probe_file():
+    """state/ladder_probe.json WAS CLOBBERED 36s AFTER THE PROBE WROTE IT.
+
+    A concurrent run whose checkout still contained the committed file added
+    it to its own FILES list and rewrote it with stale content. The file is a
+    PROBE's result; a run that did not probe has nothing to say about it.
+    """
+    yml = os.path.join(REPO_ROOT, ".github", "workflows",
+                       "breaking-monitor.yml")
+    with open(yml, encoding="utf-8") as fh:
+        text = fh.read()
+    step = text.split("- name: Commit breaking state", 1)[1]
+    step = step.split("- name:", 1)[0]
+    marker = "FILES+=(state/ladder_probe.json)"
+    assert marker in step, "the probe result is no longer committed at all"
+    head = step[:step.index(marker)]
+    assert 'if [ "$LADDER_PROBE" = "true" ]' in head, (
+        "the append is unconditional, so any run present in the step commits "
+        "whatever copy its checkout happens to hold:\n%s" % head)
+    assert "LADDER_PROBE:" in step, (
+        "the step never learns whether it is a probe run")
+
+    script = os.path.join(REPO_ROOT, "scripts", "commit_state.sh")
+    with open(script, encoding="utf-8") as fh:
+        body = fh.read()
+    assert "state/ladder_probe.json" in body and "LADDER_PROBE" in body, (
+        "the staging helper must refuse the probe file on its own, so a future "
+        "caller cannot re-introduce the clobber")
+
+    # BEHAVIOURAL, not just textual: a real repository with the file present
+    # and modified commits NOTHING when the run is not a probe.
+    bash = shutil.which("bash")
+    if not bash and os.path.isfile(r"C:\Program Files\Git\bin\bash.exe"):
+        bash = r"C:\Program Files\Git\bin\bash.exe"
+    assert bash, "bash is required for this test; a skip would render green"
+    tmp = fresh_dir()
+    git = ["git", "-C", tmp]
+    for argv in (["init", "-q"], ["config", "user.email", "t@example.com"],
+                 ["config", "user.name", "t"]):
+        subprocess.run(git + argv, check=True, capture_output=True)
+    os.makedirs(os.path.join(tmp, "state"), exist_ok=True)
+    probe = os.path.join(tmp, "state", "ladder_probe.json")
+    with open(probe, "w", encoding="utf-8") as fh:
+        fh.write('{"run_at": "stale"}\n')
+    subprocess.run(git + ["add", "state/ladder_probe.json"], check=True,
+                   capture_output=True)
+    subprocess.run(git + ["commit", "-qm", "seed"], check=True,
+                   capture_output=True)
+    with open(probe, "w", encoding="utf-8") as fh:
+        fh.write('{"run_at": "rewritten by a non-probe run"}\n')
+    env = dict(os.environ, LADDER_PROBE="false", GITHUB_TOKEN="")
+    proc = subprocess.run([bash, script, "chore: state",
+                           "state/ladder_probe.json"],
+                          cwd=tmp, env=env, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    log = subprocess.run(git + ["log", "--oneline"], capture_output=True,
+                         text=True).stdout.strip().splitlines()
+    assert len(log) == 1, (
+        "a non-probe run committed the probe file: %r (%s)"
+        % (log, proc.stdout + proc.stderr))
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -3523,6 +3713,10 @@ def main():
         test_76_the_verdict_is_parsed_from_stdout_only,
         test_77_a_live_rung_that_is_slow_gets_its_whole_grant,
         test_78_the_breaking_child_asks_the_cli_for_its_log,
+        test_79_the_keyed_rung_leads_the_ladder_when_its_credential_is_present,
+        test_80_a_quota_notice_is_its_own_class_not_a_timeout_or_garbage,
+        test_81_a_quota_notice_before_liveness_is_recorded_and_stops_the_provider,
+        test_82_a_non_probe_run_cannot_commit_the_probe_file,
     ]
     failures = []
     for test in tests:

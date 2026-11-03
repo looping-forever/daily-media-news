@@ -213,6 +213,10 @@ def _reachable_prefixes():
     HARD cooldown in the state file the digest walk also reads: two such runs
     would silence the digest's best rung for a day. So the seed is filtered to
     what is reachable here, and nothing is written about what is not.
+
+    A provider whose file is loaded but whose `{env:NAME}` credential is ABSENT
+    is not reachable either (2026-11-02): the call would fail as `auth` and cost
+    two attempts on every run to relearn what one `os.environ` lookup answers.
     """
     prefixes = set()
     provider = _opencode_config().get("provider")
@@ -225,10 +229,28 @@ def _reachable_prefixes():
                 cli = json.load(fh)
         except (OSError, ValueError):
             cli = {}
-        for name in (cli.get("provider") or {}):
-            if isinstance(name, str) and name:
-                prefixes.add("%s/" % name)
+        for name, block in (cli.get("provider") or {}).items():
+            if not isinstance(name, str) or not name:
+                continue
+            options = block.get("options") if isinstance(block, dict) else None
+            api_key = options.get("apiKey") if isinstance(options, dict) else ""
+            match = re.fullmatch(r"\{env:([A-Za-z_][A-Za-z0-9_]*)\}",
+                                 str(api_key or ""))
+            if match and not os.environ.get(match.group(1)):
+                continue
+            prefixes.add("%s/" % name)
     return prefixes
+
+
+def _ladder_for(seeds, prefixes):
+    """The seed ladder, ordered, filtered to the providers reachable here.
+
+    ORDER IS THE CONFIG'S, never a second list in this file (2026-10-13: an
+    embedded copy rotted while the suite stayed green). `prefixes` is a
+    parameter, not a global read, so a test can ask "what would CI walk with
+    the keyed provider loaded?" without exporting a credential.
+    """
+    return tuple(m for m in seeds if m.startswith(tuple(prefixes)))
 
 
 def _load_ladder():
@@ -243,9 +265,8 @@ def _load_ladder():
     ladder = _opencode_config().get("ladder")
     if not isinstance(ladder, list):
         return ()
-    prefixes = _reachable_prefixes()
     seeds = tuple(m for m in ladder if isinstance(m, str) and m)
-    return tuple(m for m in seeds if m.startswith(tuple(prefixes)))
+    return _ladder_for(seeds, _reachable_prefixes())
 
 
 AI_MODELS = _load_ladder()
@@ -270,6 +291,42 @@ def _reachable_only(models):
               % (len(models) - len(kept),
                  [m for m in models if m not in kept]))
     return kept
+
+
+def _cli_config_path(config_dir=None):
+    """The CLI's own provider file: `config/opencode-cli.json` by default."""
+    return os.path.abspath(os.path.join(
+        config_dir or os.path.dirname(OPENCODE_CONFIG_PATH),
+        "opencode-cli.json"))
+
+
+def _rung_env(model, env, config_dir=None):
+    """`env`, plus the CLI config that makes THIS rung's provider resolve.
+
+    ONE HELPER FOR BOTH KEYED PATHS. A provider only exists for the `opencode`
+    CLI when `OPENCODE_CONFIG` points at the file that declares it, and that is
+    true of the probe's control attempt and of the same rung inside a real walk.
+    Keeping the rule in one function is what stops the two invocations drifting.
+
+    A free rung gets the environment untouched: it needs no config file, and
+    overriding one for it would change what a real sweep resolves.
+    """
+    path = _cli_config_path(config_dir)
+    prefix = model.split("/", 1)[0] + "/"
+    try:
+        with open(path, encoding="utf-8") as fh:
+            providers = (json.load(fh) or {}).get("provider") or {}
+    except (OSError, ValueError):
+        return env
+    if not isinstance(providers, dict):
+        return env
+    if not any("%s/" % name == prefix for name in providers):
+        return env
+    if os.path.abspath(env.get("OPENCODE_CONFIG") or "") == path:
+        return env
+    rung_env = dict(env)
+    rung_env["OPENCODE_CONFIG"] = path
+    return rung_env
 
 
 #: 150s per attempt. Measured on the free rungs this ladder actually runs on:
@@ -319,9 +376,21 @@ CLI_RUNTIME_MARK = "llm runtime selected"
 #: is the subset the breaking stage has time to try, sized to its own wall.
 AI_POOL_SIZE = 4
 
-#: The pool, in ladder order. The two measured-fast models lead because the
-#: config ladder puts them first -- the order stays config's, not a second copy
-#: here (an embedded copy of the ladder is what rotted on 2026-10-13).
+#: The pool, in ladder order. The KEYED provider's rungs now lead it whenever
+#: this process can resolve them (`OPENCODE_CONFIG` + its credential), because
+#: order is the fix that costs nothing: measured 2026-11-02, a keyed rung
+#: answered the probe in 5.49s while all four free rungs produced zero bytes in
+#: 150s and carried the CLI's "subscribe to OpenCode Go" notice. The free rungs
+#: stay in the table -- they are the fallback the moment the plan allows them.
+#:
+#: WHY A KEYED RUNG IS CHEAP ENOUGH TO LEAD: the classifier prompt is ~11-15 KB
+#: (one fixed candidate, not a digest), so a call is a few thousand tokens and
+#: lands inside the provider's free allowance, where a free-pool rung that is
+#: refused costs its whole 40s liveness deadline to learn nothing.
+#:
+#: The order itself is never written here -- it is config/opencode.json's
+#: `ladder`, filtered to what this CLI can resolve. An embedded copy of the
+#: ladder is what rotted on 2026-10-13.
 AI_LADDER = tuple(AI_MODELS[:AI_POOL_SIZE])
 
 #: Depth cap == the pool this stage sizes its wall for. A cap below the pool
@@ -1736,7 +1805,7 @@ def _runner_first_liveness(runner):
 def ai_classify(pending_path, runner=None, models=None,
                 prompt_path=PROMPT_PATH,
                 attempts_per_model=AI_ATTEMPTS_PER_MODEL,
-                on_attempt=None, extra_env=None):
+                on_attempt=None, extra_env=None, config_dir=None):
     """Returns (verdict|None, error). Any failure => (None, err) and the
     caller fails safe to level 1 (silence).
 
@@ -1776,8 +1845,9 @@ def ai_classify(pending_path, runner=None, models=None,
     default.
 
     `extra_env` is added to the CHILD's environment only (never to this
-    process's). The probe uses it to point the control attempt at the keyed
-    provider's config file without exporting that variable to a real sweep.
+    process's). `config_dir` locates the CLI's provider file, so a KEYED rung
+    gets `OPENCODE_CONFIG` from `_rung_env` whether the probe or a real walk is
+    asking -- the same code path, not a second copy of the rule.
 
     A RUNNER THAT NEVER STARTED ANSWERING IS ITS OWN OUTCOME. `NoFirstOutput`
     (raised by the streaming default runner when a rung wrote only its banner
@@ -1894,16 +1964,44 @@ def ai_classify(pending_path, runner=None, models=None,
                 if hasattr(runner, attr):
                     setattr(runner, attr, None)
             try:
-                rc, out, err = runner(model, prompt_text, env, timeout)
+                rc, out, err = runner(model, prompt_text,
+                                      _rung_env(model, env, config_dir), timeout)
             except NoFirstOutput as exc:
                 # NEVER WENT LIVE. Not a timeout: no CLI log line ever proved
                 # the call was dispatched, so the rung was alive and silent.
                 # Recorded as its own outcome so the probe can attribute the
                 # silence, and NOT retried -- a second attempt buys the same.
                 wall_sec = time.monotonic() - attempt_started
+                out_tail, err_tail = exc.stdout, exc.stderr
+                # BUT THE SILENCE MAY HAVE A STATED CAUSE. Measured 2026-11-02:
+                # the free pool answered every rung with zero bytes and the
+                # CLI's own "subscribe to OpenCode Go" notice on stderr. Read
+                # as `slow_or_stalled` that is a lie about a dead pool, and the
+                # walk pays 40s per rung to re-read the same paragraph.
+                notice = model_selector.classify_failure(
+                    "%s\n%s" % (out_tail, err_tail), 0)
+                if notice == "payment_required":
+                    refused_same = (refused_same + 1
+                                    if provider_prefix == refused_prefix else 1)
+                    refused_prefix = provider_prefix
+                    model_selector.record_failure(health, model, "quota_notice",
+                                                  at=time.time())
+                    record_attempt(state_dir, model, attempt, timeout,
+                                   "quota_notice", stdout_text=out_tail,
+                                   stderr_text=err_tail, wall_sec=wall_sec)
+                    _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                                  "quota_notice", out_tail, err_tail,
+                                  first_liveness_sec=_runner_first_liveness(runner))
+                    errors.append(
+                        "%s: quota_notice -- the '%s' plan refused the call "
+                        "before any liveness line" % (model, provider_prefix))
+                    print("ai_classify: %s -> quota_notice. The '%s' plan is "
+                          "refused, not slow: the CLI said so on stderr, so the "
+                          "rung is recorded as an exhausted allowance and the "
+                          "walk moves on." % (model, provider_prefix))
+                    break
                 model_selector.record_failure(health, model, "slow_or_stalled",
                                               at=time.time())
-                out_tail, err_tail = exc.stdout, exc.stderr
                 record_attempt(state_dir, model, attempt, timeout, "no_output",
                                stdout_text=out_tail, stderr_text=err_tail,
                                wall_sec=wall_sec)
@@ -2202,14 +2300,16 @@ def _ladder_probe_control_rung(config_dir):
     `config/opencode-cli.json` already declares the keyed provider: its
     `apiKey` is an `{env:NAME}` template and its `models` block lists the ids it
     serves. The control is the first provider whose credential is PRESENT in
-    this process, and the first model that block declares -- so the answer
-    tracks that file instead of a second copy of it that can rot.
+    this process, and then THE RUNG THE REAL WALK TRIES FIRST for that provider
+    -- the ladder's own entry when it has one, else the first model the block
+    declares -- so the answer tracks those two files instead of a second copy
+    of them that can rot.
 
     The credential VALUE is never read as text and never printed: only the
     variable's NAME is returned, and the child inherits the value through its
     own environment.
     """
-    path = os.path.join(config_dir, "opencode-cli.json")
+    path = _cli_config_path(config_dir)
     if not os.path.isfile(path):
         return None, ""
     try:
@@ -2231,6 +2331,12 @@ def _ladder_probe_control_rung(config_dir):
         env_name = match.group(1)
         if not os.environ.get(env_name):
             continue
+        # THE SAME RUNG THE REAL WALK TRIES FIRST, when the ladder names one:
+        # the control is then not merely "some keyed model" but the exact rung
+        # the next sweep would spend its first window on.
+        for candidate in AI_LADDER:
+            if candidate.split("/", 1)[0] == provider:
+                return candidate, env_name
         served = block.get("models")
         if not isinstance(served, dict):
             continue
@@ -2254,8 +2360,11 @@ def _probe_attribution(control, free_rows):
     answering the same prompt in the same window separates them:
 
       * NOTHING WENT LIVE anywhere -- control wrote no liveness line AND no free
-        rung did -> `harness_no_stream`. The harness cannot see the CLI's log
-        stream from ANY provider, so the free tier is not what was measured.
+        rung did AND no free rung carried the plan's own refusal notice ->
+        `harness_no_stream`. The harness cannot see the CLI's log stream from
+        ANY provider, so the free tier is not what was measured. A rung that
+        DID carry that notice proves the stream was read, so it refuses this
+        arm: an exhausted plan is not a silent harness.
       * control answered (or answered unusably) AND no free rung produced an
         answer byte -> `free_tier_stalled`. The harness works; the tier is what
         is silent.
@@ -2274,21 +2383,24 @@ def _probe_attribution(control, free_rows):
                        for r in (free_rows or []))
     free_live = any(r.get("first_liveness_sec") is not None
                     for r in (free_rows or []))
+    # A STATED REFUSAL IS ALSO PROOF THE STREAM WAS READ. A row carrying the
+    # plan's own notice could only get there by reading the CLI's stderr, so
+    # the harness demonstrably streams and cannot be indicted for silence.
+    free_noticed = any(r.get("outcome") == "quota_notice"
+                       for r in (free_rows or []))
     if control == "unconfigured":
         return "inconclusive"
     if free_emitted:
         return "free_tier_answered"
     if control in ("answered", "unparseable"):
         return "free_tier_stalled"
-    if control == "no_output" and not free_live:
-        return "harness_no_stream"
-    return "inconclusive"
-    if control == "no_output" and not free_emitted:
-        return "harness_no_stream"
-    if control in ("answered", "unparseable") and not free_emitted:
+    if free_noticed and control in ("no_output", "failed"):
+        # THE TIER SAID WHY IT WOULD NOT SERVE. The harness is proven (the
+        # notice came off stderr), so this is the tier's fault, not the
+        # harness's -- the same verdict as a stalled tier, with better evidence.
         return "free_tier_stalled"
-    if free_emitted:
-        return "free_tier_answered"
+    if control == "no_output" and not free_live and not free_noticed:
+        return "harness_no_stream"
     return "inconclusive"
 
 
@@ -2378,11 +2490,10 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
         control_verdict, _control_err = ai_classify(
             control_pending, runner=runner, models=[control_model],
             attempts_per_model=1, on_attempt=collect_control,
-            # The keyed provider only exists for the CLI when its own config
-            # file is the one loaded. Set for THIS child only: exporting it
-            # here would reorder a real sweep's ladder.
-            extra_env={"OPENCODE_CONFIG": os.path.abspath(
-                os.path.join(config_dir, "opencode-cli.json"))})
+            # THE SAME CODE PATH AS A REAL RUNG. `_rung_env` points the child
+            # at the CLI config that declares this provider; nothing here
+            # re-implements that rule or exports the variable to a real sweep.
+            config_dir=config_dir)
         control_attempts = list(control_rows.values())
         control_seconds = round(time.perf_counter() - control_started, 2)
         if control_verdict is not None:

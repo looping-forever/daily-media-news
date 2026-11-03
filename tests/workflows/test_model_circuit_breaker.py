@@ -260,8 +260,10 @@ class ClassifierTests(unittest.TestCase):
         self.assertNotIn("payment_required", ms.COOLDOWN_SEC,
                          "a hard cooldown would remove a provider the walk "
                          "needs; the plan is recorded, never cooled")
-        self.assertEqual("transport", ms.HEALTH_KIND_OF["payment_required"],
-                         "health memory must map it without inventing a kind")
+        self.assertEqual("quota_notice", ms.HEALTH_KIND_OF["payment_required"],
+                         "health memory must record the plan refusal as its own "
+                         "kind: `transport` cannot tell an exhausted pool from a "
+                         "flaky connection, which is what 2026-11-02 cost us")
         self.assertEqual("payment_required",
                          ms.classify_failure("402 Payment Required", 1))
         self.assertEqual("payment_required",
