@@ -66,6 +66,9 @@ UNREADABLE_TITLE = "शैक्षिक सत्र २०८१ को क�
 # A Nepali result title: this is the wording the Latin-only matcher used to
 # resolve to None and burn.
 NEPALI_RESULT_TITLE = "बी.एस.सी. चौथो सेमेस्टरको परीक्षा नतिजा प्रकाशित भएको छ"
+# The notice the monitor SKIPS: an admission notice on the result feed. It is
+# positively read (no semester token -> no_match), never a result sheet.
+ADMISSION_TITLE = "Admission Notice for B.Sc.CSIT 2082"
 
 
 def list_html(rows, next_url=None):
@@ -153,6 +156,34 @@ def healthy_fetch(notices=((15700, "B.Sc. CSIT", "2026-09-28"),),
         raise RuntimeError("no fake response for %s" % url)
 
     return fetch
+
+
+def board_fetch(rows, detail_titles, pdf_by_id):
+    """A multi-notice board. Returns (fetch, requested_urls).
+
+    ``rows`` is [(id, list_title, date)], ``detail_titles`` maps id -> the real
+    title, and ``pdf_by_id`` maps id -> PDF bytes (absent = no PDF link). The
+    requested list is how a test proves a notice was NEVER opened.
+    """
+    board = list_html(rows)
+    requested = []
+
+    def fetch(url, timeout=15):
+        requested.append(url)
+        if "notice_type=21" in url:
+            return 200, board.encode()
+        for nid, _title, _date in rows:
+            if ("/notices/%d" % nid) in url:
+                pdf_url = ("https://portal.tu.edu.np/p/%d.pdf" % nid) \
+                    if nid in pdf_by_id else None
+                return 200, detail_html(detail_titles[nid], pdf_url).encode()
+            if ("portal.tu.edu.np/p/%d.pdf" % nid) in url:
+                return 200, pdf_by_id[nid]
+        if url.rstrip("/").endswith("/notices"):
+            return 200, board.encode()
+        raise RuntimeError("no fake response for %s" % url)
+
+    return fetch, requested
 
 
 class ResultPathProbeUnitTest(unittest.TestCase):
@@ -301,6 +332,94 @@ class ResultPathProbeUnitTest(unittest.TestCase):
         self.assertNotIn("13572468", blob,
                          "the owner's real roll must never appear in a "
                          "self-check report")
+
+
+class ResultPathHonestyTest(unittest.TestCase):
+    """A notice the monitor SKIPS is not a broken result path, and one record
+    must never carry a success flag next to another notice's failure."""
+
+    def test_a_no_match_notice_is_not_probed(self):
+        """An admission notice sits on the same result feed. The monitor skips
+        it at the no_match gate (check_academic_result.py:3076-3101), so the
+        self-check must not download its PDF and demand a roll table."""
+        rows = [(15700, "Admission Notice", "2026-09-28")]
+        fetch, requested = board_fetch(
+            rows, {15700: ADMISSION_TITLE},
+            {15700: b"%PDF-1.4 an admission notice has no roll table"})
+        r = scs.check_result_path(
+            RESULT_FEED, cfg_with_result_path(known_result_notice_id=None),
+            fetch, 15)
+        self.assertTrue(r["live"])
+        self.assertEqual(r["classify"], "no_match")
+        self.assertFalse(r["probed"])
+        self.assertEqual(r["failures"], [],
+                         "a skipped notice is not a failure")
+        self.assertFalse(any("portal.tu.edu.np" in u for u in requested),
+                         "the admission PDF must never be downloaded")
+
+    def test_only_non_match_notices_is_a_quiet_run_with_a_reason(self):
+        """No published CSIT result notice is the third state: honest and
+        quiet, never result_path_broken."""
+        rows = [(15700, "Admission Notice", "2026-09-28"),
+                (15701, "B.Tech Result", "2026-09-29")]
+        fetch, _requested = board_fetch(
+            rows,
+            {15700: ADMISSION_TITLE,
+             15701: "B.Tech First Semester Exam Result 2082"},
+            {15700: b"%PDF-1.4 none", 15701: b"%PDF-1.4 none"})
+        r = scs.check_result_path(
+            RESULT_FEED, cfg_with_result_path(known_result_notice_id=None),
+            fetch, 15)
+        self.assertFalse(r["probed"])
+        self.assertEqual(r["failures"], [])
+        self.assertEqual(r.get("reason"), "no_published_csit_result_notice")
+
+    def test_a_quiet_run_exits_zero_and_is_not_red(self):
+        rows = [(15700, "Admission Notice", "2026-09-28")]
+        fetch, _requested = board_fetch(
+            rows, {15700: ADMISSION_TITLE},
+            {15700: b"%PDF-1.4 none"})
+        rc, out, runs = run_selfcheck(
+            fetch, cfg_with_result_path(known_result_notice_id=None))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("::error::result path", out)
+        self.assertEqual(runs[-1]["verdict"], "ok")
+        self.assertFalse(runs[-1]["result_path"]["probed"])
+        self.assertEqual(runs[-1]["result_path"].get("reason"),
+                         "no_published_csit_result_notice")
+
+    def test_a_record_cannot_claim_pdf_ok_with_a_failure(self):
+        """The self-contradicting record: notice A's PDF fails, notice B's
+        passes. The top-level record is a success, so it carries no failure;
+        A's failure stays on A's own per-notice entry."""
+        rows = [(15700, "B.Sc. CSIT I Semester", "2026-09-28"),
+                (15701, "B.Sc. CSIT II Semester", "2026-09-29")]
+        good = build_one_page_pdf(roll="1357 2468")
+        fetch, _requested = board_fetch(
+            rows,
+            {15700: "TU B.Sc.CSIT I Semester-2082 Exam Result",
+             15701: "TU B.Sc.CSIT II Semester-2082 Exam Result"},
+            {15700: b"%PDF-1.4 this file has no extractable text",
+             15701: good})
+        r = scs.check_result_path(
+            RESULT_FEED, cfg_with_result_path(known_result_notice_id=None),
+            fetch, 15)
+        self.assertTrue(r["pdf_ok"])
+        self.assertEqual(r["failures"], [],
+                         "a successful record must not carry a failure")
+        self.assertTrue(r["probed"])
+        per_notice = {p["id"]: p for p in r.get("probes") or []}
+        self.assertTrue(per_notice[15700]["failures"],
+                        "the failed notice's evidence must still be recorded")
+
+    def test_a_real_match_sheet_still_probes_and_passes(self):
+        r = scs.check_result_path(RESULT_FEED, cfg_with_result_path(),
+                                  healthy_fetch(), 15)
+        self.assertEqual(r["classify"], "match")
+        self.assertTrue(r["probed"])
+        self.assertTrue(r["pdf_ok"])
+        self.assertTrue(r["roll_token_found"])
+        self.assertEqual(r["failures"], [])
 
 
 class ResultPathExitCodeTest(unittest.TestCase):

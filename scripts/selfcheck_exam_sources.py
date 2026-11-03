@@ -393,50 +393,74 @@ def check_result_path(feed, cfg, fetch_fn, timeout, max_probes=3):
         return result
 
     by_id = {n.get("id"): n for n in notices}
+    # One dict per attempted notice. A single shared set of flags let one
+    # notice's success sit next to another notice's failure in the same record.
+    attempts = []
+    saw_match = False
     for nid in probes:
         notice = by_id.get(nid)
         if notice is None:
             continue
+        attempt = {
+            "id": nid,
+            "detail_ok": None,
+            "classify": None,
+            "semester": None,
+            "pdf_ok": None,
+            "roll_token_found": None,
+            "failures": [],
+        }
+        attempts.append(attempt)
         # --- 2. the detail page must yield an authoritative title -----------
         try:
             detail = fetch_notice_detail(notice.get("url") or
                                          "%s%s" % (feed_url.rstrip("/"), nid),
                                          fetch_fn=fetch_fn, timeout=probe_timeout)
         except FetchError as exc:
-            result["failures"].append("notice %d detail fetch failed: %s"
-                                      % (nid, exc))
+            attempt["failures"].append("notice %d detail fetch failed: %s"
+                                       % (nid, exc))
             continue
         except Exception as exc:
-            result["failures"].append("notice %d detail error: %s"
-                                      % (nid, exc))
+            attempt["failures"].append("notice %d detail error: %s"
+                                       % (nid, exc))
             continue
         title = (detail.get("title") or "").strip()
         if not title or detail.get("title_degraded") \
                 or is_site_constant_title(title):
             # THE site-constant burn, caught by name. If <title> is being taken
             # as the notice title again, the result path is blind.
-            result["failures"].append(
+            attempt["failures"].append(
                 "notice %d detail title is not authoritative (source=%r, "
                 "degraded=%r, title=%r) - the site-constant <title> bug is "
                 "back" % (nid, detail.get("title_source"),
                           bool(detail.get("title_degraded")), title[:80]))
             continue
-        result["detail_ok"] = True
+        attempt["detail_ok"] = True
         result["title"] = title[:200]
         result["samples"].append(title[:120])
 
         # --- 3. the title must be READABLE, not merely present -------------
         verdict = classify_semester(title)
-        result["classify"] = verdict["status"]
-        result["semester"] = verdict["semester"]
+        attempt["classify"] = verdict["status"]
+        attempt["semester"] = verdict["semester"]
         if verdict["status"] == "unknown":
-            result["failures"].append(
+            attempt["failures"].append(
                 "notice %d title is UNREADABLE by every script's vocabulary "
                 "(script=%s, stage_hits=%s): %r - the token set does not cover "
                 "this board, and a real result in this wording would defer "
                 "forever" % (nid, verdict["script"], verdict["stage_hits"],
                              title[:80]))
             continue
+
+        # --- 3b. a notice the MONITOR would skip is not a broken result path -
+        # check_academic_result.py:3076-3101 dismisses every no_match notice
+        # (admission and other-programme notices share this feed) without ever
+        # opening a roll table. Mirroring that gate here is what stops an
+        # admission PDF being demanded to carry one. Keep the two in step: if
+        # that gate changes, this one must too.
+        if verdict["status"] != "match":
+            continue
+        saw_match = True
 
         # --- 4. the PDF must download and yield a roll-shaped token ---------
         if rp.get("require_pdf") is False:
@@ -448,34 +472,62 @@ def check_result_path(feed, cfg, fetch_fn, timeout, max_probes=3):
             pdf_bytes = download_pdf(pdf_url, fetch_fn=fetch_fn,
                                      timeout=probe_timeout)
         except FetchError as exc:
-            result["failures"].append("notice %d pdf download failed: %s"
-                                      % (nid, exc))
+            attempt["failures"].append("notice %d pdf download failed: %s"
+                                       % (nid, exc))
             continue
         except Exception as exc:
-            result["failures"].append("notice %d pdf error: %s" % (nid, exc))
+            attempt["failures"].append("notice %d pdf error: %s" % (nid, exc))
             continue
         diag = {}
         text = extract_pdf_text(pdf_bytes, diag=diag)
         if not text:
-            result["failures"].append(
+            attempt["failures"].append(
                 "notice %d PDF yielded no text - %s"
                 % (nid, _pdf_stage_note(diag, len(pdf_bytes))))
             continue
         if not sheet_text_is_readable(text):
-            result["failures"].append(
+            attempt["failures"].append(
                 "notice %d PDF text carries no result-table structure (%s), so "
                 "a pass or fail could never be decided from it"
                 % (nid, structure_summary(roll_structure(text))))
             continue
-        result["pdf_ok"] = True
-        result["roll_token_found"] = True
+        attempt["pdf_ok"] = True
+        attempt["roll_token_found"] = True
         # A roll-shaped token is a SHAPE, never a roll number: nothing from a
         # real result sheet (other students' names, rolls and marks) is printed,
         # stored or transmitted by this check.
         break
 
-    if result["detail_ok"] and not result["failures"]:
+    result["probes"] = attempts
+    succeeded = next(
+        (a for a in attempts
+         if a["detail_ok"] and a["classify"] == "match" and not a["failures"]),
+        None)
+    if succeeded is not None:
+        # The record is ONE verdict: the probe that worked owns every flag, so
+        # it can never claim pdf_ok while carrying another notice's failure.
+        result["detail_ok"] = True
+        result["classify"] = succeeded["classify"]
+        result["semester"] = succeeded["semester"]
+        result["pdf_ok"] = succeeded["pdf_ok"]
+        result["roll_token_found"] = succeeded["roll_token_found"]
+        result["failures"] = []
         result["probed"] = True
+    else:
+        result["detail_ok"] = any(a["detail_ok"] for a in attempts) or None
+        if attempts:
+            result["classify"] = attempts[-1]["classify"]
+            result["semester"] = attempts[-1]["semester"]
+        result["pdf_ok"] = False if attempts else None
+        result["roll_token_found"] = False if attempts else None
+        result["failures"] = [line for a in attempts for line in a["failures"]]
+        result["probed"] = False
+        # THE THIRD STATE. Every notice is one the monitor would skip and there
+        # is no fault anywhere: the result path was simply not exercised. That
+        # is honest and quiet, never result_path_broken.
+        if attempts and not saw_match and not result["failures"]:
+            result["reason"] = "no_published_csit_result_notice"
+
     return result
 
 
@@ -652,14 +704,24 @@ def main(argv=None):
                           "result-table structure was found"
                           % result_probe["id"])
             else:
-                for failure in result_probe.get("failures") or []:
-                    print("::error::result path on %s: %s"
-                          % (result_probe.get("id"), failure))
-                if not result_probe.get("failures"):
-                    print("::error::result path on %s: reachable, but no "
-                          "notice could be probed end to end"
+                if result_probe.get("reason") == \
+                        "no_published_csit_result_notice":
+                    # THE THIRD STATE: reachable board, nothing to probe, no
+                    # fault. Saying "broken" here is the lie this check exists
+                    # to avoid, so it is informational and the verdict stays ok.
+                    print("result path on %s: no published CSIT result notice "
+                          "is listed right now, so the result path was not "
+                          "exercised this run (not a fault)"
                           % result_probe.get("id"))
-                result_failures.append(result_probe)
+                else:
+                    for failure in result_probe.get("failures") or []:
+                        print("::error::result path on %s: %s"
+                              % (result_probe.get("id"), failure))
+                    if not result_probe.get("failures"):
+                        print("::error::result path on %s: reachable, but no "
+                              "notice could be probed end to end"
+                              % (result_probe.get("id")))
+                    result_failures.append(result_probe)
             break
 
     runs = read_runs(args.state)
@@ -695,7 +757,7 @@ def main(argv=None):
         "result_path": (
             {k: result_probe.get(k) for k in
              ("id", "live", "probed", "detail_ok", "classify", "semester",
-              "pdf_ok", "roll_token_found", "error", "failures")}
+              "pdf_ok", "roll_token_found", "error", "failures", "reason")}
             if result_probe else {"live": False,
                                   "skipped": "unreachable or disabled"}),
         "config_verified_against_live": cfg.get("verified_against_live"),
@@ -737,6 +799,11 @@ def main(argv=None):
                                 result_probe.get("classify"),
                                 result_probe.get("pdf_ok"),
                                 result_probe.get("roll_token_found")))
+                    if result_probe.get("reason"):
+                        fh.write("- Result path on `%s` was NOT exercised: "
+                                 "`%s` (not a fault)\n"
+                                 % (result_probe.get("id"),
+                                    result_probe.get("reason")))
                 for failure in result_failures:
                     for line in (failure.get("failures") or []):
                         fh.write("- **RESULT PATH BROKEN** (`%s`): %s\n"
