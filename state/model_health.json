@@ -18,8 +18,8 @@
       "garbage": 0,
       "consecutive_failures": 10,
       "last_failure": "timeout",
-      "last_fail_at": 1793686889.705709,
-      "cooldown_until": 1793773289.705709
+      "last_fail_at": 1793687510.5094993,
+      "cooldown_until": 1793773910.5094993
     },
     "opencode/mimo-v2.6-flash-free": {
       "success": 0,
@@ -28,8 +28,8 @@
       "garbage": 0,
       "consecutive_failures": 10,
       "last_failure": "timeout",
-      "last_fail_at": 1793687039.7796135,
-      "cooldown_until": 1793773439.7796135
+      "last_fail_at": 1793687660.5984375,
+      "cooldown_until": 1793774060.5984375
     },
     "opencode/nemotron-3.5-lightning-free": {
       "success": 0,
@@ -38,8 +38,8 @@
       "garbage": 0,
       "consecutive_failures": 10,
       "last_failure": "timeout",
-      "last_fail_at": 1793687189.8693926,
-      "cooldown_until": 1793773589.8693926
+      "last_fail_at": 1793687810.710452,
+      "cooldown_until": 1793774210.710452
     },
     "opencode/glm-5.3-flash-free": {
       "success": 0,
@@ -118,8 +118,8 @@
       "garbage": 0,
       "consecutive_failures": 10,
       "last_failure": "timeout",
-      "last_fail_at": 1793687339.9746208,
-      "cooldown_until": 1793773739.9746208
+      "last_fail_at": 1793687960.7749221,
+      "cooldown_until": 1793774360.7749221
     }
   }
 }
