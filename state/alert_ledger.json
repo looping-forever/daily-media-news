@@ -1,15 +1,15 @@
 {
   "conditions": {
     "breaking.honesty_gate||": {
-      "alerted_at": "2026-11-03T03:57:24Z",
-      "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/deepseek-v4.1-flash-free: timed out after 150s -- e",
+      "alerted_at": "2026-11-03T03:47:01Z",
+      "cause": "ai_fail_safe: models=opencode/big-pickle,opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free source=live; opencode/big-pickle: timed out after 150s -- e models work in OpenCode (https",
       "first_seen": "2026-11-02T01:24:21Z",
       "healthy_streak": 0,
-      "last_seen": "2026-11-03T03:57:24Z",
-      "runs": 35,
-      "window_first": "",
-      "window_last": "",
-      "window_runs": 0
+      "last_seen": "2026-11-03T04:07:51Z",
+      "runs": 36,
+      "window_first": "2026-11-03T04:07:51Z",
+      "window_last": "2026-11-03T04:07:51Z",
+      "window_runs": 1
     }
   },
   "schema_version": 1
