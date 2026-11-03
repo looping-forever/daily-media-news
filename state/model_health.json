@@ -3,43 +3,43 @@
   "models": {
     "opencode/deepseek-v4.1-flash-free": {
       "success": 0,
-      "timeout": 10,
+      "timeout": 11,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 10,
+      "consecutive_failures": 11,
       "last_failure": "timeout",
-      "last_fail_at": 1793681809.2114336,
-      "cooldown_until": 1793768209.2114336
+      "last_fail_at": 1793688874.9185703,
+      "cooldown_until": 1793775274.9185703
     },
     "opencode/beam-free": {
       "success": 0,
-      "timeout": 10,
+      "timeout": 11,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 10,
+      "consecutive_failures": 11,
       "last_failure": "timeout",
-      "last_fail_at": 1793687510.5094993,
-      "cooldown_until": 1793773910.5094993
+      "last_fail_at": 1793689024.9848223,
+      "cooldown_until": 1793775424.9848223
     },
     "opencode/mimo-v2.6-flash-free": {
       "success": 0,
-      "timeout": 10,
+      "timeout": 11,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 10,
+      "consecutive_failures": 11,
       "last_failure": "timeout",
-      "last_fail_at": 1793687660.5984375,
-      "cooldown_until": 1793774060.5984375
+      "last_fail_at": 1793689175.049915,
+      "cooldown_until": 1793775575.049915
     },
     "opencode/nemotron-3.5-lightning-free": {
       "success": 0,
-      "timeout": 10,
+      "timeout": 11,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 10,
+      "consecutive_failures": 11,
       "last_failure": "timeout",
-      "last_fail_at": 1793687810.710452,
-      "cooldown_until": 1793774210.710452
+      "last_fail_at": 1793689325.1189184,
+      "cooldown_until": 1793775725.1189184
     },
     "opencode/glm-5.3-flash-free": {
       "success": 0,
