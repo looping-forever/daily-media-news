@@ -75,22 +75,28 @@ def ntfy_source():
                      for ln in m.group(1).split("\n"))
 
 
-def run_ntfy(tmpdir, payload, kind="morning"):
+def run_ntfy(tmpdir, payload, kind="morning", now_utc=None):
     """Exec the real ntfy heredoc in DRY RUN; return the payload it printed.
 
     DRY_RUN=true makes the step print the payload and return before the
     urlopen, and urlopen is additionally poisoned, so this can never make a
     network call. The assertion on the DRY RUN marker proves which branch ran.
+
+    `now_utc` pins the push clock (SEND_NOW_UTC) so two assemblies of the same
+    input are comparable; None exercises the real clock.
     """
     import urllib.request
 
     os.makedirs(os.path.join(tmpdir, "state"), exist_ok=True)
     write_json(os.path.join(tmpdir, "state", "stories.validated.json"), payload)
     env_backup = dict(os.environ)
-    os.environ.update({
+    step_env = {
         "NTFY_TOPIC": "t", "NTFY_SERVER": "https://ntfy.invalid", "DRY_RUN": "true",
         "TODAY": "2026-09-27", "DIGEST_TIME": kind,
-    })
+    }
+    if now_utc:
+        step_env["SEND_NOW_UTC"] = now_utc
+    os.environ.update(step_env)
 
     def _no_network(*_args, **_kwargs):
         raise AssertionError("ntfy test attempted a network call")

@@ -71,6 +71,11 @@ TELEGRAM_STEP = "- name: Send Telegram digest (backup)"
 
 PHASE_CHOICES = ("full", "prebuild")
 
+#: The push clock both assemblies are given: 2026-10-09T13:00:00Z is 18:45 NPT,
+#: inside the Evening band. Without a pinned clock the title reads the wall
+#: clock at each assembly, so the bytes can differ across a minute boundary.
+PINNED_SEND_UTC = "2026-10-09T13:00:00Z"
+
 
 # --------------------------------------------------------------------------
 # helpers
@@ -1116,7 +1121,14 @@ class PayloadIsIdenticalAcrossPhasesTests(TempCase):
             work = self.tmp / ("work_%s" % phase)
             work.mkdir(exist_ok=True)
             got = run_ntfy(str(work), validated_payload("degraded"),
-                           kind="morning")
+                           kind="morning", now_utc=PINNED_SEND_UTC)
+            # The clock is an INPUT, so the title must show it. This is what
+            # makes a re-read of the wall clock a deterministic failure rather
+            # than a flake that only shows up across a minute boundary.
+            self.assertIn(
+                "Evening Digest \u00b7 18:45", got["title"],
+                "the title did not use the pinned send instant %s: %r"
+                % (PINNED_SEND_UTC, got["title"]))
             payloads[phase] = json.dumps(got, ensure_ascii=False,
                                          sort_keys=True)
         self.assertEqual(

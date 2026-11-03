@@ -2551,16 +2551,29 @@ jobs:
                         % (word,))
                   return LABEL_WORD_EMOJI['Late Night']
 
-          def npt_label():
-              """(word, 'HH:MM') for RIGHT NOW in Nepal time.
+          def send_now_utc():
+              """The push instant, read ONCE per assembly.
+
+              SEND_NOW_UTC pins it for a caller that must assemble the same
+              payload twice; production never sets it. Same convention as
+              SLOT_DATE_NOW_UTC above.
+              """
+              pinned = (os.environ.get('SEND_NOW_UTC') or '').strip()
+              if pinned:
+                  return datetime.datetime.strptime(
+                      pinned, '%Y-%m-%dT%H:%M:%SZ').replace(
+                          tzinfo=datetime.timezone.utc)
+              return datetime.datetime.now(datetime.timezone.utc)
+
+          def npt_label(instant_utc):
+              """(word, 'HH:MM') for `instant_utc`, in Nepal time.
 
               UTC first, then the fixed +05:45. Never the runner's local clock:
               a naive local clock rendered a footer 5h45m behind the NPT cutoff
               on every digest, and in the one field the owner uses to tell
               morning from night that would be the worst place to repeat it.
               """
-              npt = (datetime.datetime.now(datetime.timezone.utc).replace(
-                  tzinfo=None) + NPT_OFFSET)
+              npt = (instant_utc.replace(tzinfo=None) + NPT_OFFSET)
               word = LABEL_HOUR_BOUNDS[0][1]
               for start_hour, candidate in LABEL_HOUR_BOUNDS:
                   if npt.hour >= start_hour:
@@ -3340,7 +3353,7 @@ jobs:
               # exactly the kind of wrong-claim bug this file is built to
               # prevent, and it would take someone hoisting a variable out of
               # one of those two functions to cause it.
-              label_word, label_clock = npt_label()
+              label_word, label_clock = npt_label(send_now_utc())
               send_label = '%s Digest · %s' % (label_word, label_clock)
 
               # --- Load validated stories ---
