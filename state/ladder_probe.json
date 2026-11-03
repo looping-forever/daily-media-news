@@ -1,74 +1,51 @@
 {
-  "run_at": "2026-11-02T14:02:38+00:00",
-  "head_sha": "08e70f1b8673dd0a03adf61b853481be3c2eb719",
+  "run_at": "2026-11-03T08:00:34+00:00",
+  "head_sha": "3f6275607f28125ed2bdcae6c1b3aefa233ed192",
   "trigger": "ladder_probe",
   "per_attempt_sec": 150,
   "first_output_sec": 40,
+  "liveness_signal": "stderr CLI log line containing message=stream (small=true excluded) or llm runtime selected",
   "attempt_budget_sec": 720,
   "pool": [
+    "gemini/gemini-3.5-flash-lite",
+    "gemini/gemini-3.1-flash-lite",
     "opencode/deepseek-v4.1-flash-free",
-    "opencode/beam-free",
-    "opencode/mimo-v2.6-flash-free",
-    "opencode/nemotron-3.5-lightning-free"
+    "opencode/beam-free"
   ],
   "attempts": [
     {
-      "model": "opencode/deepseek-v4.1-flash-free",
+      "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.09,
-      "first_byte_sec": null,
-      "outcome": "no_output",
+      "wall_sec": 7.92,
+      "first_byte_sec": 7.78,
+      "first_byte_source": "stdout",
+      "first_liveness_sec": 2.04,
+      "first_liveness_source": "stderr",
+      "outcome": "verdict",
       "control": false,
-      "tail_excerpt": "\u001b[0m > build · deepseek-v4.1-flash-free \u001b[0m"
-    },
-    {
-      "model": "opencode/beam-free",
-      "attempt": 1,
-      "granted_sec": 150,
-      "wall_sec": 40.13,
-      "first_byte_sec": null,
-      "outcome": "no_output",
-      "control": false,
-      "tail_excerpt": "\u001b[0m > build · beam-free \u001b[0m"
-    },
-    {
-      "model": "opencode/mimo-v2.6-flash-free",
-      "attempt": 1,
-      "granted_sec": 150,
-      "wall_sec": 40.08,
-      "first_byte_sec": null,
-      "outcome": "no_output",
-      "control": false,
-      "tail_excerpt": "\u001b[0m > build · mimo-v2.6-flash-free \u001b[0m"
-    },
-    {
-      "model": "opencode/nemotron-3.5-lightning-free",
-      "attempt": 1,
-      "granted_sec": 150,
-      "wall_sec": 40.08,
-      "first_byte_sec": null,
-      "outcome": "no_output",
-      "control": false,
-      "tail_excerpt": "\u001b[0m > build · nemotron-3.5-lightning-free \u001b[0m"
+      "tail_excerpt": "VInOOl6VJM timestamp=2026-11-03T08:00:27.208Z level=INFO run=2f4e96b1 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     },
     {
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 40.08,
-      "first_byte_sec": null,
-      "outcome": "no_output",
+      "wall_sec": 7.17,
+      "first_byte_sec": 6.99,
+      "first_byte_source": "stdout",
+      "first_liveness_sec": 2.02,
+      "first_liveness_source": "stderr",
+      "outcome": "verdict",
       "control": true,
-      "tail_excerpt": "\u001b[0m > build · gemini-3.5-flash-lite \u001b[0m"
+      "tail_excerpt": "ykKp6BQ2ww timestamp=2026-11-03T08:00:34.344Z level=INFO run=6002e839 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     }
   ],
-  "verdict": "none",
-  "control": "no_output",
+  "verdict": "parseable",
+  "control": "answered",
   "control_model": "gemini/gemini-3.5-flash-lite",
   "control_env": "GEMINI_API_KEY",
-  "attribution": "harness_no_stream",
-  "ladder_seconds": 162.61,
-  "control_seconds": 40.08,
-  "error": "models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/deepseek-v4.1-flash-free: no model output within 40s of its 150s window -- \u001b[0m > build · deepseek-v4.1-flash-free \u001b[0m; opencode/beam-free: no model output within 40s of its 150s window -- \u001b[0m > build · beam-free \u001b[0m; opencode/mimo-v2.6-flash-free:"
+  "attribution": "free_tier_answered",
+  "ladder_seconds": 9.82,
+  "control_seconds": 7.18,
+  "error": ""
 }
