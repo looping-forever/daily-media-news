@@ -3,21 +3,28 @@
 Durable knowledge for future sessions. Verified 2026-09-17. **2026-11-01:** only
 §1, §28 and the §35 secret list were re-checked against the code that day (each
 says so in place); nothing else was re-verified, so do not read this file's age
-as freshness. Do not edit product source code from this file; record decisions
-here instead.
+as freshness. **2026-11-03:** §1's tip, §4's seed ladder and §33's advice table
+were re-checked, and §42 was added for the day's changes (digest story floor,
+weather AQI, breaking ladder, ladder probe, honesty gate, `commit_state.sh`).
+Do not edit product source code from this file; record decisions here instead.
 
-## 1. Repo state (re-verified 2026-11-01)
+## 1. Repo state (re-verified 2026-11-01; tip re-checked 2026-11-03)
 
 - Repo: this repository (git, branch `master`). This section said `main` until
   2026-11-01; no ref of that name exists.
-- HEAD = `a38165b` ("test: assert the ledger repair contract, not a pinned
-  instant"). Four commits from a concurrent actor landed during the
-  2026-10-31/11-01 session (`29f98ca`, `e4a84f6`, `9450ef7`, `a38165b`), taking
-  HEAD off the `4ab6e44` that session started on. Treat the tip as moving: read
-  `git log --oneline`.
-- Working tree DIRTY during a session by design: `git status --short` showed 10
-  modified files and no untracked files at the 2026-11-01 check (this line said 9
-  until the same day's audit recounted them). Nothing was committed or pushed.
+- HEAD = `6d6170c` ("feat: keep the verdict a judgement actually returned") at
+  the 2026-11-03 check. **Superseded 2026-11-03:** this line said `a38165b`
+  until then; four commits from a concurrent actor had landed during the
+  2026-10-31/11-01 session (`29f98ca`, `e4a84f6`, `9450ef7`, `a38165b`). Treat
+  the tip as moving: read `git log --oneline`.
+- Working tree MOVES DURING A SESSION, so a count here is not durable. Measured
+  2026-11-03: `git status --porcelain` printed only `?? CON` at 15:31, then
+  showed `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
+  `tests/render/test_render_honesty.py` modified at 15:32 — with no command of
+  this session touching them, i.e. a concurrent actor. **Superseded 2026-11-03:**
+  this line recorded 10 modified files and no untracked files at the 2026-11-01
+  check. Re-run `git status`; do not trust a stored count. Nothing was committed
+  or pushed in either session.
 - Measured suite counts, 2026-11-01, `unittest discover` from the repo root:
   workflows **482**, render **488**, digest **392**, collection **254**, weather
   **135** -- all green. Two earlier readings in this session were stale, not
@@ -74,8 +81,14 @@ here instead.
 
 ## 4. Model ladder
 
-- **Seed** (`config/opencode.json`): `opencode/big-pickle` (primary) →
-  `opencode/mimo-v2.6-flash-free` → `opencode/nemotron-3.5-lightning-free`.
+- **Seed** (`config/opencode.json:5-14`, re-read 2026-11-03):
+  `gemini/gemini-3.5-flash-lite` → `gemini/gemini-3.1-flash-lite` →
+  `opencode/deepseek-v4.1-flash-free` → `opencode/beam-free` →
+  `opencode/mimo-v2.6-flash-free` → `opencode/nemotron-3.5-lightning-free` →
+  `opencode/glm-5.3-flash-free` → `opencode/flint-40b-free`. The two keyed
+  Gemini rungs lead. **Superseded 2026-11-03:** this line listed
+  `opencode/big-pickle` as primary. The breaking stage takes the first four
+  (`breaking_monitor.py:394`) — see §42.3.
 - `scripts/model_selector.py --all` returns the WHOLE live-discovered free pool
   in rank order, and the agent step walks it bounded by WALL CLOCK, not by a
   count: per-attempt `timeout 480s`, whole walk `1800s`, and it stops once one
@@ -972,6 +985,10 @@ should be corrected to 102 / 103→131 / 410 in a follow-up.
 - **`data_cutoff_npt` is `min(...)`, never `max(...)`.**
 - **`resolve_article_url` detects at render time.** Do not add a collector field
   for it.
+- **The frozen `weather` block includes `aqi`, `aqi_band`, `pm2_5`, `aqi_note`**
+  (`collect_news.py:1915`, `:2127-2145`). `aqi_band` is computed only in the
+  adapter; a renderer that re-derives it from `aqi` is a contract violation
+  (`:500-502`). See §33 and §42.2.
 - **Secret names only, never values:** `NTFY_TOPIC`, `NTFY_SERVER`,
   `CF_PAGES_API_TOKEN`, `GH_TOKEN`. `DIGEST_PASSWORD` was removed from this list
   on 2026-11-01: it and `DIGEST_USERNAME` were retired 2026-10-30 with the Pages
@@ -1194,6 +1211,17 @@ and humidity — which is exactly why people feel cold.
 | `Wear a warm jacket - feels like {temp}C when you go out {win}` | apparent ≤ 10 °C |
 | `Take a jacket - feels like {temp}C {win}` | apparent 11–14 °C |
 | `Nothing to plan for - dry and mild today ({tmax}C)` | otherwise |
+| `Limit outdoor exposure - air quality is {band} (AQI {n}).` — id **`AQI`** | AQI band is `unhealthy`, `very-unhealthy` or `hazardous` |
+
+**Rule ids, and the one that is not the engine's.** The engine's ids are
+`RULE_IDS = ("VS", "V", "W1", "U", "J2", "J1", "C")` (`weather_advice.py:188`);
+the blocked-wash line reuses `W1`'s priority (`:190`). **`AQI` is not in that
+tuple**: it is appended by the collector's adapter after the engine returns
+(`collect_news.py:2415-2432`) with priority 0, and it *deletes* the calm line
+`C` rather than sitting beside it — "nothing to plan for" and "limit outdoor
+exposure" cannot both be true. It fires only when `air_is_unsafe()` is true
+(`:1851-1859`), the same predicate the `aqi_note` reads, so the note and the
+advice cannot disagree about one day. See §42.2.
 
 ### Two deliberate anti-nag designs — keep both
 
@@ -2177,17 +2205,159 @@ be *written*, never the reason the freeze may lift.
 6. **1264 reads / 651 ns per tick** — session-measured, not a committed
    contract.
 
+## 42. 2026-11-03 — digest story floor, air quality, breaking ladder, ladder probe, state durability
+
+Everything here was read out of the code on 2026-11-03; each claim cites the
+line that makes it true. Nothing in this section was observed in a production
+run — it describes the code and its stated contracts.
+
+### 42.1 Digest acceptance requires a story COUNT, not parseability
+
+- `STORIES_FLOOR: 4` is a workflow-level constant (`daily-news.yml:13`) and both
+  gates refuse to run without it (`:1233`, `:1828`).
+- `stories_ok()` (`daily-news.yml:1443-1452`) counts the `stories` list and, when
+  the count is below the floor, *deletes* the file and returns failure — so no
+  later step can ship it. It replaced the old "does the file parse" check after
+  run `41369743596` logged "valid state/stories.json" over zero stories and a
+  2-story edition shipped as healthy (`:1437-1442`).
+- The derive gate counts schema survivors with the same validator the validation
+  step uses (`daily-news.yml:1829-1859`). When `SURVIVORS < STORIES_FLOOR`
+  (`:1870`) it removes the thin model payload and derives the labelled
+  unsummarised edition (`:1874-1891`); the deriver writes nothing below its own
+  floor and says `FLOOR: only %d stories (minimum %d)`
+  (`scripts/derive_unsummarised.py:220-221`).
+- A fallback or derived writer seals DEGRADED: any `writer.rung` that is not
+  `primary` or `retry` forces `is_partial` (`digest-prebuild.yml:567-578`), and
+  the sealed artifact records `writer {rung, attempt, model}` (`:599-601`). The
+  writer record itself is written by `digest_success()` on accepting a run
+  (`daily-news.yml:1459-1462`), so the rung and model that actually wrote the
+  edition survive into the artifact.
+
+### 42.2 Weather gained air quality
+
+- The frozen `weather` block gained four keys — `aqi`, `aqi_band`, `pm2_5`,
+  `aqi_note` (`collect_news.py:1915`, `:2127-2145`). They come from the keyless
+  Open-Meteo air-quality host (`air-quality-api.open-meteo.com`,
+  `:441-452`) with its own 4 s timeout and its own catch, so a dead air-quality
+  host costs these four fields and never the weather block (`:1578-1586`).
+- Each field is `null` when unavailable. A band is a claim about a number, so it
+  is never invented from a missing one (`:1912-1926`); `pm2_5` is kept
+  independently when the source measured it (`:2130-2145`).
+- The band is computed **only in the adapter** (`aqi_band()`, `:1840-1848`) from
+  the single `AQI_BANDS` ladder (`:500-506`). Renderers receive `aqi_band` as
+  text and never re-derive it (`:500-502`).
+- `air_is_unsafe()` is the **single predicate** (`:1851-1859`) read by both the
+  note (`:1871-1885`) and the advice (`:1862-1868`).
+- An unsafe band **replaces the calm advice line**: `_with_air_advice()` removes
+  id `C` and appends `{"id": "AQI", "text": …, "priority": 0}`
+  (`collect_news.py:2415-2432`). The `AQI` id is now in §33's advice table.
+
+### 42.3 The breaking AI ladder
+
+- `AI_LADDER = AI_MODELS[:4]` (`breaking_monitor.py:394`), derived from
+  `config/opencode.json`'s `ladder` (`:256-272`) — never a second embedded list
+  (`:175-190`) — and filtered to the providers this CLI can resolve
+  (`:206-242`). The config leads with the two keyed Gemini rungs
+  (`config/opencode.json:5-14`), so reachable keyed rungs lead the walk; the
+  free rungs stay behind them (`breaking_monitor.py:379-384`).
+- **4 rungs × 150 s = 600 s** (`:336`, `:377`) inside
+  `AI_TOTAL_BUDGET_SEC = 720` (`:410-416`) and the 900 s job
+  (`breaking-monitor.yml:113-118`).
+- **Liveness is a stderr CLI log line, not stdout bytes**: `message=stream`
+  proves a model call opened, and `small=true` is excluded because that is the
+  title call against a different model; `llm runtime selected` is the other
+  liveness line (`breaking_monitor.py:338-356`, `:358-371`).
+- **A full-window timeout forfeits its retry by construction**: every attempt
+  shares the model's one 150 s window, so `now >= model_deadline` ends that model
+  with no second attempt (`:401-408`). The retry exists for a fast failure.
+- **`payment_required` is its own failure kind.** `classify_failure()` returning
+  `payment_required` is recorded as **`quota_notice`**, not `slow_or_stalled`
+  (`:1981-2002`), because the CLI said on stderr that the plan refuses the call
+  rather than being slow.
+- **`OPENCODE_CONFIG` must reach the child, or keyed rungs are filtered out.**
+  `_rung_env()` injects the CLI provider file (`:296-329`) and the workflow sets
+  it (`breaking-monitor.yml:201-214`); without it every Gemini rung is
+  `model not found` and the reachability filter drops it (`:206-242`).
+
+### 42.4 The ladder probe
+
+- **`ladder_probe` workflow input, default `false`, manual-only**
+  (`breaking-monitor.yml:97-101`). It spends free-tier quota on purpose and
+  sends nothing (`:84-96`).
+- **Two fixed synthetic candidates**: the important story must be *judged* and
+  the unimportant one *declined* (`breaking_monitor.py:2225-2271`,
+  `:2628-2630`). `judgment_capable` is true only for that asymmetric pair; both
+  judged or both declined is not capability evidence, and "no keyed rung
+  configured" is "not measured", never "cannot judge" (`:2505-2547`, `:2726`).
+- **Per-candidate persisted verdict text**: each walk stores the answer's own
+  title/summary/level (redacted, whitespace-collapsed, capped) as `verdict`
+  beside `judged_content`, so a capability claim can be audited rather than
+  trusted (`:2458-2489`, `:2591-2601`).
+- **It cannot notify, decide or promote.** It may *ask* models to judge, but it
+  decides nothing, sends nothing and is never evidence about a news hour. It
+  writes only `state/ladder_probe.json`, keeps health/cooldown/cache in
+  `state/ladder_probe/`, and returns before the pre-gate, fast path, dedupe,
+  delivery and the honesty-gate row (`:2604-2634`).
+- **One-file commit rule**, enforced in two places: on a probe run the workflow
+  stages only `state/ladder_probe.json` (`breaking-monitor.yml:330-362`), and
+  `scripts/commit_state.sh` refuses every other path by name when
+  `LADDER_PROBE=true` — and refuses the probe file itself when it is not a probe
+  run (`commit_state.sh:40-85`).
+
+### 42.5 Honesty-gate recovery
+
+- `judged` requires **`judged == true` AND `gate == "passed"`**
+  (`breaking-monitor.yml:603-611`); the gate re-check means a suppressed sweep
+  can never resolve an open failure whatever the field says.
+- Recovery needs **two consecutive judged-healthy runs**
+  (`HEALTHY_STREAK_REQUIRED = 2`, `alert_dedupe.py:93-95`; passed at
+  `breaking-monitor.yml:758-768`), because one quiet run is not proof an outage
+  is over (`alert_dedupe.py:55-63`).
+- **A run that never consulted the classifier is not evidence either way.** A
+  suppressed gate, a `--no-model` run or the deterministic fast path leaves an
+  open failure OPEN and says so (`breaking-monitor.yml:814-826`).
+
+### 42.6 State durability — `scripts/commit_state.sh`
+
+`commit_state.sh` replaces the `git pull --ff-only || git pull --rebase -X
+theirs` ending that took the REMOTE side of a conflict. On 2026-11-01 two
+breaking sweeps raced and the slower run's `state/model_health.json` increments
+were silently dropped; the same shape existed on the cooldown file and the alert
+ledger (`commit_state.sh:4-18`). The new rule: a race is **retried and
+re-applied from the index**, never resolved by deletion, and never with
+`reset --hard` (`:20-22`, `:122-168`). It exits 0 even after its retries are
+exhausted — losing telemetry must not fail the job — but warns by name (`:24-27`,
+`:170-171`).
+
+### 42.7 Two honest limits
+
+- **The free pool currently returns no model output.** All four free rungs
+  produced zero bytes in 150 s while the CLI's stderr carried its "subscribe to
+  OpenCode Go" notice, so the **keyed rung carries the ladder**
+  (`breaking_monitor.py:379-384`, `:1976-2001`;
+  `breaking-monitor.yml:208-210`). The free rungs stay configured as the
+  fallback for when the plan allows them — do not read their presence as
+  evidence they can answer.
+- **`first_byte_sec` and `first_liveness_sec` are distinct measurements.**
+  `first_byte_sec` is the first **stdout** byte (`first_byte_source: "stdout"`);
+  `first_liveness_sec` is the first **stderr** CLI log line proving the call went
+  out (`first_liveness_source: "stderr"`) (`breaking_monitor.py:2312-2322`,
+  `:342-356`). Conflating them is what made five healthy rungs look like
+  `harness_no_stream` in the 2026-11-02 probe (`:342-350`).
+
 ---
 
-Newest section: §41 (2026-10-10, the at-least-once delivery contract, the
+Newest section: §42 (2026-11-03, the digest story floor, weather AQI, the
+breaking ladder and probe, honesty-gate recovery and `commit_state.sh`),
+followed by §41 (2026-10-10, the at-least-once delivery contract, the
 single-cron dispatcher, and the health check that hid a half-applied deploy),
-followed by §40 (2026-10-10, the delivery-ledger mirror and the two open
+and §40 (2026-10-10, the delivery-ledger mirror and the two open
 redesigns), §39 (2026-10-03, worker liveness — **its Check-16 sentence and its
 cron arithmetic are corrected/superseded by §41**) and §38 (2026-10-03,
 digest archive origin access control). §§38-40 are the security control, the
 worker liveness contract and the open redesigns; §§31-37 are the
 personal-relevance, weather-engine, guardrail, operations and risk record;
-§§23-30 are the phase-1 reliability rebuild. Read §§23-40 first for current
+§§23-30 are the phase-1 reliability rebuild. Read §§23-42 first for current
 reality, and read **§38 before making any claim about the digest archive's
 privacy**.
 
