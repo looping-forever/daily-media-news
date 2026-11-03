@@ -3584,12 +3584,17 @@ def test_82_a_non_probe_run_cannot_commit_the_probe_file():
         text = fh.read()
     step = text.split("- name: Commit breaking state", 1)[1]
     step = step.split("- name:", 1)[0]
-    marker = "FILES+=(state/ladder_probe.json)"
-    assert marker in step, "the probe result is no longer committed at all"
-    head = step[:step.index(marker)]
-    assert 'if [ "$LADDER_PROBE" = "true" ]' in head, (
-        "the append is unconditional, so any run present in the step commits "
-        "whatever copy its checkout happens to hold:\n%s" % head)
+    # THE SHAPE CHANGED ON 2026-11-03 and this pin follows it: the probe used to
+    # APPEND its file to a shared list and now REPLACES the list with it, which
+    # is the stronger rule (a probe commits only its own result). What must not
+    # change is that the probe file is still committed -- and only by a probe.
+    assert "FILES=(state/ladder_probe.json)" in step, (
+        "the probe result is no longer committed at all, or a probe still "
+        "stages the whole state list:\n%s" % step)
+    assert 'if [ "$LADDER_PROBE" = "true" ]' in step, (
+        "the FILES list is not gated on the probe flag, so any run present in "
+        "the step commits whatever copy its checkout happens to hold:\n%s"
+        % step)
     assert "LADDER_PROBE:" in step, (
         "the step never learns whether it is a probe run")
 
@@ -3630,7 +3635,264 @@ def test_82_a_non_probe_run_cannot_commit_the_probe_file():
                          text=True).stdout.strip().splitlines()
     assert len(log) == 1, (
         "a non-probe run committed the probe file: %r (%s)"
-        % (log, proc.stdout + proc.stderr))
+                         % (log, proc.stdout + proc.stderr))
+
+
+def _bash_for_commit_state():
+    """The bash this machine actually has. A skip would render the test green."""
+    bash = shutil.which("bash")
+    if not bash and os.path.isfile(r"C:\Program Files\Git\bin\bash.exe"):
+        bash = r"C:\Program Files\Git\bin\bash.exe"
+    assert bash, "bash is required for this test; a skip would render green"
+    return bash
+
+
+def _put(path, body):
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(body)
+
+
+def _dirty_state_repo(paths):
+    """A real clone with a bare remote, every path committed then DIRTY.
+
+    The remote body is `remote-<name>` and the working copy is
+    `this-run-<name>`, so a staging bug shows up as the WRONG BODY on the branch
+    rather than as a missing file -- which is how the 2026-11-03 revert read
+    (`a7c7a48ce`: 0 additions, 9 deletions).
+    """
+    bash = _bash_for_commit_state()
+    tmp = fresh_dir()
+    remote = os.path.join(tmp, "remote.git")
+    work = os.path.join(tmp, "work")
+    os.makedirs(work)
+    subprocess.run(["git", "init", "-q", "--bare", remote], check=True,
+                   capture_output=True)
+    git = ["git", "-C", work]
+    for argv in (["init", "-q"],
+                 ["config", "user.email", "t@example.com"],
+                 ["config", "user.name", "t"],
+                 ["symbolic-ref", "HEAD", "refs/heads/master"],
+                 ["remote", "add", "origin", remote]):
+        subprocess.run(git + argv, check=True, capture_output=True)
+    os.makedirs(os.path.join(work, "state"), exist_ok=True)
+    for rel in paths:
+        _put(os.path.join(work, rel), "remote-%s\n" % os.path.basename(rel))
+    subprocess.run(git + ["add", "--"] + list(paths), check=True,
+                   capture_output=True)
+    subprocess.run(git + ["commit", "-qm", "seed"], check=True,
+                   capture_output=True)
+    subprocess.run(git + ["push", "-q", "-u", "origin", "HEAD"], check=True,
+                   capture_output=True)
+    for rel in paths:
+        _put(os.path.join(work, rel), "this-run-%s\n" % os.path.basename(rel))
+    return bash, remote, work
+
+
+def _remote_body(remote, rel):
+    return subprocess.run(["git", "--git-dir", remote, "show",
+                           "master:%s" % rel],
+                          capture_output=True, text=True).stdout
+
+
+def _remote_touched(remote):
+    out = subprocess.run(["git", "--git-dir", remote, "show", "--name-only",
+                          "--format=", "master"],
+                         capture_output=True, text=True).stdout
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def _run_commit(work, bash, *args, **env_over):
+    env = dict(os.environ, GITHUB_TOKEN="", GITHUB_REF_NAME="master")
+    env.pop("LADDER_PROBE", None)
+    env.update(env_over)
+    return subprocess.run(
+        [bash, os.path.join(REPO_ROOT, "scripts", "commit_state.sh")] + list(args),
+        cwd=work, env=env, capture_output=True, text=True)
+
+
+def test_83_a_probe_run_commits_only_its_own_result():
+    """A PROBE RE-APPLIED ITS WHOLE FILE LIST OVER THE FRESH TIP.
+
+    On 2026-11-03 the probe's commit step put its own checkout copies of every
+    state file on top of the freshly-fetched branch: commit `a7c7a48ce` (0
+    additions, 9 deletions) deleted a concurrent run's gemini success block from
+    `state/model_health.json`, and `state/alert_ledger.json` went back to
+    `healthy_streak: 0` with a stale `last_seen`. A probe decides nothing, so it
+    may commit ONE path: its own result. Asserted against a real bare remote,
+    because the damage was done to the BRANCH, not to a working tree.
+    """
+    probe = "state/ladder_probe.json"
+    health = "state/model_health.json"
+    ledger = "state/alert_ledger.json"
+    stories = "state/active_stories.json"
+    bash, remote, work = _dirty_state_repo((probe, health, ledger, stories))
+    proc = _run_commit(work, bash, "chore: ladder probe [skip ci]",
+                       health, ledger, probe, stories, LADDER_PROBE="true")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert _remote_touched(remote) == [probe], (
+        "a probe run committed more than its own result: %r -- re-applying "
+        "those files over the fresh tip is what reverted a concurrent run's "
+        "state" % (_remote_touched(remote),))
+    assert _remote_body(remote, probe) == "this-run-ladder_probe.json\n", (
+        "the probe's own result is the one thing it MUST commit")
+    for rel in (health, ledger, stories):
+        assert _remote_body(remote, rel) == "remote-%s\n" % os.path.basename(rel), (
+            "the probe's commit step published its own copy of %r" % rel)
+        with open(os.path.join(work, rel), encoding="utf-8") as fh:
+            assert fh.read() == "this-run-%s\n" % os.path.basename(rel), (
+                "a refusal must drop the PATH, never discard the file: %r" % rel)
+
+
+def test_84_the_refused_paths_are_named_in_the_output():
+    """REFUSING SILENTLY IS THE SAME AS LOSING IT QUIETLY.
+
+    A path dropped from a probe's commit has to say so: otherwise the next
+    reader sees a run whose state was never published and no reason for it.
+    """
+    probe = "state/ladder_probe.json"
+    health = "state/model_health.json"
+    ledger = "state/alert_ledger.json"
+    bash, remote, work = _dirty_state_repo((probe, health, ledger))
+    before = subprocess.run(["git", "--git-dir", remote, "rev-parse", "master"],
+                            capture_output=True, text=True).stdout.strip()
+    assert before, "the seed commit never reached the bare remote"
+    proc = _run_commit(work, bash, "chore: ladder probe [skip ci]",
+                       health, ledger, LADDER_PROBE="true")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    # STDOUT only: git writes its own CRLF warnings to stderr, and a warning
+    # containing the path is not a refusal naming the path.
+    text = proc.stdout
+    for rel in (health, ledger):
+        lines = [ln for ln in text.splitlines() if rel in ln]
+        assert lines, ("the refused path %r is never named, so a reader cannot "
+                       "tell why it was not published:\n%s" % (rel, text))
+        assert "probe" in lines[0].lower(), (
+            "the refusal must state WHY, not just the path: %r" % lines[0])
+    assert "state/ladder_probe.json" in text and "only" in text.lower(), (
+        "the output must say a probe may commit only its own result:\n%s" % text)
+    after = subprocess.run(["git", "--git-dir", remote, "rev-parse", "master"],
+                           capture_output=True, text=True).stdout.strip()
+    assert after == before, "a probe run with no result file still wrote a commit"
+
+
+def test_85_a_non_probe_run_still_commits_its_own_state():
+    """THE PROBE'S RULE MUST NOT LEAK INTO THE SWEEP.
+
+    Every scheduled run commits its own health/story state; only a probe is
+    restricted. A guard that froze the real monitor's state would trade one
+    silent defect for a worse one.
+    """
+    probe = "state/ladder_probe.json"
+    health = "state/model_health.json"
+    stories = "state/active_stories.json"
+    bash, remote, work = _dirty_state_repo((probe, health, stories))
+    proc = _run_commit(work, bash, "chore: update breaking monitor state [skip ci]",
+                       health, stories, probe)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    touched = _remote_touched(remote)
+    assert set(touched) == {health, stories}, (
+        "a non-probe run must still publish its own state and only that: %r"
+        % (touched,))
+    assert _remote_body(remote, health) == "this-run-model_health.json\n", (
+        "the sweep's own health rows are exactly what a run exists to publish")
+    assert _remote_body(remote, probe) == "remote-ladder_probe.json\n", (
+        "a run that did not probe still committed the probe file")
+
+
+def test_86_the_probe_candidate_is_realistic_and_non_empty():
+    """AN EMPTY PAYLOAD IS NOT A TEST OF THE CLASSIFIER.
+
+    The probe's whole claim is "the rungs can judge"; that needs a candidate a
+    real sweep could plausibly deliver -- a headline, a snippet naming two
+    newsrooms, a source and a URL -- and it must stay clearly NON-alerting, so a
+    level-3 answer is the model over-escalating rather than a news event. No
+    death toll and no digits: a count would trip the deterministic fast path,
+    which is a different mechanism from the classifier under test.
+    """
+    cand = bm.LADDER_PROBE_CANDIDATE
+    for key in ("title", "url", "source", "snippet", "domain_category"):
+        assert isinstance(cand.get(key), str) and cand[key].strip(), key
+    assert len(cand["title"]) >= 30, cand["title"]
+    assert len(cand["snippet"]) >= 60, cand["snippet"]
+    assert re.match(r"^https://[a-z0-9.-]+\.example/", cand["url"]), cand["url"]
+    text = "%s %s" % (cand["title"], cand["snippet"])
+    assert not re.search(r"\d", text), (
+        "a number in the probe's input could trip the death-count fast path: %r"
+        % text)
+    assert not re.search(r"(?i)\b(dead|deaths|killed|casualt|injured|earthquake)\b",
+                         text), text
+    outlets = re.findall(r"\b(?:Herald|Post|Times|Gazette|Journal|Chronicle)\b",
+                         cand["snippet"])
+    assert len(outlets) >= 2, (
+        "a single anonymous outlet is not corroboration, and the real feed is "
+        "full of multi-outlet stories: %r" % cand["snippet"])
+    payload = bm._ladder_probe_pending()
+    assert len(payload["candidates"]) == 1, payload
+    sent = payload["candidates"][0]
+    for key in ("title", "url", "source", "snippet", "domain_category"):
+        assert sent[key] == cand[key], (key, sent)
+    assert sent.get("published"), sent
+
+
+def _minimal_verdict():
+    return json.dumps({"level": 1, "confidence": "LOW", "event_key": "",
+                       "title": "", "summary": "", "why_urgent": "",
+                       "escalated_from_previous": False, "sources": [],
+                       "category_suggestion": "nepal"})
+
+
+def test_87_an_empty_judgment_is_recorded_as_judged_content_false():
+    """A SCHEMA-VALID EMPTY OBJECT IS NOT PROOF THE MODEL CAN JUDGE.
+
+    Measured 2026-11-03: the probe's verdict was
+    `{"level":1,...,"title":"","summary":""}` -- valid, and indistinguishable
+    from a model that returned the prompt's "nothing qualifies" template without
+    reading anything. The file must say which it got.
+    """
+    sd = fresh_dir()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = bm.run_ladder_probe(sd, runner=lambda m, p, e, t: (0, _minimal_verdict(), ""),
+                                   models=["p/empty"], config_dir=fresh_dir())
+    assert code == 0
+    doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+    assert doc["verdict"] == "parseable", doc
+    assert doc["judged_content"] is False, (
+        "an empty judgment was recorded as content: %r" % (doc,))
+    assert doc["control_judged_content"] is False, doc
+    rule = doc["judged_rule"]
+    assert "title" in rule and "summary" in rule, (
+        "the file must state how judged_content is derived: %r" % (rule,))
+    text = out.getvalue()
+    assert "judged_content=no" in text, text
+    assert "judged nothing" in text.lower(), (
+        "an empty judgment must be reported as judging nothing, never as a "
+        "successful judgment: %s" % text)
+
+
+def test_88_a_real_verdict_is_recorded_as_judged_content_true():
+    """THE FIELD MUST BE ABLE TO SAY YES, or it only ever measures emptiness."""
+    real = json.dumps({"level": 2, "confidence": "MEDIUM",
+                       "event_key": "water-supply-cut",
+                       "title": "City water utility announces a two-day supply cut",
+                       "summary": "Reported: the utility will interrupt supply to "
+                                  "four wards while a trunk main is repaired.",
+                       "why_urgent": "Households in four wards should store water.",
+                       "escalated_from_previous": False,
+                       "sources": [{"name": "The Valley Herald",
+                                    "url": "https://valleyherald.example/a"}],
+                       "category_suggestion": "local_city"})
+    sd = fresh_dir()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = bm.run_ladder_probe(sd, runner=lambda m, p, e, t: (0, real, ""),
+                                   models=["p/real"], config_dir=fresh_dir())
+    assert code == 0
+    doc = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+    assert doc["judged_content"] is True, (
+        "a verdict that names an event and summarises it was recorded as "
+        "judging nothing: %r" % (doc,))
+    assert "judged_content=yes" in out.getvalue(), out.getvalue()
 
 
 def main():
@@ -3717,6 +3979,12 @@ def main():
         test_80_a_quota_notice_is_its_own_class_not_a_timeout_or_garbage,
         test_81_a_quota_notice_before_liveness_is_recorded_and_stops_the_provider,
         test_82_a_non_probe_run_cannot_commit_the_probe_file,
+        test_83_a_probe_run_commits_only_its_own_result,
+        test_84_the_refused_paths_are_named_in_the_output,
+        test_85_a_non_probe_run_still_commits_its_own_state,
+        test_86_the_probe_candidate_is_realistic_and_non_empty,
+        test_87_an_empty_judgment_is_recorded_as_judged_content_false,
+        test_88_a_real_verdict_is_recorded_as_judged_content_true,
     ]
     failures = []
     for test in tests:

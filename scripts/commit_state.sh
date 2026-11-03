@@ -59,6 +59,31 @@ if [ "${LADDER_PROBE:-false}" != "true" ]; then
   fi
 fi
 
+# AND THE OTHER HALF OF THE SAME RULE: a PROBE may commit its own result and
+# nothing else. On 2026-11-03 the probe's commit step re-applied its whole state
+# list over the freshly-fetched tip: commit a7c7a48ce (0 additions, 9 deletions)
+# deleted a concurrent run's gemini success block from state/model_health.json,
+# and state/alert_ledger.json went back to healthy_streak: 0 with a stale
+# last_seen. A probe decides nothing, sends nothing and writes nothing outside
+# state/ladder_probe/, so re-publishing any other file from its checkout can
+# only overwrite someone else's fresher copy. Refused BY NAME, because a path
+# dropped in silence is indistinguishable from a path that was never written.
+if [ "${LADDER_PROBE:-false}" = "true" ]; then
+  kept=()
+  for f in "${files[@]}"; do
+    if [ "$f" = "state/ladder_probe.json" ]; then
+      kept+=("$f")
+    else
+      echo "commit_state: refusing $f -- a probe run may commit only state/ladder_probe.json"
+    fi
+  done
+  files=("${kept[@]+"${kept[@]}"}")
+  if [ "${#files[@]}" -eq 0 ]; then
+    echo "commit_state: a probe run may commit only state/ladder_probe.json; nothing to commit"
+    exit 0
+  fi
+fi
+
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 

@@ -327,29 +327,34 @@ jobs:
           # slow models" was false in CI -- every run retried the same slow
           # model first. It only changes on a run that actually attempted a
           # model, so this cannot churn on a quiet hour.
-          FILES=(
-            state/active_stories.json
-            state/breaking_state.json
-            state/breaking_delivery.json
-            state/model_health.json
-          )
-          # The probe's result, when this run was one. It is COMMITTED on
-          # purpose: it is the durable answer to "do the rungs still answer?".
-          #
-          # AND ONLY WHEN THIS RUN WAS ONE (2026-11-02). The append used to be
-          # `[ -f state/ladder_probe.json ]` alone, so a concurrent run whose
-          # checkout still carried the committed file rewrote the probe's
-          # result 36s later with stale content -- the probe's own evidence,
-          # clobbered by a run that never probed. The flag is the guard, and
-          # scripts/commit_state.sh enforces the same rule for any caller.
+          # A PROBE COMMITS ITS OWN RESULT AND NOTHING ELSE (2026-11-03). This
+          # step re-applies its whole list over the freshly-fetched tip, so on a
+          # probe run it put the probe's checkout copies of the files below on
+          # top of concurrent writes: commit a7c7a48ce (0 additions, 9
+          # deletions) deleted another run's gemini success block from
+          # state/model_health.json. A probe decides nothing and writes nothing
+          # outside state/ladder_probe/, so its FILES list is that one path --
+          # and scripts/commit_state.sh refuses every other path by name, so a
+          # future caller cannot re-open this.
           if [ "$LADDER_PROBE" = "true" ]; then
-            if [ -f state/ladder_probe.json ]; then
-              FILES+=(state/ladder_probe.json)
+            # NEVER commit a DELETION here: a probe that could not write a
+            # result must leave the last good one on the branch, and the file is
+            # still tracked, so staging the path unconditionally would delete it.
+            if [ ! -f state/ladder_probe.json ]; then
+              echo "probe run: no state/ladder_probe.json was written; nothing to commit"
+              exit 0
             fi
+            FILES=(state/ladder_probe.json)
           else
-            # Belt and braces: the file must not even be present in a workspace
-            # that cannot commit it, so a later `git add` in this job cannot
-            # pick up a stale copy.
+            FILES=(
+              state/active_stories.json
+              state/breaking_state.json
+              state/breaking_delivery.json
+              state/model_health.json
+            )
+            # The probe file belongs to the run that probed. A sweep whose
+            # checkout still carries it must not even have it on disk, so no
+            # later `git add` in this job can pick up a stale copy.
             rm -f state/ladder_probe.json
           fi
           bash scripts/commit_state.sh \
@@ -371,8 +376,14 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A probe run owns state/ladder_probe.json only (2026-11-03).
+          LADDER_PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.ladder_probe || false }}
         run: |
           set -eo pipefail
+          if [ "$LADDER_PROBE" = "true" ]; then
+            echo "probe run: state/model_cooldown.json is not this run's to commit -- the probe's walk is isolated in state/ladder_probe/ and may publish only its own result"
+            exit 0
+          fi
           # THE ONLY TRACKED POOL-WALL FILE. state/model_health.json is tracked
           # too (it is committed with breaking state above), but it is a
           # per-model record rather than the shared pool wall, so it is owned by
@@ -465,6 +476,19 @@ jobs:
               lines.append("- Confirmed answer, no answer, or garbage? "
                            "`parseable` / `none` / `unparseable` are those three "
                            "and nothing else.")
+              # A SCHEMA-VALID EMPTY OBJECT IS NOT PROOF OF JUDGING. The prompt
+              # prescribes `title: ""` / `summary: ""` when nothing qualifies, so
+              # that shape is what a working model and a blind one both produce.
+              lines.append("- Judged content: %s -- %s"
+                           % (probe.get("judged_content"),
+                              probe.get("judged_rule")))
+              if probe.get("verdict") == "parseable" \
+                      and not probe.get("judged_content"):
+                  lines.append("- The answer judged NOTHING (empty title and "
+                               "summary): it proves the rung answered, not that "
+                               "it can judge, and must not be read as success.")
+              lines.append("- Control judged content: %s"
+                           % probe.get("control_judged_content"))
               # WHOSE FAULT IS THE SILENCE. `verdict: none` alone cannot tell a
               # stopped-up free tier from a runner that never shows model
               # output; the control rung and the liveness line are what separate
@@ -795,8 +819,15 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A probe run owns state/ladder_probe.json only (2026-11-03): it is
+          # what reset healthy_streak 1 -> 0 in a concurrent run's ledger.
+          LADDER_PROBE: ${{ github.event_name == 'workflow_dispatch' && inputs.ladder_probe || false }}
         run: |
           set -eo pipefail
+          if [ "$LADDER_PROBE" = "true" ]; then
+            echo "probe run: state/alert_ledger.json is not this run's to commit -- a probe sends nothing and may publish only its own result"
+            exit 0
+          fi
           if [ ! -f state/alert_ledger.json ]; then
             echo "no alert ledger was written this run"
             exit 0

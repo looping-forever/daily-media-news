@@ -2224,19 +2224,23 @@ def ai_classify(pending_path, runner=None, models=None,
 LADDER_PROBE_FILENAME = "ladder_probe.json"
 LADDER_PROBE_DIRNAME = "ladder_probe"
 
-# ONE fixed candidate, built in code, chosen so the CORRECT answer is the
-# minimal level-1 object: a calm local story covered by two outlets. No death
-# toll (that would trip the deterministic fast path, which is a different
-# mechanism), no duplicate marker, nothing alert-worthy -- so a level above 1
-# here is a MODEL fault, not a news event. The `.example` TLD is reserved and
-# non-routable: no real outlet is named, and nothing in the probe can be
-# mistaken for a real source.
+# ONE fixed candidate, built in code, chosen so that a correct answer has to
+# NAME the event: a two-day water-supply interruption announced by a utility and
+# covered by two newsrooms. It is clearly NON-alerting (level 2 at most -- the
+# next digest is enough, no interruption is earned) and carries NO death toll and
+# no digits at all, because a count would trip the deterministic fast path, which
+# is a different mechanism from the classifier under test. A level-3 answer here
+# is the model over-escalating; the probe can never send regardless. The
+# `.example` TLD is reserved and non-routable: no real outlet is named, and
+# nothing in the probe can be mistaken for a real source.
 LADDER_PROBE_CANDIDATE = {
-    "title": "Example City library extends weekend opening hours for exam season",
-    "url": "https://example-news.example/example-city-library-weekend-hours",
-    "source": "Example News",
-    "snippet": "Example News and Example Herald both report the same schedule "
-               "change at the central library; no other details were given.",
+    "title": "Capital water utility announces a two-day supply cut across "
+             "four wards",
+    "url": "https://capitaldesk.example/water-supply-cut-four-wards",
+    "source": "The Valley Herald",
+    "snippet": "The Valley Herald and the Capital Post both report the same "
+               "utility notice: supply stops for maintenance on a trunk main, "
+               "and affected wards are told to store water in advance.",
     "domain_category": "local_city",
 }
 
@@ -2404,6 +2408,23 @@ def _probe_attribution(control, free_rows):
     return "inconclusive"
 
 
+def _verdict_judged(verdict):
+    """True ONLY when the verdict named the event it judged.
+
+    THE RULE, deliberately strict: both `title` AND `summary` must be non-empty
+    after stripping. The prompt prescribes the minimal level-1 object for
+    "nothing qualifies", and that object has `"title": ""` / `"summary": ""` --
+    schema-valid and contentless. From outside it is indistinguishable from a
+    model that never read the candidate file, so the probe records which one it
+    got instead of calling the empty object a successful judgment (measured
+    2026-11-03: the probe's answer was exactly that empty object).
+    """
+    if not isinstance(verdict, dict):
+        return False
+    return all(isinstance(verdict.get(k), str) and verdict[k].strip()
+               for k in ("title", "summary"))
+
+
 def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
                      window_min=90, config_dir="config"):
     """Walk the ladder ONCE on the fixed candidate and write the result.
@@ -2473,6 +2494,7 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
     control_state = "unconfigured"
     control_attempts = []
     control_seconds = None
+    control_verdict = None
     if control_model:
         control_dir = os.path.join(probe_dir, "control")
         os.makedirs(control_dir, exist_ok=True)
@@ -2509,6 +2531,12 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
 
     attribution = _probe_attribution(control_state, free_attempts)
     attempts = free_attempts + control_attempts
+    # DID THE ANSWER JUDGE ANYTHING? A schema-valid minimal object is not
+    # evidence of classification -- the same fields the prompt prescribes for
+    # "nothing qualifies" are the fields a blind answer leaves empty. Recorded
+    # per verdict (free and control) so nobody reads "parseable" as "can judge".
+    judged = _verdict_judged(verdict)
+    control_judged = _verdict_judged(control_verdict)
 
     doc = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "head_sha": head_sha or "",
@@ -2524,6 +2552,11 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
            "pool": list(AI_LADDER),
            "attempts": attempts,
            "verdict": state,
+           "judged_content": judged,
+           "judged_rule": ("judged_content is true only when the verdict's "
+                           "title AND summary are both non-empty; the minimal "
+                           "level-1 object judges nothing"),
+           "control_judged_content": control_judged,
            "control": control_state,
            "control_model": control_model or "",
            "control_env": control_env,
@@ -2550,6 +2583,14 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
     print("ladder_probe: verdict=%s in %.2fs over %d attempt(s)%s"
           % (state, ladder_seconds, len(attempts),
              "" if not err else " -- %s" % collect_news.clean_ws(err)[:300]))
+    print("ladder_probe: judged_content=%s (%s)"
+          % ("yes" if judged else "no",
+             "title and summary present" if judged
+             else "the verdict judged nothing"))
+    if state == "parseable" and not judged:
+        print("ladder_probe: the verdict is schema-valid but judged NOTHING "
+              "(empty title and summary) -- it proves the rung ANSWERED, not "
+              "that it can judge; this run is not evidence about judging.")
     print("ladder_probe: control=%s attribution=%s%s"
           % (control_state, attribution,
              "" if not control_model
