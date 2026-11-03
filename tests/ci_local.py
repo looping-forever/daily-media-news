@@ -91,8 +91,10 @@ SUITES = (
     # Registered WITH the English gate it pins, for the reason the 2026-10-08
     # note gives: a suite nothing runs proves nothing. One headline reaches the
     # ntfy, Telegram, email and preview surfaces, and a non-English one renders
-    # as nothing on all four. STILL MISSING FROM drift-canary.yml -- the mirror
-    # is owed to whoever owns the workflow.
+    # as nothing on all four. Mirrored in drift-canary.yml in this position: it
+    # sat in this list and not in the workflow until 2026-11-03, so the only
+    # proof the gate existed ran locally only -- the drift the docstring above
+    # warns about, in its third instance.
     ("breaking_english_gate", [sys.executable, "-m", "unittest",
                                "tests.breaking.test_english_push_gate", "-v"]),
     # Registered 2026-10-13 with dynamic model selection. The ladder is no

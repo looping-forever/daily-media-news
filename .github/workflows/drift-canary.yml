@@ -865,6 +865,16 @@ jobs:
           # file is that the fast path must be re-proved on every run rather than
           # trusted once.
           run_suite "breaking_fast_path" python3 tests/breaking/test_hard_evidence_fast_path.py
+          # The English gate, executed. One headline reaches FOUR surfaces -- the
+          # ntfy push, the Telegram push, the email and the preview -- and a
+          # non-English one renders as nothing on all four. The suite pins the
+          # refusal at each one, including the fast path, so a headline whose
+          # Latin half states a toll cannot take it. This was the single entry
+          # present in tests/ci_local.py and absent here, which meant the only
+          # proof that the gate exists ran locally only -- the exact drift both
+          # files warn about. Registered here and in ci_local.py in the same
+          # position so the two lists stay one list.
+          run_suite "breaking_english_gate" python3 -m unittest tests.breaking.test_english_push_gate -v
           # Dynamic model selection: live discovery, health memory with decay,
           # the never-veto invariant, and the stage time budget. Registered in
           # the same change as the suite and for the same reason — the ladder
