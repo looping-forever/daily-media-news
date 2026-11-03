@@ -3,33 +3,33 @@
   "models": {
     "opencode/deepseek-v4.1-flash-free": {
       "success": 0,
-      "timeout": 7,
+      "timeout": 8,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 7,
+      "consecutive_failures": 8,
       "last_failure": "timeout",
-      "last_fail_at": 1793677791.8753943,
-      "cooldown_until": 1793764191.8753943
+      "last_fail_at": 1793678567.896132,
+      "cooldown_until": 1793764967.896132
     },
     "opencode/beam-free": {
       "success": 0,
-      "timeout": 7,
+      "timeout": 8,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 7,
+      "consecutive_failures": 8,
       "last_failure": "timeout",
-      "last_fail_at": 1793677941.976401,
-      "cooldown_until": 1793764341.976401
+      "last_fail_at": 1793678717.9704845,
+      "cooldown_until": 1793765117.9704845
     },
     "opencode/mimo-v2.6-flash-free": {
       "success": 0,
-      "timeout": 7,
+      "timeout": 8,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 7,
+      "consecutive_failures": 8,
       "last_failure": "timeout",
-      "last_fail_at": 1793678092.0543764,
-      "cooldown_until": 1793764492.0543764
+      "last_fail_at": 1793678868.0461648,
+      "cooldown_until": 1793765268.0461648
     },
     "opencode/nemotron-3.5-lightning-free": {
       "success": 0,
@@ -38,8 +38,8 @@
       "garbage": 0,
       "consecutive_failures": 7,
       "last_failure": "timeout",
-      "last_fail_at": 1793678242.1472769,
-      "cooldown_until": 1793764642.1472769
+      "last_fail_at": 1793677617.911731,
+      "cooldown_until": 1793764017.911731
     },
     "opencode/glm-5.3-flash-free": {
       "success": 0,
@@ -113,13 +113,13 @@
     },
     "opencode/big-pickle": {
       "success": 0,
-      "timeout": 6,
+      "timeout": 7,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 6,
+      "consecutive_failures": 7,
       "last_failure": "timeout",
-      "last_fail_at": 1793655838.582745,
-      "cooldown_until": 1793742238.582745
+      "last_fail_at": 1793678417.7997603,
+      "cooldown_until": 1793764817.7997603
     }
   }
 }
