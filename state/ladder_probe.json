@@ -1,6 +1,6 @@
 {
-  "run_at": "2026-11-03T08:00:34+00:00",
-  "head_sha": "3f6275607f28125ed2bdcae6c1b3aefa233ed192",
+  "run_at": "2026-11-03T08:30:43+00:00",
+  "head_sha": "ccd5ae576b16556fb70f9362614e3f2d71362caf",
   "trigger": "ladder_probe",
   "per_attempt_sec": 150,
   "first_output_sec": 40,
@@ -17,35 +17,38 @@
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 7.92,
-      "first_byte_sec": 7.78,
+      "wall_sec": 23.0,
+      "first_byte_sec": 22.87,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 2.04,
+      "first_liveness_sec": 1.38,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": false,
-      "tail_excerpt": "VInOOl6VJM timestamp=2026-11-03T08:00:27.208Z level=INFO run=2f4e96b1 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "tail_excerpt": "cn9LUA7Omw timestamp=2026-11-03T08:30:37.905Z level=INFO run=f01dbfe0 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     },
     {
       "model": "gemini/gemini-3.5-flash-lite",
       "attempt": 1,
       "granted_sec": 150,
-      "wall_sec": 7.17,
-      "first_byte_sec": 6.99,
+      "wall_sec": 5.36,
+      "first_byte_sec": 5.21,
       "first_byte_source": "stdout",
-      "first_liveness_sec": 2.02,
+      "first_liveness_sec": 1.29,
       "first_liveness_source": "stderr",
       "outcome": "verdict",
       "control": true,
-      "tail_excerpt": "ykKp6BQ2ww timestamp=2026-11-03T08:00:34.344Z level=INFO run=6002e839 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
+      "tail_excerpt": "koHTKW12I1 timestamp=2026-11-03T08:30:43.252Z level=INFO run=c80f8ac9 message=\"disposing instance\" directory=/home/runner/work/daily-media-news/daily-media-news"
     }
   ],
   "verdict": "parseable",
+  "judged_content": false,
+  "judged_rule": "judged_content is true only when the verdict's title AND summary are both non-empty; the minimal level-1 object judges nothing",
+  "control_judged_content": false,
   "control": "answered",
   "control_model": "gemini/gemini-3.5-flash-lite",
   "control_env": "GEMINI_API_KEY",
   "attribution": "free_tier_answered",
-  "ladder_seconds": 9.82,
-  "control_seconds": 7.18,
+  "ladder_seconds": 24.33,
+  "control_seconds": 5.36,
   "error": ""
 }
