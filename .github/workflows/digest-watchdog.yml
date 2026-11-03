@@ -337,6 +337,18 @@ jobs:
                         % (alert_dedupe.WINDOW_HOURS, _decision['suppressed']))
           alert_dedupe.save(_ledger, now=_now)
 
+          # A BROKEN DIGEST IS NOT CRITICAL. Inside 22:00-07:00 NPT the one shared
+          # decision holds it -- it is queued, not silenced -- and the 07:00 batch
+          # delivers it with everything else withheld overnight.
+          if _post:
+              _held = alert_dedupe.hold_if_quiet('digest_watchdog', title, body,
+                                                 _key, priority=priority,
+                                                 tags=['warning'], now=_now)
+              if _held:
+                  print('empty-digest notice NOT pushed: %s -- held for the '
+                        '07:00 batch. The ::error:: above still stands.' % _held)
+                  raise SystemExit(0)
+
           topic = (os.environ.get('NTFY_TOPIC') or '').strip()
           server = (os.environ.get('NTFY_SERVER') or '').strip()
           if not _post:
@@ -396,6 +408,16 @@ jobs:
           print('%s: %d run(s) affected over %s'
                 % (title, recovery['runs'],
                    alert_dedupe.human_duration(recovery['duration_seconds'])))
+          # An all-clear is good news, and good news must not wake anyone. Held
+          # on the SAME condition key as the failure, so a later failure in the
+          # same night replaces it rather than contradicting it.
+          _held = alert_dedupe.hold_if_quiet('digest_watchdog_recovery', title,
+                                             body, key, priority=3,
+                                             tags=['white_check_mark'], now=now)
+          if _held:
+              print('empty-digest recovery NOT pushed: %s -- held for the 07:00 '
+                    'batch' % _held)
+              raise SystemExit(0)
           topic = (os.environ.get('NTFY_TOPIC') or '').strip()
           server = (os.environ.get('NTFY_SERVER') or '').strip()
           if not (topic and server.startswith(('http://', 'https://'))):
@@ -566,6 +588,30 @@ jobs:
             exit 0
           fi
           echo "alert ledger pushed"
+
+      - name: Commit the held-overnight queue
+        # A notice HELD by quiet hours lives in state/quiet_queue.json, and a
+        # queue left on the runner is a dropped notice wearing a hold's clothes.
+        # Committed by scripts/commit_state.sh, which refuses every path not
+        # named on its command line.
+        #
+        # THE DELIVERY SITE IS NOT THIS WORKFLOW. The batch is sent by the start
+        # of scripts/breaking_monitor.py, once, at 07:05 NPT; this step only
+        # makes sure a held item survives until then. If that run never happens,
+        # the item stays committed and the next run delivers it late.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          if [ ! -f state/quiet_queue.json ]; then
+            echo "no held-overnight queue was written this run"
+            exit 0
+          fi
+          bash scripts/commit_state.sh \
+            "chore: update the held-overnight queue [skip ci]" \
+            state/quiet_queue.json
 
   watchdog:
     # GATED ON ITS OWN SCHEDULE, deliberately, because this job now shares a
@@ -1845,14 +1891,24 @@ jobs:
           BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
           echo "::error::$MSG"
           echo "::warning::academic monitor operator detail — check state/academic_state.json (schema_version / last_poll_time / hosts_down) and state/exam_selfcheck.json. The monitor exiting non-zero means a result may be UNSEEN, not that there is no result."
+          # A watchdog failure is NOT critical, so the one shared quiet-hours
+          # decision (scripts/may-notify.sh -> alert_dedupe.hold_if_quiet) holds
+          # it inside 22:00-07:00 NPT. The ::error:: above and the issue below
+          # are unaffected: held means "not at 3am", not "not at all".
           if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
-            curl -sS -m 15 \
-              -H "Title: A TU result could go out with nobody watching" \
-              -H "Priority: 5" \
-              -H "Tags: warning,rotating_light" \
-              -d "$BODY" \
-              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
-              || echo "::warning::academic watchdog ntfy ping failed"
+            if bash scripts/may-notify.sh digest_watchdog \
+                 "A TU result could go out with nobody watching" \
+                 "$BODY" digest_watchdog.academic_health 5; then
+              curl -sS -m 15 \
+                -H "Title: A TU result could go out with nobody watching" \
+                -H "Priority: 5" \
+                -H "Tags: warning,rotating_light" \
+                -d "$BODY" \
+                "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+                || echo "::warning::academic watchdog ntfy ping failed"
+            else
+              echo "::warning::academic watchdog ntfy HELD for the 07:00 batch (the ::error:: above still stands)"
+            fi
           else
             echo "::warning::NTFY secrets unset — skipping ntfy ping (issue still filed)"
           fi
@@ -2055,14 +2111,23 @@ jobs:
           BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
           echo "::error::$MSG"
           echo "::warning::breaking-monitor operator detail — check Cloudflare Workers -> breaking-monitor -> Cron Triggers (is the cron still listed/enabled?), then wrangler deployments list -c deploy/wrangler.toml to see which commit is actually deployed. The Worker keeps its own dead-man's switch, but it cannot report its own total death — this arm is that report."
+          # HELD, not suppressed: inside 22:00-07:00 NPT the shared decision
+          # queues this and the 07:00 batch delivers it. Detection being dead is
+          # urgent, but it is not "you may already be dead".
           if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
-            curl -sS -m 15 \
-              -H "Title: Breaking-news detection is not running" \
-              -H "Priority: 5" \
-              -H "Tags: warning,skull" \
-              -d "$BODY" \
-              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
-              || echo "::warning::worker watchdog ntfy ping failed"
+            if bash scripts/may-notify.sh digest_watchdog \
+                 "Breaking-news detection is not running" \
+                 "$BODY" digest_watchdog.worker_heartbeat 5; then
+              curl -sS -m 15 \
+                -H "Title: Breaking-news detection is not running" \
+                -H "Priority: 5" \
+                -H "Tags: warning,skull" \
+                -d "$BODY" \
+                "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+                || echo "::warning::worker watchdog ntfy ping failed"
+            else
+              echo "::warning::worker watchdog ntfy HELD for the 07:00 batch (the ::error:: above still stands)"
+            fi
           else
             echo "::warning::NTFY secrets unset — annotation only (the ::error:: above still stands)"
           fi
@@ -2393,14 +2458,20 @@ jobs:
           if [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
             # NTFY_TOPIC is a publish/subscribe capability: referenced by NAME,
             # never echoed. Only the server's answer is reported.
-            curl -sS -m 15 \
-              -H "Title: Breaking-news alert delivery is not confirmed" \
-              -H "Priority: 5" \
-              -H "Tags: warning,skull" \
-              -d "$BODY" \
-              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
-              && echo "breaking-chain ntfy sent" \
-              || echo "::warning::breaking-chain ntfy ping failed"
+            if bash scripts/may-notify.sh digest_watchdog \
+                 "Breaking-news alert delivery is not confirmed" \
+                 "$BODY" digest_watchdog.breaking_chain 5; then
+              curl -sS -m 15 \
+                -H "Title: Breaking-news alert delivery is not confirmed" \
+                -H "Priority: 5" \
+                -H "Tags: warning,skull" \
+                -d "$BODY" \
+                "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+                && echo "breaking-chain ntfy sent" \
+                || echo "::warning::breaking-chain ntfy ping failed"
+            else
+              echo "breaking-chain notice HELD for the 07:00 batch (the ::error:: above still stands)"
+            fi
           else
             echo "::warning::NTFY secrets unset — annotation only (the ::error:: above still stands)"
           fi
@@ -2464,13 +2535,19 @@ jobs:
           if [ "$GATE" != "true" ]; then
             echo "::warning::ntfy suppressed by the 6h window (this run is still red)"
           elif [ -n "$NTFY_TOPIC" ] && [ -n "$NTFY_SERVER" ]; then
-            curl -sS -m 15 \
-              -H "Title: Today's ${SLOT} digest never arrived" \
-              -H "Priority: 5" \
-              -H "Tags: warning,rotating_light" \
-              -d "$BODY" \
-              "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
-              || echo "::warning::watchdog ntfy ping failed"
+            if bash scripts/may-notify.sh digest_watchdog \
+                 "Today's ${SLOT} digest never arrived" \
+                 "$BODY" "digest.missing.${SLOT}.${TODAY}" 5; then
+              curl -sS -m 15 \
+                -H "Title: Today's ${SLOT} digest never arrived" \
+                -H "Priority: 5" \
+                -H "Tags: warning,rotating_light" \
+                -d "$BODY" \
+                "${NTFY_SERVER%/}/${NTFY_TOPIC}" \
+                || echo "::warning::watchdog ntfy ping failed"
+            else
+              echo "::warning::missed-digest ntfy HELD for the 07:00 batch (this run is still red and the issue is still filed)"
+            fi
           else
             echo "::warning::NTFY secrets unset — skipping ntfy ping (issue still filed)"
           fi
@@ -2532,6 +2609,18 @@ jobs:
                     % (title, recovery['runs'],
                        alert_dedupe.human_duration(
                            recovery['duration_seconds'])))
+              # Held on the SAME key the missing-slot alert used, so a recovery
+              # superseded by a later miss is never delivered as "recovered".
+              _held = alert_dedupe.hold_if_quiet(
+                  'digest_watchdog_recovery', title, body,
+                  alert_dedupe.condition_key('digest.missing',
+                                             recovery['slot'],
+                                             recovery['date']),
+                  priority=3, tags=['white_check_mark'], now=now)
+              if _held:
+                  print('missed-digest recovery NOT pushed: %s -- held for the '
+                        '07:00 batch' % _held)
+                  continue
               if not (topic and server.startswith(('http://', 'https://'))):
                   print('::warning::ntfy secrets unset — recovery annotation only')
                   continue
@@ -2959,11 +3048,11 @@ jobs:
 
       - name: Commit the alert ledger
         # This job used to be read-only, and it still is for everything except the
-        # alert ledger: the missed-slot arm records the condition here, so the 6h
-        # window has to survive the run like it does in the retry job. Staged BY
-        # PATH. A failure is a warning, not a red run -- the missed-slot arm
-        # already failed the job on purpose and this step must not add a second
-        # unrelated red.
+        # alert ledger and the held-overnight queue: the missed-slot arm records
+        # the condition here, and a notice held by quiet hours is written to
+        # state/quiet_queue.json, so both have to survive the run. Staged BY PATH.
+        # A failure is a warning, not a red run -- the missed-slot arm already
+        # failed the job on purpose and this step must not add a second red.
         if: always()
         continue-on-error: true
         env:
@@ -3039,3 +3128,27 @@ jobs:
             exit 0
           fi
           echo "alert ledger pushed"
+
+      - name: Commit the held-overnight queue
+        # A notice HELD by quiet hours lives in state/quiet_queue.json, and a
+        # queue left on the runner is a dropped notice wearing a hold's clothes.
+        # Committed by scripts/commit_state.sh, which refuses every path not
+        # named on its command line.
+        #
+        # THE DELIVERY SITE IS NOT THIS WORKFLOW. The batch is sent by the start
+        # of scripts/breaking_monitor.py, once, at 07:05 NPT; this step only
+        # makes sure a held item survives until then. If that run never happens,
+        # the item stays committed and the next run delivers it late.
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          if [ ! -f state/quiet_queue.json ]; then
+            echo "no held-overnight queue was written this run"
+            exit 0
+          fi
+          bash scripts/commit_state.sh \
+            "chore: update the held-overnight queue [skip ci]" \
+            state/quiet_queue.json

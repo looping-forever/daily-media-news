@@ -138,6 +138,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 try:
+    import alert_dedupe
     import collect_news
     import model_selector
     import payload_io
@@ -145,6 +146,7 @@ try:
     import validate_stories as vs
 except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import alert_dedupe
     import collect_news
     import model_selector
     import payload_io
@@ -3674,6 +3676,79 @@ def alert_subject(subject, fired_npt=None):
     return "%s — %s" % (subject, alert_fired_str(fired_npt))
 
 
+def is_critical_alert(verdict, level=None):
+    """May this alert wake the owner inside quiet hours?
+
+    TWO SHAPES ONLY, and the narrowness is the point: quiet hours exist so the
+    owner can trust a night-time buzz, which only works if almost nothing buzzes.
+
+      1. the hard-evidence fast path -- a headline stating a mass-casualty death
+         toll, which never needs the classifier's permission; or
+      2. a verified level 3 whose verdict carries a non-empty ``why_urgent`` --
+         the model said, in words, why this cannot wait until morning.
+
+    Everything else is HELD, not dropped (alert_dedupe's queue). In particular a
+    level 3 with an empty ``why_urgent`` is NOT critical: the ladder can return a
+    verified event without a single fact that argues for waking someone up.
+
+    tests/breaking/test_breaking_monitor.py pins this truth table, so widening or
+    narrowing the definition fails a test instead of silently changing what the
+    owner is woken for.
+    """
+    if level is None:
+        level = verdict.get("level")
+    try:
+        level = int(level)
+    except (TypeError, ValueError):
+        return False
+    if level != 3:
+        return False
+    if verdict.get("hard_evidence_fast_path") is True:
+        return True
+    return bool(str(verdict.get("why_urgent") or "").strip())
+
+
+def record_alert_state(verdict, state, paths, first_url, today_iso, confidence,
+                       detection_source, universal_override):
+    """Stage 8: mark the event as alerted, in memory and on disk.
+
+    Shared by a real send and a HELD alert on purpose: a held alert has been
+    ACCEPTED, so the morning run must dedupe against it instead of notifying the
+    owner a second time for an event they are about to receive.
+    """
+    reliability = "tier1" if any(is_tier1_domain(d) for d in
+                                 (collect_news.netloc_of(s.get("url", ""))
+                                  for s in verdict.get("sources") or [])) \
+        else "tier3"
+    story_for_state = {
+        "title": verdict["title"],
+        "category": verdict.get("category_suggestion") or "local_city",
+        "event_key": verdict.get("event_key") or None,
+        "url": first_url,
+        "sources": [s.get("url", "") for s in verdict.get("sources") or []],
+        "summary": verdict["summary"],
+        "latest_development": verdict["summary"],
+        "reliability": reliability,
+    }
+    event_id, event_label = story_state.upsert_sighting(state, story_for_state,
+                                                        today_iso)
+    # Override label for universal-importance items (must happen AFTER
+    # upsert_sighting so the state event gets the real label first, then
+    # we re-tag the in-memory label used for Telegram and the log row).
+    if universal_override:
+        event_label = "CRITICAL"
+    ev = next((e for e in state["stories"]
+               if e.get("event_id") == event_id), None)
+    if ev is not None:
+        ev["alerted"] = True
+        ev["alert_count"] = int(ev.get("alert_count") or 0) + 1
+        ev["last_alerted"] = story_state.kathmandu_now_iso()
+        ev["last_confidence"] = confidence
+        ev["detection_source"] = detection_source
+    story_state.save_state_atomic(paths["active"], state)
+    return event_id, event_label
+
+
 def process_alert(verdict, matched_candidates, state, paths, args,
                   smtp_factory=None, now_utc=None):
     """Stages 4→8. Returns (sent:bool, final_level:int, confidence:str,
@@ -3805,6 +3880,31 @@ def process_alert(verdict, matched_candidates, state, paths, args,
         return False, level, confidence, eid or "", \
             "; ".join(notes) or "below_alert_level"
 
+    # --- Quiet hours: HOLD a non-critical alert instead of waking the owner --
+    # Held, not dropped. The item waits in state/quiet_queue.json and rides the
+    # one morning batch (flush_quiet_queue). The story is still marked alerted
+    # below, so the 07:0x run dedupes against it rather than notifying twice for
+    # an event the owner is about to receive anyway.
+    if not args.dry_run and alert_dedupe.in_quiet_hours(now_utc) \
+            and not is_critical_alert(verdict, level):
+        event_id, _label = record_alert_state(
+            verdict, state, paths, first_url, today_iso, confidence,
+            detection_source, universal_override)
+        condition = "breaking.alert:%s" % (
+            verdict.get("event_key") or stable_alert_id(verdict))
+        queued = alert_dedupe.enqueue_quiet(
+            paths["quiet_queue"],
+            alert_dedupe.quiet_item(
+                verdict["title"], verdict["summary"], condition,
+                kind="breaking", priority=3, tags=["warning"], now=now_utc))
+        notice = alert_dedupe.held_notice(len(queued["items"]), now_utc)
+        if queued.get("dropped"):
+            notice += "; queue cap %d: dropped the %d oldest" % (
+                alert_dedupe.QUIET_QUEUE_CAP, queued["dropped"])
+        print("breaking_monitor: HELD for quiet hours -- %s (%s)"
+              % (verdict["title"], notice))
+        return False, level, confidence, event_id, notice
+
     # --- Stage 7: render + send --------------------------------------------
     # Determine event_label early for CRITICAL detection (the final label
     # comes from story_state.upsert_sighting in Stage 8, but we need the
@@ -3905,36 +4005,9 @@ def process_alert(verdict, matched_candidates, state, paths, args,
             write_json_atomic(paths["breaking_state"], bstate)
 
     # --- Stage 8: state updates (only after successful send/dry-run) --------
-    reliability = "tier1" if any(is_tier1_domain(d) for d in
-                                 (collect_news.netloc_of(s.get("url", ""))
-                                  for s in verdict.get("sources") or [])) \
-        else "tier3"
-    story_for_state = {
-        "title": verdict["title"],
-        "category": verdict.get("category_suggestion") or "local_city",
-        "event_key": verdict.get("event_key") or None,
-        "url": first_url,
-        "sources": [s.get("url", "") for s in verdict.get("sources") or []],
-        "summary": verdict["summary"],
-        "latest_development": verdict["summary"],
-        "reliability": reliability,
-    }
-    event_id, event_label = story_state.upsert_sighting(state, story_for_state,
-                                                        today_iso)
-    # Override label for universal-importance items (must happen AFTER
-    # upsert_sighting so the state event gets the real label first, then
-    # we re-tag the in-memory label used for Telegram and the log row).
-    if universal_override:
-        event_label = "CRITICAL"
-    ev = next((e for e in state["stories"]
-               if e.get("event_id") == event_id), None)
-    if ev is not None:
-        ev["alerted"] = True
-        ev["alert_count"] = int(ev.get("alert_count") or 0) + 1
-        ev["last_alerted"] = story_state.kathmandu_now_iso()
-        ev["last_confidence"] = confidence
-        ev["detection_source"] = detection_source
-    story_state.save_state_atomic(paths["active"], state)
+    event_id, event_label = record_alert_state(
+        verdict, state, paths, first_url, today_iso, confidence,
+        detection_source, universal_override)
 
     # --- Stage 7b: Telegram fan-out (FALLBACK, best-effort) ----------------
     # Runs only when the primary channel did NOT deliver, after the successful
@@ -3967,10 +4040,67 @@ def process_alert(verdict, matched_candidates, state, paths, args,
 
 
 # ---------------------------------------------------------------------------
+# Quiet hours: the morning delivery of everything held overnight
+# ---------------------------------------------------------------------------
+
+
+def flush_quiet_queue(paths, now_utc=None, http_fn=None,
+                      caller=alert_dedupe.QUIET_FLUSH_OWNER):
+    """Deliver the held-overnight batch, once quiet hours are over.
+
+    THE ONE DELIVERY SITE, and it says so out loud. Any other caller is refused:
+    two workflows that both drained the queue would send the owner the same held
+    items twice, and each would clear the other's work. If THIS run never happens
+    -- workflow disabled, schedule removed, job skipped -- nothing is lost: the
+    items stay in the committed state/quiet_queue.json and the next run that does
+    happen delivers them late instead of never.
+
+    Runs BEFORE the gate, so the batch leaves even on a run that then finds
+    nothing. The queue is cleared only for the items a 2xx actually carried: a
+    failed push leaves them held for the next run, because turning a delivery
+    failure into a silent deletion is the one outcome this queue must never
+    produce.
+    """
+    if caller != alert_dedupe.QUIET_FLUSH_OWNER:
+        return ("quiet_flush_refused: %r is not the delivery owner (%r); the "
+                "held items stay queued"
+                % (caller, alert_dedupe.QUIET_FLUSH_OWNER))
+    path = paths["quiet_queue"]
+    doc = alert_dedupe.load_quiet_queue(path)
+    if not doc["items"]:
+        return ""
+    if not alert_dedupe.claim_flush(now_utc):
+        return ("quiet_flush_skipped: another run holds the delivery lease; "
+                "%d item(s) stay queued" % len(doc["items"]))
+    try:
+        configured, why = ntfy_configured()
+        if not configured:
+            return "quiet_flush_skipped: %s (%d item(s) still held)" % (
+                why, len(doc["items"]))
+        batches = alert_dedupe.render_quiet_batches(doc)
+        delivered = []
+        for batch in batches:
+            ok, err = ntfy_send(batch["title"], batch["message"], 3,
+                                ["seedling"], http_fn=http_fn)
+            if not ok:
+                return ("quiet_flush_failed: %s (%d of %d held item(s) "
+                        "delivered; the rest stay held)"
+                        % (err, len(delivered), len(doc["items"])))
+            delivered.extend(batch["conditions"])
+        alert_dedupe.clear_quiet_items(path, delivered)
+        return ("quiet hours ended -- delivered %d held item(s) in %d "
+                "batch(es)" % (len(delivered), len(batches)))
+    finally:
+        alert_dedupe.release_flush()
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
+def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None,
+         now_utc=None):
+    now_utc = now_utc or alert_dedupe.now_utc()
     ap = argparse.ArgumentParser(
         description="Hourly breaking-news monitor (silent unless verified).")
     ap.add_argument("--state-dir", dest="state_dir", default="state")
@@ -4035,6 +4165,9 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         # record_breaking_attempt for why it exists and why it is written only
         # from a confirmed send.
         "breaking_delivery": os.path.join(state_dir, "breaking_delivery.json"),
+        # Held overnight so the owner is not woken; delivered as one morning
+        # batch by flush_quiet_queue. Committed like every other state file.
+        "quiet_queue": os.path.join(state_dir, "quiet_queue.json"),
     }
 
     # Active-story state: corruption is FATAL (exit 3), never auto-reset.
@@ -4066,6 +4199,14 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         row["cost_seconds"] = round(time.perf_counter() - t0, 2)
         append_breaking_log(paths["log"], row)
         return row
+
+    # Quiet hours are over: deliver what was held overnight, ONCE. This is
+    # deliberately before the gate -- a run that finds nothing tonight still has
+    # last night's batch to hand over -- and it writes no log row, because that
+    # row belongs to this run's own decision.
+    flush_note = flush_quiet_queue(paths, now_utc=now_utc)
+    if flush_note:
+        print("breaking_monitor: %s" % flush_note)
 
     # Stage 2: deterministic pre-gate, and it runs on EVERY run.
     #
@@ -4162,7 +4303,8 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None):
         return 0
 
     sent, level, confidence, event_id, reason = process_alert(
-        verdict, matched, state, paths, args, smtp_factory=smtp_factory)
+        verdict, matched, state, paths, args, smtp_factory=smtp_factory,
+        now_utc=now_utc)
     log_row(tripped=True, level=level, confidence=confidence,
             event_id=event_id, sent=sent, pre_gate_why=pre_gate_why,
             gate="passed", judged=judged, gate_reason=gate_reason,

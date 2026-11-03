@@ -351,6 +351,7 @@ jobs:
               state/breaking_state.json
               state/breaking_delivery.json
               state/model_health.json
+              state/quiet_queue.json
             )
             # The probe file belongs to the run that probed. A sweep whose
             # checkout still carries it must not even have it on disk, so no
@@ -696,10 +697,14 @@ jobs:
           # state file, the same mechanism the rest of the repository uses --
           # is what makes a 6h window survive between runs. The channel is
           # unchanged: same topic, same secrets, same titles.
+          # ONE CLOCK FOR THE WHOLE STEP. alert_dedupe.now_utc() is the real
+          # clock in CI and the pinned one only when a test sets
+          # ALERT_DEDUPE_NOW_UTC, so the quiet-hours branch below is testable
+          # without waiting for 23:00 and no workflow ever sets that variable.
           sys.path.insert(0, "scripts")
           import alert_dedupe
 
-          _now = _dt.datetime.now(_dt.timezone.utc)
+          _now = alert_dedupe.now_utc()
           _ledger = alert_dedupe.load()
           _key = alert_dedupe.condition_key("breaking.honesty_gate")
 
@@ -732,6 +737,21 @@ jobs:
                         "runs. The ::error:: above still stands."
                         % (alert_dedupe.WINDOW_HOURS, decision["runs"],
                            alert_dedupe.HEALTHY_STREAK_REQUIRED))
+              elif alert_dedupe.in_quiet_hours(_now):
+                  # HELD, NOT DROPPED. 22:00-07:00 NPT is the owner's sleep
+                  # window: the notice waits in the committed queue and rides
+                  # the morning batch that scripts/breaking_monitor.py delivers
+                  # once quiet hours end. The ::error:: annotation is unaffected.
+                  queued = alert_dedupe.enqueue_quiet(
+                      alert_dedupe.QUIET_QUEUE_PATH,
+                      alert_dedupe.quiet_item(
+                          title, body, _key, kind="honesty_gate", priority=4,
+                          tags=["warning"], now=_now))
+                  ntfy_note = alert_dedupe.held_notice(len(queued["items"]),
+                                                      _now)
+                  print("honesty-gate notice NOT pushed: %s -- it is held and "
+                        "delivered with the morning batch. The ::error:: above "
+                        "still stands." % ntfy_note)
               elif not (topic and server.startswith(("http://", "https://"))):
                   ntfy_note = "ntfy_not_configured"
                   print("::warning::ntfy secrets unset — the honesty-gate "
@@ -770,17 +790,34 @@ jobs:
                   label = "The breaking honesty gate (AI ladder)"
                   r_title = alert_dedupe.recovery_title(label)
                   r_body = alert_dedupe.recovery_body(label, recovery)
-                  lines.append("- Honesty-gate recovery: recovery notice sent")
                   print("honesty-gate RECOVERED: %d run(s) affected over %s"
                         % (recovery["runs"],
                            alert_dedupe.human_duration(
                                recovery["duration_seconds"])))
                   topic = (os.environ.get("NTFY_TOPIC") or "").strip()
                   server = (os.environ.get("NTFY_SERVER") or "").strip()
-                  if not (topic and server.startswith(("http://", "https://"))):
+                  if alert_dedupe.in_quiet_hours(_now):
+                      # An all-clear is GOOD news, and good news is exactly what
+                      # must not wake anyone: it is held and delivered once, in
+                      # the morning batch, on the same condition key as the
+                      # failure -- so a later failure in the same night replaces
+                      # it rather than contradicting it.
+                      queued = alert_dedupe.enqueue_quiet(
+                          alert_dedupe.QUIET_QUEUE_PATH,
+                          alert_dedupe.quiet_item(
+                              r_title, r_body, _key,
+                              kind="honesty_gate_recovery", priority=3,
+                              tags=["white_check_mark"], now=_now))
+                      held = alert_dedupe.held_notice(len(queued["items"]), _now)
+                      lines.append("- Honesty-gate recovery: HELD -- %s" % held)
+                      print("honesty-gate recovery NOT pushed: %s -- it is "
+                            "delivered with the morning batch" % held)
+                  elif not (topic and server.startswith(("http://", "https://"))):
+                      lines.append("- Honesty-gate recovery: recovery notice sent")
                       print("::warning::ntfy secrets unset — the honesty-gate "
                             "recovery is annotation-only")
                   else:
+                      lines.append("- Honesty-gate recovery: recovery notice sent")
                       try:
                           payload = json.dumps({
                               "topic": topic, "title": r_title,
@@ -867,4 +904,4 @@ jobs:
           # push fail and lose it.
           bash scripts/commit_state.sh \
             "chore: update breaking monitor state [skip ci]" \
-            state/alert_ledger.json
+            state/alert_ledger.json state/quiet_queue.json

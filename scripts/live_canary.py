@@ -57,6 +57,7 @@ if REPO_ROOT not in sys.path:
 if os.path.join(REPO_ROOT, "scripts") not in sys.path:
     sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 
+import alert_dedupe  # noqa: E402  (the quiet-hours decision, shared)
 import ntfy_classes  # noqa: E402  (deliberate: after the sys.path insert)
 
 
@@ -1130,12 +1131,25 @@ def items_found_present(blob):
 
 
 def notify_ntfy(title, message, priority=4, dry_run=True):
-    """Best-effort ntfy for the escalation ramp. Never fails the run."""
+    """Best-effort ntfy for the escalation ramp. Never fails the run.
+
+    A CANARY FAILURE IS NOT CRITICAL -- a parser drifting is not "you may
+    already be dead" -- so inside 22:00-07:00 NPT it is HELD by the shared
+    quiet-hours decision and rides the 07:00 batch with everything else. The
+    run's own history file is written either way, so a held run still records
+    its strike: held is not the same as silent.
+    """
     import urllib.request
     server = os.environ.get("NTFY_SERVER", "").strip()
     topic = os.environ.get("NTFY_TOPIC", "").strip()
     if not server or not topic or dry_run:
         print("ntfy (not sent): %s" % title)
+        return False
+    note = alert_dedupe.hold_if_quiet("canary", title, message,
+                                      "canary.live_parser", priority=priority,
+                                      tags=["canary"])
+    if note:
+        print("canary ntfy NOT sent: %s -- held for the 07:00 batch" % note)
         return False
     body = {"topic": topic, "title": title, "message": message,
             "priority": ntfy_classes.priority_for(priority),

@@ -54,6 +54,7 @@ from test_breaking_monitor import (  # noqa: E402
     QUAKE_VERDICT,
     TgRecorder,
     make_fetch,
+    ntfy_env,
     quake_body,
     read_json,
     run_main,
@@ -64,6 +65,15 @@ from test_breaking_monitor import (  # noqa: E402
 WORKFLOW = os.path.join(REPO_ROOT, ".github", "workflows", "breaking-monitor.yml")
 KEY = A.condition_key("breaking.honesty_gate")
 NOW = datetime.datetime(2026, 11, 1, 14, 18, 52, tzinfo=datetime.timezone.utc)
+
+# Nepal is UTC+05:45 all year, so a quiet-hours assertion is about the OWNER's
+# wall clock, not about UTC.
+NPT = datetime.timezone(datetime.timedelta(hours=5, minutes=45))
+
+
+def npt(day, hour, minute=0):
+    """The aware NPT instant for a 2026-11-<day> HH:MM Nepal wall clock."""
+    return datetime.datetime(2026, 11, day, hour, minute, tzinfo=NPT)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +121,40 @@ def _failed_row(reason="ai_fail_safe: every model attempt failed"):
             "reason": reason}
 
 
+def run_summary_step(code, cwd, rows, summary_path, now_utc):
+    """Run the workflow's summary code against a temp state/ directory.
+
+    The clock is PINNED through alert_dedupe's test seam, never left to the wall
+    clock: the step now holds a notice during quiet hours, so an unpinned run at
+    23:00 NPT would change what every test in this file asserts.
+    """
+    with open(os.path.join(cwd, "state", "breaking_log.json"), "w",
+              encoding="utf-8") as fh:
+        json.dump(rows, fh)
+    if os.path.exists(summary_path):
+        os.remove(summary_path)
+    env = dict(os.environ)
+    env.update({
+        "PYTHONPATH": SCRIPTS + (os.pathsep + env["PYTHONPATH"]
+                                 if env.get("PYTHONPATH") else ""),
+        "GITHUB_STEP_SUMMARY": summary_path,
+        "PAYLOAD_TITLE": "",
+        "TODAY_NPT": "",
+        "NTFY_TOPIC": "",
+        "NTFY_SERVER": "",
+        "ALERT_DEDUPE_NOW_UTC": now_utc.astimezone(
+            datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    })
+    proc = subprocess.run([sys.executable, "-c", code], cwd=cwd, env=env,
+                          capture_output=True, text=True, timeout=120)
+    out = (proc.stdout or "") + (proc.stderr or "")
+    summary = ""
+    if os.path.exists(summary_path):
+        with open(summary_path, encoding="utf-8") as fh:
+            summary = fh.read()
+    return proc.returncode, out, summary
+
+
 class SummaryStep(unittest.TestCase):
     """Runs the workflow's summary step in a throwaway repository checkout."""
 
@@ -132,32 +176,17 @@ class SummaryStep(unittest.TestCase):
                  "ai_fail_safe: every model attempt timed out")
         A.save(state, self.ledger_path, now=NOW - datetime.timedelta(hours=1))
 
-    def run_step(self, rows):
-        """Write `rows` as the run's log, run the step, return (out, summary)."""
-        with open(os.path.join(self.tmp, "state", "breaking_log.json"), "w",
-                  encoding="utf-8") as fh:
-            json.dump(rows, fh)
-        if os.path.exists(self.summary_path):
-            os.remove(self.summary_path)
-        env = dict(os.environ)
-        env.update({
-            "PYTHONPATH": SCRIPTS + (os.pathsep + env["PYTHONPATH"]
-                                     if env.get("PYTHONPATH") else ""),
-            "GITHUB_STEP_SUMMARY": self.summary_path,
-            "PAYLOAD_TITLE": "",
-            "TODAY_NPT": "",
-            "NTFY_TOPIC": "",
-            "NTFY_SERVER": "",
-        })
-        proc = subprocess.run([sys.executable, "-c", self.CODE], cwd=self.tmp,
-                              env=env, capture_output=True, text=True,
-                              timeout=120)
-        out = (proc.stdout or "") + (proc.stderr or "")
-        self.assertEqual(proc.returncode, 0, out)
-        summary = ""
-        if os.path.exists(self.summary_path):
-            with open(self.summary_path, encoding="utf-8") as fh:
-                summary = fh.read()
+    def run_step(self, rows, now_utc=None):
+        """Write `rows` as the run's log, run the step, return (out, summary).
+
+        The clock is PINNED, never left to the wall clock: this step now holds
+        a notice during the owner's quiet hours, so a real run at 23:00 NPT
+        would otherwise change what every test here asserts. NOW is 20:03 NPT,
+        outside quiet hours, so the existing expectations are the daytime ones.
+        """
+        code, out, summary = run_summary_step(
+            self.CODE, self.tmp, rows, self.summary_path, now_utc or NOW)
+        self.assertEqual(code, 0, out)
         return out, summary
 
     def ledger(self):
@@ -236,6 +265,109 @@ class SummaryStep(unittest.TestCase):
         state = {"schema_version": A.SCHEMA_VERSION, "conditions": {}}
         A.record(state, KEY, NOW - datetime.timedelta(hours=2), "cause")
         self.assertTrue(A.resolve(state, KEY, NOW)["recovery"])
+
+
+class QuietHours(unittest.TestCase):
+    """The summary step inside the owner's sleep window (22:00-07:00 NPT).
+
+    A notice that would wake the owner is HELD, not dropped: it is written to
+    state/quiet_queue.json and delivered once, in the morning batch, by
+    scripts/breaking_monitor.py.
+    """
+
+    CODE = summary_code()
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="brk-quiet-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        os.makedirs(os.path.join(self.tmp, "state"))
+        self.ledger_path = os.path.join(self.tmp, "state", "alert_ledger.json")
+        self.queue_path = os.path.join(self.tmp, "state", "quiet_queue.json")
+        self.summary_path = os.path.join(self.tmp, "step-summary.md")
+
+    def run_step(self, rows, now_utc):
+        code, out, summary = run_summary_step(
+            self.CODE, self.tmp, rows, self.summary_path, now_utc)
+        self.assertEqual(code, 0, out)
+        return out, summary
+
+    def seed_open_condition(self):
+        state = {"schema_version": A.SCHEMA_VERSION, "conditions": {}}
+        A.record(state, KEY, npt(3, 22, 30), "ai_fail_safe: every model "
+                 "attempt timed out")
+        A.save(state, self.ledger_path, now=npt(3, 22, 30))
+
+    def queue(self):
+        return A.load_quiet_queue(self.queue_path)
+
+    def test_a_failure_at_2300_npt_is_held_not_pushed(self):
+        out, summary = self.run_step([_failed_row()], npt(3, 23, 0))
+        self.assertIn("quiet hours, held 1 item(s) until 07:00 NPT", out,
+                      "the run must SAY it held the notice: %s" % out[-800:])
+        self.assertNotIn("ntfy_not_configured", out,
+                         "the quiet branch must be taken BEFORE any push attempt")
+        self.assertIn("held 1 item(s) until 07:00 NPT", summary)
+        items = self.queue()["items"]
+        self.assertEqual(len(items), 1, items)
+        self.assertEqual(items[0]["kind"], "honesty_gate")
+        self.assertEqual(items[0]["condition"], KEY,
+                         "the held item belongs to the same condition the "
+                         "ledger tracks, so a later report supersedes it")
+        self.assertTrue(items[0]["title"].startswith(
+            "Breaking honesty gate FAILED"), items[0]["title"])
+
+    def test_the_held_notice_is_delivered_by_the_monitor_at_0700(self):
+        self.run_step([_failed_row()], npt(3, 23, 0))
+        self.addCleanup(ntfy_env())
+        sent = []
+
+        def recorder(url, payload):
+            sent.append(payload)
+            return 200, "{}"
+
+        note = bm.flush_quiet_queue({"quiet_queue": self.queue_path},
+                                    now_utc=npt(4, 7, 0), http_fn=recorder)
+        self.assertIn("delivered", note)
+        self.assertEqual(len(sent), 1, sent)
+        self.assertIn("Held overnight", sent[0]["title"])
+        self.assertIn("2026-11-03 23:00", sent[0]["message"])
+        self.assertIn("Breaking honesty gate FAILED", sent[0]["message"])
+        self.assertEqual(self.queue()["items"], [])
+
+    def test_a_held_recovery_is_superseded_by_a_later_failure(self):
+        self.seed_open_condition()
+        # Two judged-healthy runs at 23:00 produce the recovery -- and it is
+        # HELD, because it would otherwise wake the owner.
+        self.run_step([_judged_row()], npt(3, 23, 0))
+        out, _summary = self.run_step([_judged_row()], npt(3, 23, 10))
+        self.assertNotIn("recovery notice delivered", out)
+        self.assertIn("quiet hours, held", out)
+        self.assertEqual(self.queue()["items"][0]["kind"],
+                         "honesty_gate_recovery")
+
+        # ... and the ladder breaks again at 05:00, the same night.
+        self.run_step([_failed_row()], npt(4, 5, 0))
+        doc = self.queue()
+        self.assertEqual(len(doc["items"]), 1,
+                         "one condition holds ONE item: %r" % (doc["items"],))
+        self.assertEqual(doc["items"][0]["kind"], "honesty_gate")
+        self.assertEqual(doc["superseded"], 1)
+
+        self.addCleanup(ntfy_env())
+        sent = []
+
+        def recorder(url, payload):
+            sent.append(payload)
+            return 200, "{}"
+
+        bm.flush_quiet_queue({"quiet_queue": self.queue_path},
+                             now_utc=npt(4, 7, 0), http_fn=recorder)
+        message = sent[0]["message"]
+        self.assertIn("FAILED", message)
+        self.assertNotIn("recovered", message.lower(),
+                         "the morning batch must not claim a recovery that a "
+                         "later failure revoked")
+        self.assertIn("superseded", message.lower())
 
 
 class FallbackDelivery(unittest.TestCase):

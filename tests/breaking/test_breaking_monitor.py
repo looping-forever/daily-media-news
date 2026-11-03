@@ -32,8 +32,10 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 SCRIPTS = os.path.join(REPO_ROOT, "scripts")
 sys.path.insert(0, SCRIPTS)
 
+import alert_dedupe            # noqa: E402
 import breaking_monitor as bm  # noqa: E402
 import ai_classifier as ac     # noqa: E402
+import live_canary             # noqa: E402
 
 NOW = datetime.now(timezone.utc)
 
@@ -167,7 +169,8 @@ def quake_sources():
 
 
 def run_main(state_dir, fetch, runner=None, dry_run=True, smtp=None,
-             sources_json="", window_min=90, no_model=False, extra_argv=()):
+             sources_json="", window_min=90, no_model=False, extra_argv=(),
+             now_utc=None):
     if not sources_json:
         # Default every run to the single synthetic test feed; otherwise the
         # built-in real-URL source list would bypass the fake fetch layer.
@@ -182,7 +185,7 @@ def run_main(state_dir, fetch, runner=None, dry_run=True, smtp=None,
         argv.append("--no-model")
     argv.extend(extra_argv)
     return bm.main(argv, fetch_fn=fetch, ai_runner=runner,
-                   smtp_factory=smtp or smtp_factory("ok"))
+                   smtp_factory=smtp or smtp_factory("ok"), now_utc=now_utc)
 
 
 # ---------------------------------------------------------------------------
@@ -4240,6 +4243,476 @@ def test_96_the_summary_step_prints_the_important_answer():
     assert "  * title: (empty)" in out, out
 
 
+# ---------------------------------------------------------------------------
+# 97-103. Quiet hours: hold a non-critical alert overnight, deliver ONE labelled
+#         batch when quiet hours end, and never hold a genuine critical alert.
+# ---------------------------------------------------------------------------
+
+# Nepal is UTC+05:45 all year (no DST), so a wall clock and an instant are two
+# different facts and both are written down here: 23:00 NPT = 17:15Z, 06:59 NPT
+# = 01:14Z, 07:00 NPT = 01:15Z.
+NPT = timezone(timedelta(hours=5, minutes=45))
+
+
+def npt(day, hour, minute=0):
+    """The aware NPT instant for a 2026-11-<day> HH:MM Nepal wall clock."""
+    return datetime(2026, 11, day, hour, minute, tzinfo=NPT)
+
+
+# The same verified earthquake, with an EMPTY why_urgent: nothing about this
+# item is a "check this now" fact, so quiet hours may hold it.
+NON_CRITICAL_VERDICT = dict(QUAKE_VERDICT, why_urgent="")
+
+
+def quiet_queue_path(state_dir):
+    return os.path.join(state_dir, "quiet_queue.json")
+
+
+def test_97_a_non_critical_level3_at_2300_npt_is_held_not_sent():
+    sd = fresh_dir()
+    restore = ntfy_env()
+    transport = NtfyTransport()
+    real_http = bm.ntfy_http
+    bm.ntfy_http = transport
+    try:
+        rc = run_main(sd, make_fetch({"feeds.example.test": quake_body()}),
+                      runner=verdict_runner(NON_CRITICAL_VERDICT),
+                      dry_run=False, now_utc=npt(3, 23, 0))
+        assert rc == 0, "a held alert is a successful run, got %s" % rc
+        assert transport.calls == [], \
+            "23:00 NPT is the owner's sleep window; nothing may be pushed"
+        rows = log_rows(sd)
+        assert len(rows) == 1, rows
+        assert rows[0]["sent"] is False, rows[0]
+        assert rows[0]["reason"].startswith(
+            "quiet hours, held 1 item(s) until 07:00 NPT"), \
+            "the log row must state the reason: %r" % rows[0]["reason"]
+        doc = read_json(quiet_queue_path(sd))
+        assert len(doc["items"]) == 1, doc
+        assert doc["items"][0]["raised_npt"] == "2026-11-03 23:00", doc
+        assert doc["items"][0]["title"] == NON_CRITICAL_VERDICT["title"], doc
+        # HELD IS NOT DROPPED: the story is marked alerted, so the 07:0x run
+        # dedupes against it instead of notifying it a second time later.
+        story = read_active(sd)["stories"][0]
+        assert story["alerted"] is True, story
+    finally:
+        bm.ntfy_http = real_http
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_98_a_non_critical_level3_at_0659_npt_is_still_held():
+    sd = fresh_dir()
+    restore = ntfy_env()
+    transport = NtfyTransport()
+    real_http = bm.ntfy_http
+    bm.ntfy_http = transport
+    try:
+        rc = run_main(sd, make_fetch({"feeds.example.test": quake_body()}),
+                      runner=verdict_runner(NON_CRITICAL_VERDICT),
+                      dry_run=False, now_utc=npt(4, 6, 59))
+        assert rc == 0
+        assert transport.calls == [], \
+            "06:59 NPT is still inside quiet hours (they end at 07:00)"
+        doc = read_json(quiet_queue_path(sd))
+        assert len(doc["items"]) == 1, doc
+        assert doc["items"][0]["raised_npt"] == "2026-11-04 06:59", doc
+    finally:
+        bm.ntfy_http = real_http
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_99_the_held_batch_is_delivered_once_when_quiet_hours_end():
+    sd = fresh_dir()
+    restore = ntfy_env()
+    transport = NtfyTransport()
+    real_http = bm.ntfy_http
+    bm.ntfy_http = transport
+    try:
+        run_main(sd, make_fetch({"feeds.example.test": quake_body()}),
+                 runner=verdict_runner(NON_CRITICAL_VERDICT),
+                 dry_run=False, now_utc=npt(3, 23, 0))
+        assert transport.calls == [], "still held at 23:00"
+
+        # 07:00 the next morning. The same story is deduped, and the held batch
+        # goes out in ONE message.
+        rc = run_main(sd, make_fetch({"feeds.example.test": quake_body()}),
+                      runner=verdict_runner(NON_CRITICAL_VERDICT),
+                      dry_run=False, now_utc=npt(4, 7, 0))
+        assert rc == 0
+        assert len(transport.calls) == 1, \
+            "the batch is one message, not one per held item: %d" % len(
+                transport.calls)
+        payload = transport.bodies()[0]
+        assert "Held overnight" in payload["title"], payload["title"]
+        assert "2026-11-03 23:00" in payload["message"], payload["message"]
+        assert NON_CRITICAL_VERDICT["title"] in payload["message"], payload
+        assert read_json(quiet_queue_path(sd))["items"] == [], \
+            "the queue is cleared only after the batch was delivered"
+
+        # ... and ONCE. A later run the same morning must not deliver it again.
+        run_main(sd, make_fetch({"feeds.example.test": quake_body()}),
+                 runner=verdict_runner(NON_CRITICAL_VERDICT),
+                 dry_run=False, now_utc=npt(4, 7, 30))
+        assert len(transport.calls) == 1, \
+            "a delivered batch must never be delivered a second time"
+    finally:
+        bm.ntfy_http = real_http
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_100_the_critical_definition_is_exactly_two_shapes():
+    fast = dict(QUAKE_VERDICT, hard_evidence_fast_path=True)
+    # The two shapes that may wake the owner at 23:00.
+    assert bm.is_critical_alert(fast, 3) is True, \
+        "a mass-casualty hard-evidence alert must never be held"
+    assert bm.is_critical_alert(QUAKE_VERDICT, 3) is True, \
+        "a verified level-3 with a why_urgent must never be held"
+    # Everything else is held, and each of these is a way a future edit could
+    # widen the definition. Changing behaviour here must fail this test.
+    assert bm.is_critical_alert(NON_CRITICAL_VERDICT, 3) is False, \
+        "a level-3 WITHOUT a why_urgent is not a critical alert"
+    assert bm.is_critical_alert(dict(QUAKE_VERDICT, why_urgent="   "),
+                                3) is False, \
+        "whitespace is not a why_urgent"
+    assert bm.is_critical_alert(QUAKE_VERDICT, 2) is False, \
+        "only level 3 can be critical"
+    assert bm.is_critical_alert(fast, 2) is False, \
+        "the fast-path flag cannot promote a level-2 verdict to critical"
+    assert bm.is_critical_alert(dict(QUAKE_VERDICT, level=2), 2) is False
+
+
+def test_101_a_critical_alert_at_2300_npt_is_sent_immediately():
+    sd = fresh_dir()
+    restore = ntfy_env()
+    transport = NtfyTransport()
+    real_http = bm.ntfy_http
+    bm.ntfy_http = transport
+    try:
+        rc = run_main(sd, make_fetch({"feeds.example.test": quake_body()}),
+                      runner=verdict_runner(QUAKE_VERDICT),
+                      dry_run=False, now_utc=npt(3, 23, 0))
+        assert rc == 0
+        assert len(transport.calls) == 1, \
+            "a genuine critical alert must NOT wait for morning"
+        assert not os.path.isfile(quiet_queue_path(sd)) or \
+            read_json(quiet_queue_path(sd))["items"] == [], \
+            "a sent alert must not also be queued"
+        assert log_rows(sd)[0]["sent"] is True
+    finally:
+        bm.ntfy_http = real_http
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_102_the_queue_is_capped_and_the_batch_says_so():
+    sd = fresh_dir()
+    path = quiet_queue_path(sd)
+    transport = NtfyTransport()
+    restore = ntfy_env()
+    try:
+        for i in range(alert_dedupe.QUIET_QUEUE_CAP + 3):
+            alert_dedupe.enqueue_quiet(path, alert_dedupe.quiet_item(
+                "Held item %02d" % i, "body %02d" % i,
+                condition="breaking.alert:%02d" % i, kind="breaking",
+                now=npt(3, 23, i % 60)))
+        doc = alert_dedupe.load_quiet_queue(path)
+        assert len(doc["items"]) == alert_dedupe.QUIET_QUEUE_CAP, doc
+        assert doc["dropped"] == 3, doc
+        assert alert_dedupe.QUIET_QUEUE_CAP > 0, "the cap is a named constant"
+
+        note = bm.flush_quiet_queue({"quiet_queue": path},
+                                    now_utc=npt(4, 7, 0),
+                                    http_fn=transport)
+        assert note, "a non-empty queue must report what it did"
+        assert len(transport.calls) == 1, transport.calls
+        message = transport.bodies()[0]["message"]
+        assert "queue cap %d" % alert_dedupe.QUIET_QUEUE_CAP in message, \
+            "the batch must state the cap it hit: %s" % message[:400]
+        assert "3 oldest" in message, message[:400]
+        dropped_line = [line for line in message.splitlines()
+                        if "oldest" in line]
+        assert dropped_line and "Held item 00" in dropped_line[0], \
+            "the dropped items must be named as dropped, not passed off as " \
+            "delivered: %r" % (dropped_line,)
+        assert read_json(path)["items"] == []
+    finally:
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_103_a_held_recovery_is_superseded_by_a_later_failure():
+    """A recovery held at 23:00 and a re-failure at 05:00 must not contradict.
+
+    The morning batch carries the LATEST state of that condition, not both an
+    "it recovered" and an "it is broken" for the same thing.
+    """
+    sd = fresh_dir()
+    path = quiet_queue_path(sd)
+    transport = NtfyTransport()
+    restore = ntfy_env()
+    try:
+        alert_dedupe.enqueue_quiet(path, alert_dedupe.quiet_item(
+            "The breaking honesty gate (AI ladder) recovered",
+            "The condition that was alerting has stopped occurring.",
+            condition="breaking.honesty_gate", kind="honesty_gate_recovery",
+            now=npt(3, 23, 10)))
+        alert_dedupe.enqueue_quiet(path, alert_dedupe.quiet_item(
+            "Breaking honesty gate FAILED — breaking news was not judged",
+            "The AI ladder returned no verdict, so this run decided nothing.",
+            condition="breaking.honesty_gate", kind="honesty_gate",
+            now=npt(4, 5, 0)))
+
+        doc = alert_dedupe.load_quiet_queue(path)
+        assert len(doc["items"]) == 1, \
+            "one condition holds one item: %r" % (doc["items"],)
+        assert doc["superseded"] == 1, doc
+        assert doc["items"][0]["kind"] == "honesty_gate"
+
+        bm.flush_quiet_queue({"quiet_queue": path}, now_utc=npt(4, 7, 0),
+                             http_fn=transport)
+        message = transport.bodies()[0]["message"]
+        assert "FAILED" in message, message
+        assert "recovered" not in message.lower(), \
+            "the batch must not claim a recovery that a later failure revoked"
+        assert "superseded" in message.lower(), \
+            "the owner must be told an earlier held item was replaced"
+    finally:
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_104_a_canary_failure_at_0615_npt_is_held_and_rides_the_0700_batch():
+    """A drifting parser is not critical: 06:15 NPT holds it, 07:00 delivers it."""
+    sd = fresh_dir()
+    path = os.path.join(sd, "state", "quiet_queue.json")
+    restore = ntfy_env()
+    saved = os.environ.get("ALERT_DEDUPE_NOW_UTC")
+    here = os.getcwd()
+    pushed = []
+
+    def _forbidden(*args, **kwargs):
+        pushed.append(args)
+        raise AssertionError("nothing may be pushed inside quiet hours")
+
+    try:
+        os.chdir(sd)
+        os.environ["ALERT_DEDUPE_NOW_UTC"] = npt(4, 6, 15).astimezone(
+            timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with unittest.mock.patch("urllib.request.urlopen", _forbidden):
+            sent = live_canary.notify_ntfy(
+                "live-parser-canary FAILED (strike 2)", "a parser drifted",
+                priority=4, dry_run=False)
+        assert sent is False, "a held canary notice is not a send"
+        assert pushed == [], pushed
+        doc = alert_dedupe.load_quiet_queue(
+            os.path.join(sd, "state", "quiet_queue.json"))
+        assert len(doc["items"]) == 1, doc
+        assert doc["items"][0]["kind"] == "canary", doc["items"][0]
+        assert doc["items"][0]["condition"] == "canary.live_parser", doc
+        assert doc["items"][0]["raised_npt"] == "2026-11-04 06:15", doc
+
+        delivered = []
+
+        def recorder(url, payload):
+            delivered.append(payload)
+            return 200, "{}"
+
+        note = bm.flush_quiet_queue({"quiet_queue": path},
+                                    now_utc=npt(4, 7, 0), http_fn=recorder)
+        assert "delivered 1" in note, note
+        assert len(delivered) == 1, delivered
+        assert "strike 2" in delivered[0]["message"], delivered[0]
+        assert "2026-11-04 06:15" in delivered[0]["message"], delivered[0]
+        assert alert_dedupe.load_quiet_queue(path)["items"] == []
+    finally:
+        os.chdir(here)
+        if saved is None:
+            os.environ.pop("ALERT_DEDUPE_NOW_UTC", None)
+        else:
+            os.environ["ALERT_DEDUPE_NOW_UTC"] = saved
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_105_a_watchdog_failure_at_2145_notifies_and_one_at_2205_is_held():
+    """The window is the owner's clock, not a round UTC hour."""
+    sd = fresh_dir()
+    path = quiet_queue_path(sd)
+    try:
+        early = alert_dedupe.hold_if_quiet(
+            "digest_watchdog", "Worker heartbeat failed", "detail",
+            "digest_watchdog.worker_heartbeat", priority=5,
+            now=npt(3, 21, 45), path=path)
+        assert early is None, "21:45 NPT is before the window: push normally"
+        assert alert_dedupe.load_quiet_queue(path)["items"] == []
+
+        late = alert_dedupe.hold_if_quiet(
+            "digest_watchdog", "Worker heartbeat failed", "detail",
+            "digest_watchdog.worker_heartbeat", priority=5,
+            now=npt(3, 22, 5), path=path)
+        assert late and late.startswith("quiet hours, held 1 item(s)"), late
+        items = alert_dedupe.load_quiet_queue(path)["items"]
+        assert len(items) == 1 and items[0]["raised_npt"] == "2026-11-03 22:05"
+    finally:
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_106_only_one_flush_site_exists_and_a_second_caller_is_refused():
+    """Two deliverers would push the same held items twice and clear each other."""
+    sd = fresh_dir()
+    path = quiet_queue_path(sd)
+    sent = []
+    try:
+        alert_dedupe.enqueue_quiet(path, alert_dedupe.quiet_item(
+            "A held notice", "body", condition="canary.live_parser",
+            kind="canary", now=npt(4, 6, 15)))
+        refused = bm.flush_quiet_queue(
+            {"quiet_queue": path}, now_utc=npt(4, 7, 0),
+            http_fn=lambda url, payload: (sent.append(payload), (200, "{}"))[1],
+            caller="digest_watchdog")
+        assert refused.startswith("quiet_flush_refused"), refused
+        assert sent == [], "a refused caller must not send anything"
+        assert len(alert_dedupe.load_quiet_queue(path)["items"]) == 1
+
+        owners = []
+        for root, _dirs, files in os.walk(SCRIPTS):
+            for name in files:
+                if not name.endswith(".py"):
+                    continue
+                with open(os.path.join(root, name), "r",
+                          encoding="utf-8") as fh:
+                    if "def flush_quiet_queue" in fh.read():
+                        owners.append(name)
+        assert owners == ["breaking_monitor.py"], owners
+    finally:
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_107_a_scheduled_run_and_a_manual_dispatch_cannot_both_deliver():
+    """An overlapping run must find the lease taken, not deliver a second copy."""
+    sd = fresh_dir()
+    path = quiet_queue_path(sd)
+    lease = os.path.join(sd, "state", "quiet_queue.lease")
+    sent = []
+    here = os.getcwd()
+    restore = ntfy_env()
+    try:
+        os.chdir(sd)
+        os.makedirs(os.path.join(sd, "state"))
+        alert_dedupe.enqueue_quiet(path, alert_dedupe.quiet_item(
+            "A held notice", "body", condition="canary.live_parser",
+            kind="canary", now=npt(4, 6, 15)))
+        assert alert_dedupe.claim_flush(npt(4, 7, 0), path=lease) is True
+        try:
+            note = bm.flush_quiet_queue(
+                {"quiet_queue": path}, now_utc=npt(4, 7, 0),
+                http_fn=lambda url, payload: (sent.append(payload),
+                                              (200, "{}"))[1])
+            assert "lease" in note, note
+            assert sent == [], sent
+        finally:
+            alert_dedupe.release_flush(lease)
+
+        note = bm.flush_quiet_queue(
+            {"quiet_queue": path}, now_utc=npt(4, 7, 1),
+            http_fn=lambda url, payload: (sent.append(payload), (200, "{}"))[1])
+        assert "delivered 1" in note, note
+        assert len(sent) == 1, sent
+        assert bm.flush_quiet_queue(
+            {"quiet_queue": path}, now_utc=npt(4, 7, 2),
+            http_fn=lambda url, payload: (sent.append(payload), (200, "{}"))[1]
+        ) == "", "an empty queue must send nothing a second time"
+        assert len(sent) == 1, sent
+    finally:
+        alert_dedupe.release_flush(lease)
+        os.chdir(here)
+        restore()
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_108_both_workflows_reach_the_same_quiet_hours_decision():
+    """No workflow may re-implement the window: they all call the shared gate."""
+    workflows = os.path.join(REPO_ROOT, ".github", "workflows")
+    with open(os.path.join(workflows, "drift-canary.yml"), "r",
+              encoding="utf-8") as fh:
+        drift = fh.read()
+    with open(os.path.join(workflows, "digest-watchdog.yml"), "r",
+              encoding="utf-8") as fh:
+        watchdog = fh.read()
+    with open(os.path.join(SCRIPTS, "live_canary.py"), "r",
+              encoding="utf-8") as fh:
+        canary_py = fh.read()
+
+    assert "alert_dedupe.hold_if_quiet" in canary_py, \
+        "the canary must use the shared decision"
+    assert watchdog.count("scripts/may-notify.sh") >= 4, \
+        "every watchdog push arm must go through the shared gate"
+    assert "alert_dedupe.hold_if_quiet" in watchdog, \
+        "the watchdog's python push arms must use the shared decision"
+    for name, text in (("drift-canary.yml", drift),
+                       ("digest-watchdog.yml", watchdog)):
+        assert "QUIET_HOURS_START" not in text, \
+            "%s must not restate the window" % name
+        assert "quiet_queue.json" in text, \
+            "%s must commit the hold, or the hold is a drop" % name
+
+
+def test_109_the_bash_bridge_returns_the_same_three_answers():
+    """The four watchdog curl arms ask this bridge, so its exit codes are the gate.
+
+    0 = push, 1 = held (and queued), 2 = misuse. Executed for real: a shell
+    bridge that is only asserted by reading it is how a wrong argument order
+    ships green.
+    """
+    bash = _bash_for_commit_state()
+    script = os.path.join(SCRIPTS, "may-notify.sh")
+    args = [bash, script, "canary", "Live parser canary",
+            "three parsers dead", "canary.live_parser", "5"]
+
+    def run(now, argv):
+        work = fresh_dir()
+        env = dict(os.environ)
+        env["PYTHONPATH"] = SCRIPTS
+        env["ALERT_DEDUPE_NOW_UTC"] = now
+        proc = subprocess.run(argv, cwd=work, env=env, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace")
+        return proc, work
+
+    proc, work = run("2026-11-04T00:30:00Z", args)
+    try:
+        assert proc.returncode == 1, (proc.returncode, proc.stdout, proc.stderr)
+        assert "quiet hours, held 1 item(s) until 07:00 NPT" in proc.stdout, \
+            proc.stdout
+        path = os.path.join(work, "state", "quiet_queue.json")
+        assert os.path.isfile(path), "held must mean QUEUED, not dropped"
+        with open(path, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        assert [i["condition"] for i in doc["items"]] == ["canary.live_parser"], doc
+        assert doc["items"][0]["priority"] == 5, doc
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    proc, work = run("2026-11-04T10:00:00Z", args)
+    try:
+        assert proc.returncode == 0, (proc.returncode, proc.stdout, proc.stderr)
+        assert proc.stdout.strip() == "", proc.stdout
+        assert not os.path.isfile(os.path.join(work, "state",
+                                              "quiet_queue.json")), \
+            "a daytime notice must not touch the queue"
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    proc, work = run("2026-11-04T10:00:00Z", [bash, script, "canary"])
+    try:
+        assert proc.returncode == 2, (proc.returncode, proc.stdout)
+        assert "required" in proc.stdout, proc.stdout
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def main():
     tests = [
         test_1_routine_news_silent_heartbeat,
@@ -4338,6 +4811,19 @@ def main():
         test_94_the_judged_candidate_keeps_the_answer_it_gave,
         test_95_the_declined_candidate_keeps_the_empty_object,
         test_96_the_summary_step_prints_the_important_answer,
+        test_97_a_non_critical_level3_at_2300_npt_is_held_not_sent,
+        test_98_a_non_critical_level3_at_0659_npt_is_still_held,
+        test_99_the_held_batch_is_delivered_once_when_quiet_hours_end,
+        test_100_the_critical_definition_is_exactly_two_shapes,
+        test_101_a_critical_alert_at_2300_npt_is_sent_immediately,
+        test_102_the_queue_is_capped_and_the_batch_says_so,
+        test_103_a_held_recovery_is_superseded_by_a_later_failure,
+        test_104_a_canary_failure_at_0615_npt_is_held_and_rides_the_0700_batch,
+        test_105_a_watchdog_failure_at_2145_notifies_and_one_at_2205_is_held,
+        test_106_only_one_flush_site_exists_and_a_second_caller_is_refused,
+        test_107_a_scheduled_run_and_a_manual_dispatch_cannot_both_deliver,
+        test_108_both_workflows_reach_the_same_quiet_hours_decision,
+        test_109_the_bash_bridge_returns_the_same_three_answers,
     ]
     failures = []
     for test in tests:

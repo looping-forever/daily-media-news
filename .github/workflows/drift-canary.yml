@@ -27,7 +27,14 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  # CONTENTS: WRITE, FOR ONE FILE. A canary notice raised inside 22:00-07:00 NPT
+  # is HELD, not dropped, and a hold that dies with the runner is a drop wearing a
+  # hold's clothes. The only thing written is state/quiet_queue.json, staged by
+  # name, and scripts/commit_state.sh refuses every path it was not given. The
+  # 07:05 breaking-monitor run owns the single delivery; this job never sends the
+  # batch. Before this, the canary job was read-only and a held notice would have
+  # vanished.
+  contents: write
 
 jobs:
   docs-lint:
@@ -716,6 +723,23 @@ jobs:
           NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 scripts/live_canary.py --notify
+
+      - name: Commit the held-overnight queue
+        if: always()
+        # A HELD NOTICE MUST SURVIVE THE RUN. Quiet hours put it in
+        # state/quiet_queue.json; without this commit a 06:15 hold would die
+        # with the runner. DELIVERY IS NOT THIS WORKFLOW'S JOB: the 07:05
+        # breaking-monitor run owns the one flush and sends the 07:00 batch.
+        # `continue-on-error` because a failed commit must not redden a canary
+        # whose own verdict is the job's signal; the queue file is state, and
+        # the next run rewrites it either way.
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash scripts/commit_state.sh \
+            "chore: update the held-overnight queue [skip ci]" \
+            state/quiet_queue.json
 
       - name: Canary assertion suite (offline)
         if: always()
