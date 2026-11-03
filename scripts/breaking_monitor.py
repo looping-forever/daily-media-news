@@ -2224,15 +2224,24 @@ def ai_classify(pending_path, runner=None, models=None,
 LADDER_PROBE_FILENAME = "ladder_probe.json"
 LADDER_PROBE_DIRNAME = "ladder_probe"
 
-# ONE fixed candidate, built in code, chosen so that a correct answer has to
-# NAME the event: a two-day water-supply interruption announced by a utility and
-# covered by two newsrooms. It is clearly NON-alerting (level 2 at most -- the
-# next digest is enough, no interruption is earned) and carries NO death toll and
-# no digits at all, because a count would trip the deterministic fast path, which
-# is a different mechanism from the classifier under test. A level-3 answer here
-# is the model over-escalating; the probe can never send regardless. The
-# `.example` TLD is reserved and non-routable: no real outlet is named, and
-# nothing in the probe can be mistaken for a real source.
+# TWO fixed candidates, because ONE cannot answer the question the probe asks.
+# A schema-valid minimal object means "I judged this and nothing qualifies" OR
+# "I cannot judge", and the prompt prescribes that same object for both, so a
+# single decline proves nothing either way (measured 2026-11-03: the water-supply
+# story came back as the minimal object twice, on two different candidates).
+# The pair separates them: a competent classifier MUST return a non-empty title
+# and summary for the important one, and MUST decline the unimportant one. One
+# judged and one declined is the only shape that demonstrates judgment; anything
+# else is recorded as `judgment_capable: false` with the failing half named.
+#
+# The IMPORTANT candidate is deliberately a LEVEL 2 story: national, time
+# sensitive, with real practical impact, but none of the LEVEL 3 triggers in
+# prompts/breaking-classify.md (no war, no disaster, no national emergency, no
+# highway closure, no bank or cyber incident). It carries no death or injury
+# words and no digits at all, because a death count is the deterministic fast
+# path -- a different mechanism from the classifier under test. Both candidates
+# use reserved `.example` hosts: no real outlet is named and nothing here can be
+# mistaken for a real source. The probe cannot send either way.
 LADDER_PROBE_CANDIDATE = {
     "title": "Capital water utility announces a two-day supply cut across "
              "four wards",
@@ -2244,13 +2253,32 @@ LADDER_PROBE_CANDIDATE = {
     "domain_category": "local_city",
 }
 
+LADDER_PROBE_IMPORTANT_CANDIDATE = {
+    "title": "National carrier grounds its international fleet after a safety "
+             "inspection",
+    "url": "https://northgatejournal.example/carrier-grounds-international-fleet",
+    "source": "The Northgate Journal",
+    "snippet": "The Northgate Journal and the Meridian Post both report the "
+               "same directive: the airline says international flights are "
+               "suspended while engineers review maintenance records, and "
+               "passengers are being rebooked.",
+    "domain_category": "nepal",
+}
 
-def _ladder_probe_pending(window_min=90, now_utc=None):
+#: (label, candidate, what a correct answer does). Order is not cosmetic: the
+#: important half is what proves the rung can judge, so it is asked first.
+LADDER_PROBE_CANDIDATES = (
+    ("important", LADDER_PROBE_IMPORTANT_CANDIDATE, "judged"),
+    ("unimportant", LADDER_PROBE_CANDIDATE, "declined"),
+)
+
+
+def _ladder_probe_pending(window_min=90, now_utc=None, candidate=None):
     """The one candidate the probe ever sends, in the payload shape a real run
     writes -- same keys, same types, so the model cannot tell a probe from a
     sweep. `published` is recent so it is not filtered as stale."""
     now_utc = now_utc or datetime.now(timezone.utc)
-    cand = dict(LADDER_PROBE_CANDIDATE)
+    cand = dict(candidate or LADDER_PROBE_CANDIDATE)
     cand["published"] = (now_utc - timedelta(minutes=30)).strftime(
         "%Y-%m-%dT%H:%M:%SZ")
     return {"generated_at": now_utc.isoformat(timespec="seconds"),
@@ -2262,7 +2290,7 @@ def _ladder_probe_pending(window_min=90, now_utc=None):
 
 def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
                       stdout_text="", stderr_text="", first_byte_sec=None,
-                      first_liveness_sec=None, control=False):
+                      first_liveness_sec=None, control=False, candidate=""):
     """One attempt, in the stable shape the committed file documents.
 
     `granted_sec` is the window GRANTED and `wall_sec` is what it took -- the
@@ -2294,6 +2322,9 @@ def _ladder_probe_row(model, attempt, granted_sec, wall_sec, outcome,
                                       else ""),
             "outcome": outcome,
             "control": bool(control),
+            # WHICH fixed candidate this attempt was asked, because the probe
+            # asks the same rung two different questions in one run.
+            "candidate": candidate,
             "tail_excerpt": _redact_secrets(tail)[-160:]}
 
 
@@ -2414,15 +2445,109 @@ def _verdict_judged(verdict):
     THE RULE, deliberately strict: both `title` AND `summary` must be non-empty
     after stripping. The prompt prescribes the minimal level-1 object for
     "nothing qualifies", and that object has `"title": ""` / `"summary": ""` --
-    schema-valid and contentless. From outside it is indistinguishable from a
-    model that never read the candidate file, so the probe records which one it
-    got instead of calling the empty object a successful judgment (measured
-    2026-11-03: the probe's answer was exactly that empty object).
+    schema-valid and contentless. On its own that is ambiguous, which is why the
+    probe now asks TWO candidates and this predicate is only ever read as one
+    half of the pair (see _probe_judgment).
     """
     if not isinstance(verdict, dict):
         return False
     return all(isinstance(verdict.get(k), str) and verdict[k].strip()
                for k in ("title", "summary"))
+
+
+def _probe_judgment(important, unimportant):
+    """Can this rung TELL THE TWO STORIES APART? One rule, stated once.
+
+    `capable` is true only when the IMPORTANT candidate came back with a
+    non-empty title and summary AND the UNIMPORTANT one came back as the
+    minimal object. Either one alone is worthless evidence:
+
+      * important judged, unimportant declined -> the rung read both stories and
+        behaved differently on each: it can judge.
+      * both declined -> "the important story was declined" is indistinguishable
+        from "the rung cannot judge", so capability is NOT shown. A decline is a
+        legitimate answer to the unimportant story and a failure on the
+        important one; the asymmetry is the whole point.
+      * both judged -> the rung answers, but it does not discriminate: the
+        unimportant story should not have been escalated into a summary.
+      * either half produced no usable answer -> nothing about judging is shown;
+        the state is reported instead of guessed.
+
+    No keyed rung at all is "not measured", never "cannot judge": nothing was
+    asked, so nothing was learned.
+    """
+    if important is None or unimportant is None:
+        return {"capable": False, "measured": False,
+                "failed": ["important", "unimportant"],
+                "reason": ("not measured: no keyed rung is configured in this "
+                           "process, so neither candidate was asked")}
+    parts = []
+    for rec, want_judged in ((important, True), (unimportant, False)):
+        if rec["judged_content"] is want_judged:
+            continue
+        label = rec["label"]
+        if rec["state"] != "answered":
+            parts.append("%s half: no usable answer (state=%s)"
+                         % (label, rec["state"]))
+        elif want_judged:
+            parts.append("%s half: declined (empty title and summary), so the "
+                         "rung did not judge a story it had to judge" % label)
+        else:
+            parts.append("%s half: judged, but it had to be declined -- the "
+                         "rung does not tell the two stories apart" % label)
+    return {"capable": not parts, "measured": True,
+            "failed": [p.split(" half:")[0] for p in parts],
+            "reason": "; ".join(parts)}
+
+
+def _walk_keyed_candidate(probe_dir, label, candidate, rung, runner,
+                          config_dir, window_min):
+    """Ask the leading keyed rung ONE fixed candidate, in its own directory.
+
+    Its own pending/health/attempt files mean neither walk can see the other's
+    cooldown, and a run can never promote a rung in the committed pool memory.
+    Exactly one attempt: the second walk is a second QUESTION, not a retry.
+    """
+    walk_dir = os.path.join(probe_dir, "control", label)
+    os.makedirs(walk_dir, exist_ok=True)
+    pending = os.path.join(walk_dir, "breaking_pending.json")
+    write_json_atomic(pending, _ladder_probe_pending(window_min,
+                                                     candidate=candidate))
+    rows = {}
+
+    def collect(**attempt):
+        attempt["control"] = True
+        attempt["candidate"] = label
+        rows[(attempt["model"], attempt["attempt"])] = _ladder_probe_row(
+            **attempt)
+
+    started = time.perf_counter()
+    verdict, _err = ai_classify(
+        pending, runner=runner, models=[rung], attempts_per_model=1,
+        on_attempt=collect,
+        # THE SAME CODE PATH AS A REAL RUNG. `_rung_env` points the child at the
+        # CLI config that declares this provider; nothing here re-implements
+        # that rule or exports the variable to a real sweep.
+        config_dir=config_dir)
+    seconds = round(time.perf_counter() - started, 2)
+    attempts = list(rows.values())
+    if verdict is not None:
+        state = "answered"
+    elif any(a["outcome"] == "no_output" for a in attempts):
+        state = "no_output"
+    elif any(a["outcome"] == "unparseable" for a in attempts):
+        state = "unparseable"
+    elif attempts:
+        state = "failed"
+    else:
+        state = "not_run"          # suppressed before any attempt
+    return {"label": label,
+            "expect": "judged" if label == "important" else "declined",
+            "rung": rung,
+            "state": state,
+            "judged_content": _verdict_judged(verdict),
+            "seconds": seconds,
+            "attempts": attempts}
 
 
 def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
@@ -2440,12 +2565,18 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
     so an artifact-only answer would be the same unrecoverable evidence the
     honesty gate was fixed to stop producing.
 
-    ONE CONTROL RUNG, ALWAYS SEPARATE. A free-tier silence cannot be attributed
-    by the free tier itself, so the probe also asks the KEYED provider once (see
-    _ladder_probe_control_rung) in its own dir. Its rows are marked
-    `control: true`, it never enters `verdict`, and if no credential is present
-    the file says `control: unconfigured` rather than failing -- a probe that
-    could not run its control is still a probe, it just cannot attribute.
+    ONE CONTROL RUNG, ASKED TWO QUESTIONS. A free-tier silence cannot be
+    attributed by the free tier itself, so the probe also asks the KEYED
+    provider (see _ladder_probe_control_rung) in its own dirs, once per fixed
+    candidate. Its rows are marked `control: true`, it never enters `verdict`,
+    and if no credential is present the file says `control: unconfigured` rather
+    than failing -- a probe that could not run its control is still a probe, it
+    just cannot attribute, and `judgment_measured: false` says the pair was
+    never asked instead of pretending the rung cannot judge.
+
+    TWO CANDIDATES, ONE VERDICT EACH. The important story must be judged and the
+    unimportant one declined; only that pair shows the rung can tell them apart
+    (see _probe_judgment). Two walks of the leading keyed rung, never four.
 
     Returns a process exit code: 0 when the probe ran and wrote its result
     (whatever the verdict -- "the ladder is broken" IS a result), 1 when the
@@ -2462,6 +2593,7 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
         # LAST WRITE WINS per (model, attempt): a refusal arm reports the
         # attempt after its generic branch would have, and the specific one is
         # the useful one.
+        attempt["candidate"] = "unimportant"   # the free walk asks this one
         rows[(attempt["model"], attempt["attempt"])] = _ladder_probe_row(
             **attempt)
 
@@ -2483,60 +2615,37 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
     else:
         state = "none"
 
-    # THE CONTROL RUNG. One attempt against the KEYED provider, in its own
-    # isolated state dir (so a free-pool refusal cannot suppress it, and its
-    # success cannot promote a rung). If the keyed rung also emits nothing in
-    # the same window, the harness cannot see model output and no free-tier
-    # tuning matters; if it answers, the free tier is the fault. Exactly one
-    # attempt: paying 150s twice to ask the same question is the burn the
-    # deadline above exists to stop.
+    # THE KEYED RUNG, ASKED TWICE. One walk answers the attribution question
+    # (is the harness blind or is the free tier stalled?); the pair of walks
+    # answers the judgment question (can this rung tell an important story from
+    # an unimportant one?), which no single answer can. Both use the first rung
+    # the real walk would try, in their own dirs, one attempt each: two walks of
+    # the leading keyed rung, never four.
     control_model, control_env = _ladder_probe_control_rung(config_dir)
-    control_state = "unconfigured"
-    control_attempts = []
-    control_seconds = None
-    control_verdict = None
+    walks = {}
     if control_model:
-        control_dir = os.path.join(probe_dir, "control")
-        os.makedirs(control_dir, exist_ok=True)
-        control_pending = os.path.join(control_dir, "breaking_pending.json")
-        write_json_atomic(control_pending, _ladder_probe_pending(window_min))
-        control_rows = {}
-
-        def collect_control(**attempt):
-            attempt["control"] = True
-            control_rows[(attempt["model"], attempt["attempt"])] = \
-                _ladder_probe_row(**attempt)
-
-        control_started = time.perf_counter()
-
-        control_verdict, _control_err = ai_classify(
-            control_pending, runner=runner, models=[control_model],
-            attempts_per_model=1, on_attempt=collect_control,
-            # THE SAME CODE PATH AS A REAL RUNG. `_rung_env` points the child
-            # at the CLI config that declares this provider; nothing here
-            # re-implements that rule or exports the variable to a real sweep.
-            config_dir=config_dir)
-        control_attempts = list(control_rows.values())
-        control_seconds = round(time.perf_counter() - control_started, 2)
-        if control_verdict is not None:
-            control_state = "answered"
-        elif any(a["outcome"] == "no_output" for a in control_attempts):
-            control_state = "no_output"
-        elif any(a["outcome"] == "unparseable" for a in control_attempts):
-            control_state = "unparseable"
-        elif control_attempts:
-            control_state = "failed"
-        else:
-            control_state = "not_run"      # suppressed before any attempt
+        for label, candidate, _expect in LADDER_PROBE_CANDIDATES:
+            walks[label] = _walk_keyed_candidate(
+                probe_dir, label, candidate, control_model, runner,
+                config_dir, window_min)
+    control_attempts = walks["unimportant"]["attempts"] \
+        if "unimportant" in walks else []
+    control_state = walks["unimportant"]["state"] \
+        if "unimportant" in walks else "unconfigured"
+    control_seconds = walks["unimportant"]["seconds"] \
+        if "unimportant" in walks else None
 
     attribution = _probe_attribution(control_state, free_attempts)
-    attempts = free_attempts + control_attempts
-    # DID THE ANSWER JUDGE ANYTHING? A schema-valid minimal object is not
-    # evidence of classification -- the same fields the prompt prescribes for
-    # "nothing qualifies" are the fields a blind answer leaves empty. Recorded
-    # per verdict (free and control) so nobody reads "parseable" as "can judge".
+    attempts = free_attempts + control_attempts + (
+        walks["important"]["attempts"] if "important" in walks else [])
+    # DID THE ANSWER JUDGE ANYTHING? The free walk's own answer is kept as one
+    # boolean for back-compat, but it is NOT evidence of capability -- that is
+    # the pair below, because one decline is the prompt's answer to "nothing
+    # qualifies" and to "I cannot read this" alike.
     judged = _verdict_judged(verdict)
-    control_judged = _verdict_judged(control_verdict)
+    control_judged = walks["unimportant"]["judged_content"] \
+        if "unimportant" in walks else False
+    judgment = _probe_judgment(walks.get("important"), walks.get("unimportant"))
 
     doc = {"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "head_sha": head_sha or "",
@@ -2553,9 +2662,27 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
            "attempts": attempts,
            "verdict": state,
            "judged_content": judged,
-           "judged_rule": ("judged_content is true only when the verdict's "
-                           "title AND summary are both non-empty; the minimal "
-                           "level-1 object judges nothing"),
+           "judged_rule": ("judged_content is true only when a verdict's title "
+                           "AND summary are both non-empty; the minimal level-1 "
+                           "object judges nothing"),
+           # THE PAIR, AND WHAT IT PROVES. A decline is a correct answer to the
+           # unimportant candidate and a failure on the important one, so only
+           # the two together say whether this rung can judge at all.
+           "judgment_capable": judgment["capable"],
+           "judgment_measured": judgment["measured"],
+           "judgment_failed": judgment["failed"],
+           "judgment_reason": judgment["reason"],
+           "judgment_rule": ("judgment_capable is true only when the important "
+                             "candidate is judged (non-empty title and summary) "
+                             "AND the unimportant candidate is declined (the "
+                             "minimal object); judgment_failed names every half "
+                             "that did not behave as required"),
+           "candidates": {
+               label: {"label": rec["label"], "expect": rec["expect"],
+                       "state": rec["state"],
+                       "judged_content": rec["judged_content"],
+                       "rung": rec["rung"], "seconds": rec["seconds"]}
+               for label, rec in walks.items()},
            "control_judged_content": control_judged,
            "control": control_state,
            "control_model": control_model or "",
@@ -2589,8 +2716,23 @@ def run_ladder_probe(state_dir, head_sha="", runner=None, models=None,
              else "the verdict judged nothing"))
     if state == "parseable" and not judged:
         print("ladder_probe: the verdict is schema-valid but judged NOTHING "
-              "(empty title and summary) -- it proves the rung ANSWERED, not "
-              "that it can judge; this run is not evidence about judging.")
+              "(empty title and summary) -- a free-rung decline is not a "
+              "capability result either way; the keyed pair below is what "
+              "answers that.")
+    for label, _cand, expect in LADDER_PROBE_CANDIDATES:
+        rec = walks.get(label)
+        if rec is None:
+            print("ladder_probe: candidate=%s NOT ASKED (no keyed rung) "
+                  "expect=%s" % (label, expect))
+            continue
+        print("ladder_probe: candidate=%s expect=%s state=%s "
+              "judged_content=%s rung=%s in %.2fs"
+              % (label, expect, rec["state"],
+                 "yes" if rec["judged_content"] else "no", rec["rung"],
+                 rec["seconds"]))
+    print("ladder_probe: judgment_capable=%s%s"
+          % ("yes" if judgment["capable"] else "no",
+             "" if judgment["capable"] else " -- " + judgment["reason"]))
     print("ladder_probe: control=%s attribution=%s%s"
           % (control_state, attribution,
              "" if not control_model

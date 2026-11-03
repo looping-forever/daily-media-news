@@ -476,17 +476,32 @@ jobs:
               lines.append("- Confirmed answer, no answer, or garbage? "
                            "`parseable` / `none` / `unparseable` are those three "
                            "and nothing else.")
-              # A SCHEMA-VALID EMPTY OBJECT IS NOT PROOF OF JUDGING. The prompt
-              # prescribes `title: ""` / `summary: ""` when nothing qualifies, so
-              # that shape is what a working model and a blind one both produce.
-              lines.append("- Judged content: %s -- %s"
+              # THE PAIR IS THE FINDING. One decline means "nothing qualifies"
+              # OR "I cannot judge", and the prompt prescribes the same empty
+              # object for both -- so a single boolean proves nothing. Only the
+              # important story being judged AND the unimportant one declined
+              # shows the rung can tell them apart.
+              lines.append("- Judgment capable: %s -- %s"
+                           % (probe.get("judgment_capable"),
+                              probe.get("judgment_reason")
+                              or "the important story was judged and the "
+                                 "unimportant one was declined"))
+              lines.append("- Judgment rule: %s" % probe.get("judgment_rule"))
+              for label, expect in (("important", "judged"),
+                                    ("unimportant", "declined")):
+                  rec = (probe.get("candidates") or {}).get(label) or {}
+                  lines.append("- Candidate %s (must be %s): state=%s, "
+                               "judged_content=%s, rung=%s, %ss"
+                               % (label, expect, rec.get("state"),
+                                  rec.get("judged_content"), rec.get("rung"),
+                                  rec.get("seconds")))
+              if probe.get("judgment_measured") is False:
+                  lines.append("- The pair was NOT ASKED in this run (no keyed "
+                               "rung), so this is not evidence either way about "
+                               "judging.")
+              lines.append("- Free-walk judged content: %s -- %s"
                            % (probe.get("judged_content"),
                               probe.get("judged_rule")))
-              if probe.get("verdict") == "parseable" \
-                      and not probe.get("judged_content"):
-                  lines.append("- The answer judged NOTHING (empty title and "
-                               "summary): it proves the rung answered, not that "
-                               "it can judge, and must not be read as success.")
               lines.append("- Control judged content: %s"
                            % probe.get("control_judged_content"))
               # WHOSE FAULT IS THE SILENCE. `verdict: none` alone cannot tell a

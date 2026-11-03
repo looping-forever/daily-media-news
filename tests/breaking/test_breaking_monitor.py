@@ -2920,11 +2920,13 @@ def test_66_the_ladder_probe_walks_once_and_cannot_send_judge_or_promote():
         % (doc["attempts"],))
     wanted = {"model", "attempt", "granted_sec", "wall_sec", "first_byte_sec",
               "first_byte_source", "first_liveness_sec", "first_liveness_source",
-              "outcome", "control", "tail_excerpt"}
+              "outcome", "control", "candidate", "tail_excerpt"}
     for row in doc["attempts"]:
         assert set(row) == wanted, row
         assert row["control"] is False, (
             "a free-rung row must never be labelled as the control: %r" % (row,))
+        assert row["candidate"] == "unimportant", (
+            "the free walk asks the candidate that must be declined: %r" % (row,))
         assert row["granted_sec"] == bm.AI_PER_ATTEMPT_TIMEOUT_SEC, row
         assert row["first_byte_sec"] is None, (
             "this stub runner cannot measure a first byte, so a number here "
@@ -3155,7 +3157,14 @@ def test_70_the_control_rung_is_labelled_and_excluded_from_the_free_verdict():
 
     control_rows = [a for a in doc["attempts"] if a.get("control")]
     free_rows = [a for a in doc["attempts"] if not a.get("control")]
-    assert [r["model"] for r in control_rows] == ["ctrl/cheap-1"], doc["attempts"]
+    # TWO walks of the same keyed rung, one per fixed candidate -- the pair is
+    # the measurement now, so the control is no longer a single row.
+    assert [r["model"] for r in control_rows] == ["ctrl/cheap-1",
+                                                  "ctrl/cheap-1"], doc["attempts"]
+    assert sorted(r["candidate"] for r in control_rows) == ["important",
+                                                            "unimportant"], (
+        "each keyed row must say which fixed candidate it answered: %r"
+        % (control_rows,))
     assert [r["model"] for r in free_rows] == ["free/one"], doc["attempts"]
     assert doc["control"] == "answered", doc
     assert doc["control_model"] == "ctrl/cheap-1", doc
@@ -3833,6 +3842,29 @@ def test_86_the_probe_candidate_is_realistic_and_non_empty():
         assert sent[key] == cand[key], (key, sent)
     assert sent.get("published"), sent
 
+    # THE IMPORTANT HALF MUST BE JUST AS REAL AND JUST AS SAFE. It is the story
+    # that has to be judged, so it has to read like something a sweep could
+    # deliver -- and it must not be able to trip the death-count fast path or
+    # name a real outlet either.
+    important = bm.LADDER_PROBE_IMPORTANT_CANDIDATE
+    for key in ("title", "url", "source", "snippet", "domain_category"):
+        assert isinstance(important.get(key), str) and important[key].strip(), key
+    assert important["domain_category"] == "nepal", important
+    assert len(important["title"]) >= 30, important["title"]
+    assert re.match(r"^https://[a-z0-9.-]+\.example/", important["url"]), \
+        important["url"]
+    itext = "%s %s" % (important["title"], important["snippet"])
+    assert not re.search(r"\d", itext), (
+        "a number in the important candidate could trip the death-count fast "
+        "path: %r" % itext)
+    assert not re.search(r"(?i)\b(dead|deaths|killed|casualt|injur|earthquake)\b",
+                         itext), itext
+    assert len(re.findall(r"\b(?:Herald|Post|Times|Gazette|Journal|Chronicle)\b",
+                          important["snippet"])) >= 2, important["snippet"]
+    assert important["title"] != cand["title"]
+    ipayload = bm._ladder_probe_pending(candidate=important)
+    assert ipayload["candidates"][0]["title"] == important["title"], ipayload
+
 
 def _minimal_verdict():
     return json.dumps({"level": 1, "confidence": "LOW", "event_key": "",
@@ -3893,6 +3925,196 @@ def test_88_a_real_verdict_is_recorded_as_judged_content_true():
         "a verdict that names an event and summarises it was recorded as "
         "judging nothing: %r" % (doc,))
     assert "judged_content=yes" in out.getvalue(), out.getvalue()
+
+
+def _keyed_probe_config(env_name="LADDER_PROBE_TEST_KEY"):
+    """A CLI config declaring one keyed provider, and the env var holding it."""
+    cfgdir = fresh_dir()
+    with open(os.path.join(cfgdir, "opencode-cli.json"), "w",
+              encoding="utf-8") as fh:
+        json.dump({"provider": {"ctrl": {
+            "options": {"apiKey": "{env:%s}" % env_name},
+            "models": {"cheap-1": {"name": "Cheap One"}}}}}, fh)
+    return cfgdir, env_name
+
+
+def _important_answer():
+    return json.dumps({"level": 2, "confidence": "HIGH",
+                       "event_key": "carrier-grounds-fleet",
+                       "title": "National carrier grounds its international fleet",
+                       "summary": "Reported: the airline suspended international "
+                                  "flights while engineers review maintenance "
+                                  "records, and passengers are being rebooked.",
+                       "why_urgent": "Anyone with an international booking must "
+                                     "rebook before departure.",
+                       "escalated_from_previous": False,
+                       "sources": [{"name": "The Northgate Journal",
+                                    "url": "https://northgatejournal.example/a"}],
+                       "category_suggestion": "nepal"})
+
+
+def _pair_runner(calls, judge_important=True, judge_unimportant=False):
+    """A stub that answers each candidate the way the goal says it must be
+    answered: the important one with a real verdict, the unimportant one with
+    the minimal object."""
+    def runner(model, prompt_text, env, timeout_sec):
+        with open(env["CANDIDATES_PATH"], encoding="utf-8") as fh:
+            pending = json.load(fh)
+        title = pending["candidates"][0]["title"]
+        calls.append((env["CANDIDATES_PATH"], title))
+        if title == bm.LADDER_PROBE_IMPORTANT_CANDIDATE["title"]:
+            return 0, (_important_answer() if judge_important
+                       else _minimal_verdict()), ""
+        return 0, (_important_answer() if judge_unimportant
+                   else _minimal_verdict()), ""
+    return runner
+
+
+def _run_pair_probe(judge_important=True, judge_unimportant=False):
+    cfgdir, env_name = _keyed_probe_config()
+    sd = fresh_dir()
+    calls = []
+    out = io.StringIO()
+    with unittest.mock.patch.dict(os.environ, {env_name: "not-a-real-key"}):
+        with contextlib.redirect_stdout(out):
+            code = bm.run_ladder_probe(
+                sd, runner=_pair_runner(calls, judge_important,
+                                        judge_unimportant),
+                models=["free/one"], config_dir=cfgdir)
+    assert code == 0, code
+    return read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME)), out.getvalue(), calls
+
+
+def test_89_a_decline_is_not_reported_as_a_failure_of_capability():
+    """A DECLINE IS A CORRECT ANSWER TO THE UNIMPORTANT STORY.
+
+    The prompt prescribes the minimal object both for "nothing qualifies" and for
+    "I cannot read this", so a decline can only ever be read as one half of a
+    pair. When the important story IS judged, the unimportant decline must appear
+    as required behaviour -- not as a failed half, and not as a capability result
+    on its own.
+    """
+    doc, text, calls = _run_pair_probe(judge_important=True,
+                                       judge_unimportant=False)
+    assert doc["judgment_measured"] is True, doc
+    assert doc["candidates"]["important"]["judged_content"] is True, doc
+    assert doc["candidates"]["unimportant"]["judged_content"] is False, (
+        "the unimportant candidate must be declined, and that must be recorded "
+        "as a decline rather than left blank: %r" % (doc,))
+    assert doc["judgment_failed"] == [], (
+        "a decline of the story that MUST be declined was counted as a failed "
+        "half: %r" % (doc.get("judgment_failed"),))
+    assert doc["judgment_capable"] is True, doc
+    assert "judged_content=no" in text, (
+        "the decline must be visible in the run log, not hidden: %s" % text)
+
+    # A DECLINE ALONE PROVES NOTHING: with no keyed rung the pair was never
+    # asked, which is recorded as unmeasured rather than as "cannot judge".
+    sd = fresh_dir()
+    with contextlib.redirect_stdout(io.StringIO()):
+        bm.run_ladder_probe(sd, runner=lambda m, p, e, t: (0, _minimal_verdict(), ""),
+                            models=["free/one"], config_dir=fresh_dir())
+    bare = read_json(os.path.join(sd, bm.LADDER_PROBE_FILENAME))
+    assert bare["judgment_measured"] is False, bare
+    assert bare["judgment_capable"] is False, bare
+    assert "not measured" in bare["judgment_reason"].lower(), bare
+
+
+def test_90_a_judged_important_candidate_makes_the_probe_capable():
+    """THE PAIR, BOTH HALVES AS REQUIRED, IS THE ONLY `true`.
+
+    Two walks of the leading keyed rung, one fixed candidate each, and each
+    candidate reaches the model as the ONLY candidate in its payload -- so the
+    answer is about that story and nothing else.
+    """
+    doc, text, calls = _run_pair_probe(judge_important=True,
+                                       judge_unimportant=False)
+    assert doc["judgment_capable"] is True, (
+        "an important story judged AND an unimportant story declined is the one "
+        "shape that shows capability: %r" % (doc,))
+    assert doc["judgment_failed"] == [], doc
+    titles = [title for _path, title in calls]
+    assert bm.LADDER_PROBE_IMPORTANT_CANDIDATE["title"] in titles, (
+        "the important candidate was never asked: %r" % (titles,))
+    assert bm.LADDER_PROBE_CANDIDATE["title"] in titles, (
+        "the unimportant candidate was never asked: %r" % (titles,))
+    assert len(set(titles)) == 2, (
+        "the pair must be two different stories, not one asked twice: %r"
+        % (titles,))
+    # TWO walks of the keyed rung, and the free walk: never four.
+    keyed = [a for a in doc["attempts"] if a.get("control")]
+    assert len(keyed) == 2, (
+        "one attempt per candidate is the whole cost of the pair: %r" % (keyed,))
+    assert sorted(a["candidate"] for a in keyed) == ["important", "unimportant"]
+    assert len({a["attempt"] for a in keyed}) == 1, (
+        "a second walk is a second QUESTION, never a retry of the first: %r"
+        % (keyed,))
+    assert "judgment_capable=yes" in text, text
+
+
+def test_91_judging_the_unimportant_candidate_is_a_failed_half():
+    """A RUNG THAT SUMMARISES EVERYTHING IS NOT DISCRIMINATING.
+
+    Both judged means the rung answers but cannot tell an important story from
+    an unimportant one, so capability is false and the failing half is named.
+    """
+    doc, text, _calls = _run_pair_probe(judge_important=True,
+                                        judge_unimportant=True)
+    assert doc["judgment_capable"] is False, doc
+    assert doc["judgment_failed"] == ["unimportant"], (
+        "the failing half must be the unimportant one, by name: %r"
+        % (doc.get("judgment_failed"),))
+    assert "unimportant half" in doc["judgment_reason"], doc["judgment_reason"]
+    assert "judgment_capable=no" in text and "unimportant half" in text, text
+
+
+def test_92_a_decline_of_the_important_candidate_names_the_failing_half():
+    """THE HARD CASE: BOTH DECLINED LOOKS EXACTLY LIKE "CANNOT JUDGE".
+
+    Measured 2026-11-03: two different candidates both came back as the minimal
+    object. That is a decline by a rung that can judge and a failure by a rung
+    that cannot, and the file must say which half's failure produced the verdict
+    rather than reporting a bare false.
+    """
+    doc, text, _calls = _run_pair_probe(judge_important=False,
+                                        judge_unimportant=False)
+    assert doc["judgment_capable"] is False, doc
+    assert doc["judgment_failed"] == ["important"], (
+        "both halves declined, so the failing half is the important one: %r"
+        % (doc.get("judgment_failed"),))
+    assert "important half" in doc["judgment_reason"], doc["judgment_reason"]
+    assert "declined" in doc["judgment_reason"], doc["judgment_reason"]
+    assert "important half" in text, (
+        "the run log must name the failing half, not print a bare false: %s"
+        % text)
+    # AND THE DECLINE OF THE UNIMPORTANT HALF IS STILL NOT A FAILURE there.
+    assert "unimportant half" not in doc["judgment_reason"], (
+        "a required decline was reported as a failed half: %r"
+        % doc["judgment_reason"])
+
+
+def test_93_the_two_candidate_probe_still_commits_only_its_own_file():
+    """THE NEW PAIR MUST NOT RE-OPEN THE CLOBBER.
+
+    Two walks write into `state/ladder_probe/`, and the result still lands in
+    exactly one tracked path: `state/ladder_probe.json`. Asserted against a real
+    bare remote, with a dirty health file present, because that is the shape that
+    reverted a concurrent run's state in `a7c7a48ce`.
+    """
+    probe = "state/ladder_probe.json"
+    health = "state/model_health.json"
+    bash, remote, work = _dirty_state_repo((probe, health))
+    # The real result of a real two-candidate probe run, not a stub file.
+    doc, _text, _calls = _run_pair_probe()
+    _put(os.path.join(work, probe), json.dumps(doc, indent=2, sort_keys=True))
+    proc = _run_commit(work, bash, "chore: ladder probe [skip ci]",
+                       health, probe, LADDER_PROBE="true")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert _remote_touched(remote) == [probe], (
+        "the two-candidate probe committed more than its own result: %r"
+        % (_remote_touched(remote),))
+    assert _remote_body(remote, health) == "remote-model_health.json\n", (
+        "the probe published its own copy of a concurrent run's health state")
 
 
 def main():
@@ -3985,6 +4207,11 @@ def main():
         test_86_the_probe_candidate_is_realistic_and_non_empty,
         test_87_an_empty_judgment_is_recorded_as_judged_content_false,
         test_88_a_real_verdict_is_recorded_as_judged_content_true,
+        test_89_a_decline_is_not_reported_as_a_failure_of_capability,
+        test_90_a_judged_important_candidate_makes_the_probe_capable,
+        test_91_judging_the_unimportant_candidate_is_a_failed_half,
+        test_92_a_decline_of_the_important_candidate_names_the_failing_half,
+        test_93_the_two_candidate_probe_still_commits_only_its_own_file,
     ]
     failures = []
     for test in tests:
