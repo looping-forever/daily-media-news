@@ -140,6 +140,7 @@ from email.mime.text import MIMEText
 try:
     import alert_dedupe
     import collect_news
+    import english_text
     import model_selector
     import payload_io
     import story_state
@@ -148,6 +149,7 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import alert_dedupe
     import collect_news
+    import english_text
     import model_selector
     import payload_io
     import story_state
@@ -1312,9 +1314,19 @@ def hard_evidence_fast_path(candidates):
     Returns (None, "") for anything that does not qualify, which is the common
     case and is never a failure: the AI ladder is then consulted exactly as
     before.
+
+    The title this returns is spliced into a push that no model wrote. The AI
+    ladder's titles ARE model-produced, which is why that path is expected to
+    come back in English; this one has no such producer, so the gate is code.
     """
     for cand in candidates or []:
         title = cand.get("title", "") or ""
+        # A push is rendered by a client whose fonts we do not control, and a
+        # Devanagari title is the 2026-11-03 empty-box defect again. The Latin
+        # half of a mixed headline can still state a toll, so this is checked
+        # before any rule reads the title.
+        if not english_text.looks_english(title):
+            continue
         blob = _gate_blob(title, cand.get("snippet", "") or "")
         if len(SPORT_GOSSIP_RE.findall(blob)) >= SPORT_GOSSIP_DOMINATING_HITS:
             continue
@@ -3762,6 +3774,16 @@ def process_alert(verdict, matched_candidates, state, paths, args,
 
     level = verdict["level"]
     confidence = verdict["confidence"]
+    # The headline is the one line every channel repeats (ntfy, Telegram, SMTP,
+    # preview). A script the page's font stack cannot draw would render as an
+    # empty box on any of them, so the whole alert is HELD here, before any
+    # channel is touched. It is not a delivery failure and it is not recorded
+    # as one: the log row says why.
+    script = english_text.non_english_script(verdict.get("title"))
+    if script:
+        return False, level, confidence, "", (
+            "held_non_english: the alert title is %s, which no channel may "
+            "carry" % script)
     notes = []
     # A fast-path verdict rides the SAME stages as an AI one, so this note is
     # the record that the classifier was bypassed. It reaches the log row and

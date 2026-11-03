@@ -330,6 +330,13 @@ NP_EN_EXTRA_QUERIES = [
 # honest fill for the manga/manhwa/manhua section -- it is mostly anime news,
 # and the section header says MANGA - MANHWA - MANHUA, so what is actually
 # covered is the manga half plus general anime/manga industry news.
+#
+# THE FOURTH FIELD IS THE FEED'S LOCALE, NOT A DETECTION. It records the language
+# the publisher publishes in (`ne` for a Nepali-language feed) and is copied into
+# the candidate as `language` for the sweep to report. It says nothing about what
+# any individual headline contains: a `ne` feed can carry an English headline and
+# an `en` feed can carry a Devanagari one. Whether a title can actually be drawn
+# is decided later by english_text, on the text itself.
 DIRECT_FEEDS = (
     # -- gaming ------------------------------------------------------------
     ("feed:gaming-rockpapershotgun", "https://www.rockpapershotgun.com/feed",

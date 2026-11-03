@@ -93,6 +93,32 @@ class RenderPage(unittest.TestCase):
             self.assertNotIn(LABEL, self.page({"edition_kind": kind}))
 
 
+class TheLabelSaysHowShortTheEditionIs(unittest.TestCase):
+    """A label that only says "no AI" explains empty summaries, not a short page.
+
+    On 2026-11-03 the page carried one story fewer because its headline was not in
+    English. The count lives in `notes`, which are CAPPED for display and lose the
+    sentence first, so the reader-visible edition line is where it belongs.
+    """
+
+    COUNTED = "2 stories were held back because they are not in English."
+
+    def page(self, notes):
+        meta = {"edition_kind": "unsummarised", "notes": notes}
+        return render_digest.render_page([], SLOT, DAY, STAMP, meta,
+                                         schedule_path=NO_SCHEDULE)
+
+    def test_the_count_rides_on_the_edition_line(self):
+        html = self.page("Research note. " + self.COUNTED)
+        self.assertIn(LABEL + " - " + self.COUNTED, html,
+                      "the label states the kind and the count in one line")
+
+    def test_a_note_without_a_count_leaves_the_label_alone(self):
+        html = self.page("Research note: two sources were unreachable.")
+        self.assertIn('<p class="health-edition">%s</p>' % LABEL, html)
+        self.assertNotIn("held back", html)
+
+
 class TheWordsAreTheSameOnAllThreeSurfaces(unittest.TestCase):
     """ONE EDITION, THREE SURFACES, ONE SENTENCE.
 

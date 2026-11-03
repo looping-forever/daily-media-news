@@ -64,6 +64,12 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import empty_state
 
+try:
+    import english_text
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import english_text
+
 # Fixed section order: (category key, display header, accent color)
 # The two institution headers are runtime values (see private_values).
 SECTIONS = [
@@ -2409,6 +2415,11 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     edition_line = ""
     if (meta or {}).get("edition_kind") == "unsummarised":
         edition_line = UNSUMMARISED_LABEL
+        # A short edition must say what made it short. The count is read back off
+        # the notes, which are capped for display and lose this sentence first.
+        held_back = english_text.held_back_from_notes((meta or {}).get("notes"))
+        if held_back:
+            edition_line += " - " + english_text.held_back_note(held_back)
 
     grouped = {}
     for s in stories:

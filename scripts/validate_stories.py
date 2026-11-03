@@ -5,6 +5,9 @@ Pipeline (in order):
   1. Load input JSON (parse failure -> fatal, exit 1).
   2. Schema-validate every story; violations DROP the individual story.
      Unparseable top-level structure -> fatal, exit 1.
+    2a. English-only gate: a story whose TITLE is not English is DROPPED
+     (`non_english_title:<script>`); a non-English SUMMARY is cleared and the
+     story stays, because the text is the defect, not the headline.
    1b. Derive `source_health` from the collector's `source_results` in
      candidates.json (scripts/source_health.py, pure + total). A missing,
      corrupt or legacy candidates file degrades to state "unknown" and never
@@ -72,6 +75,12 @@ try:
 except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import source_health
+
+try:
+    import english_text
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import english_text
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -675,6 +684,19 @@ def validate_story(story, index, normalised=None):
             # An empty headline is a story with no story in it. There is
             # nothing to repair and nothing to render.
             return fail("schema: required field '%s' is blank" % field)
+
+    # A headline the page cannot draw is not a headline. The page loads no
+    # Devanagari face, so 2026-11-03 shipped an empty box where the title was.
+    script = english_text.non_english_script(story["title"])
+    if script:
+        return fail("non_english_title: %s" % script)
+
+    # The SUMMARY is not the story: clear the unrenderable text, keep the story.
+    summary = story.get("summary")
+    if _is_str(summary) and summary.strip() and \
+            not english_text.looks_english(summary):
+        story["summary"] = ""
+        repaired.append("summary_non_english")
 
     # Descriptive fields: repair, never drop. `spoiler_reason` is the one that
     # cost three real stories on 2026-10-30, and it is optional in the
@@ -1613,6 +1635,7 @@ def main(argv=None):
     # -- Stage 2: schema validation ----------------------------------------
     stage2_counts = {"kept": 0, "dropped": 0, "repaired": 0}
     repaired_names = set()
+    summary_cleared = 0
     valid_stories = []
     for idx, story in enumerate(raw_stories):
         repaired_fields = []
@@ -1622,9 +1645,18 @@ def main(argv=None):
             stage2_counts["kept"] += 1
             stage2_counts["repaired"] += len(repaired_fields)
             repaired_names.update(repaired_fields)
+            if "summary_non_english" in repaired_fields:
+                summary_cleared += 1
         else:
             drop(story if isinstance(story, dict) else {}, reason)
             stage2_counts["dropped"] += 1
+
+    english_dropped = sum(1 for entry in filter_log
+                          if entry["reason"].startswith("non_english_title"))
+    if english_dropped:
+        # A run that refused stories for their script must not read as a quiet
+        # day: the count goes in `notes`, the one field every surface shows.
+        notes = (notes + " " + english_text.held_back_note(english_dropped)).strip()
 
     if not raw_stories:
         print("Input contains zero stories.")
@@ -1902,6 +1934,8 @@ def main(argv=None):
           % (stage2_counts["kept"], stage2_counts["dropped"],
              stage2_counts["repaired"],
              (" (%s)" % ", ".join(sorted(repaired_names))) if repaired_names else ""))
+    print("  english:     %d dropped (title not in English), %d summaries cleared"
+          % (english_dropped, summary_cleared))
     print("  keywords:    %d dropped (excluded_keywords loaded: %d)" %
           (len(valid_stories) - len(after_keywords), len(excluded_keywords)))
     print("  promo-demote: %d demoted (foreign promo events capped at priority %d)" %

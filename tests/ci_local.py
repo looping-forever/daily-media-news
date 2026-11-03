@@ -88,6 +88,13 @@ SUITES = (
     # silently lose its alert again. Mirrored in drift-canary.yml.
     ("breaking_fast_path", [sys.executable,
                             "tests/breaking/test_hard_evidence_fast_path.py"]),
+    # Registered WITH the English gate it pins, for the reason the 2026-10-08
+    # note gives: a suite nothing runs proves nothing. One headline reaches the
+    # ntfy, Telegram, email and preview surfaces, and a non-English one renders
+    # as nothing on all four. STILL MISSING FROM drift-canary.yml -- the mirror
+    # is owed to whoever owns the workflow.
+    ("breaking_english_gate", [sys.executable, "-m", "unittest",
+                               "tests.breaking.test_english_push_gate", "-v"]),
     # Registered 2026-10-13 with dynamic model selection. The ladder is no
     # longer written down: it is the config seed, extended by what the provider
     # actually serves and reordered by measured health, under a stage-wide time

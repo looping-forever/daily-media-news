@@ -103,6 +103,12 @@ except ImportError:  # imported from a cwd that is not scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import devanagari
 
+# NO RUNTIME GATE IN THIS FILE, deliberately. Every push string here is built
+# from literals plus the roll number, the semester, the date and URLs, so it is
+# English by construction. The publisher's notice TITLE stays as data in the
+# payload and never reaches the ntfy title or body -- tests/academic/
+# test_english_push.py pins that against a real Devanagari notice.
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -2442,8 +2448,9 @@ def _build_payload(state, semester, notice, passed, result_date):
     if passed:
         status = "passed"
         message = (
-            "**PASSED** — Roll %s found in the %s.\n\n"
-            "[📄 View result PDF](%s)" % (roll, title, pdf_url)
+            "**PASSED** — Roll %s found in the CSIT semester %d result "
+            "notice.\n\n[📄 View result PDF](%s)"
+            % (roll, semester, pdf_url)
         )
         ntfy_title = "🎓 CSIT Sem %d Result: PASSED" % semester
         tags = ["🎓", "white_check_mark"]
@@ -2451,9 +2458,10 @@ def _build_payload(state, semester, notice, passed, result_date):
     else:
         status = "failed"
         message = (
-            "**FAILED** — Roll %s NOT found in the %s. You will re-exam this "
-            "semester with the next batch. The monitor will keep watching for "
-            "your back/re-exam result." % (roll, title)
+            "**FAILED** — Roll %s NOT found in the CSIT semester %d result "
+            "notice. You will re-exam this semester with the next batch. The "
+            "monitor will keep watching for your back/re-exam result."
+            % (roll, semester)
         )
         ntfy_title = "🎓 CSIT Sem %d Result: FAILED" % semester
         tags = ["🎓", "x"]
@@ -2494,6 +2502,8 @@ def _build_exam_notice_payload(state, semester, notice, notice_date):
     ntfy_topic = os.environ.get("NTFY_TOPIC") or "<NTFY_TOPIC>"
     worker_base = _worker_base()
     sem_label = str(semester) if semester else "all"
+    sem_label_text = ("semester %s" % sem_label if semester
+                      else "all semesters")
     web_path = "docs/academic/%s-exam-notice-sem%s.html" % (date, sem_label)
     web_url = "%s/academic/%s-exam-notice-sem%s.html" % (
         worker_base, date, sem_label)
@@ -2502,9 +2512,14 @@ def _build_exam_notice_payload(state, semester, notice, notice_date):
         "[Open notice](%s)\n\n"
         "No pass/fail verdict: this is a notice alert (routine, form, "
         "admission card, deadline). Check the notice itself for dates."
-        % (title, notice_url)
+        % (sem_label_text, notice_url)
     )
-    ntfy_title = "🎓 CSIT exam notice: %s" % title
+    # ENGLISH ONLY. The notice title is Devanagari and the push has no font
+    # guarantee. The TITLE is omitted rather than translated, and the BODY keeps
+    # its English sentence because the notice link is the part that is actionable;
+    # a body repeating the Devanagari words would be one more unrenderable string.
+    # The verbatim title stays in the payload and on the linked notice itself.
+    ntfy_title = "🎓 CSIT exam notice: %s" % sem_label_text
     return {
         "kind": "exam_deadline",
         "semester": semester,

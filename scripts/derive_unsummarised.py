@@ -36,6 +36,10 @@ from validate_stories import VALID_CATEGORIES  # noqa: E402
 # whole and shrinking an edition that already has no model behind it.
 from validate_stories import (crime_violation, load_excluded_keywords,  # noqa: E402
                               spoiler_violation)
+# And the SAME English-only gate. A headline the page cannot draw must be
+# REFUSED here rather than shipped and dropped later, because this file is the
+# only one that knows how many stories the fallback held back.
+import english_text  # noqa: E402
 
 MIN_STORIES = 5
 PER_CATEGORY = 3
@@ -103,8 +107,10 @@ def lead_text(snippet, title, category):
     """The publisher's own description, trimmed; "" when it adds nothing.
 
     VERBATIM, never rewritten -- this file still writes no prose of its own.
-    Three rules, each of which returns "" rather than a weaker string:
+    Four rules, each of which returns "" rather than a weaker string:
 
+      * text the page cannot draw is dropped first: a Devanagari description
+        would render as an empty box;
       * shorter than SUMMARY_MIN_CHARS says nothing a headline does not;
       * a description that opens by repeating the headline is dead weight, so
         the repeat is removed and the remainder judged again;
@@ -116,6 +122,10 @@ def lead_text(snippet, title, category):
     title_text = re.sub(r"\s+", " ", str(title or "")).strip()
     if title_text and text.lower().startswith(title_text.lower()):
         text = text[len(title_text):].lstrip(" -\u2013\u2014:.")
+    if not english_text.looks_english(text):
+        # The page cannot draw it, so quoting it would ship an empty box. The
+        # headline is already English; this story keeps its bare headline.
+        return ""
     if len(text) < SUMMARY_MIN_CHARS:
         return ""
     if len(text) > SUMMARY_MAX_CHARS:
@@ -130,12 +140,16 @@ def lead_text(snippet, title, category):
     return text
 
 
-def derive(candidates, now=None):
+def derive(candidates, now=None, held=None):
     """(stories, per-category counts, skipped-category counts).
 
     `skipped` is printed by main rather than swallowed: a candidate the schema
     will not accept is a candidate the collector spent a source on for nothing,
     and the count is the evidence for that.
+
+    `held` is an optional dict the caller may pass; a candidate whose title is
+    not English is counted into ``held["non_english"]`` instead of disappearing,
+    because "the page could not draw it" is a decision the payload has to report.
     """
     now = now or datetime.now(timezone.utc)
     stories, counts, skipped, seen = [], {}, {}, []
@@ -149,6 +163,10 @@ def derive(candidates, now=None):
             continue
         if category not in VALID_CATEGORIES:
             skipped[category] = skipped.get(category, 0) + 1
+            continue
+        if not english_text.looks_english(title):
+            if isinstance(held, dict):
+                held["non_english"] = held.get("non_english", 0) + 1
             continue
         if len(title) < MIN_TITLE_CHARS:
             continue
@@ -207,12 +225,16 @@ def main(argv=None):
         print("FATAL: candidates JSON has no 'candidates' list")
         return 1
 
-    stories, counts, skipped = derive(candidates)
+    held = {}
+    stories, counts, skipped = derive(candidates, held=held)
     for category in sorted(counts):
         print("  %-24s %d" % (category, counts[category]))
     for category in sorted(skipped):
         print("  %-24s skipped %d (not a digest category)"
               % (category, skipped[category]))
+    held_n = held.get("non_english", 0)
+    if held_n:
+        print("  %-24s %d (title not in English)" % ("held back", held_n))
     print("derive_unsummarised: %d stories from %d candidates"
           % (len(stories), len(candidates)))
 
@@ -220,15 +242,21 @@ def main(argv=None):
         # Fewer than the floor means the empty/degraded path owns this run.
         print("FLOOR: only %d stories (minimum %d); nothing written to %s"
               % (len(stories), MIN_STORIES, args.out))
+        if held_n:
+            print("HELD: %d candidate(s) were not in English; the floor counted "
+                  "only the stories the page can draw" % held_n)
         return 0
 
+    notes = NOTE
+    if held_n:
+        notes = notes + " " + english_text.held_back_note(held_n)
     payload = {
         "date": args.today,
         "edition_kind": "unsummarised",
         # No model wrote this edition; naming the deriver as the writer is what
         # lets the seal report how the digest was produced.
         "writer": {"rung": "derived", "attempt": None, "model": None},
-        "notes": NOTE,
+        "notes": notes,
         "stories": stories,
     }
     if args.slot:
