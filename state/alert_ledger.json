@@ -1,12 +1,12 @@
 {
   "conditions": {
     "breaking.honesty_gate||": {
-      "alerted_at": "2026-11-02T21:44:01Z",
-      "cause": "ai_fail_safe: models=opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/big-pickle source=live; opencode/beam-free: timed out after 150s -- e models work in OpenCode (htt",
+      "alerted_at": "2026-11-03T03:47:01Z",
+      "cause": "ai_fail_safe: models=opencode/deepseek-v4.1-flash-free,opencode/beam-free,opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free source=live; opencode/deepseek-v4.1-flash-free: timed out after 150s -- e",
       "first_seen": "2026-11-02T01:24:21Z",
       "healthy_streak": 0,
-      "last_seen": "2026-11-02T21:44:01Z",
-      "runs": 34,
+      "last_seen": "2026-11-03T03:47:01Z",
+      "runs": 35,
       "window_first": "",
       "window_last": "",
       "window_runs": 0
