@@ -2078,6 +2078,111 @@
       "title": "Our LLM filter looked broken under load. It was a billing short-circuit returning {} in 0.0 seconds",
       "category": "tech_career",
       "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "polygon.com/zero-parades-directors-cut-switch-2-ps5-xbox-release",
+      "title_hash": "ec9170bd91e7d20cbb132e409df3681d6e40e9cb",
+      "title": "2026’s Best RPG Is Finally on Consoles Just in Time for GOTY Season",
+      "category": "gaming",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "yen.com.gh/ghana/314980-bank-ghana-names-20-unlicensed-mobile-loan-apps-warns-public-avoid-them",
+      "title_hash": "2f8fa39d757b0b3d90148b2eaffa08e93d79eef3",
+      "title": "Bank of Ghana releases new list of 20 shady loan apps Ghanaians should avoid - Yen News",
+      "category": "bank_local",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "dev.to/xusteve/building-a-wordpress-newsletter-plugin-benchmark-from-the-wordpressorg-api-3ei7",
+      "title_hash": "549ce40743a055075d7cca88c49e61d2bfff5824",
+      "title": "Building a WordPress Newsletter Plugin Benchmark from the WordPress.org API",
+      "category": "tech_career",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "dev.to/batuweb/does-perplexity-mention-your-brand-check-ai-answers-for-mentions-position-and-citations-cdh",
+      "title_hash": "fe02b7af362905909bd7eefb389ab98636d54eb7",
+      "title": "Does Perplexity Mention Your Brand? Check AI Answers for Mentions, Position and Citations",
+      "category": "tech_career",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cwy8lm1m59mvo",
+      "title_hash": "c1622bd88fa9b03624d98c9c000e4161710de5ba",
+      "title": "Europe on alert after supermarket freezers hit by cyber-attacks in nine countries",
+      "category": "world_major",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "videogameschronicle.com/news/former-xbox-coo-denies-claims-she-was-fired-for-a-policy-violation-says-reports-are-not-the-whole-story",
+      "title_hash": "25eeb724275295fec258cebff7432ad44ca86ba1",
+      "title": "Former Xbox COO denies claims she was ‘fired for a policy violation’, says reports are ‘not the whole story’",
+      "category": "gaming",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "weisradio.com/2026/11/03/fort-payne-railroad-crossing-highway-35-closure",
+      "title_hash": "6a3721fc402092723c567df236be42e21e422d15",
+      "title": "Highway 35 Railroad Crossing Closure Planned Tuesday in Fort Payne - WEIS | Local & Area News, Sports, & Weather - weisradio.com",
+      "category": "local_city",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/politics/karnali-cabinet-makes-five-decisions-approves-two-bills-for-provincial-assembly",
+      "title_hash": "19f75a18703abc1d47bf693352886609216b5401",
+      "title": "Karnali Cabinet makes five decisions, approves two bills for provincial assembly",
+      "category": "nepal",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "dev.to/atabek_murtazaev_18e1ac50/listing-an-api-on-rapidapi-five-things-the-docs-dont-cover-1bjc",
+      "title_hash": "81da7d09e1c950f9c7d6ef3f10f204d51617685a",
+      "title": "Listing an API on RapidAPI: five things the docs don't cover",
+      "category": "tech_career",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/main-left/nepal-news-evening-briefing-tuesday-november-03-2026",
+      "title_hash": "e0c323b6627ed866e7c0cb36ce84fce3b06b8975",
+      "title": "Nepal News Evening Briefing | Tuesday, November 03, 2026",
+      "category": "nepal",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "igorslab.de/en/notebooksbilliger-de-reports-cyberattack-customer-data-may-have-been-leaked",
+      "title_hash": "07b959dbabcda62cefdf309bf0ddb1218f462a6b",
+      "title": "Notebooksbilliger.de reports cyberattack: customer data may have been leaked - igor´sLAB",
+      "category": "bank_local",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "me.ign.com/en/avengers-the-kang-dynasty/249449/pedro-pascal-is-hiding-an-avengers-doomsday-easter-egg-on-his-doctor-doom-halloween-costume-fans-say",
+      "title_hash": "8e639d726085d478981fd05912bf954cf87b1f60",
+      "title": "Pedro Pascal Is Hiding an Avengers: Doomsday Easter Egg on His Doctor Doom Halloween Costume, Fans Say - IGN",
+      "category": "gaming",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cjy56dndlyz0o",
+      "title_hash": "0a3eab8648151855efa69d52b00b3aa3bddc1475",
+      "title": "Russian bombing kills 31 people at Ukraine aid centre, Kyiv says",
+      "category": "world_major",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c9j346xg0mkvo",
+      "title_hash": "030dff87c5c058116fa1b5330040c968e78b602d",
+      "title": "Trump to remove Rwanda and South Africa from US trade deal",
+      "category": "world_major",
+      "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "heavy.com/sports/mens-college-basketball/ucf-dior-johnson-puts-college-basketball-on-notice",
+      "title_hash": "a625917014e86d3d5831e93fac17682c535c5570",
+      "title": "UCF’s Dior Johnson Puts College Basketball On Notice - Heavy.com",
+      "category": "college_local",
+      "date_sent": "2026-11-03"
     }
   ]
 }
