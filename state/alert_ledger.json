@@ -2,14 +2,14 @@
   "conditions": {
     "breaking.honesty_gate||": {
       "alerted_at": "2026-11-03T03:47:01Z",
-      "cause": "ai_fail_safe: models=opencode/nemotron-3.5-lightning-free,opencode/big-pickle,opencode/deepseek-v4.1-flash-free,opencode/beam-free source=live; opencode/nemotron-3.5-lightning-free: timed out after 150s -- e models",
+      "cause": "ai_fail_safe: models=opencode/mimo-v2.6-flash-free,opencode/nemotron-3.5-lightning-free,opencode/big-pickle,opencode/deepseek-v4.1-flash-free source=live; opencode/mimo-v2.6-flash-free: timed out after 150s -- e mo",
       "first_seen": "2026-11-02T01:24:21Z",
       "healthy_streak": 0,
-      "last_seen": "2026-11-03T04:34:59Z",
-      "runs": 37,
+      "last_seen": "2026-11-03T04:56:51Z",
+      "runs": 38,
       "window_first": "2026-11-03T04:07:51Z",
-      "window_last": "2026-11-03T04:34:59Z",
-      "window_runs": 2
+      "window_last": "2026-11-03T04:56:51Z",
+      "window_runs": 3
     }
   },
   "schema_version": 1
