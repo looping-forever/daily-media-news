@@ -1,20 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "english.onlinekhabar.com/cyclone-arnab-bring-rain-snow.html",
-      "title_hash": "acf6df19c0e1da53b4a52da0696d53abdb4cb2d5",
-      "title": "Cyclone Arnab warning: heavy rain and snowfall possible across Nepal",
-      "category": "nepal",
-      "date_sent": "2026-10-27"
-    },
-    {
-      "url_normalized": "openai.com/index/building-scientific-understanding-with-academic-communities",
-      "title_hash": "de87e45b7823e7d21c7a8ac60df5e564f9d3a78c",
-      "title": "OpenAI announces three research discoveries in math, computer science and physics",
-      "category": "tech_career",
-      "date_sent": "2026-10-27"
-    },
-    {
       "url_normalized": "tu.edu.np/notices/15646",
       "title_hash": "ad4947daa4649c917cc5c05a870e852c7ca4f45d",
       "title": "त्रिवि केन्द्रीय कार्यालयका लागि जारको पिउने पानी सप्लाई सम्बन्धी पुनः शिलबन्दी दरभाउ पत्र आह्वानको सूचना",
@@ -2183,6 +2169,27 @@
       "title": "UCF’s Dior Johnson Puts College Basketball On Notice - Heavy.com",
       "category": "college_local",
       "date_sent": "2026-11-03"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2050621/urge-to-exercise-caution-in-the-tourism-industry",
+      "title_hash": "64cdb6e5e1e469ead71ad93829958b7d91e1b191",
+      "title": "Caution Urged for Pokhara Water Tourism Activities",
+      "category": "local_city",
+      "date_sent": "2026-11-04"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-03/mashle-magic-and-muscles-manga-gets-live-action-film-on-march-19/.243497",
+      "title_hash": "0a4e6eb8d4d85e0d023b1f5d38de4a65d98696d1",
+      "title": "Mashle: Magic and Muscles Live-Action Film Announced",
+      "category": "anime",
+      "date_sent": "2026-11-04"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-03/otaku-vampire-love-bite-manga-gets-tv-anime/.243498",
+      "title_hash": "1b068f35e4c3fe8608a3cbf8986104ab540d8219",
+      "title": "Otaku Vampire's Love Bite Manga Gets TV Anime Adaptation",
+      "category": "anime",
+      "date_sent": "2026-11-04"
     }
   ]
 }
