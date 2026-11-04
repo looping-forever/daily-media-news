@@ -1,49 +1,6 @@
 {
-  "as_of": "2026-11-03T12:57:44Z",
+  "as_of": "2026-11-04T00:59:40Z",
   "days": {
-    "2026-10-28": {
-      "evening": {
-        "actions_dispatch_at": "2026-10-28T13:35:26Z",
-        "actions_dispatch_cause": null,
-        "actions_dispatch_http_status": null,
-        "actions_dispatch_reason": null,
-        "attempts": 1,
-        "build": "500c732",
-        "dispatch_failure_class": null,
-        "edition": "failed",
-        "first_ntfy_sent_at": null,
-        "kind": "unsummarised",
-        "last_good_shown": null,
-        "late_build_dispatched": true,
-        "ntfy_sent_at": "2026-10-28T13:36:50Z",
-        "pending_at": "2026-10-28T13:35:26Z",
-        "reject_plain": "the evening push title is 75 characters, past the 72-character limit a phone notification shows.",
-        "reject_reason": "title | a late build was dispatched",
-        "scheduled_instant": "2026-10-28T13:35:00Z",
-        "sequence_id": "dmn-2026-10-28-evening",
-        "state": "sent"
-      },
-      "morning": {
-        "actions_dispatch_at": "2026-10-28T01:35:25Z",
-        "actions_dispatch_cause": "already_dispatched",
-        "actions_dispatch_http_status": 0,
-        "actions_dispatch_reason": "already dispatched this slot",
-        "attempts": 1,
-        "build": "adcdc21",
-        "edition": "failed",
-        "first_ntfy_sent_at": null,
-        "kind": "delivered",
-        "last_good_shown": "2026-10-18",
-        "late_build_dispatched": false,
-        "ntfy_sent_at": "2026-10-28T11:47:27Z",
-        "pending_at": "2026-10-28T01:55:26Z",
-        "reject_plain": "no digest was built for morning 2026-10-28.",
-        "reject_reason": "absent | NO build was dispatched",
-        "scheduled_instant": "2026-10-28T01:35:00Z",
-        "sequence_id": "dmn-2026-10-28-morning",
-        "state": "sent"
-      }
-    },
     "2026-10-29": {
       "evening": {
         "actions_dispatch_at": "2026-10-29T13:35:27Z",
@@ -222,9 +179,20 @@
     },
     "2026-11-03": {
       "evening": {
-        "built_at": "2026-11-03T12:57:38Z",
-        "source_health_state": "ok",
-        "story_count": 15
+        "actions_dispatch_at": "2026-11-03T13:35:26Z",
+        "actions_dispatch_reason": null,
+        "attempts": 1,
+        "build": "723ebbf",
+        "deduped_via": null,
+        "edition": "unsummarised",
+        "first_ntfy_sent_at": "2026-11-03T13:37:34Z",
+        "kind": "unsummarised",
+        "ntfy_sent_at": "2026-11-03T13:37:34Z",
+        "pending_at": "2026-11-03T13:35:25Z",
+        "scheduled_instant": "2026-11-03T13:35:00Z",
+        "sequence_id": "dmn-2026-11-03-evening",
+        "state": "sent",
+        "trigger_source": "worker"
       },
       "morning": {
         "actions_dispatch_at": "2026-11-03T01:35:26Z",
@@ -241,6 +209,13 @@
         "sequence_id": "dmn-2026-11-03-morning",
         "state": "sent",
         "trigger_source": "worker"
+      }
+    },
+    "2026-11-04": {
+      "morning": {
+        "built_at": "2026-11-04T00:59:34Z",
+        "source_health_state": "ok",
+        "story_count": 3
       }
     }
   },
