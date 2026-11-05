@@ -93,6 +93,11 @@ WORKFLOW_NAMES = (
     # budgeted. Registered for the reason above: an unregistered workflow is
     # one every check below silently skips.
     "ledger-repair.yml",
+    # Added 2026-11-05 with the file itself. Manual dispatch only and no cron,
+    # so it contributes nothing to the cron table -- it carries a budget entry
+    # because it does run a job. Registered for the reason this tuple exists: an
+    # unregistered workflow is one every check below silently skips.
+    "provider-probe.yml",
 )
 
 try:  # pragma: no cover - environment dependent, both branches are exercised

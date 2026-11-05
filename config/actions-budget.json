@@ -120,7 +120,20 @@
   },
   "repo_soft_cap_minutes": 1400,
   "days_per_month": 30,
-  "current_projected_minutes": 2229,
+  "current_projected_minutes": 2244,
+  "_projection_change_2026_11_05": [
+    "provider-probe.yml added: 1 job, p95 0.5 min, max 1 run/day, no cron",
+    "-> +15 min/month (2,229 -> 2,244). MANUAL DISPATCH ONLY, so this is a",
+    "CEILING on what one person can ask for, not a forecast: normal use is a",
+    "handful of runs after a provider change. It is budgeted anyway because the",
+    "checker fails a workflow file with no entry, and because 'it is only a probe'",
+    "is exactly how an unbudgeted job becomes an unbudgeted habit. The 0.5 is",
+    "checkout + setup-python + eight requests whose own sockets are capped at",
+    "40-75s each (llm_providers.Provider.timeout) plus a 3-minute job cap -- not",
+    "the cap itself. The projection was already 429 over the hard ceiling before",
+    "this line; it is now 444 over, and that gap is still REPORTED rather than",
+    "hidden (enforcement.enabled is false while the repository is public)."
+  ],
   "_projection_change_2026_11_03": [
     "drift-canary.yml p95_minutes 2.4 -> 17.0, measured: 1,002.9 s = 16.7 min of",
     "suite work in one full `python tests/ci_local.py --extra` run, rounded up to",
@@ -224,6 +237,13 @@
       "p95_minutes": 0.5,
       "crons": [],
       "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch. It exists to retire one historical false row in KV `digest:ledger` (2026-10-26 evening), and a second run finds nothing to do. `max_runs_per_day: 1` is a ceiling on human asking, not a forecast. Budgeted because the checker fails a workflow file with no entry, and because 'it is one-off' is how an unbudgeted job becomes an unbudgeted habit. ONE job: checkout, setup-python and one script that makes two KV round trips (GET, then PUT + read-back), each bounded at 30s -- 0.5 minute is the shape of that work, not the 5-minute job timeout."
+    },
+    "provider-probe.yml": {
+      "max_runs_per_day": 1,
+      "jobs_per_run": 1,
+      "p95_minutes": 0.5,
+      "crons": [],
+      "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch, so it costs nothing until a human asks. What it asks is the one question the test suites cannot: is this provider's id still served, is the key still live, does the plan still allow the call. ONE job: checkout, setup-python, and eight HTTP requests (four catalogues, four one-word completions) whose own sockets are capped at 40-75s each in scripts/llm_providers.py and whose job is capped at 3 minutes. 0.5 minute is the shape of that work, not the cap. `max_runs_per_day: 1` is a ceiling on human asking, not a forecast."
     },
     "digest-watchdog.yml": {
       "max_runs_per_day": 2,

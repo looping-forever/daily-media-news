@@ -213,6 +213,15 @@ jobs:
           # never a guess.
           OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # THE THREE KEYED HTTP FALLBACKS, between Gemini and the free pool.
+          # scripts/breaking_monitor.py routes `groq/`, `openrouter/` and
+          # `mistral/` rungs straight to the provider (one HTTPS POST, no CLI),
+          # so these variables are the whole of their configuration. An absent
+          # one removes its rung from the ladder rather than costing an attempt
+          # to learn that -- the same rule the CLI rungs already follow.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           # ntfy is the PRIMARY breaking channel; email and Telegram are
           # fallbacks that fire only when ntfy did not deliver. Reuses the
           # existing NTFY secrets (daily-news.yml, digest-watchdog.yml,

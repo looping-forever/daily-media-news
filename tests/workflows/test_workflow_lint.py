@@ -162,6 +162,16 @@ ALLOWED_SECRETS = frozenset({
     "GMAIL_APP_PASSWORD",
     "GMAIL_RECEIVER",
     "GMAIL_USER",
+    # C1, 2026-11-05. The three keyed HTTP fallbacks behind Gemini, added by
+    # the owner so one account's spent allowance can no longer end an edition.
+    # scripts/llm_providers.py reads each at CALL time, puts it in one
+    # Authorization header, and never logs or stores it. Absence removes that
+    # provider's rung from both ladders, so a repository with none of them
+    # behaves exactly as it did before -- which is why the allowlist entry is
+    # safe to ship before the secrets exist.
+    "GROQ_API_KEY",
+    "MISTRAL_API_KEY",
+    "OPENROUTER_API_KEY",
     "NTFY_SERVER",
     "NTFY_TOPIC",
     "TELEGRAM_BOT_TOKEN",

@@ -1,0 +1,82 @@
+name: Provider probe
+
+# MANUAL ONLY -- NO SCHEDULE, BY DESIGN.
+#
+# Every rung of the model ladder is written in config/opencode.json plus
+# scripts/llm_providers.py, and the suites drive all of it with a stubbed
+# transport. That proves the CODE, never the LADDER: whether an id is still
+# served, whether a key is live, whether a plan still allows the call. This is
+# the one place that asks, on purpose, with a fixed tiny input, and prints the
+# answer. It can never touch an edition: nothing here writes state/ and nothing
+# here is on a cron.
+#
+# WHAT IT PRINTS (one line per provider, plus that provider's own catalogue):
+#
+#   provider | key=present/absent | models=N | chosen=<id> | status=<code> | ms=<n> | verdict=<ok|auth|quota|model_not_found|timeout|network>
+#
+# The `available:` lines beneath each row are the evidence the candidate ids in
+# scripts/llm_providers.py are corrected from -- an account's real catalogue,
+# not a guess. A provider whose secret is absent reports `not_configured` and
+# makes NO request, which is the same "skip silently, never a failure" rule the
+# ladders apply.
+#
+# NOTHING SECRET IS PRINTED. The keys are read from the environment by
+# scripts/llm_providers.py at call time and placed in one Authorization header;
+# no step echoes an environment variable, a header, or a URL carrying a query.
+# Every provider is addressed by path only.
+
+on:
+  workflow_dispatch:
+
+# Read the repository, and nothing else. No token is written, no artifact is
+# uploaded, no commit is made -- this job's only output is its log and summary.
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe each provider
+    runs-on: ubuntu-24.04
+    # A probe that hangs is a probe that lies about the provider. Forty seconds
+    # per request is the provider's own cap (llm_providers.Provider.timeout), so
+    # four providers plus four catalogue reads fit inside three minutes with
+    # room to spare; the job cap is what stops a wedged DNS lookup.
+    timeout-minutes: 3
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+        with:
+          # The token is not needed after the checkout: this job makes no commit,
+          # pushes nothing and reads no other repository. Leaving it in
+          # .git/config would hand a live credential to every later step for no
+          # reason at all.
+          persist-credentials: false
+
+      - name: List models and ask each provider for one word
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          set -eo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+          sys.path.insert(0, 'scripts')
+          import llm_providers
+
+          rows = llm_providers.probe_rows()
+          print('provider | key | models | chosen | status | ms | verdict')
+          for row in rows:
+              print(row)
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as fh:
+                  fh.write('### Provider probe\n\n')
+                  for row in rows:
+                      fh.write('- %s\n' % row.strip())
+                  fh.write('\nA row is evidence about TODAY, not a setting: '
+                           '`not_configured` means the secret is absent, and '
+                           '`auth` means it is present and refused.\n')
+          PY

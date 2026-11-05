@@ -141,6 +141,7 @@ try:
     import alert_dedupe
     import collect_news
     import english_text
+    import llm_providers
     import model_selector
     import payload_io
     import story_state
@@ -150,6 +151,7 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     import alert_dedupe
     import collect_news
     import english_text
+    import llm_providers
     import model_selector
     import payload_io
     import story_state
@@ -253,8 +255,19 @@ def _ladder_for(seeds, prefixes):
     embedded copy rotted while the suite stayed green). `prefixes` is a
     parameter, not a global read, so a test can ask "what would CI walk with
     the keyed provider loaded?" without exporting a credential.
+
+    THE THREE KEYED HTTP PROVIDERS SIT BETWEEN GEMINI AND THE FREE POOL, added
+    2026-11-05. They are not CLI rungs, so `prefixes` must never filter them:
+    `llm_providers.ordered_ladder` appends the ones whose key is configured and
+    leaves every other seed in its own order. With no keys set the result is
+    byte-identical to the seed ladder, which is why the keyless suite still pins
+    it exactly.
     """
-    return tuple(m for m in seeds if m.startswith(tuple(prefixes)))
+    if prefixes:
+        seeds = [m for m in seeds if m.startswith(tuple(prefixes))]
+    else:
+        seeds = []
+    return llm_providers.ordered_ladder(seeds, ())
 
 
 def _load_ladder():
@@ -287,7 +300,8 @@ def _reachable_only(models):
     means the filter is wrong, not that the pool is gone.
     """
     prefixes = _reachable_prefixes()
-    kept = [m for m in models if m.startswith(tuple(prefixes))]
+    kept = [m for m in models
+            if m.startswith(tuple(prefixes)) or llm_providers.provider_of(m)]
     if not prefixes or not kept:
         return list(models)
     if len(kept) != len(models):
@@ -1602,7 +1616,20 @@ def default_ai_runner(model, prompt_text, env, timeout_sec):
     Both measurements are copied back on every call (a runner that cannot say
     reports an honest null): `last_first_byte_sec` for the answer,
     `last_first_liveness_sec` for the log line.
+
+    A KEYED HTTP RUNG HAS NO CLI AND NO STREAM. `groq/`, `openrouter/` and
+    `mistral/` rungs are one HTTPS POST, so they are answered here with the same
+    `(rc, out, err)` shape the CLI runner returns and then flow through the
+    walk's EXISTING classification: 401 reads `auth`, 429 reads
+    `quota_or_rate_limited`, 404 reads `model_not_found`, 5xx reads
+    `provider_outage`. There is no second health system, and a timeout raises
+    TimeoutExpired because that is already what "this rung spent its window"
+    means to the walk. Both first-byte measurements stay None: nothing streams.
     """
+    if llm_providers.provider_of(model):
+        default_ai_runner.last_first_byte_sec = None
+        default_ai_runner.last_first_liveness_sec = None
+        return llm_providers.cli_result(model, prompt_text, timeout_sec)
     exe = shutil.which("opencode")
     if not exe:
         raise RuntimeError("opencode binary not found on PATH")

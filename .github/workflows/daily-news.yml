@@ -1833,6 +1833,14 @@ jobs:
           # gemini rung fails as an auth error.
           OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The three keyed HTTP fallbacks behind Gemini, read by
+          # scripts/llm_providers.py at CALL time. Absent ones are skipped
+          # silently, so a repository without any of them behaves exactly as it
+          # did before: gemini rungs, then the free pool. Referenced by NAME
+          # only; the values never reach a log, an artifact or a debug record.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
           set -eo pipefail
           : "${STORIES_FLOOR:?the workflow-level STORIES_FLOOR is missing; the derive gate has no floor}"

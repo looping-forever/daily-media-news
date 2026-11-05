@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import english_text  # noqa: E402
+import llm_providers  # noqa: E402
 from validate_stories import crime_violation, spoiler_violation  # noqa: E402
 
 #: Stories per request. Six keeps one request near 2,000 tokens: small enough
@@ -472,14 +473,21 @@ def ladder_models():
     deliberately NOT consulted: the walk has just recorded `quota_or_rate_limited`
     for these rungs, and the point of a fresh, small request is that the next
     minute's allowance is not the one that ran out.
+
+    THE ORDER IS GEMINI, THEN THE KEYED FALLBACKS, THEN THE FREE POOL (measured
+    2026-11-05: Gemini's free tier spent its minute in 13.4s and every OpenCode
+    free id shared the same refusal, so one account's allowance ended the
+    edition). The three HTTP providers are inserted by `llm_providers`, which
+    skips any provider with no key configured -- so a repository with none of
+    those secrets set gets byte-identical behaviour to before.
     """
     import model_selector
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config = model_selector.load_config(os.path.join(root, "config", "opencode.json"))
     ladder = config.get("ladder")
     if not isinstance(ladder, list):
-        return []
-    return [m for m in ladder if isinstance(m, str) and m]
+        ladder = []
+    return list(llm_providers.ordered_ladder(ladder))
 
 
 def _decode(raw):
@@ -526,9 +534,30 @@ def opencode_run(prompt, model, timeout=KEYED_REQUEST_TIMEOUT):
     return text
 
 
+def run_model(prompt, model, timeout=KEYED_REQUEST_TIMEOUT):
+    """One batch, through whichever transport owns *model*.
+
+    Two kinds of rung share this ladder and they need different clients: a
+    `gemini/` or `opencode/` rung is an `opencode run`, and a `groq/`,
+    `openrouter/` or `mistral/` rung is a direct HTTPS POST. The batch loop, the
+    pacer and the budget arithmetic know nothing about the difference -- they
+    already pass a model id and a timeout, which is exactly what both clients
+    take.
+
+    The reason words are the repository's own (`timeout`, `transport`,
+    `quota_notice`, `auth`, `model_not_found`, `garbage`), so a fallback provider
+    failing looks the same in the debug record as a CLI rung failing.
+    """
+    if not llm_providers.provider_of(model):
+        return opencode_run(prompt, model, timeout=timeout)
+    try:
+        return llm_providers.text_for(model, prompt, timeout=timeout)
+    except llm_providers.ProviderError as exc:
+        raise Refusal(str(exc), kind=exc.kind, raw=exc.detail)
+
+
 class Pacer:
     """Keeps a rolling per-minute INPUT-token budget, and says what it did.
-
     Every request is charged BEFORE it is sent. When the charge would take the
     last minute past the budget, the pacer sleeps until the oldest charge ages
     out -- which is the only honest way to wait, because the provider counts a
@@ -603,6 +632,15 @@ def refusal_cause(kind, message):
     """Which cause a refused call is, for the edition's own note."""
     if kind == "timeout":
         return "model_timeout"
+    if kind == "garbage":
+        return "unreadable_reply"
+    if kind in ("quota_notice", "auth", "model_not_found", "bad_request"):
+        # All four are the PROVIDER declining this request -- a spent allowance,
+        # a refused key, an id it does not serve, a body it would not accept.
+        # None of them is the parser's fault, and the page says "provider
+        # refusal" for each. Named here rather than folded into the text
+        # heuristic because a 401 carries no "quota" word at all.
+        return "provider_refusal"
     if is_refusal(message):
         return "provider_refusal"
     if kind in ("empty_content", "not_json", "partial_json"):
@@ -628,7 +666,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     report; the walk's attempt log is a different question and a different file.
     """
     stories = [s for s in (stories or []) if (s.get("source_url") or s.get("url"))]
-    run = run or opencode_run
+    run = run or run_model
     clock = clock or time.monotonic
     sleep = sleep or time.sleep
     models = list(models) if models is not None else ladder_models()
@@ -681,6 +719,12 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 out["refusals"].append(str(exc).strip()[:300])
                 kind = getattr(exc, "kind", "") or (
                     "refused" if is_refusal(str(exc)) else "failed")
+                if kind == "not_configured":
+                    # A ladder built before the key was removed, or a caller
+                    # that named a provider directly. Silence is the contract:
+                    # this is a repository setting, not a model failure, and
+                    # counting it as one would page the owner about a secret.
+                    continue
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
                 causes.add(refusal_cause(kind, str(exc)))
