@@ -351,6 +351,20 @@ def main(argv=None):
         print("  %-24s %d of %d (model %s)"
               % ("summarised", written, len(stories),
                  result.get("model") or "none"))
+        # WHY EACH BATCH FAILED, next to the edition it failed to write. The run
+        # log is truncated and the shell is not where a 2 KB model reply belongs;
+        # the artifact is, and it is where the next investigator will look.
+        debug = result.get("debug") or []
+        if debug:
+            path = os.path.join(os.path.dirname(os.path.abspath(args.out))
+                                or ".", "summarise-debug.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"generated_at": datetime.now(timezone.utc)
+                           .strftime("%Y-%m-%dT%H:%M:%SZ"),
+                           "attempts": debug}, fh, ensure_ascii=False, indent=2)
+                fh.write("\n")
+            print("  %-24s %s (%d attempt(s))"
+                  % ("debug", path, len(debug)))
 
     # WHY, not merely THAT. The attempt log is the walk's own record, so the
     # note names a spent quota, a missing configuration or failed rungs instead

@@ -108,6 +108,13 @@ state/model_cache.json
 # a build's notification payload sitting in the working tree.
 state/ntfy_payload.json
 
+# The failed-summariser diagnostic written beside the edition. It carries a
+# truncated, redacted copy of a model's raw answer -- evidence, never a
+# repository fact: it is uploaded as part of the run artifact and removed by
+# "Clean transient state files". Listed here so a run killed between the write
+# and the cleanup cannot leave it in the working tree.
+state/summarise-debug.json
+
 # Test / dry-run artifacts (never commit)
 state/email.txt
 pytest_output.txt

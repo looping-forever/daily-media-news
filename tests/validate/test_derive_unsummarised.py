@@ -481,6 +481,29 @@ class SummarisedFallback(unittest.TestCase):
         self.assertEqual("", payload["stories"][4]["summary"],
                          "the unsummarised story keeps what the deriver wrote")
 
+    def test_a_failed_batch_leaves_a_debug_record_beside_the_edition(self):
+        debug = [{"model": "gemini/gemini-3.5-flash-lite",
+                  "reason": "exit_nonzero", "parse_error": "partial_json",
+                  "finish_reason": None, "stop_reason": None, "usage": {},
+                  "exit_code": 1, "timeout": 42,
+                  "raw": '[{"url": "https://a.example/0", "summ'}]
+        result = self.result(0, model=None)
+        result["debug"] = debug
+        self.payload_of(result)
+        path = os.path.join(self.tmp, "summarise-debug.json")
+        self.assertTrue(os.path.exists(path),
+                        "a run that produced no summary has to explain itself")
+        with open(path, encoding="utf-8") as fh:
+            written = json.load(fh)
+        self.assertEqual(debug, written["attempts"])
+        self.assertTrue(written["generated_at"])
+
+    def test_a_clean_run_writes_no_debug_file(self):
+        self.payload_of(self.result(5))
+        self.assertFalse(os.path.exists(
+            os.path.join(self.tmp, "summarise-debug.json")),
+            "an empty debug file would be noise in every artifact")
+
     def test_below_the_floor_no_model_is_called(self):
         path = os.path.join(self.tmp, "candidates.json")
         out = os.path.join(self.tmp, "stories.json")

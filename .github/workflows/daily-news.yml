@@ -5374,6 +5374,7 @@ jobs:
             state/agent-log.txt
             state/ntfy_payload.json
             state/candidates.json
+            state/summarise-debug.json
             docs/digests/${{ env.TODAY }}-${{ steps.digest_time.outputs.time }}.html
           retention-days: 7
           if-no-files-found: warn
@@ -5515,7 +5516,7 @@ jobs:
         # immediately after the mirror is written, so nothing later sees it.
         run: |
           set -eo pipefail
-          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/digest_writer.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json
+          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/digest_writer.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json state/summarise-debug.json
 
       - name: Commit state changes
         # DRY_RUN guard: `git push` is an outward-facing side effect, so a dry

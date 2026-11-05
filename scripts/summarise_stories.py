@@ -79,9 +79,30 @@ TOTAL_BUDGET_SECONDS = 300
 MAX_SUMMARY_CHARS = 300
 MIN_SUMMARY_CHARS = 40
 
-#: Wall clock for one CLI call. The walk allows 480s per attempt because the
-#: agent does research; a batch of six summaries has nothing to research.
-REQUEST_TIMEOUT = 120
+#: Wall clock for ONE CLI call to a KEYED rung (a provider with a real API key,
+#: e.g. gemini). The digest walk allows 480s per attempt because the agent does
+#: research; a batch of six summaries has nothing to research.
+KEYED_REQUEST_TIMEOUT = 120
+
+#: Wall clock for ONE CLI call to a FREE rung (the opencode pool). MEASURED
+#: 2026-11-05 (run 41990956737): three free rungs each sat at the 120s ceiling
+#: and returned ZERO bytes, spending 360s of a 300s budget inside batch 1 of 4.
+#: A rung that has produced nothing after 45s does not produce anything at 120s.
+FREE_REQUEST_TIMEOUT = 45
+
+#: No call is granted less than this while the budget can still pay for it.
+MIN_RUNG_SECONDS = 20
+
+#: Each batch still to come keeps this many seconds back, so one bad batch
+#: cannot leave the later batches with a call too short to answer.
+MIN_BATCH_SECONDS = 30
+
+#: How much of a failed answer is kept. 2 KB covers a partial JSON array and the
+#: metadata line that follows it, and cannot flood an artifact.
+DEBUG_RAW_LIMIT = 2048
+
+#: At most one record per failed attempt, and no more than this many in one run.
+DEBUG_MAX_RECORDS = 12
 
 #: The refusal vocabulary. A 429 from Gemini arrives as prose inside the CLI's
 #: log line, and the OpenCode pool says "Free usage limit reached", so both
@@ -116,7 +137,56 @@ class Refusal(Exception):
     The message keeps the provider's own words: the retry hint lives in that
     text ("Please retry in 40.09s"), and quoting it is what makes the wait
     explainable in the log instead of a magic number.
+
+    `kind` names WHY in one word (`timeout`, `exit_nonzero`, `empty_content`,
+    `runner_missing`), and `raw` keeps whatever the CLI printed before it failed.
+    Both are what the debug record is built from.
     """
+
+    def __init__(self, message, kind="", raw="", exit_code=None):
+        super().__init__(message)
+        self.kind = kind
+        self.raw = raw
+        self.exit_code = exit_code
+
+
+def is_free_rung(model):
+    """True for a rung served by the shared free pool rather than a keyed API."""
+    model = model or ""
+    return model.startswith("opencode/") or model.endswith("-free")
+
+
+def timeout_for_rung(model):
+    """The cap one call to *model* may never exceed, before the budget bites."""
+    return FREE_REQUEST_TIMEOUT if is_free_rung(model) else KEYED_REQUEST_TIMEOUT
+
+
+def call_timeout(model, seconds_left, batches_left, rungs_left):
+    """Seconds one call to *model* is granted, and why it is that number.
+
+    THE ARITHMETIC THAT HAS TO FIT (run 41990956737: 29 stories, so four
+    batches, TWO keyed rungs and THREE free rungs, 300s):
+
+        2 * 120 + 3 * 45 = 375s   >   300s
+
+    so the ladder alone can outlive the job, and a single hanging rung used to
+    spend 120s that a later batch needed. Three bounds make it fit:
+
+        reserve  MIN_BATCH_SECONDS per batch still to come
+        share    (seconds_left - reserve) / rungs_left
+        cap      min(rung cap, share), floored at MIN_RUNG_SECONDS,
+                 never more than seconds_left
+
+    With four batches and 300s: batch 1 reserves 90s, so its five rungs share
+    210s -> 42s each instead of 120s, and batches 2-4 still get a turn.
+    """
+    batches_left = max(1, int(batches_left))
+    rungs_left = max(1, int(rungs_left))
+    reserve = (batches_left - 1) * MIN_BATCH_SECONDS
+    usable = max(MIN_RUNG_SECONDS, float(seconds_left) - reserve)
+    share = usable / rungs_left
+    cap = min(timeout_for_rung(model), max(MIN_RUNG_SECONDS, share))
+    return max(1, int(min(cap, float(seconds_left))))
 
 
 def estimate_tokens(text):
@@ -232,6 +302,122 @@ def parse_reply(text, batch):
     return out
 
 
+def _truncation_marker(text):
+    """True when the CLI itself says the answer was cut at an output cap."""
+    return bool(re.search(
+        r'"?\s*(?:finish|stop)_?reason"?\s*:\s*"?\s*'
+        r'(length|max_tokens|max_output_tokens|token_limit)\b'
+        r'|MAX_TOKENS'
+        r'|output[_\s-]?token[_\s-]?limit',
+        text or "", re.I))
+
+
+def classify_reply(text, batch=None):
+    """WHY a reply produced no summary, in words the log can act on.
+
+    Run 41990956737 logged `answered but no usable summary came back` for two
+    keyed rungs -- one exited 1 with PARTIAL JSON on stdout, the other returned a
+    parseable answer nothing could be taken from -- and the run could not say
+    which. The order below matters: an explicit truncation marker is the CAUSE,
+    so it outranks the shape the truncation leaves behind.
+
+        truncated_at_max_tokens  the provider said it hit its output cap
+        empty_content            nothing came back at all
+        partial_json             a JSON array that stops mid-way
+        not_json                 text, but not a JSON array
+        no_usable_row            a valid array, none of it safe to print
+        ok                       at least one summary is printable
+    """
+    body = (text or "").strip()
+    if not body:
+        return "empty_content"
+    if _truncation_marker(body):
+        return "truncated_at_max_tokens"
+    start, end = body.find("["), body.rfind("]")
+    if start >= 0 and end < start:
+        return "partial_json"
+    if start < 0:
+        return "not_json"
+    try:
+        rows = json.loads(body[start:end + 1])
+    except (TypeError, ValueError):
+        return "not_json"
+    if not isinstance(rows, list):
+        return "not_json"
+    if batch is None:
+        return "ok" if rows else "no_usable_row"
+    return "ok" if parse_reply(body, batch) else "no_usable_row"
+
+
+#: Key-shaped strings that must never reach an artifact. Each replacement keeps
+#: the credential's own prefix, so the record still shows WHICH kind of key
+#: appeared without carrying it. Compiled with re.I because an inline `(?i)`
+#: mid-pattern is an error on current Python.
+_RAW_REDACTIONS = (
+    (r"AIza[0-9A-Za-z_\-]{20,}", "AIzaREDACTED"),
+    (r"sk-[A-Za-z0-9_\-]{16,}", "sk-REDACTED"),
+    (r"gh[pousr]_[A-Za-z0-9]{20,}", "gh_REDACTED"),
+    (r"xox[abprs]-[A-Za-z0-9\-]{10,}", "xox-REDACTED"),
+    (r"(bearer\s+)[A-Za-z0-9._\-]{10,}", r"\1REDACTED"),
+    (r'("?(?:api[_-]?key|authorization|token|secret|password)"?\s*[:=]\s*"?)[^"\s,}]{8,}',
+     r"\1REDACTED"),
+)
+REDACTIONS = tuple((re.compile(pattern, re.I), repl)
+                   for pattern, repl in _RAW_REDACTIONS)
+
+
+def redact(text):
+    """*text* with every key-shaped string replaced by a named placeholder."""
+    out = text or ""
+    for pattern, replacement in REDACTIONS:
+        out = pattern.sub(replacement, out)
+    return out
+
+
+def extract_meta(text):
+    """finish reason, stop reason and token counts visible in *text*.
+
+    The CLI prints these only when something goes wrong, and never in one fixed
+    shape, so every field is OPTIONAL here: a field that is not in the text is
+    None (or missing from `usage`), never guessed.
+    """
+    text = text or ""
+
+    def first(pattern):
+        match = re.search(pattern, text, re.I)
+        return match.group(1) if match else None
+
+    usage = {}
+    for key, value in re.findall(
+            r'"([a-z_]*(?:token|tokens)[a-z_]*)"\s*:\s*(\d+)', text, re.I):
+        usage[key] = int(value)
+    return {
+        "finish_reason": first(r'"finish_?reason"\s*:\s*"([^"]*)"'),
+        "stop_reason": first(r'"stop_?reason"\s*:\s*"([^"]*)"'),
+        "usage": usage,
+    }
+
+
+def debug_record(model, raw, reason, timeout=None, exit_code=None):
+    """One failed attempt, described well enough to diagnose without the run.
+
+    Redaction happens BEFORE the cut, so a key cannot survive as a fragment at
+    the 2 KB boundary.
+    """
+    meta = extract_meta(raw)
+    return {
+        "model": model,
+        "reason": reason,
+        "parse_error": classify_reply(raw),
+        "finish_reason": meta["finish_reason"],
+        "stop_reason": meta["stop_reason"],
+        "usage": meta["usage"],
+        "timeout": timeout,
+        "exit_code": exit_code,
+        "raw": redact(raw or "")[:DEBUG_RAW_LIMIT],
+    }
+
+
 def ladder_models():
     """The configured ladder, in order -- the SAME list the walk walks.
 
@@ -250,28 +436,47 @@ def ladder_models():
     return [m for m in ladder if isinstance(m, str) and m]
 
 
-def opencode_run(prompt, model, timeout=REQUEST_TIMEOUT):
+def _decode(raw):
+    return (raw or b"").decode("utf-8", errors="replace")
+
+
+def opencode_run(prompt, model, timeout=KEYED_REQUEST_TIMEOUT):
     """One `opencode run` for one batch. Returns its stdout text.
 
     The same command shape the digest walk uses (`--auto --model`), minus
     `--print-logs`: the answer is the only thing read back, and this module does
     not need the CLI's event stream to know a request finished.
+
+    THE TIMEOUT IS ENFORCED ON THE CHILD. `communicate(timeout=...)` waits on the
+    process itself, and when it expires the process is killed and reaped -- so a
+    hung rung stops running at the instant the budget says it must, instead of
+    being noticed only between requests. Whatever it printed before the kill is
+    kept: a kill mid-answer is evidence, and the debug record carries it.
     """
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             ["opencode", "run", "--auto", "--model", model],
-            input=prompt.encode("utf-8"),
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            timeout=timeout,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise Refusal("%s: %s" % (model, exc))
-    text = (proc.stdout or b"").decode("utf-8", errors="replace")
+    except OSError as exc:
+        raise Refusal("%s: %s" % (model, exc), kind="runner_missing")
+    try:
+        out, _ = proc.communicate(prompt.encode("utf-8"), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        out, _ = proc.communicate()
+        raise Refusal("%s: no answer in %ss (killed)" % (model, timeout),
+                      kind="timeout", raw=_decode(out))
+    text = _decode(out)
     if proc.returncode != 0:
-        raise Refusal("%s: exit %d: %s" % (model, proc.returncode, text[-2000:]))
+        raise Refusal("%s: exit %d: %s"
+                      % (model, proc.returncode, text[-2000:]),
+                      kind="exit_nonzero", raw=text,
+                      exit_code=proc.returncode)
     if not text.strip():
-        raise Refusal("%s: empty answer" % model)
+        raise Refusal("%s: empty answer" % model, kind="empty_content")
     return text
 
 
@@ -337,11 +542,13 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     """Summarise *stories* in paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
-             "requests": int, "waits": [s], "refusals": [str]}.
+             "requests": int, "waits": [s], "refusals": [str], "debug": [dict]}.
 
     Nothing here raises for a model problem: an edition with no summaries is a
     valid outcome that the caller labels, and a crash here would cost the
-    edition itself.
+    edition itself. `debug` is one record per failed attempt -- model, reason,
+    the provider's own metadata and a bounded, redacted copy of the raw answer --
+    so a run that produced nothing can say why without being re-run.
     """
     stories = [s for s in (stories or []) if (s.get("source_url") or s.get("url"))]
     run = run or opencode_run
@@ -351,7 +558,15 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
     pacer.deadline = clock() + float(budget_seconds)
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
-           "refusals": []}
+           "refusals": [], "debug": []}
+
+    def note(model, raw, reason, timeout, exit_code=None):
+        """Keep one failed attempt, bounded, so the artifact can explain it."""
+        if len(out["debug"]) < DEBUG_MAX_RECORDS:
+            out["debug"].append(debug_record(model, raw, reason,
+                                             timeout=timeout,
+                                             exit_code=exit_code))
+
     if not stories or not models:
         if not models:
             log("summarise_stories: no model in the configured ladder; "
@@ -361,7 +576,6 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     plan = batches(stories)[:MAX_REQUESTS]
     for index, batch in enumerate(plan, 1):
         if pacer.deadline - clock() <= 0:
-            ran_out = True
             log("  total budget of %ds is spent before batch %d/%d"
                 % (budget_seconds, index, len(plan)))
             break
@@ -372,20 +586,29 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         pacer.wait_for(prompt_tokens)
         answered = False
         ran_out = False
-        for model in models:
+        for rung, model in enumerate(models):
             remaining = pacer.deadline - clock()
             if remaining <= 0:
                 ran_out = True
                 break
+            # THE CLOCK THE CHILD IS ACTUALLY GIVEN, recomputed per call: what
+            # this batch may use, and never more than the job has left.
+            timeout = call_timeout(model, remaining,
+                                   len(plan) - index + 1, len(models) - rung)
             try:
-                text = run(prompt, model)
+                text = run(prompt, model, timeout=timeout)
                 out["requests"] += 1
             except Refusal as exc:
                 out["requests"] += 1
                 out["refusals"].append(str(exc).strip()[:300])
+                kind = getattr(exc, "kind", "") or (
+                    "refused" if is_refusal(str(exc)) else "failed")
+                note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
+                     exit_code=getattr(exc, "exit_code", None))
                 if not is_refusal(str(exc)):
-                    log("  batch %d/%d: %s failed (%s); trying the next model"
-                        % (index, len(plan), model, str(exc).strip()[:120]))
+                    log("  batch %d/%d: %s %s within %ds (%s); trying the next "
+                        "model" % (index, len(plan), model, kind, timeout,
+                                   str(exc).strip()[:120]))
                     continue
                 hint = retry_hint_seconds(str(exc))
                 delay = DEFAULT_WAIT_SECONDS if hint is None else hint
@@ -404,25 +627,33 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                        "quota" if hint is not None else "no hint", delay))
                 sleep(delay)
                 out["waits"].append(delay)
+                retry_timeout = call_timeout(model, pacer.deadline - clock(),
+                                             len(plan) - index + 1, 1)
                 try:
-                    text = run(prompt, model)
+                    text = run(prompt, model, timeout=retry_timeout)
                     out["requests"] += 1
                 except Refusal as again:
                     out["requests"] += 1
                     out["refusals"].append(str(again).strip()[:300])
+                    note(model, getattr(again, "raw", "") or str(again),
+                         getattr(again, "kind", "") or "refused", retry_timeout,
+                         exit_code=getattr(again, "exit_code", None))
                     log("  batch %d/%d: %s refused again after the wait; "
                         "trying the next model" % (index, len(plan), model))
                     continue
             except Exception as exc:      # a runner fault must not cost the edition
                 out["requests"] += 1
                 out["refusals"].append(str(exc).strip()[:300])
+                note(model, str(exc), "runner_error", timeout)
                 log("  batch %d/%d: %s errored (%s); trying the next model"
                     % (index, len(plan), model, str(exc).strip()[:120]))
                 continue
             got = parse_reply(text, batch)
             if not got:
-                log("  batch %d/%d: %s answered but no usable summary came back"
-                    % (index, len(plan), model))
+                reason = classify_reply(text, batch)
+                note(model, text, reason, timeout)
+                log("  batch %d/%d: %s answered but gave no usable summary "
+                    "(%s)" % (index, len(plan), model, reason))
                 continue
             out["summaries"].update(got)
             out["model"] = model

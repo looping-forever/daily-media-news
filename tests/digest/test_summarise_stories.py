@@ -24,6 +24,7 @@ and the three rules that keep the fix honest:
     the step that writes the edition must never be killed waiting for prose.
 """
 
+import json
 import os
 import sys
 import unittest
@@ -62,18 +63,45 @@ class FakeRun:
 
     A plan entry is either a string (the answer) or an exception instance to
     raise. Entries are consumed in order; an exhausted plan repeats the last.
+    `timeouts` is the wall clock each call was granted -- the module under test
+    decides that number, and it must never exceed the job budget.
     """
 
     def __init__(self, plan):
         self.plan = list(plan)
         self.calls = []
+        self.timeouts = []
 
-    def __call__(self, prompt, model):
+    def __call__(self, prompt, model, timeout=None):
         self.calls.append((prompt, model))
+        self.timeouts.append(timeout)
         entry = self.plan.pop(0) if len(self.plan) > 1 else self.plan[0]
         if isinstance(entry, Exception):
             raise entry
         return entry
+
+
+class HangingRun:
+    """A rung that spends EXACTLY the timeout it was given, as a killed CLI does.
+
+    The fake clock advances by the granted timeout, so `summarise` sees real
+    elapsed time without the suite waiting: that is what makes "a slow rung
+    cannot spend the window another rung needed" testable in milliseconds.
+    """
+
+    def __init__(self, clock, answer, hang=("gemini/a",)):
+        self.clock = clock
+        self.answer = answer
+        self.hang = set(hang)
+        self.seen = []
+
+    def __call__(self, prompt, model, timeout=None):
+        self.seen.append({"model": model, "timeout": timeout})
+        self.clock.now += float(timeout or 0)
+        if model in self.hang:
+            raise ss.Refusal("%s: no answer in %ss (killed)"
+                             % (model, timeout), kind="timeout")
+        return self.answer
 
 
 class FakeClock:
@@ -309,6 +337,202 @@ class TheHintParser(unittest.TestCase):
 
     def test_no_hint_is_none(self):
         self.assertIsNone(ss.retry_hint_seconds("429 Too Many Requests"))
+
+
+class TheBudgetArithmetic(unittest.TestCase):
+    """MEASURED (run 41990956737): batch 1 of 4, ~854 tokens of a 250,000/min
+    allowance, and the run still produced 0 of 29 summaries. Two keyed rungs and
+    three free rungs were each given the full 120s; the free three returned
+    nothing at all, and the 300s budget was spent inside batch ONE while three
+    later batches never ran.
+
+    So the timeout a call is granted is not a constant:
+        timeout = min(rung cap, share of the budget left)
+        share   = seconds left / (batches left * rungs left)
+    and the cap is shorter for a free rung, which is the rung measured timing out
+    with zero bytes.
+    """
+
+    def test_a_request_cannot_outlive_the_remaining_budget(self):
+        clock = FakeClock()
+        run = FakeRun([reply_for([story(1)])])
+        ss.summarise([story(1)], models=["gemini/a"], run=run,
+                     sleep=clock.sleep, clock=clock, log=lambda *a: None,
+                     budget_seconds=10)
+        self.assertLessEqual(run.timeouts[0], 10,
+                             "a 10s budget cannot grant a %ss call"
+                             % (run.timeouts[0],))
+
+    def test_a_hanging_first_rung_leaves_time_for_the_second(self):
+        clock = FakeClock()
+        batch = [story(1)]
+        run = HangingRun(clock, reply_for(batch))
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b"], run=run,
+                           clock=clock, sleep=clock.sleep, log=lambda *a: None,
+                           budget_seconds=100)
+        self.assertEqual(1, len(out["summaries"]),
+                         "the second rung must still get a call: %r"
+                         % (run.seen,))
+        self.assertGreater(run.seen[1]["timeout"], 0)
+
+    def test_free_rungs_get_the_shorter_cap(self):
+        self.assertEqual(ss.FREE_REQUEST_TIMEOUT,
+                         ss.timeout_for_rung("opencode/beam-free"))
+        self.assertEqual(ss.KEYED_REQUEST_TIMEOUT,
+                         ss.timeout_for_rung("gemini/gemini-3.5-flash-lite"))
+        self.assertLess(ss.FREE_REQUEST_TIMEOUT, ss.KEYED_REQUEST_TIMEOUT)
+
+    def test_a_free_rung_observed_in_a_run_gets_the_shorter_cap(self):
+        clock = FakeClock()
+        run = FakeRun([reply_for([story(1)])])
+        ss.summarise([story(1)], models=["opencode/beam-free"], run=run,
+                     sleep=clock.sleep, clock=clock, log=lambda *a: None,
+                     budget_seconds=300)
+        self.assertEqual(ss.FREE_REQUEST_TIMEOUT, run.timeouts[0])
+
+    def test_every_batch_still_gets_a_call_when_the_first_one_hangs(self):
+        clock = FakeClock()
+        batch = [story(n) for n in range(24)]      # four batches of six
+        run = HangingRun(clock, reply_for(batch[:6]))
+        out = ss.summarise(batch, models=["gemini/a"], run=run,
+                           clock=clock, sleep=clock.sleep, log=lambda *a: None,
+                           budget_seconds=120)
+        self.assertGreater(len(run.seen), 1,
+                           "one hanging rung must not consume the whole job: "
+                           "%r" % (run.seen,))
+
+
+class WhyTheReplyIsUnusable(unittest.TestCase):
+    """`answered but yielded no usable summary` is not a diagnosis.
+
+    Run 41990956737 logged exactly that for two keyed rungs -- one exited 1 with
+    partial JSON on stdout, the other returned something parseable-but-unusable
+    -- and nothing in the run could say which. These pin the vocabulary that
+    replaces it.
+    """
+
+    URL = "https://example.com/1"
+
+    def test_a_reply_cut_at_the_output_cap_says_so(self):
+        raw = ('[{"url": "%s", "summary": "The ministry said the new schedule"\n'
+               '{"finishReason": "MAX_TOKENS"}' % self.URL)
+        self.assertEqual("truncated_at_max_tokens", ss.classify_reply(raw))
+
+    def test_a_partial_json_reply_is_named_partial(self):
+        raw = '[{"url": "%s", "summary": "The ministry said the new' % self.URL
+        self.assertEqual("partial_json", ss.classify_reply(raw))
+
+    def test_a_genuinely_empty_reply_is_empty_content(self):
+        for raw in ("", "   \n\t "):
+            self.assertEqual("empty_content", ss.classify_reply(raw))
+
+    def test_a_balanced_but_broken_reply_is_not_json(self):
+        self.assertEqual("not_json", ss.classify_reply("I cannot help with that."))
+
+    def test_a_parseable_reply_with_no_accepted_row_says_so(self):
+        batch = [story(1)]
+        raw = reply_for(batch, "Too short.")
+        self.assertEqual("no_usable_row", ss.classify_reply(raw, batch))
+
+    def test_a_good_reply_is_ok(self):
+        batch = [story(1)]
+        self.assertEqual("ok", ss.classify_reply(reply_for(batch), batch))
+
+    def test_the_reason_reaches_the_log_and_the_result(self):
+        clock = FakeClock()
+        batch = [story(1)]
+        raw = '[{"url": "%s", "summary": "The ministry said the new' % self.URL
+        run = FakeRun([raw, raw])
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b"], run=run,
+                           clock=clock, sleep=clock.sleep, log=lambda *a: None,
+                           budget_seconds=100)
+        reasons = [d["reason"] for d in out["debug"]]
+        self.assertEqual(["partial_json", "partial_json"], reasons,
+                         "a generic 'no usable summary' is what this replaces")
+
+
+class TheDebugCapture(unittest.TestCase):
+    """What reaches the artifact: bounded, described, and free of credentials."""
+
+    def test_the_raw_capture_is_bounded(self):
+        record = ss.debug_record(model="gemini/a", raw="x" * 9000,
+                                 reason="partial_json")
+        self.assertLessEqual(len(record["raw"]), ss.DEBUG_RAW_LIMIT)
+
+    def test_the_record_names_the_model_the_reason_and_the_metadata(self):
+        raw = ('{"finish_reason": "length", "stop_reason": "max_tokens",\n'
+               ' "usage": {"prompt_token_count": 854, "candidates_token_count": 0}}')
+        record = ss.debug_record(model="gemini/a", raw=raw, reason="partial_json")
+        self.assertEqual("gemini/a", record["model"])
+        self.assertEqual("length", record["finish_reason"])
+        self.assertEqual("max_tokens", record["stop_reason"])
+        self.assertEqual(854, record["usage"].get("prompt_token_count"))
+
+    def test_a_crashed_rung_records_the_exit_code_it_died_with(self):
+        def run(prompt, model, timeout=None):
+            raise ss.Refusal("%s: exit 1" % model, kind="exit_nonzero",
+                             raw='[{"url": "https://example.com/1", "summ',
+                             exit_code=1)
+        clock = FakeClock()
+        out = ss.summarise([story(1)], models=["gemini/a"], run=run,
+                           clock=clock, sleep=clock.sleep,
+                           log=lambda *a: None, budget_seconds=100)
+        record = out["debug"][0]
+        self.assertEqual("exit_nonzero", record["reason"])
+        self.assertEqual("partial_json", record["parse_error"])
+        self.assertEqual(1, record["exit_code"],
+                         "an exit code that is always None cannot be told "
+                         "apart from a timeout")
+
+    def test_the_capture_redacts_any_key_shaped_string(self):
+        secrets = (
+            "AIzaSyD-EXAMPLEEXAMPLEEXAMPLE123",
+            "sk-abcdefghijklmnopqrstuvwx",
+            "ghp_abcdefghijklmnopqrstuvwxyz0123",
+            "xoxb-1234567890-abcdefghij",
+            "Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
+            "AKIAABCDEFGHIJKLMNOP",
+        )
+        raw = ('failed: auth AIzaSyD-EXAMPLEEXAMPLEEXAMPLE123 sk-abcdefghijklmnopqrstuvwx '
+               'ghp_abcdefghijklmnopqrstuvwxyz0123 xoxb-1234567890-abcdefghij '
+               'Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature '
+               '{"api_key": "AKIAABCDEFGHIJKLMNOP"}')
+        dumped = json.dumps(ss.debug_record(model="gemini/a", raw=raw,
+                                           reason="exit_nonzero"))
+        for secret in secrets:
+            self.assertNotIn(secret, dumped, "%r survived redaction" % secret)
+        self.assertIn("REDACTED", dumped)
+        self.assertIn("failed: auth", dumped,
+                      "redaction must not eat the diagnosis")
+
+
+class TheChildIsActuallyKilled(unittest.TestCase):
+    """`timeout=` on the child, not only a check between requests."""
+
+    def test_the_granted_timeout_is_passed_to_the_process(self):
+        import unittest.mock as mock
+        proc = mock.MagicMock()
+        proc.communicate.return_value = (b'[{"url": "u", "summary": "s"}]', None)
+        proc.returncode = 0
+        with mock.patch.object(ss.subprocess, "Popen", return_value=proc) as popen:
+            ss.opencode_run("prompt", "gemini/a", timeout=7)
+        self.assertEqual(7, proc.communicate.call_args[1]["timeout"])
+        self.assertIn("gemini/a", popen.call_args[0][0])
+
+    def test_a_timeout_kills_the_child_and_keeps_the_partial_output(self):
+        import subprocess
+        import unittest.mock as mock
+        proc = mock.MagicMock()
+        proc.communicate.side_effect = [
+            subprocess.TimeoutExpired(cmd="opencode", timeout=7),
+            (b'[{"url": "https://example.com/1", "summ', None),
+        ]
+        with mock.patch.object(ss.subprocess, "Popen", return_value=proc):
+            with self.assertRaises(ss.Refusal) as caught:
+                ss.opencode_run("prompt", "gemini/a", timeout=7)
+        proc.kill.assert_called_once()
+        self.assertEqual("timeout", caught.exception.kind)
+        self.assertIn("summ", caught.exception.raw)
 
 
 if __name__ == "__main__":
