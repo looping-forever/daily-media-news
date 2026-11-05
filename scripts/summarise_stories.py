@@ -638,7 +638,9 @@ def refusal_cause(kind, message):
     """Which cause a refused call is, for the edition's own note."""
     if kind == "timeout":
         return "model_timeout"
-    if kind == "garbage":
+    if kind in ("garbage", "empty_answer"):
+        # A 200 whose message carries no text is the model answering with
+        # nothing, not a network fault: the reader sees an unreadable reply.
         return "unreadable_reply"
     if kind in ("quota_notice", "auth", "model_not_found", "bad_request"):
         # All four are the PROVIDER declining this request -- a spent allowance,

@@ -40,8 +40,11 @@ jobs:
     # A probe that hangs is a probe that lies about the provider. Forty seconds
     # per request is the provider's own cap (llm_providers.Provider.timeout), so
     # four providers plus four catalogue reads fit inside three minutes with
-    # room to spare; the job cap is what stops a wedged DNS lookup.
-    timeout-minutes: 3
+    # room to spare. The free-id sweep is the reason the job is now capped at
+    # five: twelve ids at eight seconds each is 96s of worst case on its own,
+    # and it self-limits at FREE_PROBE_WALL_SEC = 120s so it can never spend the
+    # whole job. The cap is what stops a wedged DNS lookup.
+    timeout-minutes: 5
     steps:
       - name: Check out the repository
         uses: actions/checkout@v5
@@ -70,13 +73,27 @@ jobs:
           print('provider | key | models | chosen | status | ms | verdict')
           for row in rows:
               print(row)
+          # A provider-level row cannot tell a working id from a silent one:
+          # run 42043556280 reported OpenRouter `ok` while the id it called came
+          # back EMPTY. This asks every served free id once and ends with the
+          # one line the seeds are corrected from.
+          free_rows = llm_providers.free_probe_rows()
+          for row in free_rows:
+              print(row)
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
           if summary:
               with open(summary, 'a', encoding='utf-8') as fh:
                   fh.write('### Provider probe\n\n')
                   for row in rows:
                       fh.write('- %s\n' % row.strip())
+                  fh.write('\n### Free-id sweep\n\n')
+                  for row in free_rows:
+                      if row.startswith('usable:'):
+                          fh.write('\n**%s**\n' % row)
+                      else:
+                          fh.write('- %s\n' % row.strip())
                   fh.write('\nA row is evidence about TODAY, not a setting: '
                            '`not_configured` means the secret is absent, and '
-                           '`auth` means it is present and refused.\n')
+                           '`auth` means it is present and refused. `usable` '
+                           'means TEXT came back, not that the model obeyed.\n')
           PY

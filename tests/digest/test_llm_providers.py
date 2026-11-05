@@ -531,6 +531,17 @@ class ProbeFindingTests(unittest.TestCase):
         self.assertEqual("ok", got["verdict"])
         self.assertEqual(2, got["attempts"])
 
+    def test_a_200_with_no_text_says_the_model_said_nothing(self):
+        rows = lp.probe_rows(transport=self._send(200, EmptyAnswerTests.EMPTY),
+                             environ=KEYS)
+        row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertTrue(row.endswith("verdict=empty"),
+                        "an empty answer is not `network` -- got %r" % row)
+        note = [r for r in rows if r.strip().startswith("groq note:")][0]
+        self.assertIn("said nothing", note)
+        self.assertIn("llama-3.3-70b-versatile", note,
+                      "the note must name the id -- got %r" % note)
+
 
 class QuotaMovesOnTests(unittest.TestCase):
     """A 429 from a keyed provider is capacity: record it, walk on, do not wait."""
@@ -560,6 +571,116 @@ class QuotaMovesOnTests(unittest.TestCase):
         self.assertEqual(1, len(out["refusals"]))
         self.assertIn("quota_notice", out["refusals"][0],
                       "the 429 is recorded even though the next rung answered")
+
+
+class EmptyAnswerTests(unittest.TestCase):
+    """HTTP 200 with no `content` is not a network fault, and it is not garbage.
+
+    Probe 42043556280: OpenRouter returned 200 in 11.9s from
+    `xingchen-agi/xing4.0-29b-a4b:free` with EMPTY content. The adapter called
+    that `garbage`, the probe printed `network`, and the id stayed in the seeds.
+    """
+
+    REASONING = json.dumps({"choices": [{"message": {
+        "content": "", "reasoning": "OK"}}]})
+    EMPTY = json.dumps({"choices": [{"message": {"content": "",
+                                                "reasoning": ""}}]})
+
+    def test_reasoning_text_is_used_when_content_is_empty(self):
+        send, _ = transport_returning(200, self.REASONING)
+        with keys():
+            got = lp.call("openrouter", "p", model_id="x/y:free",
+                          transport=send)
+        self.assertTrue(got.ok)
+        self.assertEqual("OK", got.text)
+        self.assertEqual("choices.0.message.reasoning", got.field)
+
+    def test_a_message_with_nothing_anywhere_is_empty_answer(self):
+        send, _ = transport_returning(200, self.EMPTY)
+        with keys():
+            got = lp.call("openrouter", "p", model_id="x/y:free",
+                          transport=send)
+        self.assertFalse(got.ok)
+        self.assertEqual("empty_answer", got.reason)
+        self.assertEqual("empty", lp.PROBE_VERDICT["empty_answer"],
+                         "an empty answer is not a network fault")
+        with keys():
+            with self.assertRaises(lp.ProviderError) as caught:
+                lp.text_for("openrouter/x/y:free", "p", transport=send)
+        self.assertEqual("empty_answer", caught.exception.kind)
+        self.assertIn("x/y:free", str(caught.exception),
+                      "the log must name the model that returned nothing")
+        self.assertEqual("unreadable_reply",
+                         ss.refusal_cause("empty_answer", ""))
+
+    def test_an_empty_reasoning_field_is_not_mistaken_for_text(self):
+        body = json.dumps({"choices": [{"message": {
+            "content": "  ", "reasoning": "\n"}}]})
+        send, _ = transport_returning(200, body)
+        with keys():
+            got = lp.call("groq", "p", transport=send)
+        self.assertFalse(got.ok)
+        self.assertEqual("empty_answer", got.reason)
+
+
+class FreeSweepTests(unittest.TestCase):
+    """Every served free id, asked once -- the seeds are evidence, not a guess."""
+
+    PROSE = json.dumps({"choices": [{"message": {
+        "content": "This model answers in a sentence."}}]})
+
+    def setUp(self):
+        lp.clear_catalogue()
+
+    def tearDown(self):
+        lp.clear_catalogue()
+
+    def _send(self, ids, answers):
+        def send(spec):
+            if spec["url"].endswith("/models"):
+                return 200, json.dumps({"data": [{"id": i} for i in ids]})
+            model = json.loads(spec["body"])["model"]
+            return answers[model]
+
+        return send
+
+    def test_one_row_per_model_then_the_usable_line(self):
+        ids = ["a/one:free", "b/two:free", "c/three:free"]
+        answers = {"a/one:free": (200, OK_BODY),
+                   "b/two:free": (200, self.PROSE),
+                   "c/three:free": (200, EmptyAnswerTests.EMPTY)}
+        rows = lp.free_probe_rows(
+            transport=self._send(ids, answers),
+            environ={"OPENROUTER_API_KEY": "k"})
+        model_rows = [r for r in rows if " | status=" in r]
+        self.assertEqual(3, len(model_rows), rows)
+        self.assertIn("said_ok=yes", model_rows[0])
+        self.assertIn("text=yes", model_rows[0])
+        self.assertIn("said_ok=no", model_rows[1])
+        self.assertIn("verdict=usable", model_rows[1],
+                      "prose is a working answer -- the row asks for TEXT")
+        self.assertIn("text=no", model_rows[2])
+        self.assertIn("verdict=empty", model_rows[2])
+        usable = [r for r in rows if r.startswith("usable: ")][0]
+        self.assertEqual("usable: a/one:free, b/two:free", usable)
+
+    def test_the_cap_is_stated_when_more_ids_are_served(self):
+        ids = ["m%d/x:free" % i for i in range(15)]
+        answers = {i: (200, OK_BODY) for i in ids}
+        rows = lp.free_probe_rows(
+            transport=self._send(ids, answers),
+            environ={"OPENROUTER_API_KEY": "k"}, limit=12)
+        self.assertEqual(12, len([r for r in rows if " | status=" in r]))
+        self.assertIn("12 of 15", rows[0])
+        self.assertTrue(any("NOT tested (per-job cap 12)" in r for r in rows),
+                        "a cap that is not stated reads as a short catalogue")
+
+    def test_an_unreachable_catalogue_is_reported_not_guessed(self):
+        send, _ = transport_returning(503, "down")
+        rows = lp.free_probe_rows(transport=send,
+                                  environ={"OPENROUTER_API_KEY": "k"})
+        self.assertEqual(1, len(rows))
+        self.assertIn("no catalogue", rows[0])
 
 
 class NoKeyShapedStringsTests(unittest.TestCase):

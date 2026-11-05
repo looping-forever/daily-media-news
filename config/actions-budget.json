@@ -243,7 +243,7 @@
       "jobs_per_run": 1,
       "p95_minutes": 0.5,
       "crons": [],
-      "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch, so it costs nothing until a human asks. What it asks is the one question the test suites cannot: is this provider's id still served, is the key still live, does the plan still allow the call. ONE job: checkout, setup-python, and eight HTTP requests (four catalogues, four one-word completions) whose own sockets are capped at 40-75s each in scripts/llm_providers.py and whose job is capped at 3 minutes. 0.5 minute is the shape of that work, not the cap. `max_runs_per_day: 1` is a ceiling on human asking, not a forecast."
+      "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch, so it costs nothing until a human asks. What it asks is the one question the test suites cannot: is this provider's id still served, is the key still live, does the plan still allow the call. ONE job: checkout, setup-python, then four catalogues and four one-word completions whose own sockets are capped at 40-75s each in scripts/llm_providers.py, plus the OpenRouter free-id sweep -- one more catalogue and up to twelve 8s completions, self-limited at 120s -- inside a job capped at 5 minutes. 0.5 minute is the shape of a normal run (all of it answers in well under a minute), not the cap. `max_runs_per_day: 1` is a ceiling on human asking, not a forecast."
     },
     "digest-watchdog.yml": {
       "max_runs_per_day": 2,

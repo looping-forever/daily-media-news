@@ -63,6 +63,14 @@ PROBE_PROMPT = "reply with the single word OK"
 #: "quota" off one sample sends the owner to the billing page for nothing.
 PROBE_RETRY_SECONDS = 2.0
 
+#: The free-id sweep's budget. 12 ids x 8s = 96s of worst case, and the sweep
+#: also stops itself at FREE_PROBE_WALL_SEC, so it cannot spend the job's third
+#: minute even if every id hangs to its own ceiling. A slow-but-working id is
+#: recorded as `timeout`, which is a fact about that id under this cap.
+FREE_PROBE_TIMEOUT = 8
+FREE_PROBE_LIMIT = 12
+FREE_PROBE_WALL_SEC = 120
+
 
 @dataclass(frozen=True)
 class Provider:
@@ -155,12 +163,28 @@ STATUS_REASON = {
     504: "timeout",
 }
 
+#: Where an OpenAI-compatible reply may carry the answer, in reading order.
+#: `content` is the normal place; the reasoning fields are where a reasoning
+#: model puts a short answer while `content` stays empty.
+ANSWER_FIELDS = (
+    ("choices", 0, "message", "content"),
+    ("choices", 0, "message", "reasoning_content"),
+    ("choices", 0, "message", "reasoning"),
+    ("choices", 0, "text"),
+    ("choices", 0, "reasoning_content"),
+    ("choices", 0, "reasoning"),
+    ("reasoning_content",),
+    ("reasoning",),
+    ("output_text",),
+)
+
 REASON_TEXT = {
     "auth": "key refused",
     "quota_notice": "quota refused",
     "timeout": "no answer in time",
     "transport": "transport failed",
     "garbage": "unreadable reply",
+    "empty_answer": "empty answer",
     "model_not_found": "model not found",
     "bad_request": "request refused",
     "not_configured": "key not configured",
@@ -169,6 +193,7 @@ REASON_TEXT = {
 #: What the PROBE prints. Closed on purpose -- a probe that invents verdicts is
 #: a second vocabulary. `garbage` is reported as `network`: a 200 with no usable
 #: answer is a transport-shaped failure for an operator reading the table.
+#: `empty_answer` is NOT `network`: the provider answered, and said nothing.
 PROBE_VERDICT = {
     "auth": "auth",
     "quota_notice": "quota",
@@ -176,6 +201,7 @@ PROBE_VERDICT = {
     "timeout": "timeout",
     "transport": "network",
     "garbage": "network",
+    "empty_answer": "empty",
     "bad_request": "network",
 }
 
@@ -219,6 +245,7 @@ class ProviderResult:
     status: int = 0
     reason: str = ""
     detail: str = ""
+    field: str = ""
 
 
 @dataclass
@@ -370,14 +397,80 @@ def _reason_for_status(status):
 
 def _message_text(body):
     """`choices[0].message.content` out of a chat-completions body, or ""."""
+    return answer_from_body(body)[0]
+
+
+def _dig(doc, path):
+    """Walk a JSON path of dict keys and list indexes; None if it is absent."""
+    cur = doc
+    for part in path:
+        if isinstance(part, int):
+            if not isinstance(cur, list) or part >= len(cur):
+                return None
+            cur = cur[part]
+        else:
+            if not isinstance(cur, dict) or part not in cur:
+                return None
+            cur = cur[part]
+    return cur
+
+
+def _text_of(raw):
+    """A field's value as text: a string as-is, part lists joined, else ""."""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        parts = []
+        for item in raw:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                part = item.get("text") or item.get("content")
+                if isinstance(part, str):
+                    parts.append(part)
+        return "".join(parts)
+    return ""
+
+
+def looks_like_reply(body):
+    """True when the JSON is a chat-completions shape, even with no text in it.
+
+    The distinction the caller needs: `{"unexpected": true}` is garbage (not a
+    reply at all), while `{"choices":[{"message":{"content":""}}]}` IS a reply
+    that carries no answer -- `empty_answer`.
+    """
     try:
         doc = json.loads(body)
     except (TypeError, ValueError):
-        return ""
+        return False
+    first = _dig(doc, ("choices", 0))
+    if isinstance(first, (dict, str)):
+        return True
+    return isinstance(_dig(doc, ("choices", 0, "message")), dict)
+
+
+def answer_from_body(body):
+    """(text, field) -- the answer wherever this provider put it.
+
+    Measured 2026-11-05 (probe 42043556280): OpenRouter answered HTTP 200 with an
+    EMPTY `content` for `xingchen-agi/xing4.0-29b-a4b:free`, and a reasoning-tuned
+    model puts its whole answer in a `reasoning` field instead. Reading only
+    `content` reported that as `garbage`, which is indistinguishable from a broken
+    provider and sent the walk to the next rung for no reason.
+
+    `field` names where the text came from (dotted path), or "" when EVERY field
+    was empty. `looks_like_reply()` then decides whether that is `empty_answer`
+    (a reply with nothing in it) or `garbage` (not a reply at all).
+    """
     try:
-        return str(doc["choices"][0]["message"]["content"] or "")
-    except (KeyError, IndexError, TypeError):
-        return ""
+        doc = json.loads(body)
+    except (TypeError, ValueError):
+        return "", ""
+    for path in ANSWER_FIELDS:
+        text = _text_of(_dig(doc, path))
+        if text.strip():
+            return text, ".".join(str(p) for p in path)
+    return "", ""
 
 
 def _error_text(body):
@@ -430,9 +523,18 @@ def call(name, prompt, model_id=None, timeout=None, max_tokens=MAX_TOKENS,
     elapsed = time.monotonic() - started
     status = int(status or 0)
     if status == 200:
-        text = _message_text(body)
+        text, field = answer_from_body(body)
         if text.strip():
-            return ProviderResult(True, text, model_id, elapsed, status, "ok")
+            return ProviderResult(True, text, model_id, elapsed, status, "ok",
+                                  "", field)
+        # HTTP 200 AND NOTHING TO READ. A reply whose message carried no text is
+        # the model returning no answer, not a network fault: `empty_answer`
+        # names it, so the ladder moves on and the log names the id that said
+        # nothing. A body that is not a reply at all stays `garbage`.
+        if looks_like_reply(body):
+            return ProviderResult(False, "", model_id, elapsed, status,
+                                  "empty_answer",
+                                  redact(_error_text(body), key)[:300], "")
         return ProviderResult(False, "", model_id, elapsed, status, "garbage",
                               redact(_error_text(body), key)[:300])
     reason = _reason_for_status(status)
@@ -479,8 +581,9 @@ def cli_result(model_id, prompt, timeout=None, transport=None, environ=None):
     if result.ok:
         return 0, result.text, ""
     detail = result.detail or ""
-    line = "HTTP %d %s: %s" % (result.status, REASON_TEXT.get(result.reason,
-                                                             result.reason), detail)
+    line = "%s: HTTP %d %s: %s" % (model_id, result.status,
+                                   REASON_TEXT.get(result.reason, result.reason),
+                                   detail)
     if result.reason in ("timeout", "not_configured"):
         # Both mean "this rung produced nothing and its window is spent". The
         # walk retries a fast transport failure but never a timeout, and
@@ -663,6 +766,14 @@ def _probe_note(got):
     if verdict == "model_not_found":
         return ("the chosen id %r is not in this account's catalogue; seed from "
                 "the `available` line instead" % (got.get("chosen") or "-"))
+    if verdict == "empty":
+        # Measured 2026-11-05: xingchen-agi/xing4.0-29b-a4b answered 200 in
+        # 11.9s with empty content and no reasoning field. Saying nothing about
+        # it is the one outcome the owner cannot act on.
+        return ("%s answered with no content and no reasoning/text field, so the "
+                "model said nothing; the ladder treats that as `empty_answer` "
+                "and moves on (HTTP %s)"
+                % (got.get("chosen") or "-", got.get("status") or 200))
     if verdict == "quota":
         return ("rate-limited after %d attempt(s): capacity, not a wrong id"
                 % got.get("attempts", 1))
@@ -743,6 +854,84 @@ def probe_rows(transport=None, environ=None, sleep=None):
         note = _probe_note(got)
         if note:
             rows.append("    %s note: %s" % (got["provider"], note))
+    return rows
+
+
+def free_probe(name="openrouter", transport=None, environ=None,
+               limit=FREE_PROBE_LIMIT, timeout=FREE_PROBE_TIMEOUT,
+               wall_sec=FREE_PROBE_WALL_SEC, clock=None):
+    """Ask EVERY served free id once. Returns the raw table, not a summary.
+
+    WHY A SWEEP. Probe 42043556280 said OpenRouter was `ok` in 11.9s while the
+    model it called returned EMPTY content: a provider-level row cannot tell a
+    working id from a silent one, so the seeds were still a guess. This asks each
+    id separately and records the three facts that distinguish them -- status,
+    whether any text came back, and which field carried it.
+
+    `usable` means TEXT CAME BACK, not that it said "OK": a model that answers
+    with a sentence is a working model, and the point of the row is to find
+    writers, not to grade obedience.
+    """
+    clock = clock or time.monotonic
+    started = clock()
+    listing = catalogue(name, transport=transport, environ=environ, refresh=True)
+    served = list(listing.ids)
+    tested = served[:max(0, int(limit))]
+    out = {"provider": name, "served": served, "tested": tested,
+           "skipped": served[len(tested):], "catalogue": listing.reason,
+           "rows": [], "usable": []}
+    for model_id in tested:
+        if clock() - started >= wall_sec:
+            out["rows"].append({"model": model_id, "status": 0, "ms": 0,
+                                "chars": 0, "field": "", "said_ok": False,
+                                "verdict": "skipped"})
+            continue
+        result = call(name, PROBE_PROMPT, model_id=model_id, timeout=timeout,
+                      transport=transport, environ=environ)
+        verdict = ("usable" if result.ok
+                   else PROBE_VERDICT.get(result.reason, result.reason))
+        out["rows"].append({
+            "model": result.model or model_id,
+            "status": result.status,
+            "ms": int((result.elapsed or 0.0) * 1000),
+            "chars": len(result.text or ""),
+            "field": result.field or "",
+            "said_ok": _said_ok(result.text),
+            "verdict": verdict,
+        })
+        if result.ok:
+            out["usable"].append(result.model or model_id)
+    return out
+
+
+def _said_ok(text):
+    """True when the answer IS the word asked for, ignoring case and punctuation."""
+    return str(text or "").strip().strip(".\"' ").upper() == "OK"
+
+
+def free_probe_rows(name="openrouter", **kwargs):
+    """The sweep as printable lines: one row per id, then `usable: ...`."""
+    got = free_probe(name, **kwargs)
+    if got["catalogue"] != "ok":
+        return ["%s free sweep: no catalogue (%s) -- no id could be tested"
+                % (name, got["catalogue"])]
+    if not got["rows"]:
+        return ["%s free sweep: the catalogue lists no free ids" % name]
+    rows = ["%s free sweep: %d of %d served id(s) tested"
+            % (name, len(got["tested"]), len(got["served"]))]
+    if got["skipped"]:
+        rows.append("    note: %d id(s) NOT tested (per-job cap %d): %s"
+                    % (len(got["skipped"]), FREE_PROBE_LIMIT,
+                       ", ".join(got["skipped"])))
+    for row in got["rows"]:
+        rows.append(
+            "%s | status=%s | ms=%d | text=%s | chars=%d | via=%s | said_ok=%s "
+            "| verdict=%s"
+            % (row["model"], row["status"] or "-", row["ms"],
+               "yes" if row["chars"] else "no", row["chars"],
+               row["field"] or "-", "yes" if row["said_ok"] else "no",
+               row["verdict"]))
+    rows.append("usable: %s" % (", ".join(got["usable"]) or "none"))
     return rows
 
 
