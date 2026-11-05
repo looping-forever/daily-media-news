@@ -11740,6 +11740,36 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-05T06:42:01+05:45"
+    },
+    {
+      "event_id": "evt-2d2e64cba7c5",
+      "event_key": null,
+      "canonical_title": "14 killed, 147 injured in road accidents across Nepal in 24 hours - Nepalnews.com",
+      "category": "local_city",
+      "first_seen": "2026-11-05",
+      "last_seen": "2026-11-05",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiqafbvv95cuxpuw56tgfdz1jxbv9ucelhwglkm1jmehnesfbhekmzog1vu2mywgllm3jqnmpiueromldulwhlehzkmffybe5toxezrmniugdivndqznzyredfqw0xy1lvdm5uqnnyc04zc1p5z1nvy3awdnzrqufuugu2ug44uxvkbuz2utvnrwlxtwywb2jfce1tctzouzh2sxjhdy1kauw1dmddbvdptge"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-05T15:33:56+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-05T15:33:56+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "rss"
     }
   ],
   "archived": []

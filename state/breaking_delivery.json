@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-11-02T11:16:05Z",
+    "at": "2026-11-05T09:48:56Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Ilam’s recovery remains incomplete a year after 39 people were killed, despite reconstruct — check this now",
+    "title": "🚨 CRITICAL: 14 killed, 147 injured in road accidents across Nepal in 24 hours - Nepalnews.com — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-11-02T11:16:05Z",
+    "at": "2026-11-05T09:48:56Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Ilam’s recovery remains incomplete a year after 39 people were killed, despite reconstruct — check this now",
+    "title": "🚨 CRITICAL: 14 killed, 147 injured in road accidents across Nepal in 24 hours - Nepalnews.com — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-11-05T09:48:56Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: 14 killed, 147 injured in road accidents across Nepal in 24 hours - Nepalnews.com — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-11-02T11:16:05Z",
       "ok": true,
