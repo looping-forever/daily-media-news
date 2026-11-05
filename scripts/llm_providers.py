@@ -58,6 +58,11 @@ MAX_TOKENS = 1024
 #: is about the provider and never about the prompt.
 PROBE_PROMPT = "reply with the single word OK"
 
+#: One bounded second attempt on a 429. Measured 2026-11-05: Mistral answered 429
+#: in 219 ms, which is a per-minute window rather than a broken id, and reporting
+#: "quota" off one sample sends the owner to the billing page for nothing.
+PROBE_RETRY_SECONDS = 2.0
+
 
 @dataclass(frozen=True)
 class Provider:
@@ -104,8 +109,21 @@ PROVIDERS = {
         # on a digest, silently, and the guard below refuses one before a byte
         # is sent. The candidate list is the SEED; `list_models()` is what
         # proves which ids this account can actually reach.
-        ("deepseek/deepseek-r1:free",
-         "meta-llama/llama-3.3-70b-instruct:free"),
+        #
+        # SEEDED FROM THE ACCOUNT'S OWN CATALOGUE (probe, 2026-11-05): it serves
+        # 8 of the 12 ids listed and NOT the two guessed here before, so a seed
+        # id is a claim to check, never a fact. Order is for PROSE SUMMARISATION:
+        # general instruct models first, then vision-capable, then small, then
+        # the code specialist, and the content-safety classifier last -- it is
+        # built to refuse, not to write.
+        ("xingchen-agi/xing4.0-29b-a4b:free",
+         "nvidia/nemotron-3.5-super-vl:free",
+         "recursive/flint-v1.0:free",
+         "dots-studio/dots-3-note-preview:free",
+         "nvidia/nemotron-3.5-lightning:free",
+         "liquid/lfm-2.5-2.6b:free",
+         "cohere/north-mini-code:free",
+         "nvidia/nemotron-3.5-content-safety:free"),
         75,
         free_only=True,
     ),
@@ -160,6 +178,20 @@ PROBE_VERDICT = {
     "garbage": "network",
     "bad_request": "network",
 }
+
+#: Name markers that make an id a POOR prose summariser, with how hard to avoid it.
+#: Only consulted for ids the configured seeds do not name.
+_PREFERENCE_MARKERS = (
+    ("content-safety", 95), ("moderation", 90), ("guard", 85), ("safety", 80),
+    ("embed", 95), ("rerank", 95),
+    ("code", 60), ("coder", 60),
+    ("tiny", 40), ("small", 30), ("mini", 30), ("lite", 15), ("flash", 10),
+    ("experimental", 10), ("preview", 5),
+)
+
+#: `/models` reads, one per provider per process. The catalogue changes slowly
+#: and a walk asks about the same three providers repeatedly.
+_CATALOGUE_CACHE = {}
 
 
 class ProviderError(Exception):
@@ -459,6 +491,18 @@ def cli_result(model_id, prompt, timeout=None, transport=None, environ=None):
     return 1, "", line.strip()
 
 
+def _bare_id(raw):
+    """The id without the transport's own namespace prefix.
+
+    Gemini's OpenAI-compatible `/models` answers `models/gemini-…` while its chat
+    endpoint takes the bare id. Comparing the prefixed form against the configured
+    candidates matched nothing, so a healthy Gemini read as an unserved provider
+    in the 2026-11-05 probe.
+    """
+    text = str(raw or "")
+    return text[len("models/"):] if text.startswith("models/") else text
+
+
 def list_models(name, transport=None, environ=None):
     """Read the provider's own `/models`. Discovery, never a guess.
 
@@ -492,7 +536,7 @@ def list_models(name, transport=None, environ=None):
     try:
         doc = json.loads(body)
         rows = doc.get("data") if isinstance(doc, dict) else None
-        ids = [str(r.get("id")) for r in (rows or [])
+        ids = [_bare_id(r.get("id")) for r in (rows or [])
                if isinstance(r, dict) and r.get("id")]
     except (TypeError, ValueError):
         return ModelList([], status, elapsed, "garbage")
@@ -519,13 +563,126 @@ def choose_model(name, discovered, environ=None):
     return record.models[0]
 
 
-def probe(name, transport=None, environ=None):
-    """One provider, proven: key, catalogue, and one tiny real answer."""
+def _preference_key(model_id):
+    """Sort key for a served id whose name is not one of the configured seeds.
+
+    General instruct models summarise prose; a safety classifier is built to
+    refuse, an embedding cannot write a sentence, and a code specialist writes
+    the wrong register. Those are pushed to the back rather than winning by
+    catalogue order.
+    """
+    text = str(model_id or "").lower()
+    penalty = 0
+    for marker, weight in _PREFERENCE_MARKERS:
+        if marker in text:
+            penalty += weight
+    return (penalty, len(text), text)
+
+
+def preference_order(served, preferred=()):
+    """`preferred` first (in its own order), then the rest best-first."""
+    served = [i for i in (served or []) if i]
+    head = [m for m in (preferred or ()) if m in set(served)]
+    head_set = set(head)
+    return head + sorted((m for m in served if m not in head_set),
+                         key=_preference_key)
+
+
+def catalogue(name, transport=None, environ=None, refresh=False):
+    """One `/models` read per provider per process. ONLY a good read is cached.
+
+    A failed read is not evidence about the catalogue, so it is never cached: the
+    next caller asks again instead of inheriting a transient 429 for the rest of
+    the process.
+    """
+    if not refresh and name in _CATALOGUE_CACHE:
+        return _CATALOGUE_CACHE[name]
+    listing = list_models(name, transport=transport, environ=environ)
+    if listing.reason == "ok":
+        _CATALOGUE_CACHE[name] = listing
+    return listing
+
+
+def clear_catalogue():
+    """Forget cached reads -- for tests and for a deliberate re-probe."""
+    _CATALOGUE_CACHE.clear()
+
+
+def served_model(name, transport=None, environ=None, refresh=False):
+    """The id to actually send, proven against this account's catalogue.
+
+    Three outcomes, and each one is explicit because a silently wrong id is the
+    defect this replaced:
+
+    * the catalogue was read and lists ids -> the first SERVED candidate in
+      preference order; `substituted` says whether that differed from the
+      configured one, so the walk log can name what really answered;
+    * the catalogue was read and lists nothing usable -> `model` is None and
+      `reason` is `no_served_model`. The provider contributes NO rung: calling it
+      would only earn a `model_not_found` cooldown for an id nobody serves;
+    * the catalogue could not be read (no key, network, timeout, 429) -> the
+      configured candidate is kept and `reason` says `catalogue_unreadable`. That
+      is not evidence of an unserved id, and dropping a working provider on a
+      failed GET would be the same class of guess in the other direction.
+    """
+    record = provider(name)
+    configured_id = record.models[0]
+    got = {"provider": name, "model": configured_id, "source": "configured",
+           "reason": "", "configured": configured_id, "substituted": False,
+           "available": []}
+    if not key_for(name, environ):
+        got.update(model=None, source="none", reason="not_configured")
+        return got
+    listing = catalogue(name, transport=transport, environ=environ,
+                        refresh=refresh)
+    got["available"] = list(listing.ids)
+    if listing.reason != "ok":
+        got["reason"] = "catalogue_unreadable"
+        got["catalogue_reason"] = listing.reason
+        return got
+    if not listing.ids:
+        got.update(model=None, source="none", reason="no_served_model")
+        return got
+    chosen = preference_order(listing.ids, record.models)[0]
+    got.update(model=chosen, source="catalogue",
+               substituted=chosen != configured_id)
+    return got
+
+
+def _probe_note(got):
+    """The plain-sentence line under a probe row, or "".
+
+    NEVER appended to the row: the row is a fixed shape that tests and the
+    summary table read, so an explanation goes on its own indented line.
+    """
+    verdict = got.get("verdict")
+    if verdict == "auth":
+        return ("the provider REFUSED the key (HTTP %s) -- the secret is present "
+                "and was rejected; regenerate it, then re-run this probe"
+                % (got.get("status") or "401/403"))
+    if verdict == "model_not_found":
+        return ("the chosen id %r is not in this account's catalogue; seed from "
+                "the `available` line instead" % (got.get("chosen") or "-"))
+    if verdict == "quota":
+        return ("rate-limited after %d attempt(s): capacity, not a wrong id"
+                % got.get("attempts", 1))
+    if verdict == "ok" and got.get("attempts", 1) > 1:
+        return "answered on the second attempt after a 429"
+    return ""
+
+
+def probe(name, transport=None, environ=None, sleep=None):
+    """One provider, proven: key, catalogue, and one tiny real answer.
+
+    A 429 earns ONE retry after PROBE_RETRY_SECONDS: a per-minute window says
+    nothing about whether the id works, and the wait is injected so a test never
+    sleeps. The row records how many attempts it took.
+    """
     started = time.monotonic()
     key_present = configured(name, environ)
     discovered = ModelList([], 0, 0.0, "not_configured") \
-        if not key_present else list_models(name, transport=transport,
-                                            environ=environ)
+        if not key_present else catalogue(name, transport=transport,
+                                          environ=environ, refresh=True)
     chosen = choose_model(name, discovered.ids, environ)
     if not key_present:
         return {
@@ -537,10 +694,18 @@ def probe(name, transport=None, environ=None):
             "ms": int((time.monotonic() - started) * 1000),
             "verdict": "not_configured",
             "available": [],
+            "attempts": 0,
         }
     result = call(name, PROBE_PROMPT, model_id=chosen,
                   timeout=effective_timeout(name), transport=transport,
                   environ=environ)
+    attempts = 1
+    if not result.ok and result.reason == "quota_notice":
+        (sleep or time.sleep)(PROBE_RETRY_SECONDS)
+        result = call(name, PROBE_PROMPT, model_id=chosen,
+                      timeout=effective_timeout(name), transport=transport,
+                      environ=environ)
+        attempts = 2
     verdict = "ok" if result.ok else PROBE_VERDICT.get(result.reason,
                                                        result.reason)
     return {
@@ -552,18 +717,21 @@ def probe(name, transport=None, environ=None):
         "ms": int((result.elapsed or 0.0) * 1000),
         "verdict": verdict,
         "available": list(discovered.ids[:8]),
+        "attempts": attempts,
     }
 
 
-def probe_rows(transport=None, environ=None):
+def probe_rows(transport=None, environ=None, sleep=None):
     """The probe's table, one row per provider, Gemini first (it leads).
 
     The `available=` line under each row is the EVIDENCE the model ids in this
-    file are corrected from: it is the account's own catalogue, not a guess.
+    file are corrected from: it is the account's own catalogue, not a guess. The
+    `note:` line carries anything explanatory -- refused key, wrong id, retry --
+    so the pinned row shape never changes.
     """
     rows = []
     for name in ("gemini",) + LADDER_PROVIDERS:
-        got = probe(name, transport=transport, environ=environ)
+        got = probe(name, transport=transport, environ=environ, sleep=sleep)
         rows.append("%s | key=%s | models=%d | chosen=%s | status=%s | "
                     "ms=%d | verdict=%s"
                     % (got["provider"], got["key"], got["models"],
@@ -572,25 +740,48 @@ def probe_rows(transport=None, environ=None):
         if got["available"]:
             rows.append("    %s available: %s"
                         % (got["provider"], ", ".join(got["available"])))
+        note = _probe_note(got)
+        if note:
+            rows.append("    %s note: %s" % (got["provider"], note))
     return rows
 
 
-def ladder_rungs(environ=None):
+def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
+                 refresh=False):
     """The configured provider rungs, in ladder order, as full rung ids.
 
     A provider with no key is SKIPPED SILENTLY -- its absence is a repository
     setting, not a model failure, and a rung that cannot be called would cost
     the walk an attempt to learn what one `os.environ` lookup already says.
+
+    `resolve=True` asks each provider's catalogue for an id it actually serves
+    (`served_model`), which is the production path: the probe showed the seed ids
+    are guesses and this account serves a different set. It is opt-in because a
+    caller that builds a ladder at IMPORT time must not open a socket.
     """
     rungs = []
     for name in LADDER_PROVIDERS:
         if not configured(name, environ):
             continue
-        rungs.append("%s/%s" % (name, model_for(name)))
+        if not resolve:
+            rungs.append("%s/%s" % (name, model_for(name)))
+            continue
+        got = served_model(name, transport=transport, environ=environ,
+                           refresh=refresh)
+        if not got["model"]:
+            if log:
+                log("llm_providers: %s contributes no rung -- %s"
+                    % (name, got["reason"]))
+            continue
+        if got["substituted"] and log:
+            log("llm_providers: %s does not serve %r; using the served id %r"
+                % (name, got["configured"], got["model"]))
+        rungs.append("%s/%s" % (name, got["model"]))
     return tuple(rungs)
 
 
-def ordered_ladder(seeds, prefixes=(), environ=None):
+def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
+                   resolve=False, log=None):
     """`seeds` re-ordered as: Gemini, then Groq/OpenRouter/Mistral, then the rest.
 
     Gemini rungs stay first because they are the owner's stated preference,
@@ -609,4 +800,5 @@ def ordered_ladder(seeds, prefixes=(), environ=None):
         seeds = [m for m in seeds if m.startswith(tuple(prefixes))]
     gemini = [m for m in seeds if m.startswith("gemini/")]
     rest = [m for m in seeds if not m.startswith("gemini/")]
-    return tuple(gemini) + ladder_rungs(environ) + tuple(rest)
+    return tuple(gemini) + ladder_rungs(environ, transport=transport,
+                                        resolve=resolve, log=log) + tuple(rest)

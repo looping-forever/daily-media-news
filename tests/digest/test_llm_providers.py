@@ -76,6 +76,29 @@ def keys(environ=KEYS):
     return mock.patch.dict(os.environ, dict(environ))
 
 
+def router(catalogues=None, chat=(200, OK_BODY)):
+    """(fake transport, recorded specs): /models answered per provider.
+
+    `catalogues` maps a provider name to the ids its catalogue lists; a provider
+    missing from it answers with an EMPTY catalogue, which is the interesting
+    case as often as a populated one.
+    """
+    calls = []
+    catalogues = catalogues or {}
+
+    def send(spec):
+        calls.append(spec)
+        if spec["url"].endswith("/models"):
+            for name, ids in catalogues.items():
+                if lp.PROVIDERS[name].models_url == spec["url"]:
+                    return 200, json.dumps(
+                        {"data": [{"id": i} for i in ids]})
+            return 200, json.dumps({"data": []})
+        return chat
+
+    return send, calls
+
+
 class RequestShapeTests(unittest.TestCase):
     """The request is a value, so it can be asserted without a socket."""
 
@@ -235,8 +258,14 @@ class LadderOrderTests(unittest.TestCase):
             tuple(got))
 
     def test_the_summariser_walks_the_same_order(self):
+        # A fake catalogue: `ladder_models` resolves the HTTP ids against what
+        # the account serves, and a test must never open a socket.
+        send, _ = router({"groq": ["llama-3.3-70b-versatile"],
+                          "openrouter": ["recursive/flint-v1.0:free"],
+                          "mistral": ["mistral-small-latest"]})
+        lp.clear_catalogue()
         with keys():
-            got = ss.ladder_models()
+            got = ss.ladder_models(transport=send)
         providers = [lp.provider_of(m) for m in got]
         self.assertEqual(
             [None, None, "groq", "openrouter", "mistral"],
@@ -358,6 +387,179 @@ class ProbeTests(unittest.TestCase):
         send, _ = self._router()
         got = lp.probe("groq", transport=send, environ=KEYS)
         self.assertEqual(["llama-3.3-70b-versatile"], got["available"])
+
+
+class ServedModelTests(unittest.TestCase):
+    """The id sent is the one the ACCOUNT serves, not the one the seed guessed.
+
+    Measured 2026-11-05 (probe run 42032952302): OpenRouter served 8 of 12 listed
+    ids and NEITHER configured candidate. A seed id is a claim to check.
+    """
+
+    def setUp(self):
+        lp.clear_catalogue()
+
+    def tearDown(self):
+        lp.clear_catalogue()
+
+    def test_a_served_id_replaces_a_seed_the_account_does_not_serve(self):
+        send, _ = router({"openrouter": ["recursive/flint-v1.0:free"]})
+        got = lp.served_model("openrouter", transport=send, environ=KEYS)
+        self.assertEqual("recursive/flint-v1.0:free", got["model"])
+        self.assertEqual("catalogue", got["source"])
+        self.assertTrue(got["substituted"],
+                        "the log must be able to say the seed was replaced")
+        self.assertEqual(lp.PROVIDERS["openrouter"].models[0],
+                         got["configured"])
+
+    def test_a_safety_classifier_is_never_preferred_over_an_instruct_model(self):
+        # Neither id is a seed, so the NAME decides -- which is the rule that
+        # applies the moment the account's catalogue changes.
+        send, _ = router({"openrouter": ["acme/guard-classifier:free",
+                                         "acme/new-instruct:free"]})
+        got = lp.served_model("openrouter", transport=send, environ=KEYS)
+        self.assertEqual("acme/new-instruct:free", got["model"])
+
+    def test_a_catalogue_with_nothing_usable_contributes_no_rung(self):
+        send, _ = router({"groq": []})
+        got = lp.served_model("groq", transport=send, environ=KEYS)
+        self.assertIsNone(got["model"])
+        self.assertEqual("no_served_model", got["reason"])
+        rungs = lp.ladder_rungs(environ={"GROQ_API_KEY": "k"},
+                                transport=send, resolve=True)
+        self.assertEqual((), rungs,
+                         "a provider serving nothing must not be attempted")
+
+    def test_an_unreadable_catalogue_keeps_the_configured_id(self):
+        send, _ = transport_returning(503, "down")
+        got = lp.served_model("groq", transport=send, environ=KEYS)
+        self.assertEqual("llama-3.3-70b-versatile", got["model"])
+        self.assertEqual("catalogue_unreadable", got["reason"],
+                         "a failed GET is not evidence of an unserved id")
+        self.assertEqual("transport", got["catalogue_reason"])
+
+    def test_no_key_means_no_catalogue_request(self):
+        send, calls = router({"groq": ["llama-3.3-70b-versatile"]})
+        got = lp.served_model("groq", transport=send, environ={})
+        self.assertEqual("not_configured", got["reason"])
+        self.assertIsNone(got["model"])
+        self.assertEqual([], calls)
+
+    def test_one_catalogue_read_per_process(self):
+        send, calls = router({"groq": ["llama-3.3-70b-versatile"]})
+        lp.served_model("groq", transport=send, environ=KEYS)
+        lp.served_model("groq", transport=send, environ=KEYS)
+        self.assertEqual(1, len(calls),
+                         "the catalogue is read once, not once per rung")
+
+    def test_the_substitution_is_named_in_the_log(self):
+        send, _ = router({"openrouter": ["recursive/flint-v1.0:free"]})
+        notes = []
+        rungs = lp.ladder_rungs(environ={"OPENROUTER_API_KEY": "k"},
+                                transport=send, resolve=True,
+                                log=notes.append)
+        self.assertEqual(("openrouter/recursive/flint-v1.0:free",), rungs)
+        self.assertTrue(any("does not serve" in n for n in notes),
+                        "the run must name what answered -- got %r" % (notes,))
+
+
+class GeminiCatalogueTests(unittest.TestCase):
+    """Gemini's catalogue is `models/`-prefixed; its chat endpoint is not."""
+
+    def test_a_prefixed_catalogue_matches_the_bare_candidate(self):
+        send, _ = transport_returning(200, json.dumps({"data": [
+            {"id": "models/gemini-3.5-flash-lite"},
+            {"id": "models/gemini-9-pro"},
+        ]}))
+        got = lp.list_models("gemini", transport=send, environ=KEYS)
+        self.assertEqual(["gemini-3.5-flash-lite", "gemini-9-pro"], got.ids)
+        self.assertEqual("gemini-3.5-flash-lite",
+                         lp.choose_model("gemini", got.ids))
+
+
+class ProbeFindingTests(unittest.TestCase):
+    """Each 2026-11-05 finding, as the probe must now report it."""
+
+    GROQ_CATALOGUE = json.dumps({"data": [{"id": "llama-3.3-70b-versatile"}]})
+
+    def _send(self, chat_status, chat_body, chat_after=None):
+        state = {"n": 0}
+
+        def send(spec):
+            if spec["url"].endswith("/models"):
+                return 200, self.GROQ_CATALOGUE
+            state["n"] += 1
+            if state["n"] == 1:
+                return chat_status, chat_body
+            return chat_after or (chat_status, chat_body)
+
+        return send
+
+    def test_a_404_names_the_id_it_tried(self):
+        rows = lp.probe_rows(transport=self._send(
+            404, '{"error":{"message":"model not found"}}'), environ=KEYS)
+        row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertIn("verdict=model_not_found", row)
+        note = [r for r in rows if r.strip().startswith("groq note:")][0]
+        self.assertIn("llama-3.3-70b-versatile", note,
+                      "the owner must see WHICH id was refused -- got %r" % note)
+
+    def test_a_refused_key_says_regenerate_on_its_own_line(self):
+        rows = lp.probe_rows(transport=self._send(
+            403, '{"error":{"message":"forbidden"}}'), environ=KEYS)
+        row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertTrue(row.endswith("verdict=auth"),
+                        "the row shape stays pinned -- got %r" % row)
+        note = [r for r in rows if r.strip().startswith("groq note:")][0]
+        self.assertIn("REFUSED the key", note)
+        self.assertIn("regenerate", note)
+
+    def test_a_429_is_retried_once_then_recorded(self):
+        slept = []
+        got = lp.probe("mistral",
+                       transport=self._send(429, '{"error":{"message":"slow"}}'),
+                       environ=KEYS, sleep=slept.append)
+        self.assertEqual("quota", got["verdict"])
+        self.assertEqual(2, got["attempts"])
+        self.assertEqual([lp.PROBE_RETRY_SECONDS], slept,
+                         "exactly one bounded wait, never a loop")
+
+    def test_a_429_then_a_200_is_ok_on_the_second_attempt(self):
+        got = lp.probe("mistral",
+                       transport=self._send(429, "slow", (200, OK_BODY)),
+                       environ=KEYS, sleep=lambda _s: None)
+        self.assertEqual("ok", got["verdict"])
+        self.assertEqual(2, got["attempts"])
+
+
+class QuotaMovesOnTests(unittest.TestCase):
+    """A 429 from a keyed provider is capacity: record it, walk on, do not wait."""
+
+    def test_the_batch_moves_on_without_sleeping(self):
+        batch = [{"title": "Story", "summary": "Publisher text.",
+                  "source_url": "https://example.com/1",
+                  "category": "world_major"}]
+        calls = []
+
+        def run(prompt, model, timeout=None):
+            calls.append(model)
+            if model == "groq/a":
+                raise ss.Refusal("groq/a: quota_notice (HTTP 429) too many",
+                                 kind="quota_notice")
+            return json.dumps([{"url": "https://example.com/1",
+                                "summary": "A model-written sentence about "
+                                           "what happened today."}])
+
+        waits = []
+        out = ss.summarise(batch, models=["groq/a", "mistral/b"], run=run,
+                           sleep=waits.append, log=lambda *a: None,
+                           budget=10 ** 9)
+        self.assertEqual(["groq/a", "mistral/b"], calls)
+        self.assertEqual([], waits, "a 429 costs no wait on an HTTP rung")
+        self.assertEqual("mistral/b", out["model"])
+        self.assertEqual(1, len(out["refusals"]))
+        self.assertIn("quota_notice", out["refusals"][0],
+                      "the 429 is recorded even though the next rung answered")
 
 
 class NoKeyShapedStringsTests(unittest.TestCase):

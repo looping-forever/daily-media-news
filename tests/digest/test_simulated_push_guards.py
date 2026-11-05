@@ -409,6 +409,31 @@ class SimulatedPushEndToEnd(ActionsHarness):
         self.assertEqual("2026-10-29T01:35:00Z",
                          entry.get("scheduled_instant"))
 
+    def test_a_simulated_partial_push_states_its_real_counts(self):
+        payload = self._unsummarised_payload()
+        payload["edition_kind"] = "partial"
+        payload["summary_counts"] = {"summarised": 6, "total": 30}
+        self._write_payload(payload)
+        out = self.run_step(env_overrides=self._env(SIMULATE_POOL_REFUSAL="true"),
+                            history_body="")
+        self.assertEqual(1, len(self.posts), out)
+        message = json.loads(self.posted_payload())["message"]
+        self.assertIn("6 of 30 stories carry an AI summary", message,
+                      "the proof push must state the payload's own count")
+        self.assertNotIn("unsummarised edition", message,
+                         "the body contradicted its own counts: %r" % message)
+
+    def test_a_simulated_zero_count_push_never_calls_itself_unsummarised(self):
+        payload = self._unsummarised_payload()
+        payload["summary_counts"] = {"summarised": 0, "total": 30}
+        self._write_payload(payload)
+        out = self.run_step(env_overrides=self._env(SIMULATE_POOL_REFUSAL="true"),
+                            history_body="")
+        self.assertEqual(1, len(self.posts), out)
+        message = json.loads(self.posted_payload())["message"]
+        self.assertIn("No story carries an AI summary (0 of 30).", message)
+        self.assertNotIn("unsummarised edition", message)
+
     def test_the_2026_10_29_row_cannot_suppress_tomorrows_real_push(self):
         """The row exactly as run 40708709729 wrote it: no flag, no schedule."""
         self._write_payload(self._unsummarised_payload())

@@ -4642,9 +4642,28 @@ jobs:
               # re-checked after, because a clamp is only worth having if it
               # holds at the end.
               if simulate:
+                  # SAY WHAT THIS EDITION ACTUALLY IS. This line used to assert
+                  # "this is the unsummarised edition" whatever the payload said,
+                  # so a simulated PARTIAL push contradicted its own title. The
+                  # count comes from `summary_counts`, the same field the page
+                  # reads, and a payload without counts admits that instead of
+                  # guessing.
+                  if isinstance(written, int) and isinstance(total, int) and total > 0:
+                      if written <= 0:
+                          ai_note = 'No story carries an AI summary (0 of %d).' % total
+                      elif written >= total:
+                          ai_note = 'All %d stories carry an AI summary.' % total
+                      else:
+                          ai_note = ('%d of %d stories carry an AI summary; the rest '
+                                     "quote the publisher's own description."
+                                     % (written, total))
+                  elif unsummarised:
+                      ai_note = 'No story carries an AI summary.'
+                  else:
+                      ai_note = 'This edition is a fallback edition.'
                   message = ('**TEST \u2014 simulated pool refusal.** No model was '
-                             'contacted. This is the unsummarised edition, pushed to '
-                             'prove the no-AI path.\n\n') + message
+                             'contacted. ' + ai_note + ' Pushed to prove the no-AI '
+                             'path.\n\n') + message
               title = fit_title(test_prefix + fit_title(title, title_budget),
                                 TITLE_MAX_CHARS)
               if len(title) > TITLE_MAX_CHARS:                   # pragma: no cover

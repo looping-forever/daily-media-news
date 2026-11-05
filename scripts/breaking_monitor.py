@@ -311,6 +311,35 @@ def _reachable_only(models):
     return kept
 
 
+def _served_ladder(models, log=print):
+    """Each HTTP rung's id, replaced by one this account's catalogue serves.
+
+    RUN TIME ONLY. `AI_LADDER` is built at import, and opening a socket there
+    would hang every caller (the suite imports this module). The 2026-11-05 probe
+    proved the seed ids are guesses -- OpenRouter served neither of the two that
+    were configured -- so the id actually sent is resolved here, once per run,
+    and named in the log. A provider serving none of its candidates contributes
+    no rung: attempting the wrong id only earns a `model_not_found` cooldown.
+    """
+    out = []
+    for model in models:
+        name = llm_providers.provider_of(model)
+        if not name:
+            out.append(model)
+            continue
+        got = llm_providers.served_model(name)
+        if not got["model"]:
+            log("ai_classify: %s contributes no rung -- %s"
+                % (model, got["reason"]))
+            continue
+        rung = "%s/%s" % (name, got["model"])
+        if rung != model:
+            log("ai_classify: %s is not what the account serves; using %s"
+                % (model, rung))
+        out.append(rung)
+    return out
+
+
 def _cli_config_path(config_dir=None):
     """The CLI's own provider file: `config/opencode-cli.json` by default."""
     return os.path.abspath(os.path.join(
@@ -1947,6 +1976,7 @@ def ai_classify(pending_path, runner=None, models=None,
             print("ai_classify: SELECTOR FAILED (%s) -- falling back to the "
                   "stage's pool %r" % (info["select_error"], selected))
         selected = _reachable_only(selected)
+        selected = _served_ladder(selected)
     else:
         selected, info = list(models), {"source": "explicit"}
     # Read by tests and by the log row: which models this run ACTUALLY tried.

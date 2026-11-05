@@ -245,6 +245,26 @@ FALLBACK_ALL_NO_COUNT = ("Fallback edition: an AI wrote every summary in this "
 # a fallback in each of them, so the guard is a set, not one string.
 FALLBACK_KINDS = ("unsummarised", "partial", "full")
 
+
+def join_sentences(first, second):
+    """Two sentences, one space apart, and no invented dash.
+
+    The hero glued the edition label to the held-back sentence with " - ", so a
+    real page read "…AI summary for all 15 stories. - 1 story was held back…":
+    a dash after a full stop, and at a narrow width the dash led the next line.
+    A label that is only a fragment (UNSUMMARISED_LABEL has no full stop) gets
+    one, so neither ".." nor ". -" can be produced.
+    """
+    first = (first or "").strip()
+    second = (second or "").strip()
+    if not first:
+        return second
+    if not second:
+        return first
+    if not first.endswith((".", "!", "?")):
+        first += "."
+    return first + " " + second
+
 # Freshness line (FROZEN CONTRACT C). `unknown` DROPS the timestamp entirely:
 # if no source was confirmed reachable, claiming "checked through T" is the
 # exact lie this renderer exists to remove. `empty` KEEPS the timestamp -- the
@@ -2451,7 +2471,8 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         else:
             held_back = english_text.held_back_from_notes((meta or {}).get("notes"))
         if held_back:
-            edition_line += " - " + english_text.held_back_note(held_back)
+            edition_line = join_sentences(
+                edition_line, english_text.held_back_note(held_back))
 
     grouped = {}
     for s in stories:

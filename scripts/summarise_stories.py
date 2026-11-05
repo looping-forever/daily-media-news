@@ -465,7 +465,7 @@ def debug_record(model, raw, reason, timeout=None, exit_code=None):
     }
 
 
-def ladder_models():
+def ladder_models(transport=None, environ=None, log=None):
     """The configured ladder, in order -- the SAME list the walk walks.
 
     Read from config/opencode.json (the selector's own bookkeeping file) so the
@@ -480,6 +480,10 @@ def ladder_models():
     edition). The three HTTP providers are inserted by `llm_providers`, which
     skips any provider with no key configured -- so a repository with none of
     those secrets set gets byte-identical behaviour to before.
+
+    EACH HTTP RUNG'S ID IS PROVEN, NOT ASSUMED (probe, 2026-11-05): the account
+    serves a different set of ids than the seed guessed, so the catalogue decides
+    which is sent and a provider that serves none of them contributes no rung.
     """
     import model_selector
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -487,7 +491,9 @@ def ladder_models():
     ladder = config.get("ladder")
     if not isinstance(ladder, list):
         ladder = []
-    return list(llm_providers.ordered_ladder(ladder))
+    return list(llm_providers.ordered_ladder(ladder, environ=environ,
+                                             transport=transport, resolve=True,
+                                             log=log))
 
 
 def _decode(raw):
@@ -669,7 +675,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     run = run or run_model
     clock = clock or time.monotonic
     sleep = sleep or time.sleep
-    models = list(models) if models is not None else ladder_models()
+    models = list(models) if models is not None else ladder_models(log=log)
     pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
     pacer.deadline = clock() + float(budget_seconds)
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
@@ -728,6 +734,13 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
                 causes.add(refusal_cause(kind, str(exc)))
+                if kind == "quota_notice" and llm_providers.provider_of(model):
+                    # A 429 from a keyed provider is THIS ACCOUNT'S capacity, not
+                    # a wrong id: waiting would keep the batch on a rung already
+                    # refused. Record it and move on.
+                    log("  batch %d/%d: %s is rate-limited (429); trying the "
+                        "next model" % (index, len(plan), model))
+                    continue
                 if not is_refusal(str(exc)):
                     log("  batch %d/%d: %s %s within %ds (%s); trying the next "
                         "model" % (index, len(plan), model, kind, timeout,

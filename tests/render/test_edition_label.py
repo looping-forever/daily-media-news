@@ -127,7 +127,7 @@ class TheLabelSaysHowShortTheEditionIs(unittest.TestCase):
 
     def test_the_count_rides_on_the_edition_line(self):
         html = self.page("Research note. " + self.COUNTED)
-        self.assertIn(LABEL + " - " + self.COUNTED, html,
+        self.assertIn(LABEL + ". " + self.COUNTED, html,
                       "the label states the kind and the count in one line")
 
     def test_a_note_without_a_count_leaves_the_label_alone(self):
@@ -327,8 +327,8 @@ class TheCountIsCarriedOnceNotReread(unittest.TestCase):
         html = self.page({"edition_kind": "unsummarised",
                           "notes": self.SENTENCE,
                           "held_back": {"count": 6, "reason": "not_english"}})
-        self.assertIn(LABEL + " - 6 stories were held back", html)
-        self.assertNotIn(LABEL + " - 5 stories", html,
+        self.assertIn(LABEL + ". 6 stories were held back", html)
+        self.assertNotIn(LABEL + ". 5 stories", html,
                          "the renderer read the number back out of the note instead "
                          "of the field both surfaces are given")
 
@@ -343,7 +343,7 @@ class TheCountIsCarriedOnceNotReread(unittest.TestCase):
 
     def test_a_payload_without_the_field_still_reads_the_note(self):
         html = self.page({"edition_kind": "unsummarised", "notes": self.SENTENCE})
-        self.assertIn(LABEL + " - 5 stories were held back", html,
+        self.assertIn(LABEL + ". 5 stories were held back", html,
                       "an edition rendered from an older payload must keep its count")
 
     def test_the_page_and_the_email_print_the_same_number(self):
@@ -361,6 +361,51 @@ class TheCountIsCarriedOnceNotReread(unittest.TestCase):
         self.assertEqual(2, len(re.findall(r"held back", page)),
                          "the sentence must reach the page exactly twice: once on "
                          "the edition line, once in the note")
+
+
+class TheSeparatorIsASentenceBreak(unittest.TestCase):
+    """The hero must never render `. -` or `..` between its two sentences.
+
+    A real page, 2026-11-05: "Fallback edition: AI summary for all 15 stories. -
+    4 stories were held back…". A dash after a full stop, and at the phone's
+    390px the dash was the first thing on the wrapped line. Zero held-back
+    stories must add nothing at all.
+    """
+
+    def line(self, meta):
+        html = render_digest.render_page([], SLOT, DAY, STAMP, meta,
+                                         schedule_path=NO_SCHEDULE)
+        return re.search(r'<p class="health-edition">(.*?)</p>', html).group(1)
+
+    def test_one_held_back_story_follows_a_full_stop(self):
+        line = self.line({"edition_kind": "partial",
+                          "summary_counts": {"summarised": 9, "total": 15},
+                          "held_back": {"count": 1, "reason": "not_english"}})
+        self.assertTrue(
+            line.startswith(
+                "Fallback edition: AI summary for 9 of 15 stories;"), line)
+        self.assertIn(". 1 story was held back", line)
+        self.assertNotIn(" - ", line)
+        self.assertNotIn("..", line)
+
+    def test_zero_one_and_many_are_all_clean(self):
+        for count in (0, 1, 2, 30):
+            meta = {"edition_kind": "full",
+                    "summary_counts": {"summarised": 30, "total": 30},
+                    "held_back": {"count": count, "reason": "not_english"}}
+            line = self.line(meta)
+            self.assertNotIn(" - ", line, (count, line))
+            self.assertNotIn("..", line, (count, line))
+            if count == 0:
+                self.assertEqual(
+                    "Fallback edition: AI summary for all 30 stories.", line)
+            else:
+                self.assertIn(". %d stor" % count, line)
+
+    def test_a_label_that_is_only_a_fragment_gets_its_full_stop(self):
+        line = self.line({"edition_kind": "unsummarised",
+                          "held_back": {"count": 1, "reason": "not_english"}})
+        self.assertIn("(no AI today). 1 story was held back", line)
 
 
 class TheSubjectStatesTheDerivedKind(unittest.TestCase):
