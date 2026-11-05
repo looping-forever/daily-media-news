@@ -110,6 +110,56 @@ class RenderPage(unittest.TestCase):
             self.assertNotIn(LABEL, self.page({"edition_kind": kind}))
 
 
+class AModelWroteThePage(unittest.TestCase):
+    """`edition_kind` exists on a MODEL-WRITTEN edition now, and it is not a fallback.
+
+    Run 42056457121 shipped four `Reported: <its own headline>` summaries on a
+    digest a model wrote; nothing said so. Validation now counts the real prose
+    on every path, so the kind reaches the page -- but the page must not answer
+    with "Fallback edition": the model did write the digest, it just skipped some
+    summaries. The wording follows the writer, and a complete edition is silent.
+    """
+
+    def page(self, meta):
+        return render_digest.render_page([], SLOT, DAY, STAMP, meta,
+                                         schedule_path=NO_SCHEDULE)
+
+    def test_a_complete_model_written_edition_is_silent(self):
+        html = self.page({"edition_kind": "full",
+                          "summary_counts": {"summarised": 3, "total": 3},
+                          "writer": {"rung": "attempt1"}})
+        self.assertNotIn("Fallback edition", html)
+        self.assertNotIn('<p class="health-edition">', html,
+                         "an ordinary digest says nothing about summaries")
+
+    def test_a_partial_model_written_edition_states_the_count_honestly(self):
+        html = self.page({"edition_kind": "partial",
+                          "summary_counts": {"summarised": 1, "total": 3},
+                          "writer": {"rung": "attempt1"}})
+        self.assertIn("AI wrote the summary for 1 of 3 stories", html)
+        self.assertNotIn("Fallback edition", html,
+                         "a model wrote this page; calling it a fallback is false")
+
+    def test_an_unsummarised_model_written_edition_does_not_claim_no_AI(self):
+        html = self.page({"edition_kind": "unsummarised",
+                          "summary_counts": {"summarised": 0, "total": 3},
+                          "writer": {"rung": "attempt1"}})
+        self.assertIn("No AI summary survived", html)
+        self.assertNotIn("Fallback edition", html)
+        self.assertNotIn(LABEL, html,
+                         "the model DID write the headlines, so '(no AI today)' "
+                         "is the wrong sentence")
+
+    def test_the_derivers_word_are_unchanged(self):
+        html = self.page({"edition_kind": "full",
+                          "summary_counts": {"summarised": 3, "total": 3},
+                          "writer": {"rung": "derived"}})
+        self.assertIn("Fallback edition: AI summary for all 3 stories.", html)
+        html = self.page({"edition_kind": "unsummarised",
+                          "writer": {"rung": "derived"}})
+        self.assertIn(LABEL, html)
+
+
 class TheLabelSaysHowShortTheEditionIs(unittest.TestCase):
     """A label that only says "no AI" explains empty summaries, not a short page.
 

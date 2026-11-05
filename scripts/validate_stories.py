@@ -1536,21 +1536,124 @@ def held_back_total(data, dropped):
     return already + int(dropped or 0)
 
 
-def edition_facts(data, final_stories):
-    """The edition kind and its counts, recomputed from the stories that survived.
+#: The claim-status label the digest prompt requires at the start of a summary.
+#: It is a PREFIX, not the summary: `Reported: ` on its own says nothing, and
+#: `Reported: <the headline>` says nothing the headline did not.
+CLAIM_LABEL_RE = re.compile(
+    r"^\s*(?:confirmed|reported|rumou?r|speculation|updated|developing|update)"
+    r"\s*[:\-\u2013\u2014]\s*", re.I)
 
-    The deriver sets both from its own list, but this stage can drop a story: the
-    total changes, and so does the count if the dropped one carried an AI summary.
-    Recomputing here is what stops the name describing a count that no longer exists.
+#: Shortest body that can carry a fact the headline does not. Below this a
+#: "summary" is a restatement, and the page is better off quoting the publisher.
+REAL_SUMMARY_MIN_CHARS = 40
+
+#: How much a body must add BEYOND the headline it opens with. `Title SomeSite`
+#: adds only the outlet; a real summary that starts with the headline then says
+#: something of its own clears this easily.
+TITLE_REMAINDER_MIN_CHARS = 20
+
+
+def summary_body(summary):
+    """The summary without its claim-status label."""
+    return CLAIM_LABEL_RE.sub("", str(summary or "").strip()).strip()
+
+
+def _summary_key(text):
+    """Lowercase, punctuation-free, single-spaced -- for "is this the same text"."""
+    text = str(text or "").lower()
+    text = re.sub(r"[\W_]+", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def is_real_summary(summary, title="", snippet=""):
+    """True when *summary* is prose, not a stub.
+
+    RUN 42056457121 (2026-11-05): four stories shipped `Reported: <their own
+    title>`, every count said they were written, and the page, subject and push
+    said nothing about it. The LABEL is not judged here -- the prompt requires
+    it -- the BODY is. A stub is:
+
+      * an empty body, or a body shorter than REAL_SUMMARY_MIN_CHARS;
+      * the headline, or the headline plus the outlet name;
+      * the publisher's snippet copied (a feed description is not a summary).
+
+    A story that already has real prose answers True and is never rewritten.
     """
-    if not (isinstance(data, dict) and data.get("edition_kind")):
-        return None
-    ai_urls = set()
-    for story in data.get("stories") or []:
-        if isinstance(story, dict) and story.get("summary_source") == "ai":
-            ai_urls.add(story.get("source_url"))
+    body = summary_body(summary)
+    if len(body) < REAL_SUMMARY_MIN_CHARS:
+        return False
+    key = _summary_key(body)
+    title_key = _summary_key(title)
+    if title_key:
+        if key == title_key:
+            return False
+        if key.startswith(title_key) \
+                and len(key) - len(title_key) < TITLE_REMAINDER_MIN_CHARS:
+            return False
+    snippet_key = _summary_key(snippet)
+    if snippet_key and len(snippet_key) >= REAL_SUMMARY_MIN_CHARS:
+        if key == snippet_key:
+            return False
+        # A feed description trimmed with an ellipsis is still the publisher's
+        # text: the same words, cut short at the end.
+        if snippet_key.startswith(key) and len(key) >= 0.7 * len(snippet_key):
+            return False
+        # The snippet with nothing added. Prose that carries the snippet and then
+        # says something of its own clears TITLE_REMAINDER_MIN_CHARS and is real.
+        if key.startswith(snippet_key) \
+                and len(key) - len(snippet_key) < TITLE_REMAINDER_MIN_CHARS:
+            return False
+    return True
+
+
+def snippet_index(path):
+    """`source_url` -> publisher snippet, from state/candidates.json.
+
+    Absent or unreadable is EMPTY, never fatal: the predicate still catches
+    empty, too-short and title-shaped stubs without it, and the snippet only
+    sharpens the "copied the publisher" arm.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    rows = data.get("candidates") if isinstance(data, dict) else data
+    out = {}
+    for row in rows or []:
+        if isinstance(row, dict) and row.get("url"):
+            out[str(row["url"])] = str(row.get("snippet") or "")
+    return out
+
+
+def _is_ai_written(story, snippets):
+    """One story's contribution to `summary_counts.summarised`."""
+    if not isinstance(story, dict):
+        return False
+    # The deriver records whose text this is; its own fallback is never AI-written,
+    # however long the publisher's description happens to be.
+    if story.get("summary_source") == "publisher":
+        return False
+    url = story.get("source_url") or story.get("url")
+    return is_real_summary(story.get("summary"), story.get("title"),
+                           (snippets or {}).get(url, ""))
+
+
+def edition_facts(data, final_stories, snippets=None):
+    """The edition kind and its counts, computed on EVERY shipping path.
+
+    The deriver sets both from its own list, but this stage can drop a story and
+    a MODEL-WRITTEN edition carries neither field at all -- run 42056457121 was
+    exactly that, so the subject, the hero and the push had nothing to be honest
+    with. Absence of `edition_kind` on the input is no longer a reason to return
+    nothing; the stories decide.
+
+    `written` is the count of REAL summaries (is_real_summary), so a title-shaped
+    stub is not counted as AI-written merely because it is non-empty.
+    """
+    snippets = snippets or {}
     written = sum(1 for story in final_stories
-                  if isinstance(story, dict) and story.get("source_url") in ai_urls)
+                  if _is_ai_written(story, snippets))
     total = len(final_stories)
     return {"edition_kind": edition_kind.kind_for(written, total),
             "summary_counts": {"summarised": written, "total": total}}
@@ -1956,16 +2059,20 @@ def main(argv=None):
         "filter_log": filter_log[:MAX_FILTER_LOG],
     }
     # The edition KIND and its counts, recomputed from what this stage kept: a
-    # drop here changes the total, and the name has to follow it. Absent on a
-    # model-written run, so the payload keeps its old shape there.
-    facts = edition_facts(data, final_stories)
-    if facts:
-        payload["edition_kind"] = facts["edition_kind"]
-        payload["summary_counts"] = facts["summary_counts"]
-        # The note prints the same two numbers, so a drop that changes them has to
-        # rewrite the sentence too: left alone it described a 22-of-29 edition that
-        # validation had already shrunk to 22 of 27, beside a hero stating the new
-        # count. One payload, one number.
+    # drop here changes the total, and the name has to follow it. COMPUTED ON
+    # EVERY PATH -- a model-written payload used to carry neither field, which is
+    # how run 42056457121 shipped four unwritten summaries with nothing on the
+    # subject, the hero or the push to say so.
+    facts = edition_facts(data, final_stories,
+                          snippets=snippet_index(args.candidates_path))
+    payload["edition_kind"] = facts["edition_kind"]
+    payload["summary_counts"] = facts["summary_counts"]
+    if data.get("edition_kind"):
+        # A DERIVED edition's note already prints these two numbers, so a drop
+        # that changes them has to rewrite the sentence too: left alone it
+        # described a 22-of-29 edition that validation had already shrunk to 22
+        # of 27. A model-written edition has no such sentence to correct -- the
+        # hero composes its own line from `edition_kind`/`summary_counts`.
         rewritten = rewritten_note(facts, notes)
         if rewritten:
             payload["notes"] = english_text.replace_held_back(rewritten, held_total)

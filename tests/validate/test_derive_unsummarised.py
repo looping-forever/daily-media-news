@@ -410,7 +410,14 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
 
     def payload(self, sources):
         stories = [{"source_url": "https://a.example/%d" % n,
-                    "summary_source": source}
+                    "summary_source": source,
+                    # The count is content-aware now (validate_stories.
+                    # is_real_summary): a `summary_source` label over an empty
+                    # body is a stub, so the fixtures carry prose like the real
+                    # deriver writes.
+                    "summary": "Reported: The council approved the budget on "
+                               "Tuesday, with road repair and school funding as "
+                               "the two largest line items."}
                    for n, source in enumerate(sources)]
         return {"edition_kind": "partial",
                 "summary_counts": {"summarised": sources.count("ai"),
@@ -437,9 +444,22 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
         self.assertEqual({"summarised": 2, "total": 3},
                          facts["summary_counts"])
 
-    def test_a_model_written_payload_keeps_its_old_shape(self):
-        self.assertIsNone(vs.edition_facts({"stories": []}, []),
-                          "a run with no fallback kind must not gain one")
+    def test_a_model_written_payload_gains_truthful_counts(self):
+        """The round-4 contract: every path gets counts, not only the deriver's.
+
+        Run 42056457121 was model-written, carried no `edition_kind`, and so the
+        subject, hero and push had nothing honest to say about four stories whose
+        summary was their own headline. This used to assert None -- that absence
+        was the bug.
+        """
+        data = {"stories": [
+            {"title": "Closure", "summary": "Reported: " + "Closure"},
+            {"title": "Budget", "summary":
+                "Confirmed: The ministry published the final figures on "
+                "Wednesday, and the district allocation rises by nine percent."}]}
+        facts = vs.edition_facts(data, data["stories"])
+        self.assertEqual("partial", facts["edition_kind"])
+        self.assertEqual({"summarised": 1, "total": 2}, facts["summary_counts"])
 
 
 class TheNoteFollowsTheSameCount(unittest.TestCase):
@@ -451,7 +471,12 @@ class TheNoteFollowsTheSameCount(unittest.TestCase):
 
     def payload(self, sources):
         stories = [{"source_url": "https://b.example/%d" % n,
-                    "summary_source": source}
+                    "summary_source": source,
+                    # Prose, because the count is content-aware now: a
+                    # `summary_source` label over an empty body is not counted.
+                    "summary": "Reported: The council approved the budget on "
+                               "Tuesday, with road repair and school funding as "
+                               "the two largest line items."}
                    for n, source in enumerate(sources)]
         written = sources.count("ai")
         return {"edition_kind": edition_kind.kind_for(written, len(sources)),

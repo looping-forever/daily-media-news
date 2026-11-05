@@ -321,6 +321,18 @@ Prefix each `summary` with its claim status:
 - "Rumor:" — unverified leak or insider claim
 - "Speculation:" — analysis, prediction, editorial opinion
 
+THE LABEL IS NOT THE SUMMARY. Everything after the label must be prose you wrote
+about what happened, why it matters and what is new. Three shapes are NOT a
+summary — the pipeline treats each as unwritten, keeps the publisher's own
+description instead, and labels the edition as partly unwritten:
+
+- `Reported: <the headline>` — the body repeats the title;
+- `Reported: <the snippet copied>` — the body is the outlet's own description;
+- `Reported:` and nothing else.
+
+If you cannot write a real sentence for a candidate, set `summary` to `""`.
+An empty summary is honest and is counted as such; a restated headline is not.
+
 Exclude low-credibility rumors unless highly significant. The same event reported
 by multiple sources = ONE story plus `supporting_sources`.
 
@@ -409,7 +421,7 @@ Its entire content = valid JSON matching this exact shape:
   "stories": [
     {
       "title": "string, spoiler-safe",
-      "summary": "string, starts with claim-status label",
+      "summary": "string: claim-status label, then 1-2 sentences of your own prose (never the headline or the snippet again)",
       "for_you": "string, OPTIONAL (omit the key when you have no concrete personal consequence; see FOR YOU below)",
       "category": "action|world_major|local_city|nepal|education_tu|college_local|bank_local|gaming|anime|manga_manhwa_manhua|tech_career",
       "priority": 7,

@@ -2022,6 +2022,45 @@ jobs:
               ;;
           esac
 
+      - name: Summarise the summaries the model only stubbed
+        # RUN 42056457121 (2026-11-05): the agent's payload passed validation, so
+        # the deriver -- the only stage that ever called the summariser -- never
+        # ran, and four stories shipped `Reported: <their own headline>` while the
+        # page, the subject and the push all called the edition written.
+        #
+        # Validation now counts a stub as NOT written (validate_stories
+        # is_real_summary), so the fields the subject and hero read are always
+        # truthful. This step tries to make them all real: the ladder writes
+        # whatever the model skipped, a story that already has prose is never
+        # touched, and a story no model answers for keeps the publisher's own
+        # description with the count saying so. A derived edition returns
+        # immediately inside the script.
+        if: env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true' && env.EMPTY_DIGEST != 'true'
+        # Never block the edition: a repair that cannot reach a model is already
+        # labelled by validation's counts, which is the honest state.
+        continue-on-error: true
+        # summarise_stories.TOTAL_BUDGET_SECONDS is 300; this leaves the process
+        # time to finish writing after its own budget expires.
+        timeout-minutes: 8
+        env:
+          DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
+          # The SAME rungs the deriver's summariser walks: without
+          # OPENCODE_CONFIG the CLI cannot see the gemini provider, and without
+          # the key every gemini rung fails as an auth error.
+          OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          set -eo pipefail
+          START=$(date +%s)
+          python3 scripts/summarise_stubs.py \
+            --in state/stories.validated.json \
+            --candidates state/candidates.json
+          END=$(date +%s)
+          STAGE_KEY=summarise_stubs STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
+
       - name: Enrich stories with media (og:image/video)
         if: env.FALLBACK_NOOP != 'true'
         timeout-minutes: 5
@@ -2087,14 +2126,27 @@ jobs:
               counts = counts if isinstance(counts, dict) else {}
               written = counts.get('summarised')
               total = counts.get('total')
+              # WHO wrote the page decides the WORDS. `full`/`partial` now exist
+              # on a model-written edition too, where "fallback edition" would be
+              # false: the model did write the digest, it just skipped some
+              # summaries. The hero says "AI wrote the summary for N of M
+              # stories", so the subject says the same thing.
+              writer = data.get('writer')
+              writer = writer if isinstance(writer, dict) else {}
+              model_written = bool(writer.get('rung')) and str(writer.get('rung')) != 'derived'
               if edition == 'unsummarised':
                   tag = ' - unsummarised edition (no AI today)'
               elif edition == 'partial':
                   if isinstance(written, int) and isinstance(total, int) and total > 0:
-                      tag = ' - fallback edition (%d of %d stories summarised)' % (
-                          written, total)
+                      if model_written:
+                          tag = ' - AI summary for %d of %d stories' % (
+                              written, total)
+                      else:
+                          tag = ' - fallback edition (%d of %d stories summarised)' % (
+                              written, total)
                   else:
-                      tag = ' - fallback edition (some stories summarised)'
+                      tag = (' - some stories have no AI summary' if model_written
+                             else ' - fallback edition (some stories summarised)')
           except Exception as exc:
               print('WARNING: could not read edition_kind for the subject: %s' % exc)
           subject = 'Daily Media News - %s - %s%s' % (kind, today, tag)
@@ -3473,6 +3525,10 @@ jobs:
               total = counts.get('total')
               unsummarised = edition == 'unsummarised'
               partial = edition == 'partial'
+              # `partial` on a MODEL-WRITTEN edition is not a fallback edition.
+              writer = data.get('writer')
+              writer = writer if isinstance(writer, dict) else {}
+              model_written = bool(writer.get('rung')) and str(writer.get('rung')) != 'derived'
 
               # --- Why the edition is empty, in the payload's own words ---
               # `empty_kind` is computed once by scripts/validate_stories.py and
@@ -4547,8 +4603,13 @@ jobs:
                       title = '%s %s \u00b7 %s \u00b7 %d of %d summarised' % (
                           emoji, send_label, today, written, total)
                   else:
-                      title = '%s %s \u00b7 %s \u00b7 fallback edition' % (
-                          emoji, send_label, today)
+                      title = '%s %s \u00b7 %s \u00b7 %s' % (
+                          emoji, send_label, today,
+                          # A model-written edition is not a fallback; only the
+                          # no-count branch ever said so, and only the deriver's
+                          # page may.
+                          'some stories have no AI summary' if model_written
+                          else 'fallback edition')
               else:
                   title = '%s %s \u00b7 %s \u00b7 %d %s' % (
                       emoji, send_label, today, len(ordered),
@@ -4660,7 +4721,8 @@ jobs:
                   elif unsummarised:
                       ai_note = 'No story carries an AI summary.'
                   else:
-                      ai_note = 'This edition is a fallback edition.'
+                      ai_note = ('This edition is model-written.' if model_written
+                                 else 'This edition is a fallback edition.')
                   message = ('**TEST \u2014 simulated pool refusal.** No model was '
                              'contacted. ' + ai_note + ' Pushed to prove the no-AI '
                              'path.\n\n') + message

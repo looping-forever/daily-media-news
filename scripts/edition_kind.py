@@ -42,3 +42,34 @@ def summary_note(kind, written, total):
     if kind == FULL:
         return NOTE_ALL % total
     return NOTE_SOME % (written, total)
+
+
+#: A MODEL-WRITTEN edition that still has unwritten summaries. "Fallback
+#: edition" is the deriver's own name and would be false here -- a model did
+#: write most of this page. RUN 42056457121 shipped four stories whose summary
+#: restated their own headline and said nothing anywhere; this is the sentence
+#: that would have said it.
+NOTE_MODEL_SOME = ("AI wrote the summary for %d of %d stories; the rest quote "
+                   "the publisher's own description.")
+NOTE_MODEL_NONE = ("No AI summary survived for this edition, so the text under "
+                   "each headline is the publisher's own description.")
+
+
+def model_note(kind, written, total):
+    """The sentence a model-written edition needs, or None when it needs none."""
+    if kind == FULL:
+        return None
+    if kind == UNSUMMARISED or written <= 0:
+        return NOTE_MODEL_NONE
+    return NOTE_MODEL_SOME % (written, total)
+
+
+def has_model_note(notes):
+    """True when *notes* already opens with one of the model-written sentences.
+
+    The repair step can run twice (a rerun of the job), and prepending the same
+    sentence twice would print one fact as two.
+    """
+    text = str(notes or "").strip()
+    return text.startswith("AI wrote the summary") or \
+        text.startswith("No AI summary survived")

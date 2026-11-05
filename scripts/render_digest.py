@@ -245,6 +245,37 @@ FALLBACK_ALL_NO_COUNT = ("Fallback edition: an AI wrote every summary in this "
 # a fallback in each of them, so the guard is a set, not one string.
 FALLBACK_KINDS = ("unsummarised", "partial", "full")
 
+# The SAME counts on a MODEL-WRITTEN edition, which is not a fallback: a model
+# did write most of the page, so "Fallback edition" would be false. `full` needs
+# no line at all -- there is nothing unwritten to admit.
+PARTIAL_MODEL_LABEL = ("AI wrote the summary for %d of %d stories; the rest "
+                       "quote the publisher's own description.")
+PARTIAL_MODEL_NO_COUNT = ("AI wrote some summaries; the rest quote the "
+                          "publisher's own description.")
+UNSUMMARISED_MODEL_LABEL = ("No AI summary survived for this edition; the text "
+                            "under each headline is the publisher's own "
+                            "description.")
+
+
+def _is_derived(meta):
+    """True when the deriver wrote this edition (the no-AI fallback path)."""
+    writer = (meta or {}).get("writer")
+    return isinstance(writer, dict) and str(writer.get("rung") or "") == "derived"
+
+
+def _is_model_written(meta):
+    """True when a model wrote the page and the deriver did NOT.
+
+    `edition_kind` used to exist only on the deriver's path, so its presence
+    meant "fallback". Validation now computes it on EVERY path (including a
+    model-written edition, where it certifies a complete digest), so the wording
+    has to look at who wrote the page. A payload with no `writer` keeps the old
+    fallback wording -- it predates this distinction.
+    """
+    writer = (meta or {}).get("writer")
+    return (isinstance(writer, dict) and bool(writer.get("rung"))
+            and not _is_derived(meta))
+
 
 def join_sentences(first, second):
     """Two sentences, one space apart, and no invented dash.
@@ -2440,7 +2471,12 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     # unsummarised edition that forgets to admit it.
     edition_line = ""
     kind = (meta or {}).get("edition_kind")
-    if kind in FALLBACK_KINDS:
+    model_written = _is_model_written(meta)
+    derived = not model_written
+    # A MODEL-WRITTEN edition with every summary written says nothing: it is an
+    # ordinary digest, and calling it a "Fallback edition" would be the opposite
+    # lie to the one run 42056457121 shipped.
+    if kind in FALLBACK_KINDS and not (model_written and kind == "full"):
         # HOW MANY came from a model and how many are the publisher's own words.
         # Absent counts (an edition built before this field existed) fall back to
         # a label that is true without them.
@@ -2451,14 +2487,18 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         if isinstance(written, int) and isinstance(total, int) and written > 0:
             if written >= total:
                 edition_line = FALLBACK_ALL_LABEL % total
-            else:
+            elif derived:
                 edition_line = FALLBACK_PART_LABEL % (written, total)
-        elif kind == "partial":
-            edition_line = FALLBACK_PART_NO_COUNT
+            else:
+                edition_line = PARTIAL_MODEL_LABEL % (written, total)
         elif kind == "full":
             edition_line = FALLBACK_ALL_NO_COUNT
+        elif kind == "partial":
+            edition_line = FALLBACK_PART_NO_COUNT if derived \
+                else PARTIAL_MODEL_NO_COUNT
         else:
-            edition_line = UNSUMMARISED_LABEL
+            edition_line = UNSUMMARISED_LABEL if derived \
+                else UNSUMMARISED_MODEL_LABEL
         # A short edition must say what made it short. The count is DATA on the
         # payload (`held_back.count`), written once by the pipeline; only a payload
         # predating that field is read back off its notes text.

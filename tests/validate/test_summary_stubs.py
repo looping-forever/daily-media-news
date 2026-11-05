@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""tests/validate/test_summary_stubs.py — prose vs stub, and the repair.
+
+Run 42056457121 (2026-11-05) shipped four stories whose summary was
+`Reported: <their own headline>`. The deriver never ran (the digest WAS
+model-written), the count said they were written, and no surface mentioned it.
+
+These tests pin the three things that close it:
+  * `is_real_summary` tells prose from a stub, label and all;
+  * `edition_facts` computes the counts on a payload that never had them;
+  * `summarise_stubs.repair` replaces a stub, never touches prose, and keeps the
+    publisher's text when no model answers.
+
+Offline: the summariser is injected, no provider is contacted.
+"""
+
+import unittest
+
+from . import REPO_ROOT  # noqa: F401  (REPO_ROOT puts scripts/ on sys.path)
+
+import summarise_stubs
+import validate_stories as vs
+
+TITLE = ("Prepare for delay: TxDOT closing S.A. highway ramp in just hours "
+         "- MySA")
+SNIPPET = ("Prepare for delay: TxDOT closing S.A. highway ramp in just hours "
+           "MySA")
+PROSE = ("Reported: TxDOT will close the Loop 1604 ramp at Highway 90 for "
+         "resurfacing from 21:00 on Thursday, and drivers heading west are "
+         "advised to use the Frontage Road instead.")
+
+
+def story(url, summary, title=TITLE, snippet=SNIPPET, source=None):
+    row = {"title": title, "summary": summary, "source_url": url,
+           "category": "local_city"}
+    if source:
+        row["summary_source"] = source
+    return row
+
+
+class RealSummaryTests(unittest.TestCase):
+    def test_a_title_restating_summary_is_a_stub(self):
+        self.assertFalse(vs.is_real_summary("Reported: " + TITLE, TITLE, SNIPPET))
+        self.assertFalse(vs.is_real_summary(
+            "Reported: Prepare for delay: TxDOT closing S.A. highway ramp in "
+            "just hours MySA", TITLE, SNIPPET),
+            "the summary the run actually shipped was the title without its dash")
+
+    def test_the_snippet_copied_verbatim_is_a_stub(self):
+        self.assertFalse(vs.is_real_summary("Reported: " + SNIPPET, TITLE, SNIPPET))
+        # A feed description trimmed with an ellipsis is still the publisher's.
+        self.assertFalse(vs.is_real_summary(
+            SNIPPET[:-8] + "…", TITLE, SNIPPET))
+
+    def test_an_empty_or_short_body_is_a_stub(self):
+        for summary in ("", "   ", "Reported:", "Confirmed: just in",
+                        "Reported: -"):
+            self.assertFalse(vs.is_real_summary(summary, TITLE, SNIPPET),
+                             repr(summary))
+
+    def test_real_prose_behind_the_label_is_not_a_stub(self):
+        self.assertTrue(vs.is_real_summary(PROSE, TITLE, SNIPPET))
+
+    def test_prose_that_opens_with_the_headline_is_not_a_stub(self):
+        text = ("Reported: " + TITLE + ". The closure starts at 21:00 and lasts "
+                "until 05:00, so the westbound lanes will be shut overnight.")
+        self.assertTrue(vs.is_real_summary(text, TITLE, SNIPPET),
+                        "a real summary may open with the headline")
+
+    def test_the_label_alone_does_not_decide_it(self):
+        # The prompt REQUIRES the label, so it can never be the stub signal.
+        self.assertTrue(vs.is_real_summary(PROSE, TITLE, SNIPPET))
+        self.assertFalse(vs.is_real_summary("Reported: " + TITLE, TITLE, SNIPPET))
+
+
+class CountsOnEveryPathTests(unittest.TestCase):
+    def test_a_model_written_payload_that_never_had_the_fields_gets_them(self):
+        stories = [story("https://x/1", PROSE)]
+        facts = vs.edition_facts({}, stories,
+                                 snippets={"https://x/1": SNIPPET})
+        self.assertEqual("full", facts["edition_kind"])
+        self.assertEqual({"summarised": 1, "total": 1}, facts["summary_counts"])
+
+    def test_a_stub_is_not_counted_as_ai_written(self):
+        stories = [story("https://x/1", PROSE),
+                   story("https://x/2", "Reported: " + TITLE)]
+        facts = vs.edition_facts({}, stories,
+                                 snippets={"https://x/1": SNIPPET,
+                                           "https://x/2": SNIPPET})
+        self.assertEqual("partial", facts["edition_kind"])
+        self.assertEqual({"summarised": 1, "total": 2}, facts["summary_counts"])
+
+    def test_publisher_text_is_never_counted_even_when_it_is_prose(self):
+        stories = [story("https://x/1", PROSE, source="publisher")]
+        facts = vs.edition_facts({}, stories)
+        self.assertEqual("unsummarised", facts["edition_kind"])
+        self.assertEqual(0, facts["summary_counts"]["summarised"])
+
+
+class RepairTests(unittest.TestCase):
+    def _payload(self, stories):
+        return {"stories": stories}
+
+    def test_a_stub_is_replaced_by_the_models_prose(self):
+        payload = self._payload([
+            story("https://x/1", "Reported: " + TITLE),
+            story("https://x/2", PROSE)])
+        asked = []
+
+        def summarise(rows):
+            asked.extend(r["source_url"] for r in rows)
+            return {"summaries": {"https://x/1": PROSE}}
+
+        counts = summarise_stubs.repair(
+            payload, {"https://x/1": SNIPPET, "https://x/2": SNIPPET},
+            summarise=summarise, log=lambda *_a: None)
+        self.assertEqual(["https://x/1"], asked,
+                         "only the stub is sent to the ladder")
+        self.assertEqual(PROSE, payload["stories"][0]["summary"])
+        self.assertEqual("ai", payload["stories"][0]["summary_source"])
+        self.assertEqual(1, counts["written"])
+        self.assertEqual("full", payload["edition_kind"])
+        self.assertEqual({"summarised": 2, "total": 2},
+                         payload["summary_counts"])
+
+    def test_real_prose_is_never_sent_and_never_rewritten(self):
+        payload = self._payload([story("https://x/2", PROSE)])
+        called = []
+        counts = summarise_stubs.repair(
+            payload, {}, summarise=lambda rows: called.append(rows) or {},
+            log=lambda *_a: None)
+        self.assertEqual([], called)
+        self.assertEqual(0, counts["stubs"])
+        self.assertEqual(PROSE, payload["stories"][0]["summary"])
+
+    def test_a_failed_ladder_keeps_publisher_text_and_a_truthful_count(self):
+        payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
+        counts = summarise_stubs.repair(
+            payload, {"https://x/1": SNIPPET}, summarise=lambda rows: {},
+            log=lambda *_a: None)
+        self.assertEqual(1, counts["publisher"])
+        self.assertEqual(SNIPPET, payload["stories"][0]["summary"],
+                         "the publisher's own description, quoted verbatim")
+        self.assertEqual("publisher", payload["stories"][0]["summary_source"])
+        self.assertEqual("unsummarised", payload["edition_kind"])
+        self.assertEqual({"summarised": 0, "total": 1},
+                         payload["summary_counts"])
+        self.assertIn("No AI summary", payload["notes"],
+                      "the note has to say it, not stay silent")
+
+    def test_a_story_with_no_snippet_is_left_empty_not_invented(self):
+        payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
+        summarise_stubs.repair(payload, {}, summarise=lambda rows: {},
+                               log=lambda *_a: None)
+        self.assertEqual("", payload["stories"][0]["summary"],
+                         "with nothing to quote, an empty summary is the honest "
+                         "choice")
+
+    def test_a_second_repair_does_not_print_the_count_twice(self):
+        payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
+        summarise_stubs.repair(payload, {"https://x/1": SNIPPET},
+                               summarise=lambda rows: {}, log=lambda *_a: None)
+        once = payload["notes"]
+        summarise_stubs.repair(payload, {"https://x/1": SNIPPET},
+                               summarise=lambda rows: {}, log=lambda *_a: None)
+        self.assertEqual(once, payload["notes"],
+                         "a rerun prepended the same sentence again: two copies "
+                         "of one fact")
+
+    def test_main_leaves_a_derived_edition_alone(self):
+        import json
+        import os
+        import tempfile
+        payload = {"writer": {"rung": "derived"},
+                   "notes": "Fallback edition: an AI wrote the summary for 1 of "
+                            "1 stories; the rest quote the publisher's own "
+                            "description.",
+                   "stories": [story("https://x/1", "Reported: " + TITLE)]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "stories.validated.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh)
+            rc = summarise_stubs.main(
+                ["--in", path, "--candidates", os.path.join(tmp, "absent.json")])
+            self.assertEqual(0, rc)
+            with open(path, encoding="utf-8") as fh:
+                after = json.load(fh)
+        self.assertEqual(payload, after,
+                         "the deriver already ran the summariser; this step must "
+                         "not touch its file")
+
+    def test_a_model_answer_that_is_still_a_stub_is_not_accepted(self):
+        payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
+        counts = summarise_stubs.repair(
+            payload, {"https://x/1": SNIPPET},
+            summarise=lambda rows: {"summaries": {
+                "https://x/1": "Reported: " + TITLE}},
+            log=lambda *_a: None)
+        self.assertEqual(0, counts["written"])
+        self.assertEqual(1, counts["publisher"])
+        self.assertEqual(SNIPPET, payload["stories"][0]["summary"])
+
+
+if __name__ == "__main__":
+    unittest.main()
