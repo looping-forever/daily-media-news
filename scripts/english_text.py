@@ -81,15 +81,38 @@ def held_back_note(count):
     return "%d stories were held back because they are not in English." % count
 
 
-#: The two shapes `held_back_note` can produce, as one pattern. The page reads
-#: the count back off the notes because they are capped for display and this
-#: sentence is appended LAST, so it is the first thing a long note loses.
+#: The two shapes `held_back_note` can produce, as one pattern. Used to WRITE one
+#: sentence with `replace_held_back`, and to read the count off OLD payloads that
+#: predate the `held_back` field.
 _HELD_BACK_RE = re.compile(
     r"(\d+) stor(?:y was|ies were) held back because "
     r"(?:it is|they are) not in English\.")
 
 
 def held_back_from_notes(notes):
-    """How many stories the notes admit to holding back; 0 when they say nothing."""
+    """LEGACY: how many stories the notes say were held back, read back off the text.
+
+    Only for a payload written before `held_back` existed on it. New payloads carry
+    the count as data, because a number that lives in prose is a number that can be
+    re-derived differently by each reader -- which is exactly what happened: one page
+    stated two counts for the same edition.
+    """
     match = _HELD_BACK_RE.search(str(notes or ""))
     return int(match.group(1)) if match else 0
+
+
+def replace_held_back(notes, count):
+    """The notes with exactly ONE held-back sentence, stating `count`.
+
+    Two stages can withhold a story for its script -- the deriver and the validator --
+    and each used to APPEND its own sentence. A payload that passed through both
+    therefore carried two different numbers in one field, and every reader picked a
+    different one: the page regexed the first, the visible capped note kept whichever
+    fit in the limit. Writing the sentence instead of appending to it is what makes
+    "one count" true rather than hoped for.
+    """
+    text = _HELD_BACK_RE.sub("", str(notes or ""))
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    if not count:
+        return text
+    return (text + " " + held_back_note(count)).strip()

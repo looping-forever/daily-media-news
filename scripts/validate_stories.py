@@ -1512,6 +1512,24 @@ def derive_empty_outcome(raw, final, source_health, candidates=None,
                                     "returned nothing")
 
 
+def held_back_total(data, dropped):
+    """Held-back stories for this edition: what the deriver recorded, plus this stage.
+
+    The deriver already withheld stories for their script; this stage withholds a few
+    more. Summing them in ONE place is what lets the page and the email state the same
+    number -- before this, each stage appended its own sentence and each reader picked
+    a different one.
+    """
+    record = data.get("held_back") if isinstance(data, dict) else None
+    already = 0
+    if isinstance(record, dict):
+        try:
+            already = int(record.get("count") or 0)
+        except (TypeError, ValueError):
+            already = 0
+    return already + int(dropped or 0)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate/filter daily digest stories.")
     ap.add_argument("--in", dest="in_path", default="state/stories.json")
@@ -1653,10 +1671,11 @@ def main(argv=None):
 
     english_dropped = sum(1 for entry in filter_log
                           if entry["reason"].startswith("non_english_title"))
-    if english_dropped:
+    held_total = held_back_total(data, english_dropped)
+    if held_total:
         # A run that refused stories for their script must not read as a quiet
         # day: the count goes in `notes`, the one field every surface shows.
-        notes = (notes + " " + english_text.held_back_note(english_dropped)).strip()
+        notes = english_text.replace_held_back(notes, held_total)
 
     if not raw_stories:
         print("Input contains zero stories.")
@@ -1909,6 +1928,11 @@ def main(argv=None):
             }
         except (TypeError, ValueError):
             pass
+    # The held-back count is DATA now, not a number a renderer reads back out of
+    # the prose. Pass on the total this stage reached (deriver's count + its own
+    # drops) so the page line and the note sentence cannot disagree.
+    if held_total or isinstance(data.get("held_back"), dict):
+        payload["held_back"] = {"count": held_total, "reason": "not_english"}
     # The writer rung is the producer's claim about WHICH model (or the no-AI
     # deriver) wrote this edition. Passthrough only: the seal needs it to mark a
     # fallback edition degraded, and a model-written payload predating the field

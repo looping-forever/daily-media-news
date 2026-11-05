@@ -2420,9 +2420,17 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
                 edition_line = FALLBACK_PART_LABEL % (written, total)
         else:
             edition_line = UNSUMMARISED_LABEL
-        # A short edition must say what made it short. The count is read back off
-        # the notes, which are capped for display and lose this sentence first.
-        held_back = english_text.held_back_from_notes((meta or {}).get("notes"))
+        # A short edition must say what made it short. The count is DATA on the
+        # payload (`held_back.count`), written once by the pipeline; only a payload
+        # predating that field is read back off its notes text.
+        record = (meta or {}).get("held_back")
+        if isinstance(record, dict):
+            try:
+                held_back = int(record.get("count") or 0)
+            except (TypeError, ValueError):
+                held_back = 0
+        else:
+            held_back = english_text.held_back_from_notes((meta or {}).get("notes"))
         if held_back:
             edition_line += " - " + english_text.held_back_note(held_back)
 

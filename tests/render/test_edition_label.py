@@ -31,6 +31,8 @@ if _HERE not in sys.path:
 from fixtures import validated_payload  # noqa: E402
 
 import render_digest  # noqa: E402
+import build_email  # noqa: E402
+import english_text  # noqa: E402
 
 LABEL = "Unsummarised edition (no AI today)"
 SLOT = "evening"
@@ -250,6 +252,62 @@ class TheWordsAreTheSameOnAllThreeSurfaces(unittest.TestCase):
             2,
             "only one place in the workflow names the edition, so either the "
             "email or the push lost its label")
+
+
+class TheCountIsCarriedOnceNotReread(unittest.TestCase):
+    """Run 41995372308 put two held-back counts in front of one reader.
+
+    The page's edition line said six, the research note said five. Both numbers were
+    read out of the same prose field by different readers -- the line with a regex,
+    the note by rendering the text itself -- and the count had been written there by
+    two different stages. A number that lives in a sentence can be re-derived
+    differently; a number that lives on the payload cannot.
+    """
+
+    SENTENCE = "5 stories were held back because they are not in English."
+
+    def page(self, meta):
+        return render_digest.render_page([], SLOT, DAY, STAMP, meta,
+                                         schedule_path=NO_SCHEDULE)
+
+    def test_the_carried_count_beats_the_one_in_the_notes(self):
+        html = self.page({"edition_kind": "unsummarised",
+                          "notes": self.SENTENCE,
+                          "held_back": {"count": 6, "reason": "not_english"}})
+        self.assertIn(LABEL + " - 6 stories were held back", html)
+        self.assertNotIn(LABEL + " - 5 stories", html,
+                         "the renderer read the number back out of the note instead "
+                         "of the field both surfaces are given")
+
+    def test_a_carried_zero_says_nothing_even_when_the_note_claims_a_count(self):
+        html = self.page({"edition_kind": "unsummarised",
+                          "notes": self.SENTENCE,
+                          "held_back": {"count": 0, "reason": "not_english"}})
+        line = re.search(r'<p class="health-edition">(.*?)</p>', html).group(1)
+        self.assertEqual(LABEL, line,
+                         "zero is a fact, not a missing value: the old payloads "
+                         "without the field are the ones that read the note")
+
+    def test_a_payload_without_the_field_still_reads_the_note(self):
+        html = self.page({"edition_kind": "unsummarised", "notes": self.SENTENCE})
+        self.assertIn(LABEL + " - 5 stories were held back", html,
+                      "an edition rendered from an older payload must keep its count")
+
+    def test_the_page_and_the_email_print_the_same_number(self):
+        count = 6
+        notes = english_text.replace_held_back("Research note.", count)
+        meta = {"edition_kind": "unsummarised", "notes": notes,
+                "held_back": {"count": count, "reason": "not_english"}}
+        page = self.page(meta)
+        mail = build_email.notice_text({}, notes)
+        numbers = set(int(n) for n in re.findall(
+            r"(\d+) stor(?:y was|ies were) held back", page + mail))
+        self.assertEqual({count}, numbers,
+                         "the page and the email disagree about how many stories "
+                         "the edition held back: %r" % (numbers,))
+        self.assertEqual(2, len(re.findall(r"held back", page)),
+                         "the sentence must reach the page exactly twice: once on "
+                         "the edition line, once in the note")
 
 
 if __name__ == "__main__":
