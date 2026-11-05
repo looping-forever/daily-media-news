@@ -628,6 +628,18 @@ jobs:
         # the archive index. A redirect on its own is never success. No
         # credentials are sent, and a 401 or 403 here is the defect this check
         # exists to catch.
+        #
+        # A FRESH DEPLOY IS NOT LIVE THE SECOND IT IS UPLOADED. Measured, run
+        # 41945133018 (2026-11-05): ONE GET at 00:57:36Z answered 404 while
+        # Pages was still propagating the page the build had written at 00:55Z;
+        # the step failed, nothing was sealed, and the Worker's delivery arm
+        # built the edition 22 minutes late. The same URL answered 308 -> 200 a
+        # minute later. So a 404 is retried, not believed: three attempts, ten
+        # seconds apart, ten seconds each -- 50 s at worst, which is 30 s more
+        # than the one 20 s GET this replaced, and still an ORDER OF MAGNITUDE
+        # inside the job's budget. The seal is NOT weakened: content is still
+        # asserted on the body of the 200, and a page that never arrives fails
+        # after the last attempt with every status it returned.
         run: |
           set -eo pipefail
           FIELDS="$(python3 -c "import json;a=json.load(open('prebuild/artifact.json'));print(a.get('page_url',''),a.get('slot',''),a.get('date',''))")" || {
@@ -647,29 +659,59 @@ jobs:
           BODY_FILE="$RUNNER_TEMP/prebuild_page.html"
           HEADER_FILE="$RUNNER_TEMP/prebuild_page.headers"
           MAX_REDIRECTS=5
-          set +e
-          RAW="$(curl --disable -sS -m 20 -L --max-redirs "$MAX_REDIRECTS" \
-            -D "$HEADER_FILE" -o "$BODY_FILE" \
-            -w '%{http_code} %{num_redirects} %{url_effective}' "$PAGE_URL")"
-          CURL_RC=$?
-          set -e
-          if [ "$CURL_RC" -ne 0 ] || [ -z "$RAW" ]; then
-            echo "::error::the anonymous GET of $PAGE_URL failed (curl exit $CURL_RC), so the page the owner will open cannot be verified. A redirect chain longer than $MAX_REDIRECTS is the usual cause."
-            exit 1
-          fi
-          CODE="${RAW%% *}"
-          REST="${RAW#* }"
-          HOPS="${REST%% *}"
-          EFFECTIVE="${REST#* }"
-          HOPS="${HOPS:-0}"
-          EFFECTIVE="${EFFECTIVE:-$PAGE_URL}"
-          # `curl -D` writes CRLF, so $2 is "308\r" and the diagnostic splits
-          # across lines in the log. Strip the CR before splitting the fields.
-          CHAIN="$(awk '{sub(/\r$/, "")} toupper($1) ~ /^HTTP\// {printf "%s%s", sep, $2; sep=" -> "}' "$HEADER_FILE" 2>/dev/null || true)"
-          echo "redirect chain: ${CHAIN:-none} ($HOPS hop(s))"
-          echo "anonymous GET -> HTTP $CODE, final URL $EFFECTIVE"
+          ATTEMPTS=3
+          ATTEMPT_TIMEOUT=10
+          BACKOFF_SEC=10
+          attempt=1
+          STATUSES=""
+          CODE=""
+          CURL_RC=0
+          HOPS=0
+          EFFECTIVE="$PAGE_URL"
+          CHAIN=""
+          while :; do
+            # A fresh header file per attempt, so the chain printed below is
+            # THIS attempt's chain and not the previous one's plus this one.
+            : > "$HEADER_FILE"
+            set +e
+            RAW="$(curl --disable -sS -m "$ATTEMPT_TIMEOUT" -L --max-redirs "$MAX_REDIRECTS" \
+              -D "$HEADER_FILE" -o "$BODY_FILE" \
+              -w '%{http_code} %{num_redirects} %{url_effective}' "$PAGE_URL")"
+            CURL_RC=$?
+            set -e
+            if [ "$CURL_RC" -ne 0 ] || [ -z "$RAW" ]; then
+              CODE="curl-$CURL_RC"
+              HOPS=0
+              EFFECTIVE="$PAGE_URL"
+            else
+              CODE="${RAW%% *}"
+              REST="${RAW#* }"
+              HOPS="${REST%% *}"
+              EFFECTIVE="${REST#* }"
+              HOPS="${HOPS:-0}"
+              EFFECTIVE="${EFFECTIVE:-$PAGE_URL}"
+            fi
+            # `curl -D` writes CRLF, so $2 is "308\r" and the diagnostic splits
+            # across lines in the log. Strip the CR before splitting the fields.
+            CHAIN="$(awk '{sub(/\r$/, "")} toupper($1) ~ /^HTTP\// {printf "%s%s", sep, $2; sep=" -> "}' "$HEADER_FILE" 2>/dev/null || true)"
+            echo "redirect chain: ${CHAIN:-none} ($HOPS hop(s))"
+            if [ "$CURL_RC" -ne 0 ]; then
+              echo "attempt $attempt/$ATTEMPTS: the anonymous GET failed (curl exit $CURL_RC), final URL $EFFECTIVE"
+              STATUSES="${STATUSES}${STATUSES:+; }attempt ${attempt}: curl exit ${CURL_RC}"
+            else
+              echo "attempt $attempt/$ATTEMPTS: anonymous GET -> HTTP $CODE, final URL $EFFECTIVE"
+              STATUSES="${STATUSES}${STATUSES:+; }attempt ${attempt}: HTTP ${CODE}"
+            fi
+            if [ "$CODE" = "200" ]; then break; fi
+            # A gate and a redirect loop do not clear by waiting: no retry.
+            case "$CODE" in 401|403|curl-47) break ;; esac
+            if [ "$attempt" -ge "$ATTEMPTS" ]; then break; fi
+            attempt=$((attempt+1))
+            echo "HTTP $CODE is not a verdict yet: Pages may still be propagating this deploy. Retrying in ${BACKOFF_SEC}s (attempt $attempt/$ATTEMPTS)."
+            sleep "$BACKOFF_SEC"
+          done
           if [ "$HOPS" -gt "$MAX_REDIRECTS" ]; then
-            echo "::error::the digest page took $HOPS redirects, more than the $MAX_REDIRECTS allowed. That is a redirect loop, not the one-hop extensionless redirect."
+            echo "::error::the digest page took $HOPS redirects, more than the $MAX_REDIRECTS allowed. That is a redirect loop, not the one-hop extensionless redirect. Attempts: $STATUSES"
             exit 1
           fi
           case "$EFFECTIVE" in
@@ -682,7 +724,25 @@ jobs:
             exit 1
           fi
           if [ "$CODE" != "200" ]; then
-            echo "::error::the digest page the prebuild just deployed answered HTTP $CODE to an ANONYMOUS request after $HOPS redirect hop(s) (final URL $EFFECTIVE). The site is public by design, so a non-200 FINAL status means the owner's link is gated or dead."
+            # NOT DEPLOYED YET AND GENUINELY MISSING look identical from one
+            # sample; the difference is that the first clears in seconds. The
+            # retries above already spent that time, so what is left is a page
+            # waiting cannot fix -- and the error says which status each attempt
+            # saw instead of guessing which case this is.
+            WINDOW=$(( ATTEMPT_TIMEOUT * ATTEMPTS + BACKOFF_SEC * (ATTEMPTS - 1) ))
+            case "$CODE" in
+              401|403)
+                DETAIL="That is the Cloudflare Access gate, which no retry can clear, so it was not retried. The site is public by design, so the owner's link is gated." ;;
+              curl-47)
+                DETAIL="curl refused the redirect chain (exit 47): a loop or a dead host, which waiting does not change." ;;
+              404)
+                DETAIL="$PAGE_URL answered 404 on all $ATTEMPTS attempts over about ${WINDOW}s. Deploy propagation does not last that long, so this is not 'not deployed yet': Pages is serving nothing at that path -- the upload did not land, or the artifact points at the wrong file." ;;
+              5*)
+                DETAIL="The last attempt got a 5xx, which is the origin failing, not the page propagating." ;;
+              *)
+                DETAIL="The page never answered 200 to an anonymous request." ;;
+            esac
+            echo "::error::the digest page the prebuild just deployed was NOT reachable: $STATUSES (final URL $EFFECTIVE). $DETAIL"
             exit 1
           fi
           if grep -aqF '<title>Personal News Informer — Digest Archive</title>' "$BODY_FILE"; then
@@ -702,7 +762,7 @@ jobs:
             echo "::error::the digest page answered 200 but carries no <h2 class=\"section-header\">. Production is serving something other than the digest that was just built, so the artifact's click target is wrong."
             exit 1
           fi
-          echo "page liveness: anonymous 200 + ${SLOT_TITLE} ${TODAY} digest markup present"
+          echo "page liveness: anonymous 200 + ${SLOT_TITLE} ${TODAY} digest markup present (attempt $attempt/$ATTEMPTS)"
 
       - name: Seal the artifact into the Worker
         # Seals prebuild/artifact.json. On a defined skip there is no record to

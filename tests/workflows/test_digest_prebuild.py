@@ -2753,11 +2753,27 @@ curl() {
   # Optional argument recorder. Without it, "the step passes the configured
   # username to curl" can only be asserted as a string in the YAML.
   if [ -n "${STUB_CURL_ARGS_LOG:-}" ]; then printf '%s\\n' "$*" >> "$STUB_CURL_ARGS_LOG"; fi
+  # A SEQUENCE OF STATUSES, because the liveness check now retries. Without
+  # this a stub can only answer the same status every time, so "404 on the
+  # first GET, 200 on the second" -- the measured propagation shape -- could
+  # not be expressed at all.
+  call=0
+  if [ -n "${STUB_CURL_CALLS:-}" ]; then
+    if [ -f "$STUB_CURL_CALLS" ]; then call="$(cat "$STUB_CURL_CALLS" 2>/dev/null || echo 0)"; fi
+    call=$(( call + 1 ))
+    printf '%s' "$call" > "$STUB_CURL_CALLS"
+  fi
+  code="${STUB_CURL_CODE:-200}"
+  if [ -n "${STUB_CURL_CODES:-}" ] && [ "$call" -gt 0 ]; then
+    code="$(printf '%s\\n' $STUB_CURL_CODES | sed -n "${call}p")"
+    if [ -z "$code" ]; then
+      code="$(printf '%s\\n' $STUB_CURL_CODES | tail -n 1)"
+    fi
+  fi
   if [ -n "$hdr" ]; then
-    printf '%s' "${STUB_CURL_HEADERS:-HTTP/1.1 ${STUB_CURL_CODE:-200}}" > "$hdr"
+    printf '%s' "${STUB_CURL_HEADERS:-HTTP/1.1 $code}" > "$hdr"
   fi
   if [ -n "$out" ]; then printf '%s' "${STUB_CURL_BODY:-}" > "$out"; fi
-  code="${STUB_CURL_CODE:-200}"
   hops="${STUB_CURL_NUM_REDIRECTS:-0}"
   eff="${STUB_CURL_EFFECTIVE:-$url}"
   if [ -n "$fmt" ]; then
@@ -2772,6 +2788,10 @@ curl() {
   # A redirect loop is curl exit 47, so the stub can refuse the same way.
   return "${STUB_CURL_EXIT:-0}"
 }
+# The liveness check backs off between retries. Waiting the real 20 s per test
+# proves nothing the step's own numbers do not already state (and they are
+# asserted separately), so the wait is a no-op here.
+sleep() { :; }
 """.replace("__PYTHON__", sys.executable)
 
 
@@ -2984,6 +3004,116 @@ class SealStepExecutionTests(TempDirCase):
              "STUB_CURL_CODE": "404", "STUB_CURL_BODY": ""})
         self.assertNotEqual(0, code, out)
         self.assertIn("::error::", out)
+
+    # -- PROPAGATION, NOT ABSENCE. Run 41945133018 (2026-11-05) had ONE GET
+    #    answer 404 at 00:57:36Z while Pages was still propagating the page the
+    #    build had written two minutes earlier. The step failed, nothing was
+    #    sealed, and the owner's push arrived 22 minutes late. A fresh deploy
+    #    must be given a brief chance to appear -- without ever sealing a page
+    #    that does not.
+
+    def _sequence(self, codes):
+        """Make the stub curl answer one status per call: "404 200" is the
+        measured propagation shape, and it could not be expressed before."""
+        calls = self.tmp / "curl_calls.txt"
+        if calls.exists():
+            calls.unlink()
+        self.addCleanup(lambda: calls.exists() and calls.unlink())
+        return {"STUB_CURL_CODES": codes, "STUB_CURL_CALLS": str(calls)}, calls
+
+    def test_a_transient_404_then_a_200_does_not_fail_the_seal(self):
+        """DEFECT 1, EXECUTED. The first attempt 404s, the retry 200s, and the
+        whole body contract still runs on that 200."""
+        self._write_artifact()
+        env, calls = self._sequence("404 200")
+        env.update({"SLOT": "morning", "TODAY": "2026-10-09",
+                    "STUB_CURL_BODY": self._digest_body()})
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing", env)
+        self.assertEqual(0, code,
+                         "a 404 that clears on the retry still failed the seal, "
+                         "so a propagating deploy can cost the on-time push:\n%s"
+                         % out)
+        self.assertIn("attempt 1/3: anonymous GET -> HTTP 404", out)
+        self.assertIn("attempt 2/3: anonymous GET -> HTTP 200", out)
+        self.assertIn("Retrying in 10s (attempt 2/3)", out)
+        self.assertIn("page liveness: anonymous 200", out)
+        self.assertNotIn("::error::", out)
+        self.assertEqual("2", calls.read_text(encoding="utf-8"),
+                         "the retry did not happen: one curl call only")
+
+    def test_a_page_that_never_appears_fails_with_the_status_sequence(self):
+        """The seal is NOT weakened: a page that never arrives still refuses,
+        and the error names every attempt instead of one guessed cause."""
+        self._write_artifact()
+        env, calls = self._sequence("404 404 404")
+        env.update({"SLOT": "morning", "TODAY": "2026-10-09",
+                    "STUB_CURL_BODY": ""})
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing", env)
+        self.assertNotEqual(0, code,
+                            "a page that never becomes reachable was sealed:\n%s"
+                            % out)
+        self.assertIn("::error::", out)
+        self.assertIn("attempt 1: HTTP 404; attempt 2: HTTP 404; "
+                      "attempt 3: HTTP 404", out,
+                      "the error must carry the status sequence, so the reader "
+                      "can tell a wall from a one-off:\n%s" % out)
+        self.assertIn("not 'not deployed yet'", out,
+                      "a 404 that survives the retries is a missing page and "
+                      "must say so:\n%s" % out)
+        self.assertEqual("3", calls.read_text(encoding="utf-8"),
+                         "the retries are bounded to three attempts")
+
+    def test_the_308_to_the_extensionless_url_is_followed_even_after_a_retry(self):
+        """The deployed page legitimately answers the .html URL with a 308 to
+        the extensionless path. The retry must not turn that hop into a verdict:
+        the first attempt 308s without following (no hop), the second lands on
+        the extensionless 200, and the seal passes."""
+        self._write_artifact()
+        env, calls = self._sequence("308 200")
+        env.update({
+            "SLOT": "morning", "TODAY": "2026-10-09",
+            "STUB_CURL_NUM_REDIRECTS": "0",
+            "STUB_CURL_EFFECTIVE":
+                "https://daily-digest.example.pages.dev/digests/2026-10-09-morning",
+            "STUB_CURL_BODY": self._digest_body()})
+        code, out = self.run_seal_step(
+            "Verify the digest page is live before sealing", env)
+        self.assertEqual(0, code,
+                         "a 308 followed by the extensionless 200 was refused:\n%s"
+                         % out)
+        self.assertIn("attempt 1/3: anonymous GET -> HTTP 308", out)
+        self.assertIn("attempt 2/3: anonymous GET -> HTTP 200", out)
+        self.assertIn("final URL https://daily-digest.example.pages.dev/"
+                      "digests/2026-10-09-morning", out)
+        self.assertNotIn("::error::", out)
+        self.assertEqual("2", calls.read_text(encoding="utf-8"), out)
+
+    def test_the_retry_budget_is_bounded_and_read_from_the_step(self):
+        """The numbers, not a promise: three attempts, ten seconds each, ten
+        seconds apart, 50 s at worst -- 30 s more than the single 20 s GET this
+        replaces. An unbounded `while true` would also pass every test above."""
+        step = step_named(PREBUILD_WORKFLOW, "seal",
+                          "Verify the digest page is live before sealing")
+        run = step["run"]
+        values = {}
+        for name in ("ATTEMPTS", "ATTEMPT_TIMEOUT", "BACKOFF_SEC"):
+            m = re.search(r"(?m)^\s*%s=(\d+)\s*$" % name, run)
+            self.assertIsNotNone(m, "%s is not a plain integer in the step" % name)
+            values[name] = int(m.group(1))
+        self.assertEqual(3, values["ATTEMPTS"])
+        self.assertEqual(10, values["ATTEMPT_TIMEOUT"])
+        self.assertEqual(10, values["BACKOFF_SEC"])
+        self.assertIn('sleep "$BACKOFF_SEC"', run,
+                      "the backoff is declared but never waited")
+        self.assertIn('[ "$attempt" -ge "$ATTEMPTS" ]', run,
+                      "the retry loop has no attempt bound, so it is unbounded")
+        worst = (values["ATTEMPTS"] * values["ATTEMPT_TIMEOUT"]
+                 + values["BACKOFF_SEC"] * (values["ATTEMPTS"] - 1))
+        self.assertLessEqual(worst, 50,
+                             "the retry costs %ds, past the 50 s this step was "
+                             "given" % worst)
 
     # -- the 308-following contract, world by world. The deployed page
     #    LEGITIMATELY answers `/digests/<date>-<slot>.html` with 308 to the
