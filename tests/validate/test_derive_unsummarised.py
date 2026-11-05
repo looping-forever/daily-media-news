@@ -221,6 +221,23 @@ class TheFloorCarriesText(unittest.TestCase):
         self.assertEqual("", stories[0]["summary"],
                          "a repeat of the headline adds nothing to a headline")
 
+    def test_a_description_that_is_a_headline_paraphrase_is_dropped(self):
+        """RUN 42078530071: six of eight "publisher" bodies were the headline.
+
+        The snippet was never judged as prose, so the same words that failed the
+        model answer shipped as the publisher's own description.
+        """
+        title = "The Dangers in My Heart Season 3 Set for April 2027"
+        stories, _, _ = dut.derive([
+            cand(title, "https://kathmandupost.com/p", category="nepal",
+                 snippet="A new teaser trailer for the third season of The "
+                         "Dangers in My Heart has revealed an April 2027 "
+                         "premiere window."),
+        ], now=NOW)
+        self.assertEqual("", stories[0]["summary"],
+                         "a paraphrase of the headline adds nothing a headline "
+                         "does not already say")
+
     def test_a_long_description_is_cut_on_a_word_boundary(self):
         stories, _, _ = dut.derive([
             cand(long_title("long"), "https://kathmandupost.com/l",

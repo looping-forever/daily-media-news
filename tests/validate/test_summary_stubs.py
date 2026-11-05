@@ -23,8 +23,16 @@ import validate_stories as vs
 
 TITLE = ("Prepare for delay: TxDOT closing S.A. highway ramp in just hours "
          "- MySA")
+#: RUN 42078530071: this feed description is the headline without its dash. It
+#: was quoted as "the publisher's own description", so the card read as a heading
+#: with itself underneath.
 SNIPPET = ("Prepare for delay: TxDOT closing S.A. highway ramp in just hours "
            "MySA")
+#: A real publisher description: names the ramp, the cross-street, a time, and
+#: what a driver should do -- none of which the headline says.
+DESCRIPTION = ("The Texas Department of Transportation says the Loop 1604 ramp "
+               "at Highway 90 closes at 21:00 on Thursday for resurfacing, and "
+               "westbound drivers should use the Frontage Road instead.")
 PROSE = ("Reported: TxDOT will close the Loop 1604 ramp at Highway 90 for "
          "resurfacing from 21:00 on Thursday, and drivers heading west are "
          "advised to use the Frontage Road instead.")
@@ -138,10 +146,10 @@ class RepairTests(unittest.TestCase):
     def test_a_failed_ladder_keeps_publisher_text_and_a_truthful_count(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
         counts = summarise_stubs.repair(
-            payload, {"https://x/1": SNIPPET}, summarise=lambda rows, **_kw: {},
-            log=lambda *_a: None)
+            payload, {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, **_kw: {}, log=lambda *_a: None)
         self.assertEqual(1, counts["publisher"])
-        self.assertEqual(SNIPPET, payload["stories"][0]["summary"],
+        self.assertEqual(DESCRIPTION, payload["stories"][0]["summary"],
                          "the publisher's own description, quoted verbatim")
         self.assertEqual("publisher", payload["stories"][0]["summary_source"])
         self.assertEqual("unsummarised", payload["edition_kind"])
@@ -204,10 +212,10 @@ class RepairTests(unittest.TestCase):
 
     def test_a_second_repair_does_not_print_the_count_twice(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
-        summarise_stubs.repair(payload, {"https://x/1": SNIPPET},
+        summarise_stubs.repair(payload, {"https://x/1": DESCRIPTION},
                                summarise=lambda rows, **_kw: {}, log=lambda *_a: None)
         once = payload["notes"]
-        summarise_stubs.repair(payload, {"https://x/1": SNIPPET},
+        summarise_stubs.repair(payload, {"https://x/1": DESCRIPTION},
                                summarise=lambda rows, **_kw: {}, log=lambda *_a: None)
         self.assertEqual(once, payload["notes"],
                          "a rerun prepended the same sentence again: two copies "
@@ -295,8 +303,8 @@ class RepairTests(unittest.TestCase):
             story("https://x/2", "Reported: " + TITLE),
             story("https://x/3", "Reported: " + TITLE)])
         summarise_stubs.repair(
-            payload, {"https://x/1": SNIPPET, "https://x/2": SNIPPET,
-                      "https://x/3": SNIPPET},
+            payload, {"https://x/1": DESCRIPTION, "https://x/2": DESCRIPTION,
+                      "https://x/3": DESCRIPTION},
             summarise=lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
             log=lambda *_a: None, derived=True)
         self.assertEqual({"summarised": 1, "publisher": 2, "none": 0,
@@ -311,13 +319,89 @@ class RepairTests(unittest.TestCase):
     def test_a_model_answer_that_is_still_a_stub_is_not_accepted(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
         counts = summarise_stubs.repair(
-            payload, {"https://x/1": SNIPPET},
+            payload, {"https://x/1": DESCRIPTION},
             summarise=lambda rows, **_kw: {"summaries": {
                 "https://x/1": "Reported: " + TITLE}},
             log=lambda *_a: None)
         self.assertEqual(0, counts["written"])
         self.assertEqual(1, counts["publisher"])
-        self.assertEqual(SNIPPET, payload["stories"][0]["summary"])
+        self.assertEqual(DESCRIPTION, payload["stories"][0]["summary"])
+
+
+class ThePublisherFallbackPassesTheSameTest(unittest.TestCase):
+    """RUN 42078530071: 6 of 8 "publisher text" bodies were the headline again.
+
+    The fallback quoted the feed's snippet without asking whether it was prose,
+    so a card read as a heading with itself underneath while the note called it
+    "the publisher's own description". One predicate decides now.
+    """
+
+    def repair(self, stories, snippets, floor=4):
+        payload = {"stories": stories}
+        counts = summarise_stubs.repair(
+            payload, snippets, summarise=lambda rows, **_kw: {},
+            log=lambda *_a: None, floor=floor)
+        return payload, counts
+
+    def test_a_headline_snippet_is_never_used_as_a_summary(self):
+        payload, counts = self.repair(
+            [story("https://x/1", "Reported: " + TITLE)],
+            {"https://x/1": SNIPPET})
+        row = payload["stories"][0]
+        self.assertEqual(0, counts["publisher"],
+                         "the headline echoed is not the publisher's description")
+        self.assertEqual(1, counts["none"])
+        self.assertEqual("none", row["summary_source"])
+        self.assertTrue(row["summary"].strip(), "and it is still not empty")
+
+    def test_a_headline_paraphrase_snippet_is_not_a_summary(self):
+        title = "The Dangers in My Heart Season 3 Set for April 2027"
+        paraphrase = ("A new teaser trailer for the third season of The Dangers "
+                      "in My Heart has revealed an April 2027 premiere window.")
+        payload, counts = self.repair(
+            [dict(story("https://x/1", "Reported: " + title), title=title)],
+            {"https://x/1": paraphrase})
+        self.assertEqual(0, counts["publisher"],
+                         "the headline rewritten is not a description")
+        self.assertNotEqual(paraphrase, payload["stories"][0]["summary"])
+
+    def test_a_headline_snippet_obeys_the_floor(self):
+        stories = [story("https://x/%d" % n, PROSE) for n in range(1, 5)]
+        stories.append(story("https://x/5", "Reported: " + TITLE))
+        payload, counts = self.repair(
+            stories, {"https://x/5": SNIPPET}, floor=4)
+        self.assertEqual(1, counts["dropped"],
+                         "nothing usable to print, so it leaves the edition")
+        self.assertEqual(4, len(payload["stories"]))
+        for row in payload["stories"]:
+            self.assertNotEqual(SNIPPET, row["summary"])
+
+
+class BothPromptsDemandADetailTheHeadlineLacks(unittest.TestCase):
+    """RUN 42078530071: 21 of 21 model answers were rejected as a paraphrase.
+
+    The prompt asked for a summary and never for a detail the headline lacks, so
+    the models did exactly what they were told. These assert the instruction is
+    in both prompts, by content, so a reworded rule still passes and a deleted
+    one goes red.
+    """
+
+    PATTERN = r"number.{0,200}(named person|name).{0,200}(place).{0,200}date"
+
+    def test_the_digest_prompt_carries_the_requirement(self):
+        import os
+        from . import REPO_ROOT
+        path = os.path.join(str(REPO_ROOT), "prompts", "daily-digest.md")
+        with open(path, encoding="utf-8") as fh:
+            text = " ".join(fh.read().lower().split())
+        self.assertRegex(text, self.PATTERN)
+        self.assertIn("never restate the headline", text)
+
+    def test_the_summariser_prompt_carries_the_requirement(self):
+        import summarise_stories
+        low = " ".join(summarise_stories.PROMPT.lower().split())
+        self.assertRegex(low, self.PATTERN)
+        self.assertIn("restates the headline", low)
 
 
 class TheNoteMatchesWhatTheStoriesCarry(unittest.TestCase):
@@ -341,8 +425,8 @@ class TheNoteMatchesWhatTheStoriesCarry(unittest.TestCase):
         payload = self.repair(
             stories,
             lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
-            {"https://x/1": SNIPPET, "https://x/2": SNIPPET,
-             "https://x/3": SNIPPET})
+            {"https://x/1": DESCRIPTION, "https://x/2": DESCRIPTION,
+             "https://x/3": DESCRIPTION})
         notes = payload["notes"]
         self.assertIn("an AI wrote the summary for 1 of 3 stories", notes)
         self.assertIn("the rest quote the publisher's own description", notes)
@@ -367,8 +451,9 @@ class TheNoteMatchesWhatTheStoriesCarry(unittest.TestCase):
                    story("https://x/2", "Reported: " + TITLE),
                    story("https://x/3", "Reported: " + TITLE)]
         payload = self.repair(stories, lambda rows, **_kw: {},
-                              {"https://x/1": SNIPPET, "https://x/2": SNIPPET,
-                               "https://x/3": SNIPPET})
+                              {"https://x/1": DESCRIPTION,
+                               "https://x/2": DESCRIPTION,
+                               "https://x/3": DESCRIPTION})
         notes = payload["notes"]
         self.assertIn("no AI summary survived", notes)
         self.assertIn("publisher's own description", notes)

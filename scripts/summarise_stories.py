@@ -94,6 +94,12 @@ FREE_REQUEST_TIMEOUT = 45
 #: No call is granted less than this while the budget can still pay for it.
 MIN_RUNG_SECONDS = 20
 
+#: What the FIRST rung of a batch is granted. RUN 42078530071: eight stories and
+#: eight rungs cut the fair share to the 20s floor, so `gemini-3.5-flash-lite`
+#: failed five 20s attempts that a six-story batch has always needed longer for.
+#: 90s still leaves 210s of the 300s allowance. Fallback rungs keep 20s.
+LEAD_RUNG_SECONDS = 90
+
 #: Each batch still to come keeps this many seconds back, so one bad batch
 #: cannot leave the later batches with a call too short to answer.
 MIN_BATCH_SECONDS = 30
@@ -124,6 +130,10 @@ PROMPT = (
     "You are summarising news stories for a personal morning digest.\n"
     "For each story below, write ONE plain sentence (at most 40 words) that "
     "says what happened, using only the title and snippet given.\n"
+    "The sentence MUST carry at least one concrete detail the headline does "
+    "not: a number, a named person, a place, a date, or a specific claim. A "
+    "sentence that only restates the headline in different words is not a "
+    "summary -- leave it empty instead.\n"
     "Never invent a fact, a number, a name or a quote that is not in the input. "
     "If a story has too little text to summarise, use an empty string.\n\n"
     "Return ONLY a JSON array, one object per story, with exactly these keys:\n"
@@ -196,13 +206,14 @@ def rung_timeout(models, index, seconds_left, batches_left):
     """
     group = rung_group_size(models, index)
     share = call_timeout(models[index], seconds_left, batches_left,
-                         len(models) - index - (group - 1))
+                         len(models) - index - (group - 1),
+                         lead=(index == 0))
     if group <= 1:
         return int(share)
     return max(1, int(share / group))
 
 
-def call_timeout(model, seconds_left, batches_left, rungs_left):
+def call_timeout(model, seconds_left, batches_left, rungs_left, lead=False):
     """Seconds one call to *model* is granted, and why it is that number.
 
     THE ARITHMETIC THAT HAS TO FIT (run 41990956737: 29 stories, so four
@@ -215,18 +226,21 @@ def call_timeout(model, seconds_left, batches_left, rungs_left):
 
         reserve  MIN_BATCH_SECONDS per batch still to come
         share    (seconds_left - reserve) / rungs_left
-        cap      min(rung cap, share), floored at MIN_RUNG_SECONDS,
+        cap      min(rung cap, share), floored at the rung's floor,
                  never more than seconds_left
 
-    With four batches and 300s: batch 1 reserves 90s, so its five rungs share
-    210s -> 42s each instead of 120s, and batches 2-4 still get a turn.
+    The floor is LEAD_RUNG_SECONDS for the batch's first rung and
+    MIN_RUNG_SECONDS for the fallbacks. With four batches and 300s: batch 1
+    reserves 90s, so its five rungs share 210s -> 42s each instead of 120s, and
+    batches 2-4 still get a turn.
     """
     batches_left = max(1, int(batches_left))
     rungs_left = max(1, int(rungs_left))
+    floor = LEAD_RUNG_SECONDS if lead else MIN_RUNG_SECONDS
     reserve = (batches_left - 1) * MIN_BATCH_SECONDS
-    usable = max(MIN_RUNG_SECONDS, float(seconds_left) - reserve)
+    usable = max(floor, float(seconds_left) - reserve)
     share = usable / rungs_left
-    cap = min(timeout_for_rung(model), max(MIN_RUNG_SECONDS, share))
+    cap = min(timeout_for_rung(model), max(floor, share))
     return max(1, int(min(cap, float(seconds_left))))
 
 
@@ -544,11 +558,14 @@ def ladder_models(transport=None, environ=None, log=None):
 COOLDOWN_ENV = "MODEL_COOLDOWN_PATH"
 
 #: Refusal kinds that mean THIS RUNG produced nothing: no verdict, no bytes, an
-#: auth wall, a dead transport, a hit against its own clock. Quota is excluded --
-#: the whole pool shares that allowance, so cooling rungs for it would empty the
-#: ladder -- and so is `not_configured`, which is a repository setting.
+#: auth wall, a dead transport, a hit against its own clock, a CLI exit that
+#: carried no answer, an empty answer. Quota is excluded -- the whole pool shares
+#: that allowance, so cooling rungs for it would empty the ladder -- and so is
+#: `not_configured`, which is a repository setting. RUN 42078530071: the five
+#: exit-1/empty rows were missing here, so they left no health record.
 DEMOTING_KINDS = frozenset({"other", "auth", "transport", "timeout",
-                            "model_not_found", "refused", "failed"})
+                            "model_not_found", "refused", "failed",
+                            "exit_nonzero", "empty_content"})
 
 
 def record_refusal(cooldown, model, kind, now=None):
@@ -768,7 +785,9 @@ def refusal_cause(kind, message):
         return "provider_refusal"
     if is_refusal(message):
         return "provider_refusal"
-    if kind in ("empty_content", "not_json", "partial_json"):
+    if kind in ("empty_content", "not_json", "partial_json", "exit_nonzero"):
+        # RUN 42078530071: a CLI that exits 1 after printing half an array is an
+        # UNREADABLE REPLY, not a broken runner -- the runner ran and answered.
         return "unreadable_reply"
     return "runner_fault"
 

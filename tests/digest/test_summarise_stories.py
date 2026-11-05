@@ -402,6 +402,78 @@ class TheBudgetArithmetic(unittest.TestCase):
                            "one hanging rung must not consume the whole job: "
                            "%r" % (run.seen,))
 
+    def test_the_lead_rung_gets_the_realistic_budget(self):
+        """RUN 42078530071: five ~20s attempts, because 20s is the FLOOR.
+
+        Eight rungs and two batches made the fair share 33s in batch 1 and less
+        later, so `MIN_RUNG_SECONDS` -- not the provider's cap -- became the time
+        a six-story batch was given. It is the batch's first rung that has to
+        answer, so it gets the intended value and the fallbacks keep the floor.
+        """
+        self.assertEqual(90, ss.LEAD_RUNG_SECONDS)
+        ladder = (["gemini/gemini-3.5-flash-lite", "gemini/gemini-3.1-flash-lite"]
+                  + ["opencode/m%d-free" % n for n in range(6)])
+        lead = ss.rung_timeout(ladder, 0, seconds_left=300, batches_left=2)
+        self.assertEqual(ss.LEAD_RUNG_SECONDS, lead)
+        fallback = ss.rung_timeout(ladder, 1, seconds_left=300, batches_left=2)
+        self.assertLess(fallback, lead,
+                        "the lead's budget must not starve the rungs behind it")
+
+    def test_the_lead_rungs_budget_never_exceeds_the_job(self):
+        ladder = ["gemini/gemini-3.5-flash-lite", "gemini/other"]
+        self.assertLessEqual(
+            ss.rung_timeout(ladder, 0, seconds_left=25, batches_left=1), 25)
+
+    def test_an_exit_nonzero_twice_demotes_the_rung_within_the_run(self):
+        """The four rc=1 partial answers left no health record at all."""
+        cool = {"schema_version": 1, "models": {}, "pool": {}}
+        stories = [story(n) for n in range(7)]      # two batches: 6 + 1
+        failed = []
+
+        def run(prompt, model, timeout=None):
+            if model == BROKEN:
+                failed.append(model)
+                raise ss.Refusal("%s: exit 1: partial json" % model,
+                                 kind="exit_nonzero", exit_code=1)
+            return json.dumps([
+                {"url": url,
+                 "summary": "A model-written sentence about what happened today."}
+                for url in __import__("re").findall(
+                    r"https://example\.com/\d+", prompt)])
+
+        out = ss.summarise(stories, models=[BROKEN, WORKS], run=run,
+                           sleep=lambda *_a: None, cooldown=cool,
+                           log=lambda *_a: None)
+        self.assertEqual(7, len(out["summaries"]))
+        self.assertEqual(2, len(failed),
+                         "two attempts in two batches, then it is skipped")
+        row = cool["models"][BROKEN]
+        self.assertTrue(row.get("until"),
+                        "two unanswered requests must cool the rung: %r" % (row,))
+
+    def test_an_empty_answer_twice_demotes_the_rung_within_the_run(self):
+        cool = {"schema_version": 1, "models": {}, "pool": {}}
+        stories = [story(n) for n in range(7)]
+        failed = []
+
+        def run(prompt, model, timeout=None):
+            if model == BROKEN:
+                failed.append(model)
+                raise ss.Refusal("%s: empty answer" % model,
+                                 kind="empty_content")
+            return json.dumps([
+                {"url": url,
+                 "summary": "A model-written sentence about what happened today."}
+                for url in __import__("re").findall(
+                    r"https://example\.com/\d+", prompt)])
+
+        out = ss.summarise(stories, models=[BROKEN, WORKS], run=run,
+                           sleep=lambda *_a: None, cooldown=cool,
+                           log=lambda *_a: None)
+        self.assertEqual(7, len(out["summaries"]))
+        self.assertEqual(2, len(failed))
+        self.assertTrue(cool["models"][BROKEN].get("until"))
+
 
 class WhyTheReplyIsUnusable(unittest.TestCase):
     """`answered but yielded no usable summary` is not a diagnosis.

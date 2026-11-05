@@ -330,6 +330,14 @@ description instead, and labels the edition as partly unwritten:
 - `Reported: <the snippet copied>` — the body is the outlet's own description;
 - `Reported:` and nothing else.
 
+EVERY SUMMARY MUST CARRY A CONCRETE DETAIL THE HEADLINE DOES NOT: a number, a
+named person, a place, a date, or a specific claim. Never restate the headline
+or the snippet: a sentence built out of the headline's own words with a new verb
+is still the headline, and the pipeline rejects it — 21 of 21 answers in one run
+did exactly that and every one was discarded as "headline paraphrased with no
+detail". If the title and snippet contain no such detail, set `summary` to `""`
+rather than rewording the title.
+
 If you cannot write a real sentence for a candidate, set `summary` to `""`.
 An empty summary is honest and is counted as such; a restated headline is not.
 
@@ -421,7 +429,7 @@ Its entire content = valid JSON matching this exact shape:
   "stories": [
     {
       "title": "string, spoiler-safe",
-      "summary": "string: claim-status label, then 1-2 sentences of your own prose (never the headline or the snippet again)",
+      "summary": "string: claim-status label, then 1-2 sentences of your own prose that carry a detail the headline lacks (never the headline or the snippet again)",
       "for_you": "string, OPTIONAL (omit the key when you have no concrete personal consequence; see FOR YOU below)",
       "category": "action|world_major|local_city|nepal|education_tu|college_local|bank_local|gaming|anime|manga_manhwa_manhua|tech_career",
       "priority": 7,

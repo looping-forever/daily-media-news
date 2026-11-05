@@ -277,7 +277,7 @@ def lead_text(snippet, title, category):
     """The publisher's own description, trimmed; "" when it adds nothing.
 
     VERBATIM, never rewritten -- this file still writes no prose of its own.
-    Four rules, each of which returns "" rather than a weaker string:
+    Five rules, each of which returns "" rather than a weaker string:
 
       * text the page cannot draw is dropped first: a Devanagari description
         would render as an empty box;
@@ -287,6 +287,10 @@ def lead_text(snippet, title, category):
       * text the validator would VETO is dropped here first. Quoting a
         description adds words that never used to reach those gates, and the
         floor must not lose a story to text it added itself.
+      * RUN 42078530071: a feed snippet that IS the headline (or a paraphrase of
+        it) was quoted as "the publisher's own description", so six of eight
+        cards read as a heading with itself underneath. The snippet now passes
+        the SAME predicate the writer's prose does -- one rule, every producer.
     """
     text = re.sub(r"\s+", " ", str(snippet or "")).strip()
     title_text = re.sub(r"\s+", " ", str(title or "")).strip()
@@ -306,6 +310,11 @@ def lead_text(snippet, title, category):
     if any(k in low for k in EXCLUDED_KEYWORDS):
         return ""
     if spoiler_violation(category, "none", text) or crime_violation(text):
+        return ""
+    if not is_real_summary(text, title_text):
+        # The snippet is the headline, a paraphrase of it, or a fragment: no
+        # better than the headline already on the card, and calling it the
+        # publisher's description would be a false claim about the source.
         return ""
     return text
 
