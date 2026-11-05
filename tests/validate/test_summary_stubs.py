@@ -107,7 +107,7 @@ class RepairTests(unittest.TestCase):
             story("https://x/2", PROSE)])
         asked = []
 
-        def summarise(rows):
+        def summarise(rows, **_kw):
             asked.extend(r["source_url"] for r in rows)
             return {"summaries": {"https://x/1": PROSE}}
 
@@ -127,7 +127,7 @@ class RepairTests(unittest.TestCase):
         payload = self._payload([story("https://x/2", PROSE)])
         called = []
         counts = summarise_stubs.repair(
-            payload, {}, summarise=lambda rows: called.append(rows) or {},
+            payload, {}, summarise=lambda rows, **_kw: called.append(rows) or {},
             log=lambda *_a: None)
         self.assertEqual([], called)
         self.assertEqual(0, counts["stubs"])
@@ -136,7 +136,7 @@ class RepairTests(unittest.TestCase):
     def test_a_failed_ladder_keeps_publisher_text_and_a_truthful_count(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
         counts = summarise_stubs.repair(
-            payload, {"https://x/1": SNIPPET}, summarise=lambda rows: {},
+            payload, {"https://x/1": SNIPPET}, summarise=lambda rows, **_kw: {},
             log=lambda *_a: None)
         self.assertEqual(1, counts["publisher"])
         self.assertEqual(SNIPPET, payload["stories"][0]["summary"],
@@ -150,7 +150,7 @@ class RepairTests(unittest.TestCase):
 
     def test_a_story_with_no_snippet_is_left_empty_not_invented(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
-        summarise_stubs.repair(payload, {}, summarise=lambda rows: {},
+        summarise_stubs.repair(payload, {}, summarise=lambda rows, **_kw: {},
                                log=lambda *_a: None)
         self.assertEqual("", payload["stories"][0]["summary"],
                          "with nothing to quote, an empty summary is the honest "
@@ -159,41 +159,113 @@ class RepairTests(unittest.TestCase):
     def test_a_second_repair_does_not_print_the_count_twice(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
         summarise_stubs.repair(payload, {"https://x/1": SNIPPET},
-                               summarise=lambda rows: {}, log=lambda *_a: None)
+                               summarise=lambda rows, **_kw: {}, log=lambda *_a: None)
         once = payload["notes"]
         summarise_stubs.repair(payload, {"https://x/1": SNIPPET},
-                               summarise=lambda rows: {}, log=lambda *_a: None)
+                               summarise=lambda rows, **_kw: {}, log=lambda *_a: None)
         self.assertEqual(once, payload["notes"],
                          "a rerun prepended the same sentence again: two copies "
                          "of one fact")
 
-    def test_main_leaves_a_derived_edition_alone(self):
+    def test_main_repairs_a_derived_edition(self):
+        """RUN 42070185644: a derived edition's stubs were never repaired.
+
+        The step returned the moment it saw `writer.rung == derived`, so the
+        deriver's own label error had no second stage to catch it.
+        """
         import json
         import os
         import tempfile
+        from unittest import mock
         payload = {"writer": {"rung": "derived"},
                    "notes": "Fallback edition: an AI wrote the summary for 1 of "
-                            "1 stories; the rest quote the publisher's own "
+                            "2 stories; the rest quote the publisher's own "
                             "description.",
-                   "stories": [story("https://x/1", "Reported: " + TITLE)]}
+                   "stories": [story("https://x/1", "Reported: " + TITLE),
+                               story("https://x/2", PROSE)]}
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "stories.validated.json")
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(payload, fh)
-            rc = summarise_stubs.main(
-                ["--in", path, "--candidates", os.path.join(tmp, "absent.json")])
+            with mock.patch.object(summarise_stubs, "_ladder",
+                                   return_value={"summaries":
+                                                 {"https://x/1": PROSE}}):
+                rc = summarise_stubs.main(
+                    ["--in", path, "--candidates", os.path.join(tmp, "absent.json")])
             self.assertEqual(0, rc)
             with open(path, encoding="utf-8") as fh:
                 after = json.load(fh)
-        self.assertEqual(payload, after,
-                         "the deriver already ran the summariser; this step must "
-                         "not touch its file")
+        self.assertEqual(PROSE, after["stories"][0]["summary"],
+                         "the derived edition's stub is repaired")
+        self.assertEqual("ai", after["stories"][0]["summary_source"])
+        self.assertEqual(PROSE, after["stories"][1]["summary"],
+                         "a summary that already passed is never rewritten")
+        self.assertEqual({"summarised": 2, "total": 2}, after["summary_counts"])
+        self.assertEqual(1, after["notes"].count("an AI wrote the summary"),
+                         "the deriver's stale count sentence is replaced, not "
+                         "joined by a second one: %r" % after["notes"])
+        self.assertIn("an AI wrote the summary for all 2 stories", after["notes"])
+
+    def test_a_derived_repair_reports_its_budget_and_asks_only_for_stubs(self):
+        import summarise_stories
+        payload = self._payload([story("https://x/1", "Reported: " + TITLE),
+                                 story("https://x/2", PROSE)])
+        seen = {}
+
+        def summarise(rows, budget_seconds=None):
+            seen["urls"] = [r["source_url"] for r in rows]
+            seen["budget"] = budget_seconds
+            return {"summaries": {"https://x/1": PROSE}}
+
+        summarise_stubs.repair(payload, {"https://x/1": SNIPPET,
+                                        "https://x/2": SNIPPET},
+                               summarise=summarise, log=lambda *_a: None,
+                               derived=True)
+        self.assertEqual(["https://x/1"], seen["urls"],
+                         "the repair may spend ladder time on the stubs and on "
+                         "nothing else")
+        self.assertEqual(summarise_stories.TOTAL_BUDGET_SECONDS, seen["budget"],
+                         "one edition's whole allowance, so a fifteen-story "
+                         "edition cannot hang the job")
+
+    def test_the_most_important_stubs_are_repaired_first(self):
+        payload = self._payload([
+            story("https://x/1", "Reported: " + TITLE),
+            dict(story("https://x/2", "Reported: " + TITLE), priority=9),
+            dict(story("https://x/3", "Reported: " + TITLE), priority=5)])
+        asked = []
+        summarise_stubs.repair(
+            payload, {}, summarise=lambda rows, **_kw: asked.extend(
+                r["source_url"] for r in rows) or {},
+            log=lambda *_a: None, derived=True)
+        self.assertEqual(["https://x/2", "https://x/3", "https://x/1"], asked,
+                         "when the budget cannot cover every stub, the edition's "
+                         "own priority order decides which are attempted")
+
+    def test_a_budget_exhausted_repair_leaves_an_honest_count(self):
+        payload = self._payload([
+            story("https://x/1", "Reported: " + TITLE),
+            story("https://x/2", "Reported: " + TITLE),
+            story("https://x/3", "Reported: " + TITLE)])
+        summarise_stubs.repair(
+            payload, {"https://x/1": SNIPPET, "https://x/2": SNIPPET,
+                      "https://x/3": SNIPPET},
+            summarise=lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
+            log=lambda *_a: None, derived=True)
+        self.assertEqual({"summarised": 1, "total": 3},
+                         payload["summary_counts"],
+                         "one of three was written; the other two are not")
+        self.assertEqual("partial", payload["edition_kind"])
+        self.assertIn("an AI wrote the summary for 1 of 3 stories",
+                      payload["notes"])
+        self.assertEqual(2, [s.get("summary_source")
+                             for s in payload["stories"]].count("publisher"))
 
     def test_a_model_answer_that_is_still_a_stub_is_not_accepted(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
         counts = summarise_stubs.repair(
             payload, {"https://x/1": SNIPPET},
-            summarise=lambda rows: {"summaries": {
+            summarise=lambda rows, **_kw: {"summaries": {
                 "https://x/1": "Reported: " + TITLE}},
             log=lambda *_a: None)
         self.assertEqual(0, counts["written"])

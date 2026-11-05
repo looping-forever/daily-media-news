@@ -34,7 +34,8 @@ from validate_stories import VALID_CATEGORIES  # noqa: E402
 # the fallback applies them FIRST: a story whose description would be vetoed
 # keeps its bare headline (the old behaviour) instead of being dropped as a
 # whole and shrinking an edition that already has no model behind it.
-from validate_stories import (crime_violation, load_excluded_keywords,  # noqa: E402
+from validate_stories import (crime_violation, is_real_summary,  # noqa: E402
+                              load_excluded_keywords, snippet_index,
                               spoiler_violation)
 # And the SAME English-only gate. A headline the page cannot draw must be
 # REFUSED here rather than shipped and dropped later, because this file is the
@@ -361,17 +362,27 @@ def derive(candidates, now=None, held=None):
     return stories, counts, skipped
 
 
-def apply_summaries(stories, summaries):
+def apply_summaries(stories, summaries, snippets=None):
     """Overwrite each story's summary with the model's, and count what landed.
 
     A url the model did not answer for keeps whatever the deriver wrote, which
     is the publisher's description or the empty string. Nothing is invented to
     fill a gap, and no story is dropped for lacking a summary.
+
+    THE LABEL IS DECIDED BY `is_real_summary`, the same predicate the validator
+    counts with. RUN 42070185644 (2026-11-05) shipped six stories marked "ai"
+    whose body only restated the headline, so the push said "5 of 15 summarised"
+    and the note said the rest quote the publisher -- both false. A text that is
+    not prose is not kept, so the story keeps the publisher's own description
+    and its label.
     """
     written = 0
     for story in stories or []:
-        text = (summaries or {}).get(story.get("source_url") or "")
-        if isinstance(text, str) and text.strip():
+        url = story.get("source_url") or ""
+        text = (summaries or {}).get(url)
+        snippet = (snippets or {}).get(url, "")
+        if isinstance(text, str) and text.strip() and is_real_summary(
+                text.strip(), story.get("title"), snippet):
             story["summary"] = text.strip()
             # Per-story truth, so the validator can subtract anything it drops
             # instead of trusting a total that no longer matches the list.
@@ -445,7 +456,8 @@ def main(argv=None):
         # tests and by hand, and it must not need the summariser to import.
         import summarise_stories
         result = summarise_stories.summarise(stories)
-        written = apply_summaries(stories, result.get("summaries"))
+        written = apply_summaries(stories, result.get("summaries"),
+                                  snippet_index(args.candidates))
         causes = result.get("causes") or {}
         for refusal in result.get("refusals") or []:
             print("  refusal: %s" % refusal)

@@ -16,12 +16,19 @@ This step runs AFTER validation on every shipping path and repairs exactly that:
     (derive_unsummarised.lead_text -- quoted, never invented) and
     `summary_counts` says how many really were AI-written.
 
-A derived edition returns immediately: it has already been through this.
+A DERIVED edition is repaired too (run 42070185644): its writer rung is
+`derived`, but the deriver's labelling used to be the only decision made about
+its text, so a stub it wrote had no second stage to catch it. The whole step
+shares ONE allowance (summarise_stories.TOTAL_BUDGET_SECONDS), so a fifteen-story
+edition cannot hang the job; if the allowance cannot cover every stub, the
+edition's own priority order decides which ones are attempted and the count says
+honestly how many were written.
 """
 
 import argparse
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -44,27 +51,47 @@ def stubs(stories, snippets):
                 (snippets or {}).get(_url(s), ""))]
 
 
-def _ladder(stories):
+def _by_importance(stories):
+    """Most important first, keeping payload order for equal priorities."""
+    return sorted(stories, key=lambda s: -int(s.get("priority") or 0))
+
+
+def _ladder(stories, budget_seconds=None):
     import summarise_stories
-    return summarise_stories.summarise(stories)
+    return summarise_stories.summarise(stories, budget_seconds=budget_seconds)
 
 
-def repair(payload, snippets=None, summarise=None, log=print, derived=False):
+def _without_count_sentence(notes):
+    """Drop the deriver's count sentence: the counters just replaced it."""
+    text = str(notes or "").strip()
+    if edition_kind.NOTE_COUNT_MARKER not in text:
+        return text
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    return " ".join(s for s in sentences
+                    if edition_kind.NOTE_COUNT_MARKER not in s).strip()
+
+
+def repair(payload, snippets=None, summarise=None, log=print, derived=False,
+           budget_seconds=None):
     """Summarise the stubs in place; returns the counts this step reached.
 
     `summarise` is injected so a test never calls a provider: it takes the list
-    of stub stories and returns the summariser's own {"summaries": {url: text}}.
+    of stub stories (most important first) and `budget_seconds`, and returns the
+    summariser's own {"summaries": {url: text}}.
     """
+    import summarise_stories
     snippets = snippets or {}
+    spend = (summarise_stories.TOTAL_BUDGET_SECONDS
+             if budget_seconds is None else budget_seconds)
     stories = payload.get("stories") or []
-    found = stubs(stories, snippets)
+    found = _by_importance(stubs(stories, snippets))
     if not found:
         log("summarise_stubs: every story already has a written summary")
         return {"stubs": 0, "written": 0, "publisher": 0}
 
     log("summarise_stubs: %d of %d stories have no written summary; asking the "
-        "ladder" % (len(found), len(stories)))
-    result = (summarise or _ladder)(found)
+        "ladder (allowance %ds)" % (len(found), len(stories), spend))
+    result = (summarise or _ladder)(found, budget_seconds=spend)
     summaries = result.get("summaries") or {}
     written = publisher = 0
     for story in found:
@@ -87,15 +114,22 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False):
     facts = validate_stories.edition_facts(payload, stories, snippets=snippets)
     payload["edition_kind"] = facts["edition_kind"]
     payload["summary_counts"] = facts["summary_counts"]
-    # A model-written edition has no deriver note to correct, so the count
-    # sentence is composed here when it still has unwritten summaries.
-    if not derived:
+    existing = _without_count_sentence(payload.get("notes"))
+    if derived:
+        # The deriver's sentence quoted ITS count; the repair just changed it,
+        # so the sentence is rebuilt from the same two numbers the payload now
+        # carries rather than left to describe an edition that no longer exists.
+        sentence = validate_stories.rewritten_note(facts, payload.get("notes"))
+    else:
         sentence = edition_kind.model_note(facts["edition_kind"],
                                            facts["summary_counts"]["summarised"],
                                            facts["summary_counts"]["total"])
-        existing = str(payload.get("notes") or "").strip()
-        if sentence and not edition_kind.has_model_note(existing):
-            payload["notes"] = (sentence + " " + existing).strip()
+        if edition_kind.has_model_note(existing):
+            sentence = ""
+    if sentence:
+        payload["notes"] = (sentence + " " + existing).strip()
+    elif existing != str(payload.get("notes") or "").strip():
+        payload["notes"] = existing
     log("summarise_stubs: replaced %d with written summaries, %d with publisher "
         "text; edition_kind=%s (%d of %d)"
         % (written, publisher, facts["edition_kind"],
@@ -106,7 +140,7 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(
-        description="Summarise the stubs a model-written digest shipped.")
+        description="Summarise the stubs a digest shipped.")
     ap.add_argument("--in", dest="in_path",
                     default="state/stories.validated.json")
     ap.add_argument("--candidates", default="state/candidates.json")
@@ -122,13 +156,10 @@ def main(argv=None):
         print("FATAL: %s is not a JSON object" % args.in_path)
         return 1
     writer = payload.get("writer") if isinstance(payload.get("writer"), dict) else {}
-    if str(writer.get("rung") or "") == "derived":
-        # The deriver already ran the summariser on this edition.
-        print("summarise_stubs: derived edition -- nothing to repair")
-        return 0
+    derived = str(writer.get("rung") or "") == "derived"
 
     counts = repair(payload, validate_stories.snippet_index(args.candidates),
-                    log=lambda line: print(line, flush=True))
+                    log=lambda line: print(line, flush=True), derived=derived)
     if not counts["stubs"]:
         return 0
 

@@ -577,6 +577,14 @@ def promote_rung(cooldown, model, log=None):
     return True
 
 
+def _hard_cooled(cooldown, model):
+    """True when `model` is on a live rung_broken cooldown right now."""
+    if cooldown is None:
+        return False
+    import model_selector
+    return model_selector.on_hard_cooldown(cooldown, model)
+
+
 def demoted_order(models, cooldown, now=None, log=None):
     """The ladder with a demoted rung at the BACK -- never removed.
 
@@ -796,9 +804,16 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     if cooldown is None and cooldown_path:
         import model_selector
         cooldown = model_selector.load_cooldown(cooldown_path)
-    models = list(models) if models is not None else ladder_models(log=log)
-    if cooldown is not None:
-        models = demoted_order(models, cooldown, log=log)
+    base = list(models) if models is not None else ladder_models(log=log)
+    order = demoted_order(base, cooldown, log=log) if cooldown is not None \
+        else list(base)
+    #: Rungs demoted by a refusal IN THIS RUN. They are skipped for the rest of
+    #: it (run 42070185644 paid the same broken rung in all three batches), but
+    #: never removed outright: if every other rung refuses, the fallback is the
+    #: full order, because an edition with no summaries is worse than one written
+    #: late by a rung that had failed.
+    dead = set()
+    dirty = False
     pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
     pacer.deadline = clock() + float(budget_seconds)
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
@@ -819,12 +834,28 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                                              timeout=timeout,
                                              exit_code=exit_code))
 
-    if not stories or not models:
-        if not models:
+    if not stories or not base:
+        if not base:
             log("summarise_stories: no model in the configured ladder; "
                 "nothing is summarised")
         save_memory()
         return out
+
+    def record(model, kind):
+        """Remember a refusal; announce a demotion the moment it happens."""
+        nonlocal dirty
+        row = record_refusal(cooldown, model, kind)
+        if row is None:
+            return False
+        dirty = True
+        if cooldown is not None and _hard_cooled(cooldown, model):
+            dead.add(model)
+            # The same formatter that reorders the next run's ladder, called
+            # only for its line: a demotion caused by THIS run has to be in THIS
+            # run's log, not only in the next one's.
+            demoted_order(base, cooldown, log=log)
+            dirty = False
+        return True
 
     plan = batches(stories)[:MAX_REQUESTS]
     for index, batch in enumerate(plan, 1):
@@ -832,6 +863,12 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             log("  total budget of %ds is spent before batch %d/%d"
                 % (budget_seconds, index, len(plan)))
             break
+        if dirty and cooldown is not None:
+            # RECOMPUTED BETWEEN BATCHES: a rung that refused twice during the
+            # last one is reordered (and skipped, below) for the rest of this run.
+            order = demoted_order(base, cooldown, log=log)
+            dirty = False
+        active = [m for m in order if m not in dead] or list(order)
         prompt = build_prompt(batch)
         prompt_tokens = estimate_tokens(prompt)
         log("  batch %d/%d: %d stories, prompt ~%d tokens (budget %d/min)"
@@ -840,7 +877,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         answered = False
         ran_out = False
         causes = set()
-        for rung, model in enumerate(models):
+        for rung, model in enumerate(active):
             remaining = pacer.deadline - clock()
             if remaining <= 0:
                 ran_out = True
@@ -849,7 +886,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             # this batch may use, and never more than the job has left. A
             # provider's several served ids share ONE rung's slice, so the
             # multi-id rung cannot outlive the rung it belongs to.
-            timeout = rung_timeout(models, rung, remaining,
+            timeout = rung_timeout(active, rung, remaining,
                                    len(plan) - index + 1)
             try:
                 text = run(prompt, model, timeout=timeout)
@@ -868,7 +905,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
                 causes.add(refusal_cause(kind, str(exc)))
-                if record_refusal(cooldown, model, kind):
+                if record(model, kind):
                     log("  batch %d/%d: %s produced nothing (%s); recorded for "
                         "the ladder memory" % (index, len(plan), model, kind))
                 if kind == "quota_notice" and llm_providers.provider_of(model):
@@ -902,7 +939,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 out["waits"].append(delay)
                 retry_timeout = call_timeout(model, pacer.deadline - clock(),
                                              len(plan) - index + 1, 1)
-                group = rung_group_size(models, rung)
+                group = rung_group_size(active, rung)
                 if group > 1:
                     # The retry is still this rung's time, not a fresh budget.
                     retry_timeout = max(1, int(retry_timeout / group))
@@ -917,8 +954,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                          exit_code=getattr(again, "exit_code", None))
                     causes.add(refusal_cause(
                         getattr(again, "kind", "") or "refused", str(again)))
-                    if record_refusal(cooldown, model,
-                                      getattr(again, "kind", "") or "refused"):
+                    if record(model, getattr(again, "kind", "") or "refused"):
                         log("  batch %d/%d: %s produced nothing after the wait; "
                             "recorded for the ladder memory"
                             % (index, len(plan), model))

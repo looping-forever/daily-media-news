@@ -738,5 +738,45 @@ class TheBrokenRungIsDemoted(unittest.TestCase):
         self.assertEqual([WORKS], [model for _p, model in run.calls])
 
 
+class TheOrderIsRecomputedBetweenBatches(unittest.TestCase):
+    """RUN 42070185644: the order was fixed for the whole run.
+
+    `demoted_order` ran once, before batch 1. A rung that then refused twice --
+    three times, in that edition -- was still tried first for every later batch,
+    and not one demotion line appeared in the log.
+    """
+
+    def setUp(self):
+        self.cool = {"schema_version": 1, "models": {}, "pool": {}}
+        self.stories = [story(n) for n in range(13)]     # 6 + 6 + 1
+
+    def run_of(self):
+        batches = ss.batches(self.stories)
+        return FakeRun([
+            ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other"),
+            reply_for(batches[0]),
+            ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other"),
+            reply_for(batches[1]),
+            reply_for(batches[2]),
+        ])
+
+    def test_a_rung_that_failed_twice_mid_run_is_skipped_for_the_rest(self):
+        log = []
+        run = self.run_of()
+        out = ss.summarise(self.stories, models=[BROKEN, WORKS], run=run,
+                           sleep=lambda *_a: None, cooldown=self.cool,
+                           log=log.append)
+        self.assertEqual([BROKEN, WORKS, BROKEN, WORKS, WORKS],
+                         [model for _p, model in run.calls],
+                         "the third batch must not pay the broken rung again")
+        self.assertTrue(any("ladder: %s demoted to the back until" % BROKEN
+                            in line for line in log),
+                        "the demotion has to be visible in the run that caused "
+                        "it, not only in the next run's log: %r" % (log,))
+        self.assertEqual(13, len(out["summaries"]),
+                         "every story still gets a summary from the rung that "
+                         "works")
+
+
 if __name__ == "__main__":
     unittest.main()

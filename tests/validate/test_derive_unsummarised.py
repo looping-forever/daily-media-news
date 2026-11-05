@@ -736,6 +736,7 @@ class SummarisedFallback(unittest.TestCase):
         self.assertEqual("", payload["stories"][4]["summary"],
                          "the unsummarised story keeps what the deriver wrote")
 
+
     def test_a_failed_batch_leaves_a_debug_record_beside_the_edition(self):
         debug = [{"model": "gemini/gemini-3.5-flash-lite",
                   "reason": "exit_nonzero", "parse_error": "partial_json",
@@ -889,6 +890,52 @@ class TheBannerNamesTheRealCause(unittest.TestCase):
                          dut.reason_from_causes({}))
         self.assertEqual(dut.REASON_ALL_FAILED,
                          dut.reason_from_causes({"runner_fault": 0}))
+
+
+#: RUN 42070185644 (2026-11-05): six stories shipped `summary_source: "ai"` while
+#: their body only restated their own headline. This one is the run's verbatim.
+#: The label is what the page and the push consulted, so a body that fails the
+#: prose test was still announced as written.
+HANOVER_TITLE = ("Abduction, barricade situation causes road closure in Hanover "
+                 "- WRIC ABC 8News")
+HANOVER_STUB = ("An abduction and barricade situation has resulted in a road "
+                "closure in Hanover.")
+HANOVER_PUBLISHED = ("Police said a barricade situation following an abduction "
+                     "closed a road in Hanover on Tuesday afternoon.")
+HANOVER_PROSE = ("Police said the road between Hanover Square and Mill Road was "
+                 "closed for four hours while officers negotiated, and 12 people "
+                 "were escorted out of the building.")
+
+
+class TheDeriverNeverLabelsAStubAsWritten(unittest.TestCase):
+    """ONE predicate decides prose, and it decides the LABEL too.
+
+    The deriver used to mark any non-empty model answer as AI-written. The
+    validator counted with `is_real_summary`, so the label and the number told
+    two different stories -- and the label is the one the push printed.
+    """
+
+    def story(self, url="https://x/1"):
+        return {"title": HANOVER_TITLE, "summary": HANOVER_PUBLISHED,
+                "source_url": url, "category": "world_major"}
+
+    def test_a_headline_rewrite_is_labelled_publisher_and_not_counted(self):
+        stories = [self.story()]
+        written = dut.apply_summaries(stories, {"https://x/1": HANOVER_STUB})
+        self.assertEqual(0, written,
+                         "a body that is the headline again is not written")
+        self.assertEqual("publisher", stories[0]["summary_source"])
+        self.assertEqual(HANOVER_PUBLISHED, stories[0]["summary"],
+                         "the publisher's own description stays; the stub is not "
+                         "kept under an AI label")
+
+    def test_a_summary_that_is_real_prose_stays_ai_written(self):
+        stories = [self.story()]
+        written = dut.apply_summaries(stories, {"https://x/1": HANOVER_PROSE},
+                                      snippets={"https://x/1": HANOVER_PUBLISHED})
+        self.assertEqual(1, written)
+        self.assertEqual("ai", stories[0]["summary_source"])
+        self.assertEqual(HANOVER_PROSE, stories[0]["summary"])
 
 
 if __name__ == "__main__":
