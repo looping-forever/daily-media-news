@@ -162,6 +162,46 @@ def timeout_for_rung(model):
     return FREE_REQUEST_TIMEOUT if is_free_rung(model) else KEYED_REQUEST_TIMEOUT
 
 
+def rung_group_size(models, index):
+    """How many consecutive rungs from *index* are ONE provider's candidates.
+
+    `llm_providers.ladder_rungs` emits an HTTP provider's served ids as
+    consecutive rungs -- up to three for OpenRouter, whose 2026-11-05 sweep found
+    seven usable free ids. Those ids are one RUNG of the clock: they exist so a
+    429, an empty answer or a 404 costs an id instead of the whole provider.
+    CLI rungs never group: each is a different provider by construction.
+    """
+    if not models or index >= len(models):
+        return 1
+    name = llm_providers.provider_of(models[index])
+    if not name:
+        return 1
+    start = index
+    while start > 0 and llm_providers.provider_of(models[start - 1]) == name:
+        start -= 1
+    end = index + 1
+    while end < len(models) and llm_providers.provider_of(models[end]) == name:
+        end += 1
+    return end - start
+
+
+def rung_timeout(models, index, seconds_left, batches_left):
+    """The slice ONE rung may use, with a provider's ids sharing a single slice.
+
+    Without the division, three OpenRouter rungs would each get a whole rung's
+    share and the provider could spend three times the clock it is entitled to.
+    With it, the group's slices add up to the share a single rung would have had
+    -- and a 429 (which returns in milliseconds) leaves almost all of it for the
+    next id.
+    """
+    group = rung_group_size(models, index)
+    share = call_timeout(models[index], seconds_left, batches_left,
+                         len(models) - index - (group - 1))
+    if group <= 1:
+        return int(share)
+    return max(1, int(share / group))
+
+
 def call_timeout(model, seconds_left, batches_left, rungs_left):
     """Seconds one call to *model* is granted, and why it is that number.
 
@@ -716,9 +756,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 ran_out = True
                 break
             # THE CLOCK THE CHILD IS ACTUALLY GIVEN, recomputed per call: what
-            # this batch may use, and never more than the job has left.
-            timeout = call_timeout(model, remaining,
-                                   len(plan) - index + 1, len(models) - rung)
+            # this batch may use, and never more than the job has left. A
+            # provider's several served ids share ONE rung's slice, so the
+            # multi-id rung cannot outlive the rung it belongs to.
+            timeout = rung_timeout(models, rung, remaining,
+                                   len(plan) - index + 1)
             try:
                 text = run(prompt, model, timeout=timeout)
                 out["requests"] += 1
@@ -767,6 +809,10 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 out["waits"].append(delay)
                 retry_timeout = call_timeout(model, pacer.deadline - clock(),
                                              len(plan) - index + 1, 1)
+                group = rung_group_size(models, rung)
+                if group > 1:
+                    # The retry is still this rung's time, not a fresh budget.
+                    retry_timeout = max(1, int(retry_timeout / group))
                 try:
                     text = run(prompt, model, timeout=retry_timeout)
                     out["requests"] += 1

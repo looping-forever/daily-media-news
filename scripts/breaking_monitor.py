@@ -320,13 +320,22 @@ def _served_ladder(models, log=print):
     were configured -- so the id actually sent is resolved here, once per run,
     and named in the log. A provider serving none of its candidates contributes
     no rung: attempting the wrong id only earns a `model_not_found` cooldown.
+
+    ONE RUNG PER PROVIDER, deliberately. The digest walk expands OpenRouter into
+    up to three consecutive rungs and divides one rung's clock between them; this
+    walk gives each model its own 150s window instead, so three ids would cost
+    450s of a budget that cannot pay it. A provider met twice is resolved once.
     """
     out = []
+    seen = set()
     for model in models:
         name = llm_providers.provider_of(model)
         if not name:
             out.append(model)
             continue
+        if name in seen:
+            continue
+        seen.add(name)
         got = llm_providers.served_model(name)
         if not got["model"]:
             log("ai_classify: %s contributes no rung -- %s"

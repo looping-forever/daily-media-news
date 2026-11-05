@@ -118,20 +118,34 @@ PROVIDERS = {
         # is sent. The candidate list is the SEED; `list_models()` is what
         # proves which ids this account can actually reach.
         #
-        # SEEDED FROM THE ACCOUNT'S OWN CATALOGUE (probe, 2026-11-05): it serves
-        # 8 of the 12 ids listed and NOT the two guessed here before, so a seed
-        # id is a claim to check, never a fact. Order is for PROSE SUMMARISATION:
-        # general instruct models first, then vision-capable, then small, then
-        # the code specialist, and the content-safety classifier last -- it is
-        # built to refuse, not to write.
-        ("xingchen-agi/xing4.0-29b-a4b:free",
-         "nvidia/nemotron-3.5-super-vl:free",
-         "recursive/flint-v1.0:free",
-         "dots-studio/dots-3-note-preview:free",
+        # SEEDED FROM THE 2026-11-05 SWEEP (probe 42049082917), which answered
+        # with text from exactly these seven ids. A seed is a CLAIM TO CHECK,
+        # never a fact: `list_models()` proves it again on every run, and a seed
+        # the account no longer serves is dropped by the intersection rather than
+        # attempted. Order is for PROSE SUMMARISATION, and the measured latency
+        # only breaks ties INSIDE a class:
+        #
+        #   1-3 general instruct (the writers) -- the biggest first, because a
+        #        bigger instruct model writes a better sentence;
+        #   4   general + vision -- prose-capable, kept for image stories;
+        #   5   note/preview build -- writes, but its 5.6s is the slowest measured;
+        #   6   reasoning-tuned -- can write, but its answer can land in
+        #        `reasoning` with an empty `content` (the 42043556280 failure);
+        #   7   code specialist -- writes the wrong register, so it goes last and
+        #        exists only as a last resort.
+        #
+        # DROPPED, with the reason, so nobody re-adds them: the xingchen id was
+        # the EMPTY-content offender of 42043556280 and is 429 now; both gemma-4
+        # ids are 429; liquid/lfm no longer appears in the sweep; and the
+        # nemotron content-safety id is a 404 -- a stale id in a seed list is a
+        # defect, not a spare.
+        ("nvidia/nemotron-3-ultra-550b-a55b:free",
          "nvidia/nemotron-3.5-lightning:free",
-         "liquid/lfm-2.5-2.6b:free",
-         "cohere/north-mini-code:free",
-         "nvidia/nemotron-3.5-content-safety:free"),
+         "recursive/flint-v1.0:free",
+         "nvidia/nemotron-3.5-super-vl:free",
+         "dots-studio/dots-3-note-preview:free",
+         "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+         "cohere/north-mini-code:free"),
         75,
         free_only=True,
     ),
@@ -218,6 +232,19 @@ _PREFERENCE_MARKERS = (
 #: `/models` reads, one per provider per process. The catalogue changes slowly
 #: and a walk asks about the same three providers repeatedly.
 _CATALOGUE_CACHE = {}
+
+#: How many SERVED ids one provider rung may try before giving up on the provider.
+#: One id per rung threw away everything the sweep measured: 2026-11-05 found
+#: seven usable OpenRouter ids, and a single 429 on the first one ended the
+#: provider for the whole edition. Three is the bound -- enough to step over a
+#: 429/empty/404, small enough that the group still fits inside one rung's share
+#: of the walk clock (`summarise_stories.rung_group` divides the slice).
+PROVIDER_ROUNDS = {"openrouter": 3}
+
+
+def provider_rounds(name):
+    """How many served ids this provider's rung may try (1 unless measured)."""
+    return int(PROVIDER_ROUNDS.get(name, 1))
 
 
 class ProviderError(Exception):
@@ -714,6 +741,10 @@ def clear_catalogue():
 def served_model(name, transport=None, environ=None, refresh=False):
     """The id to actually send, proven against this account's catalogue.
 
+    ONE id: the first of `served_models()`. Kept because every caller that asks
+    "which id does this provider serve" wants exactly one, and because the
+    breaking walk still walks one id per provider.
+
     Three outcomes, and each one is explicit because a silently wrong id is the
     defect this replaced:
 
@@ -728,27 +759,50 @@ def served_model(name, transport=None, environ=None, refresh=False):
       is not evidence of an unserved id, and dropping a working provider on a
       failed GET would be the same class of guess in the other direction.
     """
+    got = served_models(name, limit=1, transport=transport, environ=environ,
+                        refresh=refresh)
+    got["model"] = got["models"][0] if got["models"] else None
+    return got
+
+
+def served_models(name, limit=None, transport=None, environ=None,
+                  refresh=False):
+    """Up to `limit` ids this account serves for *name*, best first.
+
+    THE RUNG'S CANDIDATES, not one id. `limit` defaults to `provider_rounds`,
+    which is 1 for every provider except OpenRouter: the 2026-11-05 sweep found
+    seven usable free ids there, and a walk that can only try the first one
+    gives up on the whole provider the moment that id is 429, empty or 404.
+
+    The SAME three outcomes as `served_model`, applied to the whole list: ids
+    from a real catalogue read, nothing (so no rung), or the configured id when
+    the catalogue could not be read. Only a good read is cached, so a transient
+    429 on `/models` is asked again rather than remembered.
+    """
     record = provider(name)
-    configured_id = record.models[0]
-    got = {"provider": name, "model": configured_id, "source": "configured",
-           "reason": "", "configured": configured_id, "substituted": False,
-           "available": []}
+    limit = max(1, int(limit or provider_rounds(name)))
+    got = {"provider": name, "models": [], "reason": "", "available": [],
+           "configured": record.models[0], "substituted": False,
+           "source": "configured"}
     if not key_for(name, environ):
-        got.update(model=None, source="none", reason="not_configured")
+        got["reason"] = "not_configured"
+        got["source"] = "none"
         return got
     listing = catalogue(name, transport=transport, environ=environ,
                         refresh=refresh)
     got["available"] = list(listing.ids)
     if listing.reason != "ok":
+        got["models"] = [record.models[0]]
         got["reason"] = "catalogue_unreadable"
         got["catalogue_reason"] = listing.reason
         return got
     if not listing.ids:
-        got.update(model=None, source="none", reason="no_served_model")
+        got["reason"] = "no_served_model"
+        got["source"] = "none"
         return got
-    chosen = preference_order(listing.ids, record.models)[0]
-    got.update(model=chosen, source="catalogue",
-               substituted=chosen != configured_id)
+    got["models"] = preference_order(listing.ids, record.models)[:limit]
+    got["substituted"] = got["models"][0] != record.models[0]
+    got["source"] = "catalogue"
     return got
 
 
@@ -760,8 +814,16 @@ def _probe_note(got):
     """
     verdict = got.get("verdict")
     if verdict == "auth":
-        return ("the provider REFUSED the key (HTTP %s) -- the secret is present "
-                "and was rejected; regenerate it, then re-run this probe"
+        # MEASURED 2026-11-05: Groq answered 403 in 26 ms to a key the owner had
+        # just regenerated. "Regenerate it" was advice already taken, and it sent
+        # the next hour to a button that was not the problem -- a rejected key is
+        # about the key's SCOPE and the ACCOUNT's state, not about its value.
+        return ("the provider REFUSED the key (HTTP %s): the secret is PRESENT "
+                "and was rejected, so this is not a missing credential. Check "
+                "the key's scope/permissions and the account's status in the "
+                "provider console, and confirm the workflow secret really carries "
+                "the current value -- a fresh secret is refused the same way "
+                "while the scope or the account is wrong"
                 % (got.get("status") or "401/403"))
     if verdict == "model_not_found":
         return ("the chosen id %r is not in this account's catalogue; seed from "
@@ -943,10 +1005,12 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
     setting, not a model failure, and a rung that cannot be called would cost
     the walk an attempt to learn what one `os.environ` lookup already says.
 
-    `resolve=True` asks each provider's catalogue for an id it actually serves
-    (`served_model`), which is the production path: the probe showed the seed ids
-    are guesses and this account serves a different set. It is opt-in because a
-    caller that builds a ladder at IMPORT time must not open a socket.
+    `resolve=True` asks each provider's catalogue for the ids it actually serves
+    (`served_models`), which is the production path: the probe showed the seed ids
+    are guesses and this account serves a different set. OpenRouter contributes up
+    to `provider_rounds` CONSECUTIVE rungs, so one 429/empty/404 costs an id, not
+    the provider; the walk divides one rung's clock between them. It is opt-in
+    because a caller that builds a ladder at IMPORT time must not open a socket.
     """
     rungs = []
     for name in LADDER_PROVIDERS:
@@ -955,17 +1019,24 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
         if not resolve:
             rungs.append("%s/%s" % (name, model_for(name)))
             continue
-        got = served_model(name, transport=transport, environ=environ,
-                           refresh=refresh)
-        if not got["model"]:
+        got = served_models(name, transport=transport, environ=environ,
+                            refresh=refresh)
+        if not got["models"]:
             if log:
                 log("llm_providers: %s contributes no rung -- %s"
                     % (name, got["reason"]))
             continue
         if got["substituted"] and log:
-            log("llm_providers: %s does not serve %r; using the served id %r"
-                % (name, got["configured"], got["model"]))
-        rungs.append("%s/%s" % (name, got["model"]))
+            if len(got["models"]) == 1:
+                log("llm_providers: %s does not serve %r; using the served id %r"
+                    % (name, got["configured"], got["models"][0]))
+            else:
+                log("llm_providers: %s does not serve %r; trying %d served ids "
+                    "in order: %s"
+                    % (name, got["configured"], len(got["models"]),
+                       ", ".join(got["models"])))
+        for chosen in got["models"]:
+            rungs.append("%s/%s" % (name, chosen))
     return tuple(rungs)
 
 

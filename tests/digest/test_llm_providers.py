@@ -504,7 +504,10 @@ class ProbeFindingTests(unittest.TestCase):
         self.assertIn("llama-3.3-70b-versatile", note,
                       "the owner must see WHICH id was refused -- got %r" % note)
 
-    def test_a_refused_key_says_regenerate_on_its_own_line(self):
+    def test_a_refused_key_points_at_scope_and_account(self):
+        # Probe 42049082917: Groq answered 403 in 26 ms to a key regenerated
+        # minutes earlier. "Regenerate it" was advice ALREADY TAKEN, so the note
+        # must send the owner to the two things that were not tried.
         rows = lp.probe_rows(transport=self._send(
             403, '{"error":{"message":"forbidden"}}'), environ=KEYS)
         row = [r for r in rows if r.startswith("groq | ")][0]
@@ -512,7 +515,10 @@ class ProbeFindingTests(unittest.TestCase):
                         "the row shape stays pinned -- got %r" % row)
         note = [r for r in rows if r.strip().startswith("groq note:")][0]
         self.assertIn("REFUSED the key", note)
-        self.assertIn("regenerate", note)
+        self.assertIn("scope", note)
+        self.assertIn("account", note)
+        self.assertNotIn("regenerat", note,
+                         "the owner already regenerated it -- got %r" % note)
 
     def test_a_429_is_retried_once_then_recorded(self):
         slept = []
@@ -681,6 +687,156 @@ class FreeSweepTests(unittest.TestCase):
                                   environ={"OPENROUTER_API_KEY": "k"})
         self.assertEqual(1, len(rows))
         self.assertIn("no catalogue", rows[0])
+
+
+class OpenRouterRungTests(unittest.TestCase):
+    """Probe 42049082917: seven usable free ids, so ONE id is not a rung.
+
+    The sweep measured these answering with text; the two 429s and the 404 are
+    today's weather, not a licence to hardcode anything -- the catalogue check
+    stays, and only the ORDER and the count come from the measurement.
+    """
+
+    MEASURED = (
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "recursive/flint-v1.0:free",
+        "nvidia/nemotron-3.5-super-vl:free",
+        "dots-studio/dots-3-note-preview:free",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "cohere/north-mini-code:free",
+    )
+
+    def setUp(self):
+        lp.clear_catalogue()
+
+    def tearDown(self):
+        lp.clear_catalogue()
+
+    def _rungs(self, ids=None):
+        send, _ = router({"openrouter": list(ids or self.MEASURED)})
+        return lp.ladder_rungs(environ={"OPENROUTER_API_KEY": "k"},
+                               transport=send, resolve=True)
+
+    def test_the_first_rung_is_a_prose_model_from_the_measured_list(self):
+        rungs = self._rungs()
+        self.assertEqual("openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+                         rungs[0],
+                         "a specialist or a silent id must not lead")
+        self.assertEqual(lp.PROVIDERS["openrouter"].models[0],
+                         "nvidia/nemotron-3-ultra-550b-a55b:free")
+
+    def test_specialists_are_last_in_the_seed_order(self):
+        # Requirement, not a guess: a model that exists but writes the wrong
+        # register must not lead. The code specialist is last, and the
+        # reasoning-tuned id (whose answer can land in `reasoning`) sits behind
+        # every plain instruct model.
+        seeds = lp.PROVIDERS["openrouter"].models
+        self.assertEqual("cohere/north-mini-code:free", seeds[-1])
+        self.assertLess(seeds.index("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"),
+                        len(seeds) - 1)
+
+    def test_the_rung_is_bounded_to_three_ids(self):
+        rungs = [r for r in self._rungs() if r.startswith("openrouter/")]
+        self.assertEqual(lp.PROVIDER_ROUNDS["openrouter"], len(rungs))
+        self.assertEqual(3, len(rungs), "the group must not grow with the catalogue")
+
+    def test_a_429_falls_through_to_the_next_id_and_logs_both(self):
+        lines = []
+        models = ["openrouter/%s" % i for i in self.MEASURED[:3]]
+        calls = []
+
+        def run(prompt, model, timeout=None):
+            calls.append(model)
+            if len(calls) == 1:
+                raise ss.Refusal("openrouter: quota_notice (HTTP 429) too many",
+                                 kind="quota_notice")
+            return json.dumps([{"url": "https://example.com/1",
+                                "summary": "A model-written sentence about what "
+                                           "happened today."}])
+
+        out = ss.summarise(_one_story(), models=models, run=run,
+                           sleep=lambda _s: None, log=lines.append,
+                           budget=10 ** 9)
+        self.assertEqual(models[:2], calls, "the 429 costs one id, not the provider")
+        self.assertEqual(models[1], out["model"])
+        joined = "\n".join(lines)
+        self.assertIn(models[0], joined)
+        self.assertIn(models[1], joined)
+
+    def test_an_empty_answer_falls_through_too(self):
+        lines = []
+        models = ["openrouter/%s" % i for i in self.MEASURED[:2]]
+        calls = []
+
+        def run(prompt, model, timeout=None):
+            calls.append(model)
+            if len(calls) == 1:
+                raise ss.Refusal("%s: empty_answer (HTTP 200)" % model,
+                                 kind="empty_answer")
+            return json.dumps([{"url": "https://example.com/1",
+                                "summary": "A model-written sentence about what "
+                                           "happened today."}])
+
+        out = ss.summarise(_one_story(), models=models, run=run,
+                           sleep=lambda _s: None, log=lines.append,
+                           budget=10 ** 9)
+        self.assertEqual(models[1], out["model"], "an empty answer is not the end")
+        self.assertIn("empty_answer", "\n".join(out["refusals"]))
+
+    def test_a_404_falls_through_too(self):
+        models = ["openrouter/%s" % i for i in self.MEASURED[:2]]
+        calls = []
+
+        def run(prompt, model, timeout=None):
+            calls.append(model)
+            if len(calls) == 1:
+                raise ss.Refusal("%s: model_not_found (HTTP 404)" % model,
+                                 kind="model_not_found")
+            return json.dumps([{"url": "https://example.com/1",
+                                "summary": "A model-written sentence about what "
+                                           "happened today."}])
+
+        out = ss.summarise(_one_story(), models=models, run=run,
+                           sleep=lambda _s: None, log=lambda *_a: None,
+                           budget=10 ** 9)
+        self.assertEqual(models[1], out["model"])
+
+    def test_the_group_fits_inside_one_rung_of_the_clock(self):
+        # The same provider before the expansion (one id) and after (three):
+        # the three slices must add up to the ONE slice the single id had.
+        before = ["gemini/x", "openrouter/a", "mistral/y"]
+        after = ["gemini/x", "openrouter/a", "openrouter/b", "openrouter/c",
+                 "mistral/y"]
+        single = ss.rung_timeout(before, 1, seconds_left=300, batches_left=1)
+        slices = [ss.rung_timeout(after, i, seconds_left=300, batches_left=1)
+                  for i in (1, 2, 3)]
+        self.assertLessEqual(sum(slices), single,
+                             "the group may not outlive the rung it replaces")
+        self.assertGreaterEqual(min(slices), 1)
+
+    def test_the_stale_404_id_is_absent_everywhere(self):
+        stale = "nvidia/nemotron-3.5-content-safety:free"
+        offenders = []
+        for path in (REPO_ROOT / "scripts", REPO_ROOT / "config",
+                     REPO_ROOT / "tests", REPO_ROOT / "README.md"):
+            files = [path] if path.is_file() else list(path.rglob("*"))
+            for item in files:
+                if not item.is_file():
+                    continue
+                if item.name == Path(__file__).name:
+                    continue      # this test names the id on purpose
+                if item.suffix in (".py", ".json", ".yml", ".md"):
+                    if stale in item.read_text(encoding="utf-8",
+                                               errors="replace"):
+                        offenders.append(item.name)
+        self.assertEqual([], offenders,
+                         "a 404 id in a seed list is a defect, not a spare")
+
+
+def _one_story():
+    return [{"title": "Story", "summary": "Publisher text.",
+             "source_url": "https://example.com/1", "category": "world_major"}]
 
 
 class NoKeyShapedStringsTests(unittest.TestCase):
