@@ -391,5 +391,114 @@ class NoAIReason(unittest.TestCase):
         self.assertIn("no AI model was configured or reachable", notes)
 
 
+class SummarisedFallback(unittest.TestCase):
+    """The fallback with a model behind it: counted, labelled, nothing invented.
+
+    2026-11-05 shipped fifteen headlines over the publisher's own descriptions
+    because the agentic walk spent its per-minute allowance in thirteen seconds.
+    A batch of summaries fits that allowance, so the edition can carry real
+    sentences -- and the moment it does, two claims on the page have to change:
+    what the note says, and what the edition line counts.
+    """
+
+    TEXT = ("The ministry said the new schedule starts next month and covers "
+            "every district office in the valley.")
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="derive_summarised_")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def candidates(self):
+        return [cand(DISTINCT[n], "https://a.example/%d" % n,
+                     category=("world_major" if n < 3 else "local_city"))
+                for n in range(5)]
+
+    def payload_of(self, summarise):
+        path = os.path.join(self.tmp, "candidates.json")
+        out = os.path.join(self.tmp, "stories.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"candidates": self.candidates()}, fh)
+        # `--summarise` would spawn `opencode run`; the SUMMARY RESULT is what
+        # this class is about, so the model call is replaced, never made.
+        import unittest.mock as mock
+        import summarise_stories
+        with mock.patch.object(summarise_stories, "summarise",
+                               return_value=summarise):
+            rc = dut.main(["--candidates", path, "--out", out,
+                           "--today", "2026-11-05", "--slot", "morning",
+                           "--attempts", os.path.join(self.tmp, "absent.log"),
+                           "--summarise"])
+        self.assertEqual(0, rc)
+        with open(out, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def result(self, count, model="gemini/gemini-3.5-flash-lite"):
+        return {"summaries": {"https://a.example/%d" % n: self.TEXT
+                              for n in range(count)},
+                "model": model, "requests": 1, "waits": [], "refusals": []}
+
+    def test_every_story_can_carry_a_written_summary(self):
+        payload = self.payload_of(self.result(5))
+        self.assertEqual(5, payload["summary_counts"]["summarised"])
+        self.assertEqual(5, payload["summary_counts"]["total"])
+        for story in payload["stories"]:
+            self.assertEqual(self.TEXT, story["summary"])
+        ok, reason = vs.validate_story(payload["stories"][0], 0)
+        self.assertTrue(ok, "the validator must accept a written summary: %s"
+                        % reason)
+
+    def test_the_edition_kind_stays_unsummarised(self):
+        payload = self.payload_of(self.result(5))
+        self.assertEqual("unsummarised", payload["edition_kind"],
+                         "the SEAL reads this field as 'no model wrote the "
+                         "digest'; that is still true when a model wrote one "
+                         "sentence per story")
+        self.assertEqual({"rung": "derived", "attempt": None, "model": None},
+                         payload["writer"])
+
+    def test_the_note_counts_instead_of_claiming_every_text_is_the_publisher_s(self):
+        payload = self.payload_of(self.result(2))
+        self.assertIn("an AI wrote the summary for 2 of 5 stories",
+                      payload["notes"])
+        self.assertNotIn("the text under each headline is the publisher's own "
+                         "description", payload["notes"],
+                         "the old note over an AI sentence is a false claim")
+
+    def test_a_batch_that_answered_nothing_keeps_the_old_edition(self):
+        payload = self.payload_of({"summaries": {}, "model": None,
+                                   "requests": 2, "waits": [],
+                                   "refusals": ["gemini/a: quota"]})
+        self.assertEqual({"summarised": 0, "total": 5},
+                         payload["summary_counts"])
+        self.assertIn("no AI model was configured or reachable",
+                      payload["notes"])
+        self.assertEqual("unsummarised", payload["edition_kind"])
+
+    def test_no_story_is_dropped_for_lacking_a_summary(self):
+        payload = self.payload_of(self.result(2))
+        self.assertEqual(5, len(payload["stories"]),
+                         "a partial answer must not shrink the edition")
+        self.assertEqual("", payload["stories"][4]["summary"],
+                         "the unsummarised story keeps what the deriver wrote")
+
+    def test_below_the_floor_no_model_is_called(self):
+        path = os.path.join(self.tmp, "candidates.json")
+        out = os.path.join(self.tmp, "stories.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"candidates": self.candidates()[:4]}, fh)
+        import unittest.mock as mock
+        import summarise_stories
+        with mock.patch.object(summarise_stories, "summarise") as called:
+            rc = dut.main(["--candidates", path, "--out", out,
+                           "--today", "2026-11-05", "--slot", "morning",
+                           "--attempts", os.path.join(self.tmp, "absent.log"),
+                           "--summarise"])
+        self.assertEqual(0, rc)
+        called.assert_not_called()
+        self.assertFalse(os.path.exists(out),
+                         "nothing is written below the floor, so nothing should "
+                         "have been spent on prose for it")
+
+
 if __name__ == "__main__":
     unittest.main()

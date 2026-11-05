@@ -119,6 +119,56 @@ class TheLabelSaysHowShortTheEditionIs(unittest.TestCase):
         self.assertNotIn("held back", html)
 
 
+class TheLabelCountsWhatTheModelWrote(unittest.TestCase):
+    """A fallback whose stories DO carry written summaries cannot say "no AI".
+
+    2026-11-05 shipped fifteen headlines over publisher descriptions. The fix is
+    a batch of small model requests, and the moment some of those requests land
+    the page has two kinds of text under one headline style. `edition_kind` still
+    says `unsummarised` (no model wrote the DIGEST, and the seal must keep
+    treating it as degraded); the label is where the count belongs.
+    """
+
+    PART = ("Fallback edition: AI summary for 4 of 15 stories, the rest quote "
+            "the publisher")
+    ALL = "Fallback edition: AI summary for all 15 stories"
+
+    def page(self, meta):
+        return render_digest.render_page([], SLOT, DAY, STAMP, meta,
+                                         schedule_path=NO_SCHEDULE)
+
+    def test_a_partial_fallback_counts_both_kinds(self):
+        html = self.page({"edition_kind": "unsummarised",
+                          "summary_counts": {"summarised": 4, "total": 15}})
+        self.assertIn(self.PART, html)
+        self.assertNotIn(LABEL, html, "the old label over written summaries is "
+                                      "the false claim this change removes")
+
+    def test_a_fully_summarised_fallback_says_so_without_a_fraction(self):
+        html = self.page({"edition_kind": "unsummarised",
+                          "summary_counts": {"summarised": 15, "total": 15}})
+        self.assertIn(self.ALL, html)
+
+    def test_zero_summaries_keeps_the_old_label(self):
+        html = self.page({"edition_kind": "unsummarised",
+                          "summary_counts": {"summarised": 0, "total": 15}})
+        self.assertIn('<p class="health-edition">%s</p>' % LABEL, html)
+
+    def test_counts_without_the_kind_render_nothing(self):
+        html = self.page({"summary_counts": {"summarised": 4, "total": 15}})
+        self.assertNotIn("Fallback edition", html)
+        self.assertNotIn('<p class="health-edition">', html)
+
+    def test_malformed_counts_do_not_break_the_old_label(self):
+        for counts in (None, {}, {"summarised": "4", "total": 15},
+                       {"summarised": 4}, "4 of 15"):
+            html = self.page({"edition_kind": "unsummarised",
+                              "summary_counts": counts})
+            self.assertIn('<p class="health-edition">%s</p>' % LABEL, html,
+                          "counts %r must fall back to the old label rather "
+                          "than render a wrong one" % (counts,))
+
+
 class TheWordsAreTheSameOnAllThreeSurfaces(unittest.TestCase):
     """ONE EDITION, THREE SURFACES, ONE SENTENCE.
 

@@ -1814,15 +1814,25 @@ jobs:
 
       - name: Derive the unsummarised edition
         if: env.FALLBACK_NOOP != 'true'
-        # NO MODEL IN THIS STEP. When the walk above produced no usable
-        # state/stories.json, the collector's own candidates are the edition:
-        # headlines, links and hosts, with no summary written by anything. The
-        # page, email and push all say so, so an unlabelled empty summary can
-        # never be read as a real one. It is skipped whenever the agent DID
-        # write stories, so a normal run is unchanged.
+        timeout-minutes: 8
+        # ONE MODEL CALL PER BATCH, NOT A WALK. When the walk above produced no
+        # usable state/stories.json, the collector's own candidates are the
+        # edition's skeleton: title, link, host and the publisher's description.
+        # `--summarise` then asks a model for one sentence per story in batches
+        # of six -- a fixed, small request each, paced against the provider's
+        # per-minute allowance -- so the edition carries real summaries instead
+        # of publisher text. A batch that refuses leaves its stories exactly as
+        # the deriver built them; nothing is dropped and nothing is invented.
+        # Skipped whenever the agent DID write stories, so a normal run is
+        # unchanged.
         env:
           TODAY: ${{ env.TODAY }}
           DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
+          # The SAME two variables the agent step needs: without OPENCODE_CONFIG
+          # the CLI cannot see the gemini provider, and without the key every
+          # gemini rung fails as an auth error.
+          OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -eo pipefail
           : "${STORIES_FLOOR:?the workflow-level STORIES_FLOOR is missing; the derive gate has no floor}"
@@ -1889,14 +1899,15 @@ jobs:
           # Below the floor the deriver writes NOTHING and exits 0 on purpose:
           # the existing empty-digest classification is the owner of that case.
           echo "::warning::No usable digest from the model walk -- deriving the unsummarised edition from the collected candidates (no model produced a digest)."
-          echo "### Unsummarised edition (no AI today)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Fallback edition (no model wrote the digest)" >> "$GITHUB_STEP_SUMMARY"
           START=$(date +%s)
           python3 scripts/derive_unsummarised.py \
             --candidates state/candidates.json \
             --out state/stories.json \
             --today "$TODAY" \
             --slot "$DIGEST_TIME" \
-            --attempts state/agent-attempts.log
+            --attempts state/agent-attempts.log \
+            --summarise
           END=$(date +%s)
           STAGE_KEY=derive STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
 

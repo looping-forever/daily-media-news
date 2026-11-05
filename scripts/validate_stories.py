@@ -1897,6 +1897,18 @@ def main(argv=None):
     # model-written run, so the payload keeps its old shape there.
     if data.get("edition_kind"):
         payload["edition_kind"] = str(data["edition_kind"])
+    # How much of a fallback edition the model actually wrote. Passthrough only,
+    # like edition_kind: the renderer labels the page with it ("AI summary for N
+    # of M stories"), and a payload without it renders exactly as before.
+    counts = data.get("summary_counts")
+    if isinstance(counts, dict):
+        try:
+            payload["summary_counts"] = {
+                "summarised": int(counts.get("summarised") or 0),
+                "total": int(counts.get("total") or 0),
+            }
+        except (TypeError, ValueError):
+            pass
     # The writer rung is the producer's claim about WHICH model (or the no-AI
     # deriver) wrote this edition. Passthrough only: the seal needs it to mark a
     # fallback edition degraded, and a model-written payload predating the field

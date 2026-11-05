@@ -228,6 +228,14 @@ HEALTH_BANNER = {
 # and the push cannot drift into three different descriptions of one edition.
 UNSUMMARISED_LABEL = "Unsummarised edition (no AI today)"
 
+# The same edition when SOME stories did get a written summary. The fallback's
+# text is then two things at once -- an AI sentence on some stories, the
+# publisher's description on the rest -- and one label cannot describe both, so
+# the count is carried from the payload instead of being guessed here.
+FALLBACK_PART_LABEL = ("Fallback edition: AI summary for %d of %d stories, "
+                       "the rest quote the publisher")
+FALLBACK_ALL_LABEL = "Fallback edition: AI summary for all %d stories"
+
 # Freshness line (FROZEN CONTRACT C). `unknown` DROPS the timestamp entirely:
 # if no source was confirmed reachable, claiming "checked through T" is the
 # exact lie this renderer exists to remove. `empty` KEEPS the timestamp -- the
@@ -2398,7 +2406,20 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     # unsummarised edition that forgets to admit it.
     edition_line = ""
     if (meta or {}).get("edition_kind") == "unsummarised":
-        edition_line = UNSUMMARISED_LABEL
+        # HOW MANY came from a model and how many are the publisher's own words.
+        # Absent counts (an edition built before this field existed) fall back to
+        # the old label byte-for-byte.
+        counts = (meta or {}).get("summary_counts")
+        written = total = None
+        if isinstance(counts, dict):
+            written, total = counts.get("summarised"), counts.get("total")
+        if isinstance(written, int) and isinstance(total, int) and written > 0:
+            if written >= total:
+                edition_line = FALLBACK_ALL_LABEL % total
+            else:
+                edition_line = FALLBACK_PART_LABEL % (written, total)
+        else:
+            edition_line = UNSUMMARISED_LABEL
         # A short edition must say what made it short. The count is read back off
         # the notes, which are capped for display and lose this sentence first.
         held_back = english_text.held_back_from_notes((meta or {}).get("notes"))

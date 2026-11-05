@@ -58,6 +58,13 @@ CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(
 NOTE = ("Unsummarised edition: %s, so the text under each headline is the "
         "publisher's own description, not a summary written for you.")
 
+#: The same note when SOME stories did get a written summary. Saying "the text
+#: under each headline is the publisher's description" over an AI sentence is
+#: the one claim this page must never make, so the counted form replaces it
+#: whenever summarise_stories answered for at least one story.
+NOTE_SUMMARISED = ("Fallback edition: an AI wrote the summary for %d of %d "
+                   "stories; the rest quote the publisher's own description.")
+
 #: WHY there is no AI, in the walk's own vocabulary. The old note said only
 #: "no AI was available", which is true of every case and therefore tells the
 #: reader nothing: the 2026-11-05 edition HAD the keyed models configured, and
@@ -260,6 +267,22 @@ def derive(candidates, now=None, held=None):
     return stories, counts, skipped
 
 
+def apply_summaries(stories, summaries):
+    """Overwrite each story's summary with the model's, and count what landed.
+
+    A url the model did not answer for keeps whatever the deriver wrote, which
+    is the publisher's description or the empty string. Nothing is invented to
+    fill a gap, and no story is dropped for lacking a summary.
+    """
+    written = 0
+    for story in stories or []:
+        text = (summaries or {}).get(story.get("source_url") or "")
+        if isinstance(text, str) and text.strip():
+            story["summary"] = text.strip()
+            written += 1
+    return written
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Derive the no-AI fallback edition.")
     ap.add_argument("--candidates", default="state/candidates.json")
@@ -269,6 +292,11 @@ def main(argv=None):
     # The walk's own attempt log: the only evidence of why no model wrote this
     # edition. Absent or empty means no model was contacted at all.
     ap.add_argument("--attempts", default="state/agent-attempts.log")
+    # OFF by default so a hand-run and every existing test stay offline; the
+    # workflow turns it on. The flag, not a hidden default, is what makes "this
+    # run may call a model" visible in the YAML.
+    ap.add_argument("--summarise", action="store_true",
+                    help="ask a model for one summary per story, in paced batches")
     args = ap.parse_args(argv)
 
     if not os.path.isfile(args.candidates):
@@ -299,13 +327,30 @@ def main(argv=None):
           % (len(stories), len(candidates)))
 
     if len(stories) < MIN_STORIES:
-        # Fewer than the floor means the empty/degraded path owns this run.
+        # Fewer than the floor means the empty/degraded path owns this run. This
+        # is decided BEFORE any model call: the count cannot change here, so
+        # summarising first would spend quota on an edition nothing will read.
         print("FLOOR: only %d stories (minimum %d); nothing written to %s"
               % (len(stories), MIN_STORIES, args.out))
         if held_n:
             print("HELD: %d candidate(s) were not in English; the floor counted "
                   "only the stories the page can draw" % held_n)
         return 0
+
+    # Only what the model wrote, never which stories ship: a refused batch
+    # leaves those stories with the publisher's text.
+    written = 0
+    if args.summarise and stories:
+        # Imported here, not at module level: the deriver is used offline by
+        # tests and by hand, and it must not need the summariser to import.
+        import summarise_stories
+        result = summarise_stories.summarise(stories)
+        written = apply_summaries(stories, result.get("summaries"))
+        for refusal in result.get("refusals") or []:
+            print("  refusal: %s" % refusal)
+        print("  %-24s %d of %d (model %s)"
+              % ("summarised", written, len(stories),
+                 result.get("model") or "none"))
 
     # WHY, not merely THAT. The attempt log is the walk's own record, so the
     # note names a spent quota, a missing configuration or failed rungs instead
@@ -322,11 +367,20 @@ def main(argv=None):
           % ("no-AI reason", reason, len(re.findall(r"\bkind=", attempts_text))))
 
     notes = note_for(reason, attempts_text)
+    if written:
+        notes = NOTE_SUMMARISED % (written, len(stories))
     if held_n:
         notes = notes + " " + english_text.held_back_note(held_n)
     payload = {
         "date": args.today,
+        # STILL `unsummarised`, even when every story got a written summary.
+        # The seal, the delivery ledger and the Worker all read this field as
+        # "no model produced this digest", which remains true: the selection,
+        # the ranking and the page are derived. What the model wrote is one
+        # sentence per story, and `summary_counts` is what says how many.
         "edition_kind": "unsummarised",
+        # The count the page needs to be honest about its own text.
+        "summary_counts": {"summarised": written, "total": len(stories)},
         # No model wrote this edition; naming the deriver as the writer is what
         # lets the seal report how the digest was produced.
         "writer": {"rung": "derived", "attempt": None, "model": None},
@@ -344,8 +398,8 @@ def main(argv=None):
         json.dump(payload, fh, ensure_ascii=False, indent=2)
         fh.write("\n")
     os.replace(tmp, args.out)
-    print("wrote %s (%d stories, edition_kind=unsummarised)"
-          % (args.out, len(stories)))
+    print("wrote %s (%d stories, edition_kind=unsummarised, %d summarised)"
+          % (args.out, len(stories), written))
     return 0
 
 
