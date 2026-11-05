@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
@@ -36,7 +37,7 @@ from validate_stories import VALID_CATEGORIES  # noqa: E402
 # whole and shrinking an edition that already has no model behind it.
 from validate_stories import (crime_violation, is_real_summary,  # noqa: E402
                               load_excluded_keywords, snippet_index,
-                              spoiler_violation)
+                              spoiler_violation, stub_reason)
 # And the SAME English-only gate. A headline the page cannot draw must be
 # REFUSED here rather than shipped and dropped later, because this file is the
 # only one that knows how many stories the fallback held back.
@@ -192,13 +193,18 @@ def _cause_prose(ranked, keep=None):
     return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
-def note_for(reason, attempts_text="", causes=None):
+def note_for(reason, attempts_text="", causes=None, publisher=0, none=0,
+             total=0):
     """The page's own sentence for WHY no model wrote this edition.
 
     When the summariser recorded causes, each cause is reported with the number
     of STORIES it cost. The sentence is composed longest-first and the first
     form that fits NOTE_BUDGET wins, so a held-back clause appended afterwards can
     never be the thing that gets cut.
+
+    The tail states what is under the headlines. It used to claim every one
+    quoted the publisher, which was false for a story whose feed carried no
+    description (run 42074891307).
     """
     details = []
     ranked = rank_causes(causes)
@@ -212,11 +218,16 @@ def note_for(reason, attempts_text="", causes=None):
         if names:
             fallback = "%s (%s)" % (fallback, ", ".join(names))
     details.append(fallback)
+    if none <= 0:
+        pattern = NOTE
+    else:
+        tail = edition_kind.coverage_phrase(publisher, none, total)
+        pattern = "Unsummarised edition: %%s; %s." % tail
     for detail in details:
-        note = NOTE % detail
+        note = pattern % detail
         if len(note) <= NOTE_BUDGET:
             return note
-    return NOTE % details[-1]
+    return pattern % details[-1]
 
 
 def title_tokens(title):
@@ -362,7 +373,70 @@ def derive(candidates, now=None, held=None):
     return stories, counts, skipped
 
 
-def apply_summaries(stories, summaries, snippets=None):
+#: How much of a rejected answer is kept in the debug artifact. Long enough to
+#: recognise a headline or a mangled reply, short enough for a JSON file.
+DEBUG_TEXT_MAX_CHARS = 500
+_JOINERS = "\u200d\ufe0f\u20e3"
+
+
+def clip_text(text, limit=DEBUG_TEXT_MAX_CHARS):
+    """*text* cut to *limit* code points at a character boundary, then marked.
+
+    Python slices code points, but a grapheme can span several of them (an emoji
+    family is joined by zero-width joiners). Cutting right after a joiner or a
+    combining mark leaves half a visible character, so the cut walks back to the
+    last safe boundary first.
+    """
+    text = str(text or "")
+    if len(text) <= limit:
+        return text
+    cut = max(0, limit)
+    while cut > 0 and (unicodedata.combining(text[cut])
+                       or text[cut - 1] in _JOINERS):
+        cut -= 1
+    return text[:cut] + "\u2026"
+
+
+def record_rejections(path, rejected, attempts=None):
+    """Append rejected answers to the gitignored debug artifact.
+
+    The file exists to answer "why did this run write 0 summaries". A failed
+    request keeps the record it already had (`attempts`), and a received answer
+    the predicate refused is added with its own reason and verbatim text. Best
+    effort: a debug artifact must never fail the step.
+    """
+    if not path:
+        return
+    data = {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            loaded = json.load(fh)
+        if isinstance(loaded, dict):
+            data = loaded
+    except (OSError, ValueError):
+        data = {}
+    rows = list(data.get("attempts") or [])
+    rows.extend(attempts or [])
+    rejects = list(data.get("rejected") or [])
+    rejects.extend(rejected or [])
+    data["generated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    data["attempts"] = rows
+    if rejects:
+        data["rejected"] = rejects
+    out_dir = os.path.dirname(os.path.abspath(path))
+    if out_dir and not os.path.isdir(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+    tmp = path + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except OSError:
+        return
+
+
+def apply_summaries(stories, summaries, snippets=None, model="", rejected=None):
     """Overwrite each story's summary with the model's, and count what landed.
 
     A url the model did not answer for keeps whatever the deriver wrote, which
@@ -388,8 +462,17 @@ def apply_summaries(stories, summaries, snippets=None):
             # instead of trusting a total that no longer matches the list.
             story["summary_source"] = "ai"
             written += 1
-        else:
-            story["summary_source"] = "publisher"
+            continue
+        if isinstance(text, str) and text.strip() and rejected is not None:
+            # A received answer the predicate refused. RUN 42074891307 left no
+            # record of these, so "0 written" could not be diagnosed.
+            rejected.append({
+                "title": str(story.get("title") or ""),
+                "model": model or "",
+                "text": clip_text(text.strip()),
+                "reason": stub_reason(text.strip(), story.get("title"), snippet),
+            })
+        story["summary_source"] = "publisher"
     return written
 
 
@@ -451,33 +534,44 @@ def main(argv=None):
     # leaves those stories with the publisher's text.
     written = 0
     causes = {}
+    publisher = none = 0
     if args.summarise and stories:
         # Imported here, not at module level: the deriver is used offline by
         # tests and by hand, and it must not need the summariser to import.
         import summarise_stories
         result = summarise_stories.summarise(stories)
+        rejected = []
         written = apply_summaries(stories, result.get("summaries"),
-                                  snippet_index(args.candidates))
+                                  snippet_index(args.candidates),
+                                  model=result.get("model") or "",
+                                  rejected=rejected)
         causes = result.get("causes") or {}
         for refusal in result.get("refusals") or []:
             print("  refusal: %s" % refusal)
         print("  %-24s %d of %d (model %s)"
               % ("summarised", written, len(stories),
                  result.get("model") or "none"))
-        # WHY EACH BATCH FAILED, next to the edition it failed to write. The run
-        # log is truncated and the shell is not where a 2 KB model reply belongs;
-        # the artifact is, and it is where the next investigator will look.
+        # WHY EACH BATCH FAILED, and WHY each received answer was refused, next
+        # to the edition it failed to write. The run log is truncated and the
+        # shell is not where a 2 KB model reply belongs; the artifact is, and it
+        # is where the next investigator will look.
         debug = result.get("debug") or []
-        if debug:
+        if debug or rejected:
             path = os.path.join(os.path.dirname(os.path.abspath(args.out))
                                 or ".", "summarise-debug.json")
-            with open(path, "w", encoding="utf-8") as fh:
-                json.dump({"generated_at": datetime.now(timezone.utc)
-                           .strftime("%Y-%m-%dT%H:%M:%SZ"),
-                           "attempts": debug}, fh, ensure_ascii=False, indent=2)
-                fh.write("\n")
-            print("  %-24s %s (%d attempt(s))"
-                  % ("debug", path, len(debug)))
+            record_rejections(path, rejected, attempts=debug)
+            print("  %-24s %s (%d attempt(s), %d rejected answer(s))"
+                  % ("debug", path, len(debug), len(rejected)))
+    if stories:
+        for story in stories:
+            if story.get("summary_source") == "ai":
+                continue
+            if str(story.get("summary") or "").strip():
+                # A non-AI story with a body: the deriver wrote it from the
+                # feed's description, so it is publisher text.
+                publisher += 1
+            else:
+                none += 1
 
     # WHY, not merely THAT. The attempt log is the walk's own record, so the
     # note names a spent quota, a missing configuration or failed rungs instead
@@ -495,12 +589,14 @@ def main(argv=None):
           % ("no-AI reason", reason, len(re.findall(r"\bkind=", attempts_text)),
              "" if not causes else ", %d summariser cause(s)" % len(causes)))
 
-    notes = note_for(reason, attempts_text, causes=causes)
+    notes = note_for(reason, attempts_text, causes=causes,
+                     publisher=publisher, none=none, total=len(stories))
     # One decision, taken from the counters the note prints, used by the note AND
     # the payload field: the name and the number cannot drift apart here.
     kind = edition_kind.kind_for(written, len(stories))
     if written:
-        notes = edition_kind.summary_note(kind, written, len(stories))
+        notes = edition_kind.summary_note(kind, written, len(stories),
+                                          publisher, none)
     if held_n:
         notes = english_text.replace_held_back(notes, held_n)
     payload = {

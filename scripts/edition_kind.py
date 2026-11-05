@@ -33,15 +33,59 @@ NOTE_NONE_SURVIVED = ("Fallback edition: no AI summary survived validation for "
 NOTE_COUNT_MARKER = "an AI wrote the summary"
 
 
-def summary_note(kind, written, total):
+def _carry(n):
+    return "carries no summary" if n == 1 else "carry no summary"
+
+
+def coverage_phrase(publisher, none, total=None):
+    """Who supplied the text for the stories no model wrote -- and how many have none.
+
+    RUN 42074891307: the note said "the rest quote the publisher's own
+    description" over a story with no publisher text at all. A story with neither
+    a written summary nor publisher text is stated as such, never folded into the
+    publisher claim. All four combinations resolve here, so no caller has to
+    guess which half is true.
+    """
+    if publisher <= 0:
+        if total is not None and none >= total:
+            return "no story carries a summary of its own"
+        return "%d %s" % (none, _carry(none))
+    if none <= 0:
+        return "the rest quote the publisher's own description"
+    return ("%d quote the publisher's own description and %d %s"
+            % (publisher, none, _carry(none)))
+
+
+def sourcing_note(kind, written, total, publisher, none, fallback=True):
+    """The count sentence for all four combinations of written/publisher text."""
+    if written <= 0:
+        if publisher <= 0:
+            return NOTE_NO_TEXT_FALLBACK if fallback else NOTE_NO_TEXT_MODEL
+        if none <= 0:
+            return NOTE_NONE_SURVIVED if fallback else NOTE_MODEL_NONE
+        pattern = NOTE_REST_FALLBACK if fallback else NOTE_REST_MODEL
+        return pattern % (coverage_phrase(publisher, none, total),)
+    if kind == FULL:
+        return NOTE_ALL % total
+    if none <= 0:
+        return NOTE_SOME % (written, total)
+    pattern = NOTE_REST_FALLBACK if fallback else NOTE_REST_MODEL
+    return pattern % (written, total, coverage_phrase(publisher, none, total))
+
+
+def summary_note(kind, written, total, publisher=None, none=None):
     """The one sentence a fallback edition prints about who wrote its summaries."""
     if written <= 0:
         # Zero is the deriver's ground: it knows WHY no model answered, and that
         # paragraph is a better sentence than anything this function can build.
         return None
-    if kind == FULL:
-        return NOTE_ALL % total
-    return NOTE_SOME % (written, total)
+    if publisher is None or none is None:
+        # A caller that has only the old pair (the deriver's payload) gets the
+        # sentence that pair can prove: the rest is all it knows.
+        if kind == FULL:
+            return NOTE_ALL % total
+        return NOTE_SOME % (written, total)
+    return sourcing_note(kind, written, total, publisher, none, fallback=True)
 
 
 #: A MODEL-WRITTEN edition that still has unwritten summaries. "Fallback
@@ -53,15 +97,27 @@ NOTE_MODEL_SOME = ("AI wrote the summary for %d of %d stories; the rest quote "
                    "the publisher's own description.")
 NOTE_MODEL_NONE = ("No AI summary survived for this edition, so the text under "
                    "each headline is the publisher's own description.")
+#: The combinations the two sentences above cannot state: a story that carries
+#: NEITHER a written summary NOR the publisher's description. Each names the
+#: count, so an empty body is never described as publisher text.
+NOTE_REST_FALLBACK = ("Fallback edition: an AI wrote the summary for %d of %d "
+                      "stories; %s.")
+NOTE_REST_MODEL = "AI wrote the summary for %d of %d stories; %s."
+NOTE_NO_TEXT_FALLBACK = ("Fallback edition: no AI summary survived for this "
+                         "edition, and no story carries a summary of its own.")
+NOTE_NO_TEXT_MODEL = ("No AI summary survived for this edition, and no story "
+                      "carries a summary of its own.")
 
 
-def model_note(kind, written, total):
+def model_note(kind, written, total, publisher=None, none=None):
     """The sentence a model-written edition needs, or None when it needs none."""
     if kind == FULL:
         return None
-    if kind == UNSUMMARISED or written <= 0:
-        return NOTE_MODEL_NONE
-    return NOTE_MODEL_SOME % (written, total)
+    if publisher is None or none is None:
+        if kind == UNSUMMARISED or written <= 0:
+            return NOTE_MODEL_NONE
+        return NOTE_MODEL_SOME % (written, total)
+    return sourcing_note(kind, written, total, publisher, none, fallback=False)
 
 
 def has_model_note(notes):

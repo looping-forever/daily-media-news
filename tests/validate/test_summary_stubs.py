@@ -79,7 +79,8 @@ class CountsOnEveryPathTests(unittest.TestCase):
         facts = vs.edition_facts({}, stories,
                                  snippets={"https://x/1": SNIPPET})
         self.assertEqual("full", facts["edition_kind"])
-        self.assertEqual({"summarised": 1, "total": 1}, facts["summary_counts"])
+        self.assertEqual({"summarised": 1, "publisher": 0, "none": 0,
+                          "total": 1}, facts["summary_counts"])
 
     def test_a_stub_is_not_counted_as_ai_written(self):
         stories = [story("https://x/1", PROSE),
@@ -88,7 +89,8 @@ class CountsOnEveryPathTests(unittest.TestCase):
                                  snippets={"https://x/1": SNIPPET,
                                            "https://x/2": SNIPPET})
         self.assertEqual("partial", facts["edition_kind"])
-        self.assertEqual({"summarised": 1, "total": 2}, facts["summary_counts"])
+        self.assertEqual({"summarised": 1, "publisher": 0, "none": 1,
+                          "total": 2}, facts["summary_counts"])
 
     def test_publisher_text_is_never_counted_even_when_it_is_prose(self):
         stories = [story("https://x/1", PROSE, source="publisher")]
@@ -120,8 +122,8 @@ class RepairTests(unittest.TestCase):
         self.assertEqual("ai", payload["stories"][0]["summary_source"])
         self.assertEqual(1, counts["written"])
         self.assertEqual("full", payload["edition_kind"])
-        self.assertEqual({"summarised": 2, "total": 2},
-                         payload["summary_counts"])
+        self.assertEqual({"summarised": 2, "publisher": 0, "none": 0,
+                          "total": 2}, payload["summary_counts"])
 
     def test_real_prose_is_never_sent_and_never_rewritten(self):
         payload = self._payload([story("https://x/2", PROSE)])
@@ -143,18 +145,62 @@ class RepairTests(unittest.TestCase):
                          "the publisher's own description, quoted verbatim")
         self.assertEqual("publisher", payload["stories"][0]["summary_source"])
         self.assertEqual("unsummarised", payload["edition_kind"])
-        self.assertEqual({"summarised": 0, "total": 1},
-                         payload["summary_counts"])
+        self.assertEqual({"summarised": 0, "publisher": 1, "none": 0,
+                          "total": 1}, payload["summary_counts"])
         self.assertIn("No AI summary", payload["notes"],
                       "the note has to say it, not stay silent")
 
-    def test_a_story_with_no_snippet_is_left_empty_not_invented(self):
-        payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
+    def test_a_story_with_no_snippet_is_never_left_with_an_empty_body(self):
+        """RUN 42074891307: the repair wrote "" and the push printed a heading.
+
+        `lead_text("")` returns "" when the candidate carries no publisher
+        description, and the step assigned that empty string over the story's own
+        text. Five stories held four, so the empty story is dropped instead.
+        """
+        stories = [story("https://x/%d" % n, PROSE) for n in range(1, 5)]
+        stories.append(story("https://x/5", "Reported: " + TITLE))
+        payload = self._payload(stories)
         summarise_stubs.repair(payload, {}, summarise=lambda rows, **_kw: {},
-                               log=lambda *_a: None)
-        self.assertEqual("", payload["stories"][0]["summary"],
-                         "with nothing to quote, an empty summary is the honest "
-                         "choice")
+                               log=lambda *_a: None, floor=4)
+        self.assertEqual(4, len(payload["stories"]),
+                         "the story with no text to print is dropped while the "
+                         "floor still holds")
+        for row in payload["stories"]:
+            self.assertTrue(str(row.get("summary") or "").strip(),
+                            "no story may ship an empty body: %r" % (row,))
+
+    def test_a_story_kept_below_the_floor_gets_a_non_empty_body(self):
+        payload = self._payload([story("https://x/1", "Reported: " + TITLE),
+                                 story("https://x/2", PROSE)])
+        summarise_stubs.repair(payload, {}, summarise=lambda rows, **_kw: {},
+                               log=lambda *_a: None, floor=4)
+        self.assertEqual(2, len(payload["stories"]),
+                         "the floor forbids shrinking below itself")
+        self.assertEqual("Reported: " + TITLE, payload["stories"][0]["summary"],
+                         "it keeps its own previous text, not an empty string")
+        self.assertEqual("none", payload["stories"][0]["summary_source"],
+                         "its text is not a summary and must never count as one")
+
+    def test_a_story_dropped_for_having_no_summary_respects_the_floor(self):
+        five = [story("https://x/%d" % n, PROSE) for n in range(1, 5)]
+        five.append(dict(story("https://x/5", ""), title=TITLE))
+        payload = self._payload(five)
+        summarise_stubs.repair(payload, {}, summarise=lambda rows, **_kw: {},
+                               log=lambda *_a: None, floor=4)
+        self.assertEqual(4, len(payload["stories"]),
+                         "five minus one is the floor, so the drop is allowed")
+        for row in payload["stories"]:
+            self.assertTrue(str(row.get("summary") or "").strip())
+
+        four = [story("https://x/%d" % n, PROSE) for n in range(1, 4)]
+        four.append(dict(story("https://x/4", ""), title=TITLE))
+        payload = self._payload(four)
+        summarise_stubs.repair(payload, {}, summarise=lambda rows, **_kw: {},
+                               log=lambda *_a: None, floor=4)
+        self.assertEqual(4, len(payload["stories"]),
+                         "four minus one is below the floor, so it is kept")
+        self.assertTrue(payload["stories"][-1]["summary"].strip(),
+                        "and it still ships a non-empty body")
 
     def test_a_second_repair_does_not_print_the_count_twice(self):
         payload = self._payload([story("https://x/1", "Reported: " + TITLE)])
@@ -200,7 +246,8 @@ class RepairTests(unittest.TestCase):
         self.assertEqual("ai", after["stories"][0]["summary_source"])
         self.assertEqual(PROSE, after["stories"][1]["summary"],
                          "a summary that already passed is never rewritten")
-        self.assertEqual({"summarised": 2, "total": 2}, after["summary_counts"])
+        self.assertEqual({"summarised": 2, "publisher": 0, "none": 0,
+                          "total": 2}, after["summary_counts"])
         self.assertEqual(1, after["notes"].count("an AI wrote the summary"),
                          "the deriver's stale count sentence is replaced, not "
                          "joined by a second one: %r" % after["notes"])
@@ -252,8 +299,8 @@ class RepairTests(unittest.TestCase):
                       "https://x/3": SNIPPET},
             summarise=lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
             log=lambda *_a: None, derived=True)
-        self.assertEqual({"summarised": 1, "total": 3},
-                         payload["summary_counts"],
+        self.assertEqual({"summarised": 1, "publisher": 2, "none": 0,
+                          "total": 3}, payload["summary_counts"],
                          "one of three was written; the other two are not")
         self.assertEqual("partial", payload["edition_kind"])
         self.assertIn("an AI wrote the summary for 1 of 3 stories",
@@ -271,6 +318,103 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(0, counts["written"])
         self.assertEqual(1, counts["publisher"])
         self.assertEqual(SNIPPET, payload["stories"][0]["summary"])
+
+
+class TheNoteMatchesWhatTheStoriesCarry(unittest.TestCase):
+    """RUN 42074891307: the note said the rest quote the publisher's description.
+
+    The story under it carried an empty body, so the sentence was false. All four
+    combinations are pinned here: some/none written crossed with some/none
+    publisher text.
+    """
+
+    def repair(self, stories, summarise, snippets, derived=True):
+        payload = {"stories": stories}
+        summarise_stubs.repair(payload, snippets, summarise=summarise,
+                               log=lambda *_a: None, derived=derived, floor=3)
+        return payload
+
+    def test_some_written_and_some_publisher(self):
+        stories = [story("https://x/1", "Reported: " + TITLE),
+                   story("https://x/2", "Reported: " + TITLE),
+                   story("https://x/3", "Reported: " + TITLE)]
+        payload = self.repair(
+            stories,
+            lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
+            {"https://x/1": SNIPPET, "https://x/2": SNIPPET,
+             "https://x/3": SNIPPET})
+        notes = payload["notes"]
+        self.assertIn("an AI wrote the summary for 1 of 3 stories", notes)
+        self.assertIn("the rest quote the publisher's own description", notes)
+        self.assertNotIn("carry no summary", notes)
+
+    def test_some_written_and_no_publisher_text(self):
+        stories = [story("https://x/1", "Reported: " + TITLE),
+                   story("https://x/2", "Reported: " + TITLE),
+                   story("https://x/3", "Reported: " + TITLE)]
+        payload = self.repair(
+            stories,
+            lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}}, {})
+        notes = payload["notes"]
+        self.assertIn("an AI wrote the summary for 1 of 3 stories", notes)
+        self.assertIn("2 carry no summary", notes)
+        self.assertNotIn("publisher's own description", notes,
+                         "no story carries publisher text: the note cannot say "
+                         "they quote it")
+
+    def test_no_story_written_but_publisher_text_exists(self):
+        stories = [story("https://x/1", "Reported: " + TITLE),
+                   story("https://x/2", "Reported: " + TITLE),
+                   story("https://x/3", "Reported: " + TITLE)]
+        payload = self.repair(stories, lambda rows, **_kw: {},
+                              {"https://x/1": SNIPPET, "https://x/2": SNIPPET,
+                               "https://x/3": SNIPPET})
+        notes = payload["notes"]
+        self.assertIn("no AI summary survived", notes)
+        self.assertIn("publisher's own description", notes)
+
+    def test_no_story_written_and_no_publisher_text(self):
+        stories = [story("https://x/1", "Reported: " + TITLE),
+                   story("https://x/2", "Reported: " + TITLE),
+                   story("https://x/3", "Reported: " + TITLE)]
+        payload = self.repair(stories, lambda rows, **_kw: {}, {})
+        notes = payload["notes"]
+        self.assertIn("no AI summary survived", notes)
+        self.assertIn("no story carries a summary of its own", notes)
+        self.assertNotIn("publisher's own description", notes,
+                         "the empty text is not the publisher's description")
+
+
+class ARejectedAnswerIsRecorded(unittest.TestCase):
+    """FIX 3: "0 written" must be diagnosable, not a silent discard."""
+
+    def test_a_rejected_answer_is_written_to_the_debug_file(self):
+        import json
+        import os
+        import tempfile
+        payload = {"stories": [story("https://x/1", "Reported: " + TITLE)]}
+        answer = "Reported: " + TITLE
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "summarise-debug.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"attempts": [{"reason": "exit_nonzero"}]}, fh)
+            summarise_stubs.repair(
+                payload, {"https://x/1": SNIPPET},
+                summarise=lambda rows, **_kw: {
+                    "summaries": {"https://x/1": answer},
+                    "model": "gemini/test-model"},
+                log=lambda *_a: None, floor=1, debug_path=path)
+            with open(path, encoding="utf-8") as fh:
+                written = json.load(fh)
+        self.assertEqual([{"reason": "exit_nonzero"}], written["attempts"],
+                         "a failed request keeps the record it already had")
+        record = written["rejected"][0]
+        self.assertEqual(TITLE, record["title"])
+        self.assertEqual("gemini/test-model", record["model"])
+        self.assertEqual(answer, record["text"],
+                         "the verbatim answer, not a summary of it")
+        self.assertTrue(record["reason"],
+                        "the predicate's own reason, so '0 written' is diagnosable")
 
 
 #: RUN 42061741326 (2026-11-05): two of the summaries that shipped were the

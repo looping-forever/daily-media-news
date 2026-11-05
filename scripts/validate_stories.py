@@ -1688,6 +1688,56 @@ def _summary_key(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
+STUB_EMPTY = "empty or too short: %d chars, minimum %d"
+STUB_HEADLINE = "it is the headline itself"
+STUB_HEADLINE_TAIL = "it is the headline plus a short remainder"
+STUB_SNIPPET = "it is the publisher's snippet copied verbatim"
+STUB_SNIPPET_CUT = "it is the publisher's snippet trimmed with an ellipsis"
+STUB_SNIPPET_TAIL = "it is the publisher's snippet plus a short remainder"
+STUB_PARAPHRASE = ("it is the headline paraphrased with no detail the headline "
+                   "did not carry")
+
+
+def stub_reason(summary, title="", snippet=""):
+    """The exact reason *summary* is a stub, or "" when it is real prose.
+
+    `is_real_summary` is this function plus "is it empty", so the predicate and
+    its diagnostic can never disagree. RUN 42074891307 discarded a received model
+    answer with no record, and "0 written" could not be diagnosed.
+    """
+    body = summary_body(summary)
+    if len(body) < REAL_SUMMARY_MIN_CHARS:
+        return STUB_EMPTY % (len(body), REAL_SUMMARY_MIN_CHARS)
+    key = _summary_key(body)
+    title_key = _summary_key(title)
+    if title_key:
+        if key == title_key:
+            return STUB_HEADLINE
+        if key.startswith(title_key) \
+                and len(key) - len(title_key) < TITLE_REMAINDER_MIN_CHARS:
+            return STUB_HEADLINE_TAIL
+    snippet_key = _summary_key(snippet)
+    if snippet_key and len(snippet_key) >= REAL_SUMMARY_MIN_CHARS:
+        if key == snippet_key:
+            return STUB_SNIPPET
+        # A feed description trimmed with an ellipsis is still the publisher's
+        # text: the same words, cut short at the end.
+        if snippet_key.startswith(key) and len(key) >= 0.7 * len(snippet_key):
+            return STUB_SNIPPET_CUT
+        # The snippet with nothing added. Prose that carries the snippet and then
+        # says something of its own clears TITLE_REMAINDER_MIN_CHARS and is real.
+        if key.startswith(snippet_key) \
+                and len(key) - len(snippet_key) < TITLE_REMAINDER_MIN_CHARS:
+            return STUB_SNIPPET_TAIL
+    # THE PARAPHRASE ARM, last because it is the narrowest: it only fires on a
+    # body built from the headline's own words, and there it demands a fact the
+    # headline could not have given the reader.
+    if title_key and is_title_paraphrase(body, title) \
+            and not novel_details(body, title):
+        return STUB_PARAPHRASE
+    return ""
+
+
 def is_real_summary(summary, title="", snippet=""):
     """True when *summary* is prose, not a stub.
 
@@ -1705,37 +1755,7 @@ def is_real_summary(summary, title="", snippet=""):
 
     A story that already has real prose answers True and is never rewritten.
     """
-    body = summary_body(summary)
-    if len(body) < REAL_SUMMARY_MIN_CHARS:
-        return False
-    key = _summary_key(body)
-    title_key = _summary_key(title)
-    if title_key:
-        if key == title_key:
-            return False
-        if key.startswith(title_key) \
-                and len(key) - len(title_key) < TITLE_REMAINDER_MIN_CHARS:
-            return False
-    snippet_key = _summary_key(snippet)
-    if snippet_key and len(snippet_key) >= REAL_SUMMARY_MIN_CHARS:
-        if key == snippet_key:
-            return False
-        # A feed description trimmed with an ellipsis is still the publisher's
-        # text: the same words, cut short at the end.
-        if snippet_key.startswith(key) and len(key) >= 0.7 * len(snippet_key):
-            return False
-        # The snippet with nothing added. Prose that carries the snippet and then
-        # says something of its own clears TITLE_REMAINDER_MIN_CHARS and is real.
-        if key.startswith(snippet_key) \
-                and len(key) - len(snippet_key) < TITLE_REMAINDER_MIN_CHARS:
-            return False
-    # THE PARAPHRASE ARM, last because it is the narrowest: it only fires on a
-    # body built from the headline's own words, and there it demands a fact the
-    # headline could not have given the reader.
-    if title_key and is_title_paraphrase(body, title) \
-            and not novel_details(body, title):
-        return False
-    return True
+    return stub_reason(summary, title, snippet) == ""
 
 
 def snippet_index(path):
@@ -1762,9 +1782,9 @@ def _is_ai_written(story, snippets):
     """One story's contribution to `summary_counts.summarised`."""
     if not isinstance(story, dict):
         return False
-    # The deriver records whose text this is; its own fallback is never AI-written,
-    # however long the publisher's description happens to be.
-    if story.get("summary_source") == "publisher":
+    # The deriver and the repair record whose text this is; neither fallback is
+    # ever AI-written, however long the publisher's description happens to be.
+    if story.get("summary_source") in ("publisher", "none"):
         return False
     url = story.get("source_url") or story.get("url")
     return is_real_summary(story.get("summary"), story.get("title"),
@@ -1784,11 +1804,26 @@ def edition_facts(data, final_stories, snippets=None):
     stub is not counted as AI-written merely because it is non-empty.
     """
     snippets = snippets or {}
-    written = sum(1 for story in final_stories
-                  if _is_ai_written(story, snippets))
+    written = publisher = none = 0
+    for story in final_stories:
+        if _is_ai_written(story, snippets):
+            written += 1
+            continue
+        # Publisher text is only what a stage labelled publisher AND left a body
+        # for. Everything else carries no summary at all, and the note says so
+        # instead of calling an empty body the publisher's description.
+        if isinstance(story, dict) \
+                and story.get("summary_source") == "publisher" \
+                and str(story.get("summary") or "").strip():
+            publisher += 1
+        else:
+            none += 1
     total = len(final_stories)
     return {"edition_kind": edition_kind.kind_for(written, total),
-            "summary_counts": {"summarised": written, "total": total}}
+            "summary_counts": {"summarised": written,
+                               "publisher": publisher,
+                               "none": none,
+                               "total": total}}
 
 
 def rewritten_note(facts, notes):
@@ -1799,9 +1834,18 @@ def rewritten_note(facts, notes):
     values the payload now carries -- and if the drops removed every written
     summary, the sentence says that instead of quoting a count that is gone.
     """
-    note = edition_kind.summary_note(facts["edition_kind"],
-                                     facts["summary_counts"]["summarised"],
-                                     facts["summary_counts"]["total"])
+    counts = facts["summary_counts"]
+    text = str(notes or "").strip()
+    if counts["summarised"] <= 0 and counts["none"] <= 0 \
+            and text.startswith("Unsummarised edition:") \
+            and edition_kind.NOTE_COUNT_MARKER not in text:
+        # Nothing to correct: every story still quotes the publisher, and the
+        # deriver's reason paragraph is the only true sentence for zero written.
+        return None
+    note = edition_kind.sourcing_note(facts["edition_kind"],
+                                      counts["summarised"], counts["total"],
+                                      counts["publisher"], counts["none"],
+                                      fallback=True)
     if note:
         return note
     if edition_kind.NOTE_COUNT_MARKER in str(notes or ""):

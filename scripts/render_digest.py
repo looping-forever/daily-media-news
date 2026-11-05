@@ -70,6 +70,12 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import english_text
 
+try:
+    import edition_kind
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import edition_kind
+
 # Fixed section order: (category key, display header, accent color)
 # The two institution headers are runtime values (see private_values).
 SECTIONS = [
@@ -2482,11 +2488,24 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         # a label that is true without them.
         counts = (meta or {}).get("summary_counts")
         written = total = None
+        publisher = none = None
         if isinstance(counts, dict):
             written, total = counts.get("summarised"), counts.get("total")
+            publisher, none = counts.get("publisher"), counts.get("none")
+        # The publisher claim is only printable when publisher text exists. A
+        # payload predating the two extra counts keeps the old wording, which its
+        # stories really did carry; a payload that has them says exactly what it
+        # has, including stories with no summary at all (run 42074891307).
+        known = isinstance(publisher, int) and isinstance(none, int)
+        coverage = (edition_kind.coverage_phrase(publisher, none, total)
+                    if known else "")
         if isinstance(written, int) and isinstance(total, int) and written > 0:
             if written >= total:
                 edition_line = FALLBACK_ALL_LABEL % total
+            elif known and none > 0:
+                edition_line = ((edition_kind.NOTE_REST_FALLBACK
+                                 if derived else edition_kind.NOTE_REST_MODEL)
+                                % (written, total, coverage))
             elif derived:
                 edition_line = FALLBACK_PART_LABEL % (written, total)
             else:
@@ -2496,6 +2515,11 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         elif kind == "partial":
             edition_line = FALLBACK_PART_NO_COUNT if derived \
                 else PARTIAL_MODEL_NO_COUNT
+        elif known and none > 0:
+            edition_line = ((UNSUMMARISED_LABEL + "; %s.")
+                            % coverage if derived
+                            else "No AI summary survived for this edition; %s."
+                            % coverage)
         else:
             edition_line = UNSUMMARISED_LABEL if derived \
                 else UNSUMMARISED_MODEL_LABEL

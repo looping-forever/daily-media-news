@@ -427,8 +427,8 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
     def test_a_dropped_written_story_lowers_both_numbers(self):
         data = self.payload(["ai", "ai", "ai", "publisher"])
         facts = vs.edition_facts(data, data["stories"][:3])
-        self.assertEqual({"summarised": 3, "total": 3},
-                         facts["summary_counts"])
+        self.assertEqual({"summarised": 3, "publisher": 0, "none": 0,
+                          "total": 3}, facts["summary_counts"])
         self.assertEqual("full", facts["edition_kind"],
                          "the name must describe what survived, not what was sent")
 
@@ -441,8 +441,8 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
         data = self.payload(["ai", "ai", "publisher", "publisher"])
         facts = vs.edition_facts(data, data["stories"][:3])
         self.assertEqual("partial", facts["edition_kind"])
-        self.assertEqual({"summarised": 2, "total": 3},
-                         facts["summary_counts"])
+        self.assertEqual({"summarised": 2, "publisher": 1, "none": 0,
+                          "total": 3}, facts["summary_counts"])
 
     def test_a_model_written_payload_gains_truthful_counts(self):
         """The round-4 contract: every path gets counts, not only the deriver's.
@@ -459,7 +459,8 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
                 "Wednesday, and the district allocation rises by nine percent."}]}
         facts = vs.edition_facts(data, data["stories"])
         self.assertEqual("partial", facts["edition_kind"])
-        self.assertEqual({"summarised": 1, "total": 2}, facts["summary_counts"])
+        self.assertEqual({"summarised": 1, "publisher": 0, "none": 1,
+                          "total": 2}, facts["summary_counts"])
 
 
 class TheNoteFollowsTheSameCount(unittest.TestCase):
@@ -753,6 +754,16 @@ class SummarisedFallback(unittest.TestCase):
             written = json.load(fh)
         self.assertEqual(debug, written["attempts"])
         self.assertTrue(written["generated_at"])
+
+    def test_truncating_a_rejected_answer_never_splits_a_character(self):
+        family = "\U0001F468\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466"
+        clipped = dut.clip_text(family * 40, limit=10)
+        self.assertTrue(clipped.endswith("\u2026"),
+                        "the cut is marked, so nobody mistakes it for the whole")
+        self.assertNotIn("\u200D\u2026", clipped,
+                         "a zero-width joiner left dangling is half a character")
+        self.assertTrue((family * 40).startswith(clipped[:-1]),
+                        "the prefix is untouched text")
 
     def test_a_clean_run_writes_no_debug_file(self):
         self.payload_of(self.result(5))
