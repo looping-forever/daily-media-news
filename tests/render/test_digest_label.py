@@ -1385,11 +1385,13 @@ class TestNtfyTitle(unittest.TestCase):
             % (owners,))
 
     def test_the_heredoc_uses_send_label_in_all_title_shapes(self):
-        """One word in, four titles out -- and none of them re-derives it.
+        """One word in, every title out -- and none of them re-derives it.
 
         The fourth shape is the unsummarised fallback (2026-10-28): it names the
         edition kind instead of the item count, so the count can never push the
-        one fact that changes how the push must be read off the shade.
+        one fact that changes how the push must be read off the shade. The
+        partial shape (2026-11-05) adds two more: with counts and without, since
+        a payload predating `summary_counts` still has to admit itself.
         """
         code = ntfy_source()
         self.assertIn("send_label = '%s Digest · %s' % (label_word, label_clock)",
@@ -1402,8 +1404,8 @@ class TestNtfyTitle(unittest.TestCase):
         names = [n.id for n in ast.walk(tree)
                  if isinstance(n, ast.Name) and n.id == "send_label"]
         self.assertEqual(
-            len(names), 5,
-            "expected the one assignment plus its four title uses, found %d "
+            len(names), 7,
+            "expected the one assignment plus its six title uses, found %d "
             "references: %r -- a title shape was left building its own label"
             % (len(names), names))
         self.assertNotIn("emoji, label,", code)
@@ -1721,6 +1723,51 @@ class TestTheEmojiFollowsTheWord(unittest.TestCase):
         payload["digest_time"] = "morning"
         payload["generated_at_npt"] = "2026-10-12 02:03"
         return payload
+
+
+class ThePushStatesTheDerivedKind(unittest.TestCase):
+    """The push title is built from `edition_kind`, so it must follow the counts.
+
+    A 22-of-29 edition called "unsummarised edition (no AI today)" is the live
+    defect: the title is the first surface the owner reads, and it was claiming
+    no model wrote anything while twenty-two models had.
+    """
+
+    def _payload(self, kind, written, total):
+        payload = validated_payload("ok")
+        payload["digest_time"] = "morning"
+        payload["generated_at_npt"] = "2026-10-12 02:03"
+        payload["edition_kind"] = kind
+        payload["summary_counts"] = {"summarised": written, "total": total}
+        return payload
+
+    def title_of(self, kind, written, total):
+        tmp = tempfile.mkdtemp(prefix="label-kind-")
+        try:
+            return run_ntfy(tmp, self._payload(kind, written, total))["title"]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_a_partial_edition_states_its_count_and_never_says_no_ai(self):
+        title = self.title_of("partial", 22, 29)
+        self.assertIn("22 of 29 summarised", title)
+        self.assertNotIn("(no AI today)", title)
+        self.assertNotIn("unsummarised", title)
+
+    def test_a_full_edition_is_an_ordinary_digest_title(self):
+        title = self.title_of("full", 29, 29)
+        self.assertNotIn("(no AI today)", title)
+        self.assertNotIn("unsummarised", title)
+        self.assertIn("items", title)
+
+    def test_a_partial_edition_without_counts_still_admits_itself(self):
+        title = self.title_of("partial", None, None)
+        self.assertIn("fallback edition", title)
+        self.assertNotIn("(no AI today)", title)
+
+    def test_zero_summaries_keeps_the_no_ai_title(self):
+        title = self.title_of("unsummarised", 0, 27)
+        self.assertIn("unsummarised edition", title)
 
 
 if __name__ == "__main__":

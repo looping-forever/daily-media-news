@@ -82,6 +82,12 @@ except ImportError:  # direct-script fallback when cwd != scripts/
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import english_text
 
+try:
+    import edition_kind
+except ImportError:  # direct-script fallback when cwd != scripts/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import edition_kind
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -1530,6 +1536,44 @@ def held_back_total(data, dropped):
     return already + int(dropped or 0)
 
 
+def edition_facts(data, final_stories):
+    """The edition kind and its counts, recomputed from the stories that survived.
+
+    The deriver sets both from its own list, but this stage can drop a story: the
+    total changes, and so does the count if the dropped one carried an AI summary.
+    Recomputing here is what stops the name describing a count that no longer exists.
+    """
+    if not (isinstance(data, dict) and data.get("edition_kind")):
+        return None
+    ai_urls = set()
+    for story in data.get("stories") or []:
+        if isinstance(story, dict) and story.get("summary_source") == "ai":
+            ai_urls.add(story.get("source_url"))
+    written = sum(1 for story in final_stories
+                  if isinstance(story, dict) and story.get("source_url") in ai_urls)
+    total = len(final_stories)
+    return {"edition_kind": edition_kind.kind_for(written, total),
+            "summary_counts": {"summarised": written, "total": total}}
+
+
+def rewritten_note(facts, notes):
+    """The count sentence for the counters validation reached, or None to leave it.
+
+    The sentence in `notes` was written by the deriver from its own list. A drop
+    here can change either number, so the sentence is rebuilt from the same two
+    values the payload now carries -- and if the drops removed every written
+    summary, the sentence says that instead of quoting a count that is gone.
+    """
+    note = edition_kind.summary_note(facts["edition_kind"],
+                                     facts["summary_counts"]["summarised"],
+                                     facts["summary_counts"]["total"])
+    if note:
+        return note
+    if edition_kind.NOTE_COUNT_MARKER in str(notes or ""):
+        return edition_kind.NOTE_NONE_SURVIVED
+    return None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate/filter daily digest stories.")
     ap.add_argument("--in", dest="in_path", default="state/stories.json")
@@ -1911,23 +1955,20 @@ def main(argv=None):
         "filtered_count": len(filter_log),
         "filter_log": filter_log[:MAX_FILTER_LOG],
     }
-    # Passthrough, not validation: the edition KIND is the producer's claim (the
-    # no-AI fallback), and the renderer needs it to label the page. Absent on a
+    # The edition KIND and its counts, recomputed from what this stage kept: a
+    # drop here changes the total, and the name has to follow it. Absent on a
     # model-written run, so the payload keeps its old shape there.
-    if data.get("edition_kind"):
-        payload["edition_kind"] = str(data["edition_kind"])
-    # How much of a fallback edition the model actually wrote. Passthrough only,
-    # like edition_kind: the renderer labels the page with it ("AI summary for N
-    # of M stories"), and a payload without it renders exactly as before.
-    counts = data.get("summary_counts")
-    if isinstance(counts, dict):
-        try:
-            payload["summary_counts"] = {
-                "summarised": int(counts.get("summarised") or 0),
-                "total": int(counts.get("total") or 0),
-            }
-        except (TypeError, ValueError):
-            pass
+    facts = edition_facts(data, final_stories)
+    if facts:
+        payload["edition_kind"] = facts["edition_kind"]
+        payload["summary_counts"] = facts["summary_counts"]
+        # The note prints the same two numbers, so a drop that changes them has to
+        # rewrite the sentence too: left alone it described a 22-of-29 edition that
+        # validation had already shrunk to 22 of 27, beside a hero stating the new
+        # count. One payload, one number.
+        rewritten = rewritten_note(facts, notes)
+        if rewritten:
+            payload["notes"] = english_text.replace_held_back(rewritten, held_total)
     # The held-back count is DATA now, not a number a renderer reads back out of
     # the prose. Pass on the total this stage reached (deriver's count + its own
     # drops) so the page line and the note sentence cannot disagree.

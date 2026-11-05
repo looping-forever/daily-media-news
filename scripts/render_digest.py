@@ -232,9 +232,18 @@ UNSUMMARISED_LABEL = "Unsummarised edition (no AI today)"
 # text is then two things at once -- an AI sentence on some stories, the
 # publisher's description on the rest -- and one label cannot describe both, so
 # the count is carried from the payload instead of being guessed here.
-FALLBACK_PART_LABEL = ("Fallback edition: AI summary for %d of %d stories, "
-                       "the rest quote the publisher")
-FALLBACK_ALL_LABEL = "Fallback edition: AI summary for all %d stories"
+FALLBACK_PART_LABEL = ("Fallback edition: AI summary for %d of %d stories; "
+                       "the rest quote the publisher's own description.")
+FALLBACK_ALL_LABEL = "Fallback edition: AI summary for all %d stories."
+# Without counts (a payload predating them) the kind still says what is true.
+FALLBACK_PART_NO_COUNT = ("Fallback edition: an AI wrote some summaries; the "
+                          "rest quote the publisher's own description.")
+FALLBACK_ALL_NO_COUNT = ("Fallback edition: an AI wrote every summary in this "
+                         "edition.")
+
+# Every kind the deriver can write: 0 summaries, some, all. The page must admit
+# a fallback in each of them, so the guard is a set, not one string.
+FALLBACK_KINDS = ("unsummarised", "partial", "full")
 
 # Freshness line (FROZEN CONTRACT C). `unknown` DROPS the timestamp entirely:
 # if no source was confirmed reachable, claiming "checked through T" is the
@@ -2405,10 +2414,11 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
     # payload rather than passed by the caller, so no caller can render an
     # unsummarised edition that forgets to admit it.
     edition_line = ""
-    if (meta or {}).get("edition_kind") == "unsummarised":
+    kind = (meta or {}).get("edition_kind")
+    if kind in FALLBACK_KINDS:
         # HOW MANY came from a model and how many are the publisher's own words.
         # Absent counts (an edition built before this field existed) fall back to
-        # the old label byte-for-byte.
+        # a label that is true without them.
         counts = (meta or {}).get("summary_counts")
         written = total = None
         if isinstance(counts, dict):
@@ -2418,6 +2428,10 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
                 edition_line = FALLBACK_ALL_LABEL % total
             else:
                 edition_line = FALLBACK_PART_LABEL % (written, total)
+        elif kind == "partial":
+            edition_line = FALLBACK_PART_NO_COUNT
+        elif kind == "full":
+            edition_line = FALLBACK_ALL_NO_COUNT
         else:
             edition_line = UNSUMMARISED_LABEL
         # A short edition must say what made it short. The count is DATA on the

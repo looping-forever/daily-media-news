@@ -18,9 +18,13 @@ because a test that imports the constant cannot notice the constant being
 edited.
 """
 
+import html as htmllib
+import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -82,7 +86,7 @@ class RenderPage(unittest.TestCase):
         self.assertIn('<p class="health-edition">', html)
 
     def test_ordinary_meta_renders_no_label(self):
-        for meta in ({}, {"edition_kind": None}, {"edition_kind": "full"},
+        for meta in ({}, {"edition_kind": None},
                      validated_payload("ok")):
             html = self.page(meta)
             self.assertNotIn(LABEL, html)
@@ -90,8 +94,19 @@ class RenderPage(unittest.TestCase):
                              "no edition kind means no new ELEMENT (the CSS rule "
                              "is always in the stylesheet)")
 
-    def test_only_the_exact_kind_is_labelled(self):
-        for kind in ("", "partial", "UNSUMMARISED", "unsummarised-ish"):
+    def test_every_fallback_kind_is_labelled(self):
+        """`partial` and `full` are fallback EDITIONS too, not normal digests.
+
+        The kind is derived from the counts now, so a 22-of-29 edition is
+        `partial` and a 29-of-29 one is `full`. Neither may render silently: a
+        full fallback still has no model written digest behind it.
+        """
+        for kind in ("unsummarised", "partial", "full"):
+            self.assertIn('<p class="health-edition">',
+                          self.page({"edition_kind": kind}), "kind %r" % kind)
+
+    def test_only_a_fallback_kind_is_labelled(self):
+        for kind in ("", "UNSUMMARISED", "unsummarised-ish", "delivered"):
             self.assertNotIn(LABEL, self.page({"edition_kind": kind}))
 
 
@@ -126,14 +141,14 @@ class TheLabelCountsWhatTheModelWrote(unittest.TestCase):
 
     2026-11-05 shipped fifteen headlines over publisher descriptions. The fix is
     a batch of small model requests, and the moment some of those requests land
-    the page has two kinds of text under one headline style. `edition_kind` still
-    says `unsummarised` (no model wrote the DIGEST, and the seal must keep
-    treating it as degraded); the label is where the count belongs.
+    the page has two kinds of text under one headline style. `edition_kind` names
+    that state (`partial`, `full`, or still `unsummarised`), and the label is where
+    the count belongs.
     """
 
-    PART = ("Fallback edition: AI summary for 4 of 15 stories, the rest quote "
-            "the publisher")
-    ALL = "Fallback edition: AI summary for all 15 stories"
+    PART = ("Fallback edition: AI summary for 4 of 15 stories; the rest quote "
+            "the publisher's own description.")
+    ALL = "Fallback edition: AI summary for all 15 stories."
 
     def page(self, meta):
         return render_digest.render_page([], SLOT, DAY, STAMP, meta,
@@ -142,7 +157,8 @@ class TheLabelCountsWhatTheModelWrote(unittest.TestCase):
     def test_a_partial_fallback_counts_both_kinds(self):
         html = self.page({"edition_kind": "unsummarised",
                           "summary_counts": {"summarised": 4, "total": 15}})
-        self.assertIn(self.PART, html)
+        self.assertIn(htmllib.escape(self.PART), html,
+                      "the label is HTML-escaped, apostrophe and all")
         self.assertNotIn(LABEL, html, "the old label over written summaries is "
                                       "the false claim this change removes")
 
@@ -150,6 +166,43 @@ class TheLabelCountsWhatTheModelWrote(unittest.TestCase):
         html = self.page({"edition_kind": "unsummarised",
                           "summary_counts": {"summarised": 15, "total": 15}})
         self.assertIn(self.ALL, html)
+
+    def test_the_partial_label_is_a_whole_sentence_at_render_time(self):
+        """22 of 29 is the live case: the sentence used to stop at 'publisher'.
+
+        The old text had no full stop and no object, so the rendered paragraph
+        read as if it had been cut. This pins the whole `<p>` the reader gets,
+        escaped apostrophe and all -- not the constant the renderer formats.
+        """
+        html = self.page({"edition_kind": "partial",
+                          "summary_counts": {"summarised": 22, "total": 29}})
+        whole = ("Fallback edition: AI summary for 22 of 29 stories; the rest "
+                 "quote the publisher&#x27;s own description.")
+        self.assertIn('<p class="health-edition">%s</p>' % whole, html,
+                      "the hero label must be one complete sentence")
+        self.assertNotIn("the rest quote the publisher</p>", html,
+                         "the old unfinished tail is still being rendered")
+
+    def test_a_partial_edition_never_says_no_ai(self):
+        html = self.page({"edition_kind": "partial",
+                          "summary_counts": {"summarised": 22, "total": 29}})
+        self.assertNotIn(LABEL, html)
+        self.assertNotIn("(no AI today)", html)
+        self.assertIn("AI summary for 22 of 29 stories", html)
+
+    def test_a_full_edition_is_labelled_without_a_fraction(self):
+        html = self.page({"edition_kind": "full",
+                          "summary_counts": {"summarised": 29, "total": 29}})
+        self.assertIn("Fallback edition: AI summary for all 29 stories.", html)
+        self.assertNotIn("(no AI today)", html)
+
+    def test_a_kind_without_counts_still_says_something_true(self):
+        partial = self.page({"edition_kind": "partial"})
+        self.assertIn("an AI wrote some summaries", partial)
+        full = self.page({"edition_kind": "full"})
+        self.assertIn("an AI wrote every summary", full)
+        for html in (partial, full):
+            self.assertNotIn(LABEL, html)
 
     def test_zero_summaries_keeps_the_old_label(self):
         html = self.page({"edition_kind": "unsummarised",
@@ -308,6 +361,110 @@ class TheCountIsCarriedOnceNotReread(unittest.TestCase):
         self.assertEqual(2, len(re.findall(r"held back", page)),
                          "the sentence must reach the page exactly twice: once on "
                          "the edition line, once in the note")
+
+
+class TheSubjectStatesTheDerivedKind(unittest.TestCase):
+    """The subject is composed FROM the payload, so it must follow the counts.
+
+    Run, not read: the heredoc is executed in a temp directory with a pushed
+    payload, and the assertion is on the file the Gmail step actually reads.
+    """
+
+    WORKFLOW = (Path(__file__).resolve().parents[2] / ".github" / "workflows"
+                / "daily-news.yml")
+
+    def subject_of(self, payload):
+        tmp = tempfile.mkdtemp(prefix="subject-kind-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        os.makedirs(os.path.join(tmp, "state"), exist_ok=True)
+        with open(os.path.join(tmp, "state", "stories.validated.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump(payload, fh)
+
+        src = self.WORKFLOW.read_text(encoding="utf-8")
+        start = src.index("state/email_subject.txt', 'w'")
+        start = src.rindex("python3 - <<'PY'", 0, start)
+        end = re.compile(r"\n\s*PY\b").search(src, start).start()
+        body = "\n".join(line[10:] if line.startswith(" " * 10) else line
+                         for line in src[start:end].split("\n")[1:])
+
+        backup = dict(os.environ)
+        os.environ["DIGEST_TIME"] = "morning"
+        os.environ["TODAY"] = "2026-11-05"
+        cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            exec(compile(body, "daily-news.yml:subject", "exec"),
+                 {"__name__": "subject"})
+        finally:
+            os.chdir(cwd)
+            os.environ.clear()
+            os.environ.update(backup)
+        with open(os.path.join(tmp, "state", "email_subject.txt"),
+                  encoding="utf-8") as fh:
+            return fh.read().strip()
+
+    def payload(self, kind, written, total):
+        data = {"digest_time": "morning", "date": "2026-11-05", "stories": []}
+        data["edition_kind"] = kind
+        data["summary_counts"] = {"summarised": written, "total": total}
+        return data
+
+    def test_a_partial_edition_states_its_count_and_never_says_no_ai(self):
+        subject = self.subject_of(self.payload("partial", 22, 29))
+        self.assertIn("22 of 29 stories summarised", subject)
+        self.assertNotIn("no AI", subject)
+        self.assertNotIn("unsummarised", subject)
+
+    def test_a_full_edition_is_an_ordinary_subject(self):
+        subject = self.subject_of(self.payload("full", 29, 29))
+        self.assertEqual("Daily Media News - morning - 2026-11-05", subject,
+                         "a fully written fallback carries no tag")
+
+    def test_zero_summaries_keeps_the_no_ai_tag(self):
+        subject = self.subject_of(self.payload("unsummarised", 0, 27))
+        self.assertIn("unsummarised edition (no AI today)", subject)
+
+    def test_a_partial_edition_without_counts_still_admits_itself(self):
+        data = self.payload("partial", None, None)
+        data.pop("summary_counts")
+        subject = self.subject_of(data)
+        self.assertIn("fallback edition", subject)
+        self.assertNotIn("no AI", subject)
+
+    def test_a_model_written_payload_gets_no_tag(self):
+        subject = self.subject_of({"digest_time": "morning", "stories": []})
+        self.assertEqual("Daily Media News - morning - 2026-11-05", subject)
+
+
+class TheSealAndTheWorkerReadTheDerivedKind(unittest.TestCase):
+    """The two consumers that cannot be executed here are pinned as TEXT.
+
+    `digest-prebuild.yml` seals the artifact and `cloudflare-worker.js` files the
+    delivery; both branch on the kind, so both must know `partial` exists.
+    """
+
+    ROOT = Path(__file__).resolve().parents[2]
+
+    def test_the_seal_treats_a_partial_edition_as_partial(self):
+        text = (self.ROOT / ".github" / "workflows" /
+                "digest-prebuild.yml").read_text(encoding="utf-8")
+        self.assertIn("edition_kind in ('unsummarised', 'partial')", text,
+                      "a 22-of-29 edition would seal as a fresh digest")
+
+    def test_the_worker_files_a_partial_edition_as_partial(self):
+        text = (self.ROOT / "deploy" / "cloudflare-worker.js").read_text(
+            encoding="utf-8")
+        self.assertIn('editionKind === KIND_PARTIAL', text,
+                      "the Worker knows only `unsummarised`, so a partial edition "
+                      "reaches the ledger as `delivered`")
+
+    def test_the_workflow_names_the_deriver_for_every_fallback_kind(self):
+        text = (self.ROOT / ".github" / "workflows" /
+                "daily-news.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            "in ('unsummarised', 'partial', 'full')", text,
+            "a partial edition would inherit a model's writer rung")
 
 
 if __name__ == "__main__":

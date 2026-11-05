@@ -1945,7 +1945,7 @@ jobs:
           # model by definition; a model-written one names the attempt that
           # wrote it, recorded by `digest_success`.
           writer = None
-          if str(payload.get('edition_kind') or '') == 'unsummarised':
+          if str(payload.get('edition_kind') or '') in ('unsummarised', 'partial', 'full'):
               writer = {'rung': 'derived', 'attempt': None, 'model': None}
           elif os.path.isfile('state/digest_writer.json'):
               try:
@@ -2069,8 +2069,24 @@ jobs:
           tag = ''
           try:
               with open('state/stories.validated.json', encoding='utf-8') as fh:
-                  if json.load(fh).get('edition_kind') == 'unsummarised':
-                      tag = ' - unsummarised edition (no AI today)'
+                  data = json.load(fh)
+              # THE KIND IS DERIVED, NOT ASSUMED. The same two counters the page
+              # prints decide the words here: 0 summaries is the no-AI edition,
+              # some is a fallback with a count, and all is a normal digest and
+              # takes no tag at all.
+              edition = str(data.get('edition_kind') or '').strip().lower()
+              counts = data.get('summary_counts')
+              counts = counts if isinstance(counts, dict) else {}
+              written = counts.get('summarised')
+              total = counts.get('total')
+              if edition == 'unsummarised':
+                  tag = ' - unsummarised edition (no AI today)'
+              elif edition == 'partial':
+                  if isinstance(written, int) and isinstance(total, int) and total > 0:
+                      tag = ' - fallback edition (%d of %d stories summarised)' % (
+                          written, total)
+                  else:
+                      tag = ' - fallback edition (some stories summarised)'
           except Exception as exc:
               print('WARNING: could not read edition_kind for the subject: %s' % exc)
           subject = 'Daily Media News - %s - %s%s' % (kind, today, tag)
@@ -3388,7 +3404,16 @@ jobs:
 
               # The fallback edition declares itself in the payload; the push is
               # the surface a reader sees first, so the title says it in words.
-              unsummarised = str(data.get('edition_kind') or '') == 'unsummarised'
+              # The KIND is read, never assumed: 0 summaries is the no-AI edition,
+              # some is a partial fallback that states its count, all is a normal
+              # digest and takes no clause.
+              edition = str(data.get('edition_kind') or '').strip().lower()
+              counts = data.get('summary_counts')
+              counts = counts if isinstance(counts, dict) else {}
+              written = counts.get('summarised')
+              total = counts.get('total')
+              unsummarised = edition == 'unsummarised'
+              partial = edition == 'partial'
 
               # --- Why the edition is empty, in the payload's own words ---
               # `empty_kind` is computed once by scripts/validate_stories.py and
@@ -4455,6 +4480,16 @@ jobs:
                   # the whole push must be read is not the thing that gets cut.
                   title = '%s %s \u00b7 %s \u00b7 unsummarised edition' % (
                       emoji, send_label, today)
+              elif partial:
+                  # A PARTIAL FALLBACK SAYS HOW PARTIAL: the count is the fact,
+                  # and "no AI" over twenty-two written summaries is the lie this
+                  # branch exists to stop.
+                  if isinstance(written, int) and isinstance(total, int) and total > 0:
+                      title = '%s %s \u00b7 %s \u00b7 %d of %d summarised' % (
+                          emoji, send_label, today, written, total)
+                  else:
+                      title = '%s %s \u00b7 %s \u00b7 fallback edition' % (
+                          emoji, send_label, today)
               else:
                   title = '%s %s \u00b7 %s \u00b7 %d %s' % (
                       emoji, send_label, today, len(ordered),
@@ -4644,14 +4679,14 @@ jobs:
               # the record describes what was BUILT even when the push then
               # fails. THE SAME RULE AS THE SEAL AND THE WORKER: digest-prebuild
               # .yml:567 computes is_partial as "health is not ok, or the edition
-              # is unsummarised", and cloudflare-worker.js:3374 orders the kinds
-              # unsummarised > partial > delivered. A third copy of the rule is
+              # is not a complete one", and cloudflare-worker.js:3374 orders the
+              # kinds unsummarised > partial > delivered. A third copy of the rule is
               # a third place to correct, so it is stated once here and pinned by
               # tests/digest/test_ledger_kind.py.
               built_kind = KIND_DELIVERED
               if unsummarised:
                   built_kind = KIND_UNSUMMARISED
-              elif health_state(source_health) != 'ok':
+              elif partial or health_state(source_health) != 'ok':
                   built_kind = KIND_PARTIAL
 
               # ---- THE LEDGER GUARD, AND WHY IT READS DIFFERENT FIELDS ----

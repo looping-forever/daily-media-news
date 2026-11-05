@@ -3495,9 +3495,16 @@ async function deliverDigestPlan(env, slot, writer, options) {
   const artifact = verdict.artifact;
   // The sealed artifact says which kind of edition it is; `is_partial` alone
   // would call an unsummarised build `delivered` whenever the sources were ok.
-  const kind = artifact.edition_kind === KIND_UNSUMMARISED
+  // The edition kind is derived by the pipeline (0 summaries = unsummarised,
+  // some = partial, all = full), and each of those maps to the delivery kind the
+  // ledger already knows: `full` is an ordinary digest, `partial` is a smaller
+  // one, `unsummarised` is the one that must never read as fresh.
+  const editionKind = String(artifact.edition_kind || "").trim().toLowerCase();
+  const kind = editionKind === KIND_UNSUMMARISED
     ? KIND_UNSUMMARISED
-    : (artifact.is_partial === true ? KIND_PARTIAL : KIND_DELIVERED);
+    : (editionKind === KIND_PARTIAL || artifact.is_partial === true
+      ? KIND_PARTIAL
+      : KIND_DELIVERED);
   const scheduledInstant = digestScheduledInstant(today, slotName);
   if (writer) {
     await writer({

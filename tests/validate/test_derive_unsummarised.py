@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from . import REPO_ROOT, SCRIPTS  # noqa: F401  (SCRIPTS is put on sys.path there)
 
 import derive_unsummarised as dut  # noqa: E402
+import edition_kind  # noqa: E402
 import english_text  # noqa: E402
 import validate_stories as vs  # noqa: E402
 
@@ -384,6 +385,127 @@ class TheValidatorDoesNotAppendASecondCount(unittest.TestCase):
             self.assertEqual(1, vs.held_back_total(record, 1), "record %r" % (record,))
 
 
+class TheKindFollowsTheCounts(unittest.TestCase):
+    """A page that says "22 of 29" must never call itself "unsummarised"."""
+
+    def test_none_some_and_all(self):
+        self.assertEqual("unsummarised", edition_kind.kind_for(0, 29))
+        self.assertEqual("partial", edition_kind.kind_for(22, 29))
+        self.assertEqual("full", edition_kind.kind_for(29, 29))
+
+    def test_an_empty_edition_is_unsummarised_not_full(self):
+        self.assertEqual("unsummarised", edition_kind.kind_for(0, 0))
+
+    def test_a_count_past_the_total_is_still_full(self):
+        self.assertEqual("full", edition_kind.kind_for(30, 29))
+
+
+class TheValidatorRecountsTheKind(unittest.TestCase):
+    """Validation drops stories, so the kind has to be recomputed, not carried.
+
+    The deriver's name describes its own list. A story dropped here changes the
+    total, and if that story carried an AI summary it changes the count too --
+    the exact case where a passed-through name starts lying.
+    """
+
+    def payload(self, sources):
+        stories = [{"source_url": "https://a.example/%d" % n,
+                    "summary_source": source}
+                   for n, source in enumerate(sources)]
+        return {"edition_kind": "partial",
+                "summary_counts": {"summarised": sources.count("ai"),
+                                   "total": len(sources)},
+                "stories": stories}
+
+    def test_a_dropped_written_story_lowers_both_numbers(self):
+        data = self.payload(["ai", "ai", "ai", "publisher"])
+        facts = vs.edition_facts(data, data["stories"][:3])
+        self.assertEqual({"summarised": 3, "total": 3},
+                         facts["summary_counts"])
+        self.assertEqual("full", facts["edition_kind"],
+                         "the name must describe what survived, not what was sent")
+
+    def test_a_dropped_publisher_story_can_make_the_edition_full(self):
+        data = self.payload(["ai", "ai", "publisher"])
+        facts = vs.edition_facts(data, data["stories"][:2])
+        self.assertEqual("full", facts["edition_kind"])
+
+    def test_a_partial_edition_stays_partial_when_the_mix_holds(self):
+        data = self.payload(["ai", "ai", "publisher", "publisher"])
+        facts = vs.edition_facts(data, data["stories"][:3])
+        self.assertEqual("partial", facts["edition_kind"])
+        self.assertEqual({"summarised": 2, "total": 3},
+                         facts["summary_counts"])
+
+    def test_a_model_written_payload_keeps_its_old_shape(self):
+        self.assertIsNone(vs.edition_facts({"stories": []}, []),
+                          "a run with no fallback kind must not gain one")
+
+
+class TheNoteFollowsTheSameCount(unittest.TestCase):
+    """The hero and the note print one pair of numbers, so both must move together.
+
+    A drop here used to leave the sentence describing the deriver's list: the page
+    said "AI summary for 22 of 27" over a note saying "22 of 29".
+    """
+
+    def payload(self, sources):
+        stories = [{"source_url": "https://b.example/%d" % n,
+                    "summary_source": source}
+                   for n, source in enumerate(sources)]
+        written = sources.count("ai")
+        return {"edition_kind": edition_kind.kind_for(written, len(sources)),
+                "summary_counts": {"summarised": written, "total": len(sources)},
+                "notes": edition_kind.summary_note(
+                    edition_kind.kind_for(written, len(sources)), written,
+                    len(sources)),
+                "stories": stories}
+
+    def test_a_smaller_total_rewrites_the_sentence(self):
+        data = self.payload(["ai"] * 22 + ["publisher"] * 7)
+        facts = vs.edition_facts(data, data["stories"][:27])
+        note = vs.rewritten_note(facts, data["notes"])
+        self.assertIn("22 of 27 stories", note)
+        self.assertNotIn("29", note,
+                         "the note still quotes the list the deriver saw")
+
+    def test_a_dropped_remainder_makes_the_sentence_complete(self):
+        data = self.payload(["ai", "ai", "publisher"])
+        facts = vs.edition_facts(data, data["stories"][:2])
+        note = vs.rewritten_note(facts, data["notes"])
+        self.assertIn("for all 2 stories", note)
+        self.assertNotIn("the rest quote", note,
+                         "a complete edition describes a remainder that is gone")
+
+    def test_dropping_every_written_story_stops_quoting_a_count(self):
+        data = self.payload(["ai", "ai", "publisher"])
+        facts = vs.edition_facts(data, data["stories"][2:])
+        note = vs.rewritten_note(facts, data["notes"])
+        self.assertIn("no AI summary survived validation", note)
+        self.assertNotIn("an AI wrote the summary", note,
+                         "the dropped summaries are still claimed on the page")
+
+    def test_the_no_ai_reason_paragraph_is_left_alone(self):
+        data = self.payload(["publisher", "publisher"])
+        facts = vs.edition_facts(data, data["stories"])
+        reason = ("Unsummarised edition: every AI model this build reached "
+                  "refused on its provider's quota.")
+        self.assertIsNone(vs.rewritten_note(facts, reason),
+                          "the deriver's reason paragraph is the only true "
+                          "sentence for a zero-summary edition")
+
+    def test_the_held_back_sentence_is_rewritten_not_duplicated(self):
+        data = self.payload(["ai"] * 2 + ["publisher"] * 2)
+        facts = vs.edition_facts(data, data["stories"][:3])
+        notes = english_text.replace_held_back(data["notes"], 5)
+        notes = english_text.replace_held_back(
+            vs.rewritten_note(facts, notes), 5)
+        self.assertEqual(1, len(english_text._HELD_BACK_RE.findall(notes)))
+        self.assertIn("2 of 3 stories", notes)
+        self.assertIn("5 stories were held back", notes)
+
+
+
 class OneSentenceHoweverManyStagesWriteIt(unittest.TestCase):
     def test_replacing_never_stacks_two_numbers(self):
         notes = english_text.replace_held_back("Research note.", 5)
@@ -536,14 +658,33 @@ class SummarisedFallback(unittest.TestCase):
         self.assertTrue(ok, "the validator must accept a written summary: %s"
                         % reason)
 
-    def test_the_edition_kind_stays_unsummarised(self):
+    def test_the_edition_kind_follows_the_count(self):
+        """0 summaries is unsummarised, some is partial, all is full.
+
+        This used to assert `unsummarised` for a fully-written edition, because
+        the SEAL read the field as "no model wrote the digest". The owner
+        overruled that on 2026-11-05: a page that says "22 of 29" must not call
+        itself "no AI today", so the field now names what the counts say.
+        """
+        self.assertEqual("full", self.payload_of(self.result(5))["edition_kind"])
+        self.assertEqual("partial", self.payload_of(self.result(2))["edition_kind"])
+        self.assertEqual("unsummarised",
+                         self.payload_of(self.result(0))["edition_kind"])
+
+    def test_every_story_is_marked_with_where_its_summary_came_from(self):
+        payload = self.payload_of(self.result(2))
+        sources = [story.get("summary_source") for story in payload["stories"]]
+        self.assertEqual(2, sources.count("ai"))
+        self.assertEqual(3, sources.count("publisher"),
+                         "the validator subtracts a dropped story by this mark, "
+                         "so every story has to carry one")
+
+    def test_a_fully_summarised_edition_does_not_describe_a_remainder(self):
         payload = self.payload_of(self.result(5))
-        self.assertEqual("unsummarised", payload["edition_kind"],
-                         "the SEAL reads this field as 'no model wrote the "
-                         "digest'; that is still true when a model wrote one "
-                         "sentence per story")
-        self.assertEqual({"rung": "derived", "attempt": None, "model": None},
-                         payload["writer"])
+        self.assertIn("an AI wrote the summary for all 5 stories",
+                      payload["notes"])
+        self.assertNotIn("the rest quote", payload["notes"],
+                         "there is no 'rest' when every story was written")
 
     def test_the_note_counts_instead_of_claiming_every_text_is_the_publisher_s(self):
         payload = self.payload_of(self.result(2))

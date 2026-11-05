@@ -559,8 +559,9 @@ jobs:
           # so the reader knows it is one.
           health = validated.get('source_health')
           state = str(health.get('state') or '').strip().lower() if isinstance(health, dict) else 'unknown'
-          # The no-AI fallback seals as its own KIND. It is folded into
-          # `is_partial` as well, on purpose: a Worker deployed before this
+          # The fallback seals as its own KIND, and a partial one too: 22 written
+          # summaries out of 29 is a smaller edition than it looks. Both are
+          # folded into `is_partial` on purpose -- a Worker deployed before this
           # change knows only `is_partial`, and a labelled partial is a far
           # better failure than an unlabelled "fresh".
           edition_kind = str(validated.get('edition_kind') or '').strip()
@@ -574,7 +575,7 @@ jobs:
           writer_rung = str(writer.get('rung') or '').strip().lower()
           writer_degraded = (bool(writer_rung)
                              and writer_rung not in ('primary', 'retry'))
-          is_partial = (state != 'ok' or edition_kind == 'unsummarised'
+          is_partial = (state != 'ok' or edition_kind in ('unsummarised', 'partial')
                         or writer_degraded)
 
           if not built_at:

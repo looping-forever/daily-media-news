@@ -40,6 +40,9 @@ from validate_stories import (crime_violation, load_excluded_keywords,  # noqa: 
 # REFUSED here rather than shipped and dropped later, because this file is the
 # only one that knows how many stories the fallback held back.
 import english_text  # noqa: E402
+# And the ONE rule that names the edition, shared with the validator so a drop
+# there cannot leave the name describing a count that no longer exists.
+import edition_kind  # noqa: E402
 
 MIN_STORIES = 5
 PER_CATEGORY = 3
@@ -63,13 +66,6 @@ NOTE = ("Unsummarised edition: %s; the text is the publisher's own "
 #: sentence cut mid-word at "…they are not in". So the sentence is composed to
 #: fit with room to spare: it is never allowed to reach either cap.
 NOTE_BUDGET = 236
-
-#: The same note when SOME stories did get a written summary. Saying "the text
-#: under each headline is the publisher's description" over an AI sentence is
-#: the one claim this page must never make, so the counted form replaces it
-#: whenever summarise_stories answered for at least one story.
-NOTE_SUMMARISED = ("Fallback edition: an AI wrote the summary for %d of %d "
-                   "stories; the rest quote the publisher's own description.")
 
 #: WHY there is no AI, in the walk's own vocabulary. The old note said only
 #: "no AI was available", which is true of every case and therefore tells the
@@ -377,7 +373,12 @@ def apply_summaries(stories, summaries):
         text = (summaries or {}).get(story.get("source_url") or "")
         if isinstance(text, str) and text.strip():
             story["summary"] = text.strip()
+            # Per-story truth, so the validator can subtract anything it drops
+            # instead of trusting a total that no longer matches the list.
+            story["summary_source"] = "ai"
             written += 1
+        else:
+            story["summary_source"] = "publisher"
     return written
 
 
@@ -483,18 +484,20 @@ def main(argv=None):
              "" if not causes else ", %d summariser cause(s)" % len(causes)))
 
     notes = note_for(reason, attempts_text, causes=causes)
+    # One decision, taken from the counters the note prints, used by the note AND
+    # the payload field: the name and the number cannot drift apart here.
+    kind = edition_kind.kind_for(written, len(stories))
     if written:
-        notes = NOTE_SUMMARISED % (written, len(stories))
+        notes = edition_kind.summary_note(kind, written, len(stories))
     if held_n:
         notes = english_text.replace_held_back(notes, held_n)
     payload = {
         "date": args.today,
-        # STILL `unsummarised`, even when every story got a written summary.
-        # The seal, the delivery ledger and the Worker all read this field as
-        # "no model produced this digest", which remains true: the selection,
-        # the ranking and the page are derived. What the model wrote is one
-        # sentence per story, and `summary_counts` is what says how many.
-        "edition_kind": "unsummarised",
+        # Derived, not assumed: 0 summaries is `unsummarised`, some is `partial`,
+        # all is `full`. The seal, the delivery ledger and the Worker all branch
+        # on this field, so a hardcoded value here is what made a 22-of-29
+        # edition claim "no AI today".
+        "edition_kind": kind,
         # The count the page needs to be honest about its own text.
         "summary_counts": {"summarised": written, "total": len(stories)},
         # How many stories this stage withheld for their script, as DATA. The
@@ -518,8 +521,8 @@ def main(argv=None):
         json.dump(payload, fh, ensure_ascii=False, indent=2)
         fh.write("\n")
     os.replace(tmp, args.out)
-    print("wrote %s (%d stories, edition_kind=unsummarised, %d summarised)"
-          % (args.out, len(stories), written))
+    print("wrote %s (%d stories, edition_kind=%s, %d summarised)"
+          % (args.out, len(stories), kind, written))
     return 0
 
 
