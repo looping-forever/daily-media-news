@@ -251,13 +251,16 @@ class FloorAndPayload(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="derive_floor_")
         self.addCleanup(shutil.rmtree, self.tmp, True)
 
-    def run_main(self, candidates):
+    def run_main(self, candidates, attempts=""):
         path = os.path.join(self.tmp, "candidates.json")
         out = os.path.join(self.tmp, "stories.json")
+        log = os.path.join(self.tmp, "agent-attempts.log")
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"collected_at": "2026-10-28 09:00", "candidates": candidates}, fh)
+        with open(log, "w", encoding="utf-8") as fh:
+            fh.write(attempts)
         rc = dut.main(["--candidates", path, "--out", out, "--today", "2026-10-28",
-                       "--slot", "morning"])
+                       "--slot", "morning", "--attempts", log])
         return rc, out
 
     def test_fewer_than_five_stories_writes_nothing(self):
@@ -278,7 +281,10 @@ class FloorAndPayload(unittest.TestCase):
         with open(out, "r", encoding="utf-8") as fh:
             payload = json.load(fh)
         self.assertEqual(payload["edition_kind"], "unsummarised")
-        self.assertIn("no AI was available", payload["notes"])
+        # With no attempt log at all, the note must say nothing was configured
+        # rather than claiming a quota was spent.
+        self.assertIn("no AI model was configured or reachable", payload["notes"])
+        self.assertNotIn("no AI was available", payload["notes"])
         self.assertEqual(payload["date"], "2026-10-28")
         self.assertEqual(payload["digest_time"], "morning")
         self.assertEqual(len(payload["stories"]), 5)
@@ -304,6 +310,85 @@ class FloorAndPayload(unittest.TestCase):
         rc = dut.main(["--candidates", os.path.join(self.tmp, "absent.json"),
                        "--out", os.path.join(self.tmp, "stories.json")])
         self.assertEqual(rc, 1)
+
+
+class NoAIReason(unittest.TestCase):
+    """The note must name WHY no model wrote the edition.
+
+    2026-11-05 shipped with "no AI was available" while the keyed Gemini rungs
+    were configured and had answered a 250,000 input-tokens/min free-tier
+    refusal: true, and useless to the reader.
+    """
+
+    QUOTA_LOG = (
+        "2026-11-05T00:56:20Z attempt=1 model=gemini/gemini-3.5-flash-lite "
+        "kind=quota_or_rate_limited rc=1 allow=0\n"
+        "2026-11-05T00:56:54Z attempt=2 model=gemini/gemini-3.1-flash-lite "
+        "kind=quota_or_rate_limited rc=1 allow=0\n"
+        "2026-11-05T00:57:30Z attempt=3 model=opencode/nemotron-3-ultra-free "
+        "kind=payment_required rc=1 allow=0\n"
+    )
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="derive_reason_")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_an_empty_log_is_not_a_quota_wall(self):
+        for text in ("", None, "\n"):
+            self.assertEqual(dut.REASON_NOT_CONFIGURED,
+                             dut.reason_from_attempts(text),
+                             "%r must not claim a spent allowance" % (text,))
+
+    def test_every_quota_row_means_the_allowance_is_spent(self):
+        self.assertEqual(dut.REASON_QUOTA, dut.reason_from_attempts(self.QUOTA_LOG))
+
+    def test_a_row_that_failed_for_its_own_reason_is_not_a_quota_wall(self):
+        log = self.QUOTA_LOG + (
+            "2026-11-05T00:58:10Z attempt=4 model=opencode/big-pickle "
+            "kind=auth rc=1 allow=0\n")
+        self.assertEqual(dut.REASON_ALL_FAILED, dut.reason_from_attempts(log))
+
+    def test_the_quota_note_names_the_providers_once_each(self):
+        note = dut.note_for(dut.REASON_QUOTA, self.QUOTA_LOG)
+        self.assertIn("(gemini, opencode)", note)
+        self.assertNotIn("gemini, gemini", note)
+        self.assertIn("publisher's own description", note)
+
+    def test_the_not_configured_note_does_not_mention_a_quota(self):
+        note = dut.note_for(dut.REASON_NOT_CONFIGURED, "")
+        self.assertIn("no AI model was configured or reachable", note)
+        self.assertNotIn("quota", note)
+
+    def run_main(self, attempts):
+        path = os.path.join(self.tmp, "candidates.json")
+        out = os.path.join(self.tmp, "stories.json")
+        log = os.path.join(self.tmp, "agent-attempts.log")
+        candidates = [cand(DISTINCT[n], "https://a.example/%d" % n,
+                           category=("world_major" if n < 3 else "local_city"))
+                      for n in range(5)]
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"candidates": candidates}, fh)
+        if attempts is not None:
+            with open(log, "w", encoding="utf-8") as fh:
+                fh.write(attempts)
+        return dut.main(["--candidates", path, "--out", out,
+                         "--today", "2026-11-05", "--slot", "morning",
+                         "--attempts", log]), out
+
+    def test_the_payload_note_names_the_quota_and_the_providers(self):
+        rc, out = self.run_main(self.QUOTA_LOG)
+        self.assertEqual(0, rc)
+        with open(out, encoding="utf-8") as fh:
+            notes = json.load(fh)["notes"]
+        self.assertIn("refused on its provider's quota (gemini, opencode)", notes)
+        self.assertNotIn("no AI was available", notes)
+
+    def test_a_missing_attempt_log_still_writes_a_note(self):
+        rc, out = self.run_main(None)
+        self.assertEqual(0, rc)
+        with open(out, encoding="utf-8") as fh:
+            notes = json.load(fh)["notes"]
+        self.assertIn("no AI model was configured or reachable", notes)
 
 
 if __name__ == "__main__":

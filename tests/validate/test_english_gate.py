@@ -204,10 +204,14 @@ class DeriverHoldsBackNonEnglish(unittest.TestCase):
     def run_main(self, candidates):
         path = os.path.join(self.tmp, "candidates.json")
         out = os.path.join(self.tmp, "stories.json")
+        log = os.path.join(self.tmp, "agent-attempts.log")
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"candidates": candidates}, fh)
+        with open(log, "w", encoding="utf-8") as fh:
+            fh.write("")
         rc = dut.main(["--candidates", path, "--out", out,
-                       "--today", "2026-11-03", "--slot", "morning"])
+                       "--today", "2026-11-03", "--slot", "morning",
+                       "--attempts", log])
         return rc, out
 
     def test_payload_notes_say_how_many_were_held_back(self):
@@ -228,7 +232,7 @@ class DeriverHoldsBackNonEnglish(unittest.TestCase):
         with open(out, encoding="utf-8") as fh:
             payload = json.load(fh)
         self.assertEqual(5, len(payload["stories"]))
-        self.assertIn("no AI was available", payload["notes"])
+        self.assertIn("no AI model was configured or reachable", payload["notes"])
         self.assertIn("1 story was held back because it is not in English.",
                       payload["notes"])
 

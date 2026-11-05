@@ -1169,6 +1169,33 @@ class PoolCliTests(unittest.TestCase):
             self.assertEqual(1800, doc["pool"]["seconds"],
                              "the provider's own reset must win over the default")
 
+    def test_the_digest_ladder_tries_the_keyed_rungs_before_the_free_pool(self):
+        """2026-11-05 shipped unsummarised and the guess was "the ladder tried
+        the free pool first". It did not: the two keyed Gemini rungs are the
+        first two seeds and the free pool is appended after them. Pin that,
+        because a reorder here is a silent change to which provider is billed.
+        """
+        with open(REPO_ROOT / "config" / "opencode.json", encoding="utf-8") as fh:
+            config = json.load(fh)
+        ladder = config["ladder"]
+        self.assertEqual("gemini/gemini-3.5-flash-lite", ladder[0])
+        self.assertEqual("gemini/gemini-3.1-flash-lite", ladder[1])
+
+        # Discovery advertises the free pool first; the configured ladder is
+        # authoritative and may be appended to, never reordered.
+        discovered = list(reversed(ladder))
+        models, info = ms.select(
+            config, {},
+            discover_fn=lambda _p, cache_path=None:
+                (discovered, {"source": "live"}))
+        self.assertEqual(ladder[:2], models[:2], info["seed"])
+        gemini = [n for n, m in enumerate(models) if m.startswith("gemini/")]
+        others = [n for n, m in enumerate(models) if not m.startswith("gemini/")]
+        self.assertTrue(gemini and others, models)
+        self.assertLess(max(gemini), min(others),
+                        "a free-pool rung was ranked ahead of a keyed one: %s"
+                        % models)
+
     def test_role_digest_reaches_the_selector(self):
         with tempfile.TemporaryDirectory(prefix="cool-pool-role-") as sd:
             cfg = os.path.join(sd, "opencode.json")

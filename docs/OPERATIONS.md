@@ -106,8 +106,11 @@ priority is reserved for a critical source host being down.
 **The unsummarised edition, when no model responds.** Same push, same slot, but the
 title ends `· unsummarised edition (no AI today)` and the page and email carry the
 same label. The stories are collected headlines, links and hosts with nothing
-written by a model. It is deliberately capped below the escalation threshold, so a
-fallback never pages the way a real digest can.
+written by a model. The page's research note names WHY, read from the walk's own
+`state/agent-attempts.log`: every model refused on its provider's quota (and which
+providers), no model was configured or reachable, or every model tried failed. It is
+deliberately capped below the escalation threshold, so a fallback never pages the
+way a real digest can.
 
 **A fault, when nothing could be built.** Exactly one page, deduplicated to one per
 slot per 6 hours (`scripts/alert_dedupe.py`), plus one GitHub issue:

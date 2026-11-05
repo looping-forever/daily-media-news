@@ -1888,14 +1888,15 @@ jobs:
           fi
           # Below the floor the deriver writes NOTHING and exits 0 on purpose:
           # the existing empty-digest classification is the owner of that case.
-          echo "::warning::No usable digest from the model walk -- deriving the unsummarised edition from the collected candidates (no AI)."
+          echo "::warning::No usable digest from the model walk -- deriving the unsummarised edition from the collected candidates (no model produced a digest)."
           echo "### Unsummarised edition (no AI today)" >> "$GITHUB_STEP_SUMMARY"
           START=$(date +%s)
           python3 scripts/derive_unsummarised.py \
             --candidates state/candidates.json \
             --out state/stories.json \
             --today "$TODAY" \
-            --slot "$DIGEST_TIME"
+            --slot "$DIGEST_TIME" \
+            --attempts state/agent-attempts.log
           END=$(date +%s)
           STAGE_KEY=derive STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
 

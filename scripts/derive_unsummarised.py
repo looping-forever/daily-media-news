@@ -55,9 +55,66 @@ SUMMARY_MAX_CHARS = 240
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "config")
 
-NOTE = ("Unsummarised edition: no AI was available for this build, so the text "
-        "under each headline is the publisher's own description, not a summary "
-        "written for you.")
+NOTE = ("Unsummarised edition: %s, so the text under each headline is the "
+        "publisher's own description, not a summary written for you.")
+
+#: WHY there is no AI, in the walk's own vocabulary. The old note said only
+#: "no AI was available", which is true of every case and therefore tells the
+#: reader nothing: the 2026-11-05 edition HAD the keyed models configured, and
+#: it was the Gemini free tier's per-minute input-token quota (250,000) that
+#: refused them before the free OpenCode pool refused the rest.
+REASON_QUOTA = "quota_exhausted"
+REASON_NOT_CONFIGURED = "not_configured"
+REASON_ALL_FAILED = "all_failed"
+
+REASON_TEXT = {
+    REASON_QUOTA: "every AI model this build reached refused on its provider's quota",
+    REASON_NOT_CONFIGURED: "no AI model was configured or reachable for this build",
+    REASON_ALL_FAILED: "every AI model this build tried failed to produce a digest",
+}
+
+#: The walk's failure kinds that mean "the allowance is spent", not "the rung
+#: broke". `payment_required` is the OpenCode plan refusing its free rungs
+#: ("Free usage limit reached"), which is the same fact about an account.
+QUOTA_KINDS = frozenset({"quota_or_rate_limited", "payment_required"})
+
+
+def reason_from_attempts(text):
+    """Which of the three no-AI reasons the walk's attempt log shows.
+
+    daily-news.yml writes one row per attempt (`kind=quota_or_rate_limited`,
+    `kind=payment_required`, `kind=ok`, ...). Three outcomes, three sentences:
+
+      * NO ROWS: no model was ever contacted, so nothing was configured or
+        reachable. That is not a quota wall and not a rung that failed.
+      * every row a spent allowance: the quota ran out.
+      * anything else: a rung was tried and failed for its own reason.
+    """
+    kinds = re.findall(r"\bkind=([a-z_]+)", text or "")
+    if not kinds:
+        return REASON_NOT_CONFIGURED
+    if all(kind in QUOTA_KINDS for kind in kinds):
+        return REASON_QUOTA
+    return REASON_ALL_FAILED
+
+
+def providers_in(text):
+    """`model=<provider>/<id>` -> the provider names, in first-seen order."""
+    names = []
+    for name in re.findall(r"\bmodel=([A-Za-z0-9_.-]+)/", text or ""):
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def note_for(reason, attempts_text=""):
+    """The page's own sentence for WHY no model wrote this edition."""
+    detail = REASON_TEXT.get(reason, REASON_TEXT[REASON_ALL_FAILED])
+    if reason == REASON_QUOTA:
+        names = providers_in(attempts_text)
+        if names:
+            detail = "%s (%s)" % (detail, ", ".join(names))
+    return NOTE % detail
 
 
 def title_tokens(title):
@@ -209,6 +266,9 @@ def main(argv=None):
     ap.add_argument("--out", default="state/stories.json")
     ap.add_argument("--today", default="")
     ap.add_argument("--slot", default="")
+    # The walk's own attempt log: the only evidence of why no model wrote this
+    # edition. Absent or empty means no model was contacted at all.
+    ap.add_argument("--attempts", default="state/agent-attempts.log")
     args = ap.parse_args(argv)
 
     if not os.path.isfile(args.candidates):
@@ -247,7 +307,21 @@ def main(argv=None):
                   "only the stories the page can draw" % held_n)
         return 0
 
-    notes = NOTE
+    # WHY, not merely THAT. The attempt log is the walk's own record, so the
+    # note names a spent quota, a missing configuration or failed rungs instead
+    # of the old catch-all "no AI was available".
+    attempts_text = ""
+    if args.attempts:
+        try:
+            with open(args.attempts, "r", encoding="utf-8", errors="replace") as fh:
+                attempts_text = fh.read()
+        except OSError:
+            attempts_text = ""
+    reason = reason_from_attempts(attempts_text)
+    print("  %-24s %s (%d attempt row(s))"
+          % ("no-AI reason", reason, len(re.findall(r"\bkind=", attempts_text))))
+
+    notes = note_for(reason, attempts_text)
     if held_n:
         notes = notes + " " + english_text.held_back_note(held_n)
     payload = {
