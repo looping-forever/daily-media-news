@@ -509,10 +509,12 @@ def ladder_models(transport=None, environ=None, log=None):
     """The configured ladder, in order -- the SAME list the walk walks.
 
     Read from config/opencode.json (the selector's own bookkeeping file) so the
-    summariser cannot drift into a second, private model list. Cooldowns are
+    summariser cannot drift into a second, private model list. QUOTA cooldowns are
     deliberately NOT consulted: the walk has just recorded `quota_or_rate_limited`
     for these rungs, and the point of a fresh, small request is that the next
-    minute's allowance is not the one that ran out.
+    minute's allowance is not the one that ran out. A rung demoted by
+    `record_refusal` (a rung that answered NOTHING) is reordered by
+    `demoted_order`, which is a different fact about a different failure.
 
     THE ORDER IS GEMINI, THEN THE KEYED FALLBACKS, THEN THE FREE POOL (measured
     2026-11-05: Gemini's free tier spent its minute in 13.4s and every OpenCode
@@ -534,6 +536,73 @@ def ladder_models(transport=None, environ=None, log=None):
     return list(llm_providers.ordered_ladder(ladder, environ=environ,
                                              transport=transport, resolve=True,
                                              log=log))
+
+
+#: Where a demoted rung is remembered. The workflow sets this to
+#: state/model_cooldown.json, the one committed model-state file the digest run
+#: persists; unset means "no memory", which is what a test and a local run want.
+COOLDOWN_ENV = "MODEL_COOLDOWN_PATH"
+
+#: Refusal kinds that mean THIS RUNG produced nothing: no verdict, no bytes, an
+#: auth wall, a dead transport, a hit against its own clock. Quota is excluded --
+#: the whole pool shares that allowance, so cooling rungs for it would empty the
+#: ladder -- and so is `not_configured`, which is a repository setting.
+DEMOTING_KINDS = frozenset({"other", "auth", "transport", "timeout",
+                            "model_not_found", "refused", "failed"})
+
+
+def record_refusal(cooldown, model, kind, now=None):
+    """Demote `model` after a refusal that was not about capacity.
+
+    Two of them inside a day set a six-hour cooldown (model_selector's
+    `rung_broken`); one only records the hit. Returns the row, or None.
+    """
+    if cooldown is None or kind not in DEMOTING_KINDS:
+        return None
+    import model_selector
+    return model_selector.record_cooldown(cooldown, model, "rung_broken",
+                                          at=now)
+
+
+def promote_rung(cooldown, model, log=None):
+    """Clear a demotion because the rung just answered. True when one was cleared."""
+    if not isinstance(cooldown, dict):
+        return False
+    row = (cooldown.get("models") or {}).get(model)
+    if not isinstance(row, dict) or not row.get("until"):
+        return False
+    del cooldown["models"][model]
+    (log or (lambda *_a: None))(
+        "  ladder: %s answered, so its demotion is over now" % model)
+    return True
+
+
+def demoted_order(models, cooldown, now=None, log=None):
+    """The ladder with a demoted rung at the BACK -- never removed.
+
+    model_selector's invariant is that this file may reorder a ladder but never
+    veto one: an edition with no summaries is worse than one written by the rung
+    that failed last time, so the demoted rung is still tried once everything
+    else has refused. Both ends are logged, because a run log that does not say
+    why the order changed is a run log that cannot explain its own 99 seconds.
+    """
+    log = log or (lambda *_a: None)
+    import model_selector
+    now = time.time() if now is None else float(now)
+    keeping, cooling = [], []
+    for model in models:
+        row = ((cooldown or {}).get("models") or {}).get(model)
+        if model_selector.on_hard_cooldown(cooldown, model, now=now):
+            cooling.append(model)
+            log("  ladder: %s demoted to the back until %s (%s, %d hit(s))"
+                % (model, row.get("until"), row.get("reason") or "cooled",
+                   int(row.get("hits") or 0)))
+        else:
+            if isinstance(row, dict) and row.get("until"):
+                log("  ladder: %s promoted back (its cooldown ended %s)"
+                    % (model, row["until"]))
+            keeping.append(model)
+    return keeping + cooling
 
 
 def _decode(raw):
@@ -698,7 +767,8 @@ def refusal_cause(kind, message):
 
 def summarise(stories, models=None, run=None, sleep=None, clock=None,
               log=print, budget=INPUT_TOKEN_BUDGET_PER_MINUTE,
-              budget_seconds=TOTAL_BUDGET_SECONDS):
+              budget_seconds=TOTAL_BUDGET_SECONDS, cooldown=None,
+              cooldown_path=None):
     """Summarise *stories* in paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
@@ -712,16 +782,35 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     so a run that produced nothing can say why without being re-run. `causes`
     counts the STORIES each cause cost, because that is what the page has to
     report; the walk's attempt log is a different question and a different file.
+
+    `cooldown` / `cooldown_path` are the demotion memory: a rung that refuses
+    without a quota reason twice is moved to the back of the ladder for six
+    hours, and the next run reads that back instead of paying the same ~99s.
     """
     stories = [s for s in (stories or []) if (s.get("source_url") or s.get("url"))]
     run = run or run_model
     clock = clock or time.monotonic
     sleep = sleep or time.sleep
+    if cooldown_path is None:
+        cooldown_path = os.environ.get(COOLDOWN_ENV) or None
+    if cooldown is None and cooldown_path:
+        import model_selector
+        cooldown = model_selector.load_cooldown(cooldown_path)
     models = list(models) if models is not None else ladder_models(log=log)
+    if cooldown is not None:
+        models = demoted_order(models, cooldown, log=log)
     pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
     pacer.deadline = clock() + float(budget_seconds)
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
            "refusals": [], "debug": [], "causes": {}}
+
+    def save_memory():
+        """Persist the demotion ledger, pruned, where the caller asked for it."""
+        if cooldown is None or not cooldown_path:
+            return
+        import model_selector
+        model_selector.prune_cooldown(cooldown)
+        model_selector.save_cooldown(cooldown_path, cooldown)
 
     def note(model, raw, reason, timeout, exit_code=None):
         """Keep one failed attempt, bounded, so the artifact can explain it."""
@@ -734,6 +823,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         if not models:
             log("summarise_stories: no model in the configured ladder; "
                 "nothing is summarised")
+        save_memory()
         return out
 
     plan = batches(stories)[:MAX_REQUESTS]
@@ -778,6 +868,9 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
                 causes.add(refusal_cause(kind, str(exc)))
+                if record_refusal(cooldown, model, kind):
+                    log("  batch %d/%d: %s produced nothing (%s); recorded for "
+                        "the ladder memory" % (index, len(plan), model, kind))
                 if kind == "quota_notice" and llm_providers.provider_of(model):
                     # A 429 from a keyed provider is THIS ACCOUNT'S capacity, not
                     # a wrong id: waiting would keep the batch on a rung already
@@ -824,6 +917,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                          exit_code=getattr(again, "exit_code", None))
                     causes.add(refusal_cause(
                         getattr(again, "kind", "") or "refused", str(again)))
+                    if record_refusal(cooldown, model,
+                                      getattr(again, "kind", "") or "refused"):
+                        log("  batch %d/%d: %s produced nothing after the wait; "
+                            "recorded for the ladder memory"
+                            % (index, len(plan), model))
                     log("  batch %d/%d: %s refused again after the wait; "
                         "trying the next model" % (index, len(plan), model))
                     continue
@@ -846,6 +944,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             out["summaries"].update(got)
             out["model"] = model
             answered = True
+            promote_rung(cooldown, model, log=log)
             log("  batch %d/%d ok: %d of %d stories summarised by %s"
                 % (index, len(plan), len(got), len(batch), model))
             break
@@ -863,6 +962,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 "the publisher's text" % (index, len(plan), len(batch)))
 
     out["waits"].extend(pacer.waits)
+    save_memory()
     log("summarise_stories: %d of %d stories summarised in %d request(s), "
         "%d wait(s), model %s"
         % (len(out["summaries"]), len(stories), out["requests"],

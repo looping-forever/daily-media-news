@@ -639,5 +639,104 @@ class CapturedReplies(unittest.TestCase):
                          "the fixture was not found from %s" % os.getcwd())
 
 
+#: RUN 42061741326 (2026-11-05): `gemini-3.5-flash-lite` produced nothing twice
+#: (`rc=1`, kind `other`) and burned ~99 s before a request was ever sent, while
+#: `gemini-3.1-flash-lite` answered. Nothing recorded that, so the next run began
+#: with the same broken rung first. These tests pin the memory that stops it.
+BROKEN = "gemini/gemini-3.5-flash-lite"
+WORKS = "gemini/gemini-3.1-flash-lite"
+THIRD = "openrouter/some-free-model"
+
+
+class TheBrokenRungIsDemoted(unittest.TestCase):
+    def setUp(self):
+        self.now = 1_800_000_000.0
+        self.cool = {"schema_version": 1, "models": {}, "pool": {}}
+
+    def lines(self):
+        self.log = []
+        return self.log
+
+    def test_the_rungs_own_order_is_kept_until_something_is_cooled(self):
+        self.assertEqual([BROKEN, WORKS, THIRD],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=self.now, log=lambda *_a: None))
+
+    def test_two_refusals_cool_the_rung_and_the_demotion_is_logged(self):
+        log = []
+        for _ in range(2):
+            ss.record_refusal(self.cool, BROKEN, "other", now=self.now)
+        row = self.cool["models"][BROKEN]
+        self.assertEqual("rung_broken", row["reason"])
+        self.assertTrue(row.get("until"),
+                        "two refusals inside the day must set an expiry")
+        self.assertEqual([WORKS, THIRD, BROKEN],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=self.now, log=log.append))
+        self.assertTrue(any(BROKEN in line and "demoted" in line for line in log),
+                        "the demotion has to be visible in the run log, not only "
+                        "in a state file: %r" % (log,))
+
+    def test_one_refusal_is_not_enough(self):
+        ss.record_refusal(self.cool, BROKEN, "other", now=self.now)
+        self.assertNotIn("until", self.cool["models"][BROKEN],
+                         "a single failed attempt may be the prompt, not the rung")
+        self.assertEqual([BROKEN, WORKS, THIRD],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=self.now, log=lambda *_a: None))
+
+    def test_a_quota_refusal_never_cools_a_rung(self):
+        for kind in ("quota_notice", "quota_or_rate_limited", "not_configured"):
+            for _ in range(3):
+                ss.record_refusal(self.cool, BROKEN, kind, now=self.now)
+        self.assertEqual({}, self.cool["models"],
+                         "the whole pool shares one allowance: cooling rungs for "
+                         "it would remove every model and end the edition")
+
+    def test_the_cooldown_lapses_and_the_rung_comes_back_with_a_line(self):
+        for _ in range(2):
+            ss.record_refusal(self.cool, BROKEN, "other", now=self.now)
+        later = self.now + 7 * 3600
+        log = []
+        self.assertEqual([BROKEN, WORKS, THIRD],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=later, log=log.append))
+        self.assertTrue(any(BROKEN in line and "promoted back" in line
+                            for line in log),
+                        "the return from a demotion is as consequential as the "
+                        "demotion: %r" % (log,))
+
+    def test_a_success_clears_the_demotion_immediately(self):
+        for _ in range(2):
+            ss.record_refusal(self.cool, BROKEN, "other", now=self.now)
+        log = []
+        self.assertTrue(ss.promote_rung(self.cool, BROKEN, log=log.append))
+        self.assertNotIn(BROKEN, self.cool["models"])
+        self.assertTrue(any(BROKEN in line for line in log))
+        self.assertEqual([BROKEN, WORKS, THIRD],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=self.now, log=lambda *_a: None))
+
+    def test_a_demoted_rung_is_still_tried_when_everything_else_refuses(self):
+        """The demotion REORDERS, it does not veto: an edition with no summaries
+        is worse than one written by the rung that failed last time."""
+        for _ in range(2):
+            ss.record_refusal(self.cool, BROKEN, "other", now=self.now)
+        ordered = ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                   now=self.now, log=lambda *_a: None)
+        self.assertIn(BROKEN, ordered)
+        self.assertEqual(len(ordered), 3)
+
+    def test_a_demoted_lead_rung_costs_no_request(self):
+        """THE DEFECT ITSELF: the run must not spend ~99 s on it first."""
+        for _ in range(2):
+            ss.record_refusal(self.cool, BROKEN, "other", now=self.now)
+        run = FakeRun([reply_for([story(1)])])
+        ss.summarise([story(1)], models=[BROKEN, WORKS],
+                     run=run, sleep=lambda *_a: None,
+                     cooldown=self.cool, clock=lambda: self.now)
+        self.assertEqual([WORKS], [model for _p, model in run.calls])
+
+
 if __name__ == "__main__":
     unittest.main()

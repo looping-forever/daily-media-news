@@ -1552,6 +1552,129 @@ REAL_SUMMARY_MIN_CHARS = 40
 #: something of its own clears this easily.
 TITLE_REMAINDER_MIN_CHARS = 20
 
+#: RUN 42061741326 (2026-11-05): `Confirmed: A new teaser trailer for the third
+#: season of The Dangers in My Heart has revealed an April 2027 premiere window.`
+#: is the headline ("... Season 3 Set for April 2027") said again with different
+#: verbs, and every existing arm above passed it. A body whose content words are
+#: mostly the headline's own words is a PARAPHRASE, and a paraphrase has to earn
+#: "summary" by carrying something the headline does not: a count, a name, a
+#: place, a date, or a claim in quotes. Below this share the body is its own
+#: account of the story and is judged by the arms above alone.
+TITLE_PARAPHRASE_SHARE = 0.4
+
+#: Words that carry no fact on their own. Stripped before the comparison, so
+#: "a new teaser trailer has revealed" cannot look like new information.
+STOPWORDS = frozenset("""
+a an the and or but if of to in on at for from by with as is are was were be
+been being it its this that these those they them their he she his her we our
+you your i not no nor so than then there here what which who whom whose when
+where why how all any both each few more most other some such only own same too
+very can will just should now also said says say has have had do does did may
+might must would could about after before during under over into out up down off
+again further once while amid unless until per via
+""".split())
+
+#: A number said as a word is still a number, and the same is true of intervals.
+NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "dozen": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+    "thirty": 30, "forty": 40, "fifty": 50, "hundred": 100, "thousand": 1000,
+    "million": 1000000,
+}
+ORDINALS = {
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6,
+    "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11,
+    "twelfth": 12,
+}
+MONTHS = frozenset("""
+january february march april may june july august september october november
+december
+""".split())
+
+
+def _stem(word):
+    """A crude stem, so `closes` and `closed` are the same word for this check."""
+    for suffix in ("ing", "ed", "es", "s"):
+        if len(word) > 4 and word.endswith(suffix):
+            return word[:-len(suffix)]
+    return word
+
+
+def _normal_word(word):
+    """Lowercase, stemmed, and a number word becomes its digit."""
+    low = re.sub(r"[^0-9a-z]+", "", str(word or "").lower())
+    if not low:
+        return ""
+    if low in NUMBER_WORDS:
+        return str(NUMBER_WORDS[low])
+    if low in ORDINALS:
+        return str(ORDINALS[low])
+    return _stem(low)
+
+
+def prose_words(text):
+    """The words that carry meaning, in order, stopwords and numbers removed."""
+    out = []
+    for raw in re.findall(r"[0-9A-Za-z][0-9A-Za-z'&.\-]*", str(text or "")):
+        word = _normal_word(raw)
+        if not word or word in STOPWORDS:
+            continue
+        out.append(word)
+    return out
+
+
+def headline_tokens(title):
+    """Everything a headline already says, in the comparison's own spelling."""
+    out = set(prose_words(title))
+    out.update(w.lower() for w in re.findall(r"[A-Za-z]+", str(title or "")))
+    for digits in re.findall(r"\d[\d,]*", str(title or "")):
+        out.add(digits.replace(",", ""))
+        out.add(digits)
+    return out
+
+
+def is_title_paraphrase(body, title):
+    """True when the body is mostly made of the headline's own content words."""
+    words = prose_words(body)
+    known = set(prose_words(title))
+    if not words or not known:
+        return False
+    shared = sum(1 for word in words if word in known)
+    return shared / float(len(words)) >= TITLE_PARAPHRASE_SHARE
+
+
+def novel_details(body, title):
+    """The details the body names and the headline does not.
+
+    A detail is a number, a named entity (a capitalised word that is not the
+    sentence's first), a month, or a quoted claim. These are what a reader gets
+    from a summary that a headline cannot give them.
+    """
+    known = headline_tokens(title)
+    found = set()
+    for digits in re.findall(r"\d[\d,]*(?:\.\d+)?%?", body):
+        found.add(digits.replace(",", "").rstrip("%"))
+    for word in re.findall(r"[A-Za-z]+", body):
+        low = word.lower()
+        if low in MONTHS:
+            found.add(low)
+    tokens = re.findall(r"[0-9A-Za-z][A-Za-z'&.\-]*", body)
+    for position, word in enumerate(tokens):
+        if position == 0 or not word[:1].isupper():
+            continue
+        for part in re.split(r"[^A-Za-z0-9]+", word):
+            low = part.lower()
+            if len(low) > 2 and low not in STOPWORDS:
+                found.add(low)
+    for quote in re.findall(r"[\"\u201c\u2018']([^\"\u201d\u2019']{8,})"
+                            r"[\"\u201d\u2019']", body):
+        found.add(_summary_key(quote))
+    return {detail for detail in found
+            if detail and detail not in known
+            and _stem(detail) not in known and detail.lower() not in known}
+
 
 def summary_body(summary):
     """The summary without its claim-status label."""
@@ -1575,6 +1698,9 @@ def is_real_summary(summary, title="", snippet=""):
 
       * an empty body, or a body shorter than REAL_SUMMARY_MIN_CHARS;
       * the headline, or the headline plus the outlet name;
+      * the headline REWRITTEN -- the same content words with different verbs --
+        unless it names something the headline does not (a count, a name, a
+        place, a date, or a quoted claim);
       * the publisher's snippet copied (a feed description is not a summary).
 
     A story that already has real prose answers True and is never rewritten.
@@ -1603,6 +1729,12 @@ def is_real_summary(summary, title="", snippet=""):
         if key.startswith(snippet_key) \
                 and len(key) - len(snippet_key) < TITLE_REMAINDER_MIN_CHARS:
             return False
+    # THE PARAPHRASE ARM, last because it is the narrowest: it only fires on a
+    # body built from the headline's own words, and there it demands a fact the
+    # headline could not have given the reader.
+    if title_key and is_title_paraphrase(body, title) \
+            and not novel_details(body, title):
+        return False
     return True
 
 

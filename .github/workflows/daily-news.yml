@@ -1841,6 +1841,9 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          # The same committed demotion ledger the repair step reads, so a rung
+          # that fails in EITHER summariser call site is skipped by the order.
+          MODEL_COOLDOWN_PATH: state/model_cooldown.json
         run: |
           set -eo pipefail
           : "${STORIES_FLOOR:?the workflow-level STORIES_FLOOR is missing; the derive gate has no floor}"
@@ -2035,7 +2038,14 @@ jobs:
         # touched, and a story no model answers for keeps the publisher's own
         # description with the count saying so. A derived edition returns
         # immediately inside the script.
-        if: env.FALLBACK_NOOP != 'true' && env.DRY_RUN != 'true' && env.EMPTY_DIGEST != 'true'
+        # THE GATE IS "IS THERE ANYTHING TO REPAIR", NOT "WILL THIS RUN SHIP".
+        # It carried `DRY_RUN != 'true'` until 2026-11-05, which made the stage
+        # unverifiable: the one run that exists to prove the repair works was the
+        # one run the gate refused. This stage rewrites state/stories.validated.json
+        # and nothing else -- it sends no notification and commits no state -- so a
+        # dry run now reaches a model and spends model quota on purpose. That cost
+        # is the point: the alternative is verifying the repair only in production.
+        if: env.FALLBACK_NOOP != 'true' && env.EMPTY_DIGEST != 'true'
         # Never block the edition: a repair that cannot reach a model is already
         # labelled by validation's counts, which is the honest state.
         continue-on-error: true
@@ -2052,6 +2062,12 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          # RUN 42061741326: gemini-3.5-flash-lite answered nothing twice (rc=1,
+          # kind `other`) and cost ~99s before gemini-3.1-flash-lite wrote the
+          # batch. The summariser records that here, and this is the committed
+          # file the digest's own cooldown step persists -- so the next run starts
+          # with the rung that answered.
+          MODEL_COOLDOWN_PATH: state/model_cooldown.json
         run: |
           set -eo pipefail
           START=$(date +%s)

@@ -689,21 +689,35 @@ def on_cooldown(row, now):
 COOLDOWN_FILENAME = "model_cooldown.json"
 COOLDOWN_SCHEMA_VERSION = 1
 
-#: How long each cooled-down class stays cooled. Two very different numbers, on
-#: purpose:
+#: How long each cooled-down class stays cooled. Deliberately different numbers:
 #:   model_not_found -- the id is wrong until somebody fixes the list, so a day.
 #:   provider_outage -- genuinely transient, so 15 minutes AND only after the
 #:                      second hit. One 5xx may recover; that is why this is a
 #:                      count and not a marker.
+#:   rung_broken     -- a summariser rung that answered nothing twice, so one
+#:                      digest cycle (6h): skip it next run, re-test it after.
 #: `quota_or_rate_limited` is deliberately ABSENT. The whole free pool shares
 #: that limit, so cooling models down would remove the pool and end the run.
 COOLDOWN_SEC = {
     "model_not_found": 24 * 3600,
     "provider_outage": 15 * 60,
+    # RUN 42061741326 (2026-11-05): the summariser sent its first batch to
+    # gemini-3.5-flash-lite twice, got `rc=1` / kind `other` and no bytes each
+    # time (~99s), then gemini-3.1-flash-lite wrote the batch. The summariser had
+    # NO health memory at all, so nothing was recorded and every run began with
+    # the same dead rung. Six hours is the dedup window: one broken digest cycle,
+    # long enough that the next scheduled run skips it, short enough that a
+    # provider-side blip cannot park a working model for a day.
+    "rung_broken": 6 * 3600,
 }
 
-#: A provider_outage is evidence only when it repeats.
+#: A provider_outage is evidence only when it repeats. `rung_broken` too: one
+#: unanswered batch may be the prompt, two inside COOLDOWN_HIT_TTL_SEC is the rung.
 OUTAGE_HITS_BEFORE_COOLDOWN = 2
+HITS_BEFORE_COOLDOWN = {
+    "provider_outage": OUTAGE_HITS_BEFORE_COOLDOWN,
+    "rung_broken": OUTAGE_HITS_BEFORE_COOLDOWN,
+}
 
 #: An outage hit older than this stops counting toward a pair, so two unrelated
 #: single 5xx a month apart can never add up to a cooldown.
@@ -1120,9 +1134,10 @@ def on_hard_cooldown(doc, model, now=None):
 def record_cooldown(doc, model, kind, at=None):
     """Cool `model` down after a `kind` failure. Returns the row, or None.
 
-    Only COOLDOWN_SEC's two kinds are cooled. `provider_outage` records the hit
-    but does not start a cooldown until OUTAGE_HITS_BEFORE_COOLDOWN, so a single
-    5xx gets its chance. Everything else -- quota above all -- is ignored.
+    Only COOLDOWN_SEC's kinds are cooled. `provider_outage` and `rung_broken`
+    record the hit but do not start a cooldown until HITS_BEFORE_COOLDOWN, so a
+    single failure gets its second chance. Everything else -- quota above all --
+    is ignored.
     """
     seconds = COOLDOWN_SEC.get(kind)
     if not seconds:
@@ -1136,7 +1151,8 @@ def record_cooldown(doc, model, kind, at=None):
     row["hits"] = int(row.get("hits") or 0) + 1
     row["last_hit"] = _iso(at)
     row["reason"] = kind
-    if kind == "provider_outage" and row["hits"] < OUTAGE_HITS_BEFORE_COOLDOWN:
+    needed = HITS_BEFORE_COOLDOWN.get(kind, 1)
+    if row["hits"] < needed:
         return row
     row["until"] = _iso(at + seconds)
     return row

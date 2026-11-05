@@ -201,5 +201,61 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(SNIPPET, payload["stories"][0]["summary"])
 
 
+#: RUN 42061741326 (2026-11-05): two of the summaries that shipped were the
+#: headline rewritten, and every count called them written. Both texts are the
+#: run's own, so this calibration cannot drift into a paraphrase of the defect.
+ANIME_TITLE = "The Dangers in My Heart Season 3 Set for April 2027"
+ANIME = ("Confirmed: A new teaser trailer for the third season of The Dangers "
+         "in My Heart has revealed an April 2027 premiere window.")
+DEUSI_TITLE = ("Kathmandu District Administration issues Deusi-Bhailo "
+               "guidelines")
+DEUSI = ("Confirmed: The Kathmandu District Administration has issued 12 "
+         "guidelines for the safe and dignified conduct of Deusi-Bhailo "
+         "programs this Tihar…")
+
+
+class TheHeadlineParaphraseIsNotASummary(unittest.TestCase):
+    """A body made of the headline's own words is not an account of the story."""
+
+    def test_the_anime_paraphrase_from_the_run_is_a_stub(self):
+        self.assertFalse(
+            vs.is_real_summary(ANIME, ANIME_TITLE),
+            "this shipped as a written summary: it adds 'new teaser trailer' and "
+            "'revealed' to the headline and names nothing the headline did not "
+            "-- not a date, not a number, not a person, not a place")
+
+    def test_the_deusi_summary_that_carries_the_guideline_count_is_prose(self):
+        self.assertTrue(
+            vs.is_real_summary(DEUSI, DEUSI_TITLE),
+            "it names the issuing body, the count of guidelines and the occasion: "
+            "the headline does not carry '12' or 'Tihar'")
+
+    def test_a_paraphrase_that_adds_a_number_is_prose(self):
+        title = "Flood closes schools in Chitwan"
+        body = ("Reported: The flood has closed schools in Chitwan, and 14 of "
+                "them will stay shut for a week while the water recedes.")
+        self.assertTrue(vs.is_real_summary(body, title))
+
+    def test_a_paraphrase_that_adds_a_named_place_is_prose(self):
+        title = "Road washed away in Sindhupalchok"
+        body = ("Reported: The road washed away in Sindhupalchok on Tuesday, and "
+                "the Barhabise bridge is closed to all traffic.")
+        self.assertTrue(vs.is_real_summary(body, title))
+
+    def test_the_labels_own_words_do_not_count_as_a_detail(self):
+        # "Confirmed" is the required label, and "season three" is the headline's
+        # own "Season 3" said differently -- neither is new information.
+        text = ("Confirmed: Season three of The Dangers in My Heart will "
+                "premiere in April 2027, the season the headline describes.")
+        self.assertFalse(vs.is_real_summary(text, ANIME_TITLE))
+
+    def test_prose_sharing_only_generic_words_with_the_headline_is_still_prose(self):
+        title = "Cabinet approves budget"
+        body = ("Reported: Ministers signed off on the spending plan after a "
+                "four-hour meeting, with the health ministry receiving the "
+                "largest share of the increase.")
+        self.assertTrue(vs.is_real_summary(body, title))
+
+
 if __name__ == "__main__":
     unittest.main()
