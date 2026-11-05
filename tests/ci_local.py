@@ -108,6 +108,13 @@ SUITES = (
     ("dynamic_ladder", [sys.executable,
                         "tests/breaking/test_dynamic_model_ladder.py"]),
     ("media", [sys.executable, "tests/media/test_media_extraction.py"]),
+    # The lint of the shell and YAML in .github/workflows, including the very
+    # block that runs this list. 491 tests, 573 s measured -- the slowest entry
+    # here by a factor of three. It is ONE entry because the workflow runs it
+    # once: until 2026-11-03 a separate "Workflow shell/YAML lint gate" step ran
+    # the same command again, and both copies were green, so the duplicate looked
+    # like coverage. If it is ever given a step of its own again, delete this
+    # entry in the same change or the two lists stop being one list.
     ("workflow_lint", [sys.executable, "-m", "unittest", "discover",
                        "-s", "tests/workflows", "-t", ".", "-v"]),
     # Registered alongside U1 itself. This suite pins the two literal ntfy step
@@ -260,12 +267,29 @@ def main(argv=None):
         else:
             print("state/ is absent already: this IS the clean-checkout case")
 
+    # RUNNER_TEMP is set by GitHub and by nothing else. tests/alerts executes the
+    # workflow's ledger-commit shell, which writes "$RUNNER_TEMP/ledger_push.log";
+    # with the variable unset that is "/ledger_push.log", the DRIVE ROOT on
+    # Windows, and three of that suite's tests fail with "Permission denied" for
+    # a reason that has nothing to do with the code they test. One directory per
+    # run, exported to every child, is what makes the local result the CI result;
+    # the caller's own value, if any, is put back on exit.
+    runner_temp = tempfile.mkdtemp(prefix="ci-local-runner-temp-")
+    previous_runner_temp = os.environ.get("RUNNER_TEMP")
+    os.environ["RUNNER_TEMP"] = runner_temp
+    print("RUNNER_TEMP -> %s" % runner_temp)
+
     failed = []
     try:
         for name, cmd in suites:
             if _run(name, cmd, args.verbose) != 0:
                 failed.append(name)
     finally:
+        if previous_runner_temp is None:
+            os.environ.pop("RUNNER_TEMP", None)
+        else:
+            os.environ["RUNNER_TEMP"] = previous_runner_temp
+        shutil.rmtree(runner_temp, ignore_errors=True)
         if moved_to is not None:
             # Restored unconditionally, and verified: a runner that quietly
             # leaves the owner's runtime state in a temp directory is worse

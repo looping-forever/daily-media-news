@@ -45,13 +45,34 @@ jobs:
     # suite. Item 7's typo/flag lint + ladder-sync test + PKB freshness note are
     # the first steps of it.
     #
-    # `timeout-minutes: 25` replaces four separate budgets (5 + 60 + 12 + 10).
-    # The 60 belonged to the flag-drift job's `gh run watch` wait, which was
-    # removed on 2026-10-19: a hung job there could bill a whole hour for nothing.
-    # 25 covers the serial worst case of the four checks and is well under the 87
-    # those budgets added up to.
+    # `timeout-minutes: 46`, MEASURED, NOT GUESSED. History: 25 replaced four
+    # separate budgets (5 + 60 + 12 + 10) on 2026-10-19; the 60 belonged to the
+    # flag-drift job's `gh run watch` wait, removed the same day because a hung
+    # job there could bill a whole hour for nothing. But 25 was never measured
+    # against the MERGED job, and it was BELOW the work: the suite steps alone
+    # take 1,004 s on the owner's Windows box, so a slow-but-correct run was
+    # killed before its last steps and reported as a failure -- the false-red
+    # class this canary exists to catch, produced by the canary itself.
+    #   measured suite work ...... 1,004 s = 16.7 min   (1,578 s before the
+    #                               duplicate `workflow_lint` step was deleted)
+    #                               A second full run 10 minutes later took
+    #                               582 s = 9.7 min, so the spread is ~1.7x and
+    #                               the SLOW figure is the one budgeted: the
+    #                               286 s vs 573 s lint run is the whole gap.
+    #   x 2.5 headroom ........... 2,510 s = 41.8 min
+    #   the one stepped budget ... 42 min for the suite list, which must fit here
+    #   everything else .......... checkout, node, the CLI install, the typo
+    #                              sweep, the live parser canary, the PKB note
+    #                              and the hold commit share the remaining 4 min
+    #                              (an allowance, not a measurement: those steps
+    #                              need network and credentials, so they cannot
+    #                              be timed by tests/ci_local.py)
+    #   -> 46. Raise it only with a fresh `python tests/ci_local.py --extra`.
+    # A timeout is a CEILING, not a cost, and it is not a budget input: the
+    # projection in config/actions-budget.json is `p95_minutes` per job, never a
+    # timeout (see scripts/check_actions_budget.py), so this moves no minute.
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 46
 
     steps:
       - name: Checkout repository
@@ -795,12 +816,16 @@ jobs:
         # Every write lands in a tempfile.mkdtemp() directory, never the repo.
         # NO SUITE IS EXCLUDED — all of them are offline-safe.
         #
-        # There is one more suite in this job, `workflow_lint`, but it is a
-        # SEPARATE STEP below rather than another line here. It is not a
-        # Python-pipeline suite: it lints the shell and YAML in this very
-        # directory, including the block that runs these commands, so
-        # keeping it in its own step keeps its output readable. It is
-        # offline and stdlib-only on the same terms as the rest.
+        # `workflow_lint` runs HERE, as a line of this list, and until
+        # 2026-11-03 it ran TWICE per run: once here and once again from a
+        # "Workflow shell/YAML lint gate" step of its own further down. Same
+        # command, same 491 tests, 573 s each -- 9.6 of this job's 16.7 measured
+        # suite minutes spent proving the same thing to itself. The STEP was
+        # deleted and this line kept, because this list is what
+        # `tests/ci_local.py` mirrors entry for entry and a list with a hole in
+        # it is exactly the drift both files were written to stop; each entry
+        # still prints `::group::<name>`, so the lint's output stays collapsible
+        # in the log, which is all the separate step was buying.
         #
         # No `continue-on-error` here, on purpose. Every suite is still
         # attempted so one run reports the whole picture, and the step then
@@ -819,7 +844,16 @@ jobs:
         # The step NAME above used to read "(7 stdlib suites, offline)" for the
         # same reason it is now unnumbered: a suite count in a label goes stale
         # the moment a suite is added, and nothing fails when it does.
-        timeout-minutes: 10
+        # 42 min = 2.5 x the MEASURED 1,003 s (16.7 min) this step took on
+        # 2026-11-03 via `python tests/ci_local.py`, which runs this exact list,
+        # rounded up. It now includes the 573 s `workflow_lint` run that used to
+        # happen a second time in a step of its own. The old 10 (600 s) was BELOW
+        # the measured time on its own, so a slow day killed the step part-way
+        # down the list and reported a red that named no test. Re-measure before
+        # changing it; do not shrink it back to a round number. The same list
+        # took 582 s (9.7 min) in a second full run minutes later -- mostly the
+        # lint going 573 s -> 286 s -- so the SLOW measurement is the one sized.
+        timeout-minutes: 42
         run: |
           set -uo pipefail
           FAILED=""
@@ -885,6 +919,17 @@ jobs:
           # run rather than trusted once.
           run_suite "dynamic_ladder"  python3 tests/breaking/test_dynamic_model_ladder.py
           run_suite "media"             python3 tests/media/test_media_extraction.py
+          # The lint gate that no amount of passing Python tests could replace
+          # after the two 2026-09-27 outages: Bug A, the opencode flag gate
+          # grepped STDOUT for `--auto` while the CLI had moved `run --help` to
+          # STDERR, so a working flag read as missing and the digest died at its
+          # pre-spend gate; Bug B, an indented heredoc terminator inside a YAML
+          # block scalar, so bash never found column 0 and the step died with
+          # "here-document ... delimited by end-of-file". It lints the shell and
+          # YAML in THIS directory -- including the block below that runs these
+          # commands -- is stdlib-only and fully offline, and fails the job like
+          # any other entry. Locally, it is
+          # `python3 -m unittest discover -s tests/workflows -t . -v`.
           run_suite "workflow_lint"     python3 -m unittest discover -s tests/workflows -t . -v
           # The two literal ntfy step names, pinned by the suite that depends
           # on them. tests/render/test_render_honesty.py slices daily-news.yml
@@ -972,51 +1017,3 @@ jobs:
             exit 1
           fi
           echo "All suites green (exit codes 0; per-suite counts are in the log above)."
-
-      - name: Workflow shell/YAML lint gate
-        # The lint suite, split out so the reason it exists is visible in the
-        # Actions UI and not buried inside the log of a step that runs every
-        # other suite.
-        #
-        # This is the guardrail for the two production outages of 2026-09-27
-        # that 425 passing Python tests did not catch, because every one of
-        # those tests looked at Python and none of them looked at the shell
-        # embedded in this directory:
-        #   Bug A -- the opencode flag gate grepped STDOUT for `--auto` while
-        #     the CLI had moved `run --help` to STDERR, so a working flag read
-        #     as missing and the digest died at its pre-spend gate.
-        #   Bug B -- a `python3 - <<'PY'` heredoc had its body and `PY`
-        #     terminator indented inside a YAML block scalar, so bash never
-        #     found a column-0 terminator and the step died with
-        #     `here-document ... delimited by end-of-file`.
-        #
-        # Same command, run locally, exactly as below:
-        #   python3 -m unittest discover -s tests/workflows -t . -v
-        #
-        # It is stdlib-only and fully offline: no network, no GitHub API, no
-        # Cloudflare, no real `opencode` (the CLI is replaced by a real
-        # executable stub placed first on PATH inside a temp dir, so the
-        # regression test exercises this repository's own gate shell rather
-        # than a reimplementation of it). Writes land in a
-        # tempfile.mkdtemp() directory, never the repo.
-        #
-        # `bash -n` every `run:` block, require every heredoc terminator to
-        # be at column 0 of the PARSED string, require every Python heredoc
-        # body to compile, run the real opencode gate against a stubbed CLI
-        # on all four stream/flag combinations, require every referenced
-        # script and test path to exist, require every `secrets.*` to be on a
-        # committed allowlist, require every `if: always()` step that can
-        # fail after the work succeeded to carry `continue-on-error: true`,
-        # require every step that declares itself an always-run diagnostic to
-        # actually carry `if: always()` (which is what keeps THIS file's origin
-        # canary from being skipped again), require every cron to match a
-        # committed Nepal Time (UTC+05:45) table, and REPORT whether a dry run
-        # can mark a digest slot delivered.
-        #
-        # No `continue-on-error` here, and no pinned test count. The gate is
-        # the exit code, for the same reason the step above has no count: a
-        # pinned number starts lying the moment a test is added and nothing
-        # fails when it does. A lint that can go quietly red is worse than
-        # no lint, so this step fails the job like any other.
-        timeout-minutes: 5
-        run: python3 -m unittest discover -s tests/workflows -t . -v

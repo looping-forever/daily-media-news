@@ -53,7 +53,16 @@ WHAT IT FAILS ON
 4. an entry bills more jobs per run than the workflow actually declares;
 5. the recorded projection no longer matches the computed one, so a number
    cannot be raised (or lowered) without the file being edited on purpose;
-6. the cap plus the reserve for other repositories exceeds the allowance.
+6. the cap plus the reserve for other repositories exceeds the allowance;
+7. an entry's `p95_minutes` is materially below the rate its OWN
+   `measured_october` implies for one job today, unless the entry carries
+   `p95_reduced_since_measurement` saying why the job got cheaper. 2026-11-03:
+   drift-canary billed 2.4 minutes per job for a job taking 9.6 (16.7 measured
+   locally) because 2.4 was October's per-RUN time divided by four jobs that no
+   longer exist. Nothing else in this list can see that: the field is present,
+   the schedule agrees, and a projection computed from a wrong p95 matches
+   itself exactly -- which is how the check reported "+9 spare" under a ceiling
+   the tree was 429 minutes over.
 
 Items 2-6 are NOT the 1776/1800 comparison and are not disarmed by the switch.
 
@@ -68,7 +77,9 @@ allowed to produce, not the runs a day GitHub happens to deliver: GitHub
 24 firings a day" would bill a cost that does not occur, and a model built on
 `timeout-minutes` would flag everything and be ignored. The values committed in
 `config/actions-budget.json` are calibrated against the measured October
-consumption, and each entry records that measurement beside the estimate.
+consumption, and each entry records that measurement beside the estimate. Where
+an entry has a measurement, that measurement is not decoration: failure 7 above
+holds the declared p95 to it.
 
 THIS IS AN ESTIMATE, NOT THE METER. The account's real billing endpoints are
 unreadable to the current token (it lacks the `user` scope), so no endpoint can
@@ -197,6 +208,43 @@ def enforcement_enabled(budget):
     return bool((budget.get("enforcement") or {}).get("enabled"))
 
 
+#: How far a declared `p95_minutes` may sit BELOW the rate the entry's own
+#: `measured_october` implies before it has to be argued. A re-measured job that
+#: got a quarter quicker needs no essay; anything beyond that is a claim that the
+#: job SHRANK, and a claim is what `p95_reduced_since_measurement` is for. The
+#: number is a tolerance, not a rule of physics -- but a factor-four shortfall
+#: (drift-canary 2.4 against a measured 9.6) is not a re-measurement.
+MEASURED_SHORTFALL_TOLERANCE = 0.25
+
+
+def measured_job_minutes(entry):
+    """Minutes of ONE job TODAY, implied by the entry's own measurement.
+
+    `measured_october` records a month of RUNS, so the per-run rate is
+    minutes/runs, and the share of a single job today is that divided by TODAY's
+    `jobs_per_run`. The transformation is the whole point: a workflow that merged
+    four jobs into one now has one job carrying the entire run, and a p95
+    calibrated per job BEFORE that merge under-bills the run by the merge factor.
+    drift-canary billed 2.4 that way -- 393/41/4 -- for a job its own table and a
+    local run both put at 9.6 to 16.7 minutes.
+
+    None when the entry records no measurement, and None when the figures cannot
+    be divided. A missing measurement is not evidence of a lie, and inventing a
+    rate for a manual-dispatch workflow would make this guard the thing that cries
+    wolf.
+    """
+    measured = entry.get("measured_october") or {}
+    try:
+        minutes = float(measured.get("minutes"))
+        runs = float(measured.get("runs"))
+        jobs = float(entry.get("jobs_per_run"))
+    except (TypeError, ValueError):
+        return None
+    if runs <= 0 or jobs <= 0:
+        return None
+    return minutes / runs / jobs
+
+
 # --------------------------------------------------------------------------
 # The accounting
 # --------------------------------------------------------------------------
@@ -264,6 +312,30 @@ def problems(budget, rows, total):
             if entry.get(field) is None:
                 found.append("%s: budget entry has no `%s`." % (name, field))
 
+        # A p95 BELOW the entry's own measurement, and why this is a failure of
+        # the record rather than a stylistic nit. Nothing above could catch it:
+        # the field is present, the crons agree, the job count is legal, and a
+        # recorded projection computed from a wrong p95 matches itself exactly.
+        # That is how drift-canary billed 2.4 minutes for a job taking 9.6 and the
+        # projection claimed spare minutes under a ceiling the tree was over.
+        implied = measured_job_minutes(entry)
+        declared = entry.get("p95_minutes")
+        argued = str(entry.get("p95_reduced_since_measurement") or "").strip()
+        if (implied is not None and isinstance(declared, (int, float))
+                and not argued
+                and float(declared) < implied * (1.0 - MEASURED_SHORTFALL_TOLERANCE)):
+            measured = entry.get("measured_october") or {}
+            found.append(
+                "%s bills %s min per job but its own `measured_october` implies "
+                "%.1f of one job today (%s min over %s runs, divided by the %s "
+                "job(s) the workflow declares now). A `p95_minutes` materially "
+                "below the measurement is not a budget, it is a smaller number: "
+                "re-measure the job, or add `p95_reduced_since_measurement` saying "
+                "in words why it is genuinely cheaper now. Left as it is, the "
+                "projection advertises spare minutes the tree is actually spending."
+                % (name, declared, implied, measured.get("minutes"),
+                   measured.get("runs"), jobs))
+
     # The ONLY check the enforcement switch disarms. With the switch false this
     # number is still printed -- by ceiling_notice() -- but it cannot fail a
     # build, because a free minute cannot be over budget.
@@ -318,9 +390,12 @@ def warnings(budget, total):
         out.append(
             "the projection (%.0f) exceeds the DESIGN TARGET of %.0f (%+.0f). "
             "REPORTED, not enforced: this does not fail the check. Close the gap "
-            "by reducing daily-news.yml volume (the only line above its target), "
-            "or accept it while the hard ceiling holds."
-            % (total, target, total - target))
+            "by reducing daily-news.yml volume (the biggest single line at 1,098) "
+            "or drift-canary.yml frequency, or accept it while the ceiling is "
+            "disarmed -- but do not read it as fitting: the hard ceiling is %.0f "
+            "and this projection is %.0f OVER it."
+            % (total, target, total - target,
+               hard_ceiling(budget), total - hard_ceiling(budget)))
     return out
 
 

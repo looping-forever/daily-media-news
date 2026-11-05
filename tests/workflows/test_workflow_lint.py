@@ -7507,9 +7507,9 @@ class ActionsBudgetTests(unittest.TestCase):
         recorded = float(budget["current_projected_minutes"])
         cap = float(budget["repo_soft_cap_minutes"])
         # The same half-minute tolerance the check itself uses: the projection
-        # is a sum of floats (6.1 and 2.4 are not exact in binary), so the
-        # comparison has to be at a resolution smaller than one billed minute
-        # rather than at floating-point equality.
+        # is a sum of floats (6.1 is not exact in binary), so the comparison has
+        # to be at a resolution smaller than one billed minute rather than at
+        # floating-point equality.
         self.assertAlmostEqual(
             recorded, total, delta=0.5,
             msg="config/actions-budget.json records %s minutes a month but this "
@@ -7526,6 +7526,131 @@ class ActionsBudgetTests(unittest.TestCase):
               "hard ceiling of %.0f (%+.0f) and the design target of %.0f (%+.0f); "
               "measured October was ~3,360"
               % (len(rows), total, ceiling, ceiling - total, cap, cap - total))
+
+    # ------------------------------------------------------------------
+    # p95_minutes must be a MEASUREMENT, not a leftover division (2026-11-03).
+    #
+    # drift-canary billed 2.4 minutes per job. 2.4 was 393/41/4: October's
+    # per-RUN time divided by the four jobs the workflow no longer has. After the
+    # 2026-10-19 merge to one job the same run measures 9.6 min from that very
+    # table and 16.7 min locally, so the entry under-billed by a factor of four
+    # and the projection claimed 9 spare minutes under a ceiling it was 429 over.
+    # A number that low cannot be caught by any of the checks above: it is not a
+    # missing field, the crons agree, the job count is legal and the recorded
+    # projection matches the wrong arithmetic exactly.
+    # ------------------------------------------------------------------
+
+    def _measured_entry(self, p95, **extra):
+        """An entry whose own October measurement says one run took 9.6 minutes.
+
+        393 minutes over 41 runs with ONE job today: the run and the job are the
+        same thing, so anything billed materially below 9.6 claims a job that ran
+        four times faster than the file's own measurement records.
+        """
+        entry = self._entry(1, 1, p95, ["30 0 * * *"])
+        entry["measured_october"] = {"minutes": 393, "runs": 41}
+        entry.update(extra)
+        return entry
+
+    def test_a_p95_materially_below_the_measured_job_is_rejected(self):
+        """The exact defect: 2.4 billed for a job the table says takes 9.6.
+
+        MUTATION PROOF: delete the `measured_job_minutes` block from
+        `problems()` and this goes red on an empty problem list while the
+        projection still prints a comfortable 72 minutes a month.
+        """
+        self._workflow("heavy.yml", cron="30 0 * * *", jobs=1)
+        budget = self._budget({"heavy.yml": self._measured_entry(2.4)},
+                              projected=72.0)
+        problems, total = self._problems(budget)
+        self.assertEqual(72.0, total, "1 run x 1 job x 2.4 min x 30 days is 72")
+        self.assertEqual(1, len(problems), "\n  ".join(problems))
+        self.assertIn("p95_minutes", problems[0])
+        self.assertIn("9.6", problems[0],
+                      "the message must name the measured rate it disagrees "
+                      "with, or a reader cannot tell which number is wrong:\n%s"
+                      % problems[0])
+        self.assertIn("p95_reduced_since_measurement", problems[0],
+                      "the message must offer the acknowledgement, or the only "
+                      "way out looks like fudging the number:\n%s" % problems[0])
+
+    def test_a_p95_derived_from_the_measurement_is_accepted(self):
+        """The honest value passes, and the line is the arithmetic written out.
+
+        One job, one run a day, 17.0 minutes: 510 a month. That is the measured
+        suite work of a full local run (1,002.9 s = 16.7 min) rounded up to
+        whole billed minutes, not a timeout and not a guess.
+        """
+        self._workflow("heavy.yml", cron="30 0 * * *", jobs=1)
+        budget = self._budget({"heavy.yml": self._measured_entry(17.0)},
+                              projected=510.0)
+        problems, total = self._problems(budget)
+        self.assertEqual(510.0, total, "1 run x 1 job x 17.0 min x 30 days is 510")
+        self.assertEqual([], problems, "\n  ".join(problems))
+
+    def test_a_deliberate_reduction_must_say_so(self):
+        """digest-prebuild 4.5 -> 1.5 was real, so it is argued, not inherited.
+
+        A workflow that genuinely got cheaper may bill below its measured rate --
+        but it has to SAY so in the entry, because the silent version of that
+        edit is indistinguishable from the drift-canary mistake.
+        """
+        self._workflow("shrunk.yml", cron="30 0 * * *", jobs=1)
+        silent = self._budget({"shrunk.yml": self._measured_entry(1.5)},
+                              projected=45.0)
+        problems, _total = self._problems(silent)
+        self.assertEqual(1, len(problems), "\n  ".join(problems))
+        self.assertIn("p95_reduced_since_measurement", problems[0])
+
+        argued = self._budget(
+            {"shrunk.yml": self._measured_entry(
+                1.5,
+                p95_reduced_since_measurement="the second job was deleted and "
+                                              "the poll narrowed to 5x6s")},
+            projected=45.0)
+        problems, _total = self._problems(argued)
+        self.assertEqual([], problems,
+                         "an acknowledged reduction must pass:\n%s"
+                         % "\n  ".join(problems))
+
+    def test_an_entry_with_no_measurement_is_not_second_guessed(self):
+        """No measurement is not evidence of a lie.
+
+        Four entries here are manual-dispatch ceilings with no October runs
+        behind them. Inventing a rate for them would make the guard the thing
+        that cries wolf.
+        """
+        self._workflow("new.yml", cron="30 0 * * *", jobs=1)
+        budget = self._budget({"new.yml": self._entry(1, 1, 0.2, ["30 0 * * *"])},
+                              projected=6.0)
+        problems, _total = self._problems(budget)
+        self.assertEqual([], problems, "\n  ".join(problems))
+
+    def test_the_drift_canary_line_is_one_job_times_thirty(self):
+        """The real tree, arithmetic ASSERTED rather than printed.
+
+        The merge to one job is the whole reason the line was wrong, so the
+        multiplication is pinned where the mistake happened: one run a day times
+        one job times p95, not four jobs times a per-job number calibrated when
+        four existed.
+        """
+        check = _load_budget_checker()
+        budget = check.load_budget()
+        rows, total = check.projects(budget, ["drift-canary.yml"])
+        row = rows[0]
+        entry = row["entry"]
+        self.assertEqual(1, entry["jobs_per_run"])
+        self.assertEqual(1, entry["max_runs_per_day"])
+        self.assertAlmostEqual(
+            float(entry["p95_minutes"]) * 1.0 * 1.0 * 30.0, row["expected"],
+            delta=0.5,
+            msg="the drift-canary line must be p95 x 1 job x 1 run x 30 days; "
+                "the check computed %s" % row["expected"])
+        rows_all, total_all = check.projects(budget)
+        self.assertAlmostEqual(float(budget["current_projected_minutes"]),
+                               total_all, delta=0.5,
+                               msg="the recorded projection must be the sum of "
+                                   "every line those lines actually produce")
 
     def test_the_enforcement_switch_ships_off_and_the_worker_agrees(self):
         """The runtime quota ships DISARMED, and both copies of the flag agree.
