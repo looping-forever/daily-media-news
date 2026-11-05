@@ -1139,9 +1139,11 @@ def label_from_npt_stamp(stamp):
 def digest_label(word, clock):
     """The rendered label for a MEASURED instant: `'Evening Digest · 19:25'`.
 
-    The surfaces that really know the instant they name use this one -- the ntfy
-    push, which renders microseconds before the POST. The email is built during
-    the prebuild and does not; it uses `delivery_label`.
+    The plain shape for a caller naming an instant it read rather than a slot it
+    was told about. No shipped surface uses it any more: the page, the email and
+    the ntfy push all name the slot and the minute it is due, through their own
+    `delivery_label`. Kept because the shape is pinned by the tests that compare
+    the three copies of the boundary table.
     """
     return "%s Digest · %s" % (word, clock)
 

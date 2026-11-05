@@ -2514,11 +2514,16 @@ jobs:
           #
           # `kind` (the SLOT) stays exactly what it was: it is the word the KV
           # key, the artifact filename and state/last_digest_sent.json are keyed
-          # on, and none of those may move. What changed is the WORD THE OWNER
-          # READS, which used to be `kind` and so said "Evening" on a push that
-          # had fired at 02:03. It is now read out of the real instant at push
-          # time -- this heredoc runs microseconds before the POST below, so
-          # this IS the send time and nothing here is predicted.
+          # on, and none of those may move. The title NAMES that slot and the
+          # minute it is due, so the word is looked up from the due minute in
+          # the boundary table below -- the same table and the same boundaries
+          # as the web renderer -- and the minute itself comes from SLOT_DUE_UTC,
+          # the same copy the ledger's honesty gate reads.
+          #
+          # It used to be read off the send instant instead, and that is what
+          # pushed `🌇 Evening Digest · 17:28` for a run dispatched as
+          # `morning` (42020504648): the word and the clock agreed with each
+          # other and with nothing else the owner could see.
           #
           # Same table and same boundaries as the web renderer's
           # LABEL_HOUR_BOUNDS in scripts/render_digest.py. Duplicated on
@@ -2546,10 +2551,10 @@ jobs:
           # time-of-day labelling twice and both halves of that pair came from
           # two different clocks, which is why they could disagree.
           #
-          # Keyed by `label_word`, which `npt_label()` derives from the real
-          # push instant microseconds below, the icon and the word are now two
-          # views of ONE instant: there is no way for them to fall apart
-          # without also breaking the word itself. One entry per word in
+          # Keyed by `label_word`, which `send_label_for()` derives from the
+          # minute the title prints, the icon, the word and the clock are three
+          # views of ONE instant: there is no way for them to fall apart without
+          # also breaking the word itself. One entry per word in
           # LABEL_HOUR_BOUNDS -- eight of them -- so a new word cannot ship
           # without an icon, and a renamed word cannot ship with the wrong one.
           LABEL_WORD_EMOJI = {
@@ -2593,6 +2598,21 @@ jobs:
                           tzinfo=datetime.timezone.utc)
               return datetime.datetime.now(datetime.timezone.utc)
 
+          def label_word_for_hour(hour):
+              """The word for one NPT hour (0-23), out of LABEL_HOUR_BOUNDS.
+
+              The scan takes the LAST bound at or below `hour`, which is what
+              makes the wrap at midnight work without a special case.
+              """
+              hour = int(hour)
+              word = LABEL_HOUR_BOUNDS[0][1]
+              for start_hour, candidate in LABEL_HOUR_BOUNDS:
+                  if hour >= start_hour:
+                      word = candidate
+                  else:
+                      break
+              return word
+
           def npt_label(instant_utc):
               """(word, 'HH:MM') for `instant_utc`, in Nepal time.
 
@@ -2602,13 +2622,7 @@ jobs:
               morning from night that would be the worst place to repeat it.
               """
               npt = (instant_utc.replace(tzinfo=None) + NPT_OFFSET)
-              word = LABEL_HOUR_BOUNDS[0][1]
-              for start_hour, candidate in LABEL_HOUR_BOUNDS:
-                  if npt.hour >= start_hour:
-                      word = candidate
-                  else:
-                      break
-              return word, npt.strftime('%H:%M')
+              return label_word_for_hour(npt.hour), npt.strftime('%H:%M')
 
           def write_flag(value):
               with open(FLAG_PATH, 'w', encoding='utf-8') as fh:
@@ -2915,6 +2929,44 @@ jobs:
               return datetime.datetime(day.year, day.month, day.day,
                                        hour_minute[0], hour_minute[1],
                                        tzinfo=datetime.timezone.utc)
+
+          def slot_due_npt(slot):
+              """'HH:MM' Nepal time the committed schedule says `slot` is due at.
+
+              EMPTY when the slot has no scheduled minute. Read out of the same
+              SLOT_DUE_UTC the honesty gate below uses, so the minute the phone
+              shows and the earliest instant a send can be recorded at cannot
+              be two different numbers.
+              """
+              hour_minute = SLOT_DUE_UTC.get(str(slot or '').strip().lower())
+              if hour_minute is None:
+                  return ''
+              due = (datetime.datetime(2000, 1, 1, hour_minute[0],
+                                       hour_minute[1]) + NPT_OFFSET)
+              return due.strftime('%H:%M')
+
+          def send_label_for(slot, instant_utc):
+              """(label, word) for the push title -- the SAME label the page prints.
+
+              IT NAMES THE EDITION, NOT THE MOMENT IT LEFT. Run 42020504648 was
+              dispatched as `morning` and pushed `Evening Digest · 17:28`: the
+              word and the clock both came from the wall clock, so the shade
+              named a different edition from the page, the email subject and the
+              ledger record for the same digest. The slot is what all of those
+              are keyed on, so the slot is what the title names, and the minute
+              beside it is the scheduled one, said out loud as `due`.
+
+              The word is derived from the PRINTED minute, which is what makes
+              the word, the clock and the icon three views of one instant. A
+              slot with no scheduled minute falls back to the send instant,
+              named `built`, exactly as the page does.
+              """
+              due = slot_due_npt(slot)
+              if due:
+                  word = label_word_for_hour(int(due.split(':')[0]))
+                  return '%s Digest · due %s' % (word, due), word
+              word, clock = npt_label(instant_utc)
+              return '%s Digest · built %s' % (word, clock), word
 
           def slot_was_served(entry, date, slot, field='ntfy_sent_at'):
               """Does this row PROVE the slot was delivered? Never raises.
@@ -3369,9 +3421,9 @@ jobs:
               # the payload for every test in the repo.
               is_supersede = (trigger_source == 'supersede')
 
-              # The word the owner reads, and the clock it was read at. Both
-              # from the real instant, taken ONCE so the three title shapes
-              # below cannot disagree with each other. `kind` is untouched.
+              # The edition the owner reads, and the minute it was due. Both
+              # come from the SLOT, taken ONCE so the three title shapes below
+              # cannot disagree with each other. `kind` is untouched.
               #
               # NAMED `send_label`, NOT `label`. This heredoc already uses the
               # bare name `label` for two other, unrelated things -- a story's
@@ -3381,8 +3433,7 @@ jobs:
               # exactly the kind of wrong-claim bug this file is built to
               # prevent, and it would take someone hoisting a variable out of
               # one of those two functions to cause it.
-              label_word, label_clock = npt_label(send_now_utc())
-              send_label = '%s Digest · %s' % (label_word, label_clock)
+              send_label, label_word = send_label_for(kind, send_now_utc())
 
               # --- Load validated stories ---
               stories = []

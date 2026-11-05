@@ -1122,12 +1122,17 @@ class PayloadIsIdenticalAcrossPhasesTests(TempCase):
             work.mkdir(exist_ok=True)
             got = run_ntfy(str(work), validated_payload("degraded"),
                            kind="morning", now_utc=PINNED_SEND_UTC)
-            # The clock is an INPUT, so the title must show it. This is what
-            # makes a re-read of the wall clock a deterministic failure rather
-            # than a flake that only shows up across a minute boundary.
+            # The title is pinned by the SLOT now, not by the send instant, and
+            # that is a stronger version of what this test exists to prove: the
+            # same slot produces the same title at 18:45 and at 02:03, so a
+            # re-read of the wall clock has nothing left to leak into it. The
+            # dispatched slot here is `morning`, and the old assertion in this
+            # spot expected `Evening` -- the send clock's word -- which is the
+            # defect the slot label removes.
             self.assertIn(
-                "Evening Digest \u00b7 18:45", got["title"],
-                "the title did not use the pinned send instant %s: %r"
+                "Morning Digest \u00b7 due 07:20", got["title"],
+                "the title does not name the dispatched slot and its due minute "
+                "(send instant pinned to %s): %r"
                 % (PINNED_SEND_UTC, got["title"]))
             payloads[phase] = json.dumps(got, ensure_ascii=False,
                                          sort_keys=True)

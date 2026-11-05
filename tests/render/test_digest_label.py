@@ -1,16 +1,32 @@
 #!/usr/bin/env python3
-"""tests/render/test_digest_label.py — the label says WHEN, not WHICH SLOT.
+"""tests/render/test_digest_label.py — the label names the EDITION and its DUE time.
 
 THE OWNER'S COMPLAINT, VERBATIM
 -------------------------------
     "instead of evening can you add the time it send in... look at top right
-    at that evening, if i get some important news in like 2am then it will
-    still say evening even though its not."
+     at that evening, if i get some important news in like 2am then it will
+     still say evening even though its not."
 
-So the word the owner reads stopped following the clock. It was
-`--digest-time` -- the SLOT -- which is structural identity, not a claim about
-what time it is. A slot that slipped from 07:50 to 02:03 kept saying
-"Morning"/"Evening" because the slot never moves and a clock always does.
+AND THE ONE THAT REOPENED IT
+----------------------------
+Run 42020504648 was dispatched as `morning` and pushed
+`🌇 Evening Digest · 17:28 · 2026-11-05 · 4 items · high-priority`. The word
+followed the wall clock while the page, the email subject and the ledger all
+said morning, so the one surface read first named a different edition from
+the other three.
+
+THE RULE, AND IT IS ONE RULE FOR ALL THREE SURFACES
+---------------------------------------------------
+The word says WHICH EDITION this is -- the slot, which is what the archive
+path, the KV key, the email subject and the page are keyed on -- and the clock
+says WHEN THAT EDITION WAS DUE (`· due 07:20`), never when the push happened to
+leave. The word is derived from that due minute, so the two cannot disagree,
+and the push prints exactly the label `delivery_label` gives the page.
+
+The owner's 02:03 case is still honoured, in the shape it actually occurs: a
+build with no scheduled slot prints its own instant, named `built`, and never
+borrows a slot's minute.
+
 
 WHAT THIS FILE PINS, AND WHY EACH PART IS HERE
 ---------------------------------------------
@@ -574,12 +590,17 @@ class TestThePageNeverPrintsATimeItDidNotKnow(unittest.TestCase):
     (07:20 / 19:20) with the word `due`, because that minute is a fact that
     existed before the build started: it is read out of `deploy/schedule.json`,
     which is already pinned against the Worker's own dispatcher. What it may
-    NOT do is print a send time, because no build can know when a push leaves,
-    and the surface that DOES know (ntfy) renders at push time.
+    NOT do is print a send time, because no build can know when a push leaves --
+    and neither does the push, once the push names the same edition.
 
     The degradation is the half that makes this honest rather than merely
     convenient: a build with no scheduled slot prints the build instant, says
     `built`, and never borrows a minute that was never intended for it.
+
+    THE PUSH NOW PRINTS THE SAME LABEL. It used to print its own send minute,
+    which meant the one surface that COULD have agreed with this page was the
+    one that did not: run 42020504648 was dispatched as `morning` and pushed
+    `Evening Digest · 17:28` beside a page that said `Morning · due 07:20`.
     """
 
     META = {"source_health": {"state": "ok", "source_results": [],
@@ -1206,9 +1227,9 @@ class TestArchiveScrapersSurviveTheTitleChange(unittest.TestCase):
 class TestNtfyTitle(unittest.TestCase):
     """The push is the surface the owner actually named ("top right").
 
-    THIS IS THE ONE SURFACE THAT REALLY KNOWS WHEN IT WAS SENT. The heredoc
-    builds the title microseconds before the POST below it, so the clock it
-    renders is the push instant and not a prediction.
+    It names the SLOT it was dispatched for and the minute that slot is due,
+    which is the same label `delivery_label` gives the page and the email --
+    the three surfaces are compared to each other, not to three expectations.
     """
 
     TITLE_MAX_CHARS = 72
@@ -1233,56 +1254,111 @@ class TestNtfyTitle(unittest.TestCase):
             % (len(title), title))
         self.assertLessEqual(len(got["message"].encode("utf-8")), self.MAX_BYTES)
 
-    def test_the_title_carries_the_real_push_clock_in_npt(self):
-        """The clock in the title is NPT *now*, to the minute.
+    def test_the_title_names_the_slot_and_the_minute_it_was_due(self):
+        """A morning dispatch says Morning · due 07:20, whatever the clock says.
 
-        Asserted by re-reading the clock the test itself sees and comparing,
-        rather than by comparing against a fixed constant that would silently
-        rot. A one-minute tolerance covers the seconds between the heredoc's
-        `now()` and this assertion; a title stamped 40 minutes early (the
-        prebuild lead) or stamped in UTC would both fail it by a wide margin,
-        which is the whole failure being guarded.
+        Run 42020504648 is the case: dispatched as `morning`, it left at 17:28
+        NPT and pushed `Evening Digest · 17:28`, so the surface read first named
+        a different edition from the page, the email subject and the ledger.
+
+        Both slots are asserted, because one of them passing is how the pair got
+        out of step in the first place. The expected minute comes from
+        `render_digest.slot_due_npt`, which is itself pinned to the raw cron in
+        `deploy/schedule.json`, so this cannot agree with a hard-coded 07:20.
+        """
+        for kind in ("morning", "evening"):
+            with self.subTest(kind=kind):
+                due = render_digest.slot_due_npt(kind)
+                word = render_digest.label_word_for_hour(int(due.split(":")[0]))
+                tmp = tempfile.mkdtemp(prefix="label-ntfy-")
+                try:
+                    got = run_ntfy(tmp, self._payload(), kind=kind,
+                                   now_utc="2026-11-05T11:43:00Z")
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
+                self.assertIn("%s Digest · due %s · " % (word, due),
+                              got["title"])
+
+    def test_the_title_does_not_carry_the_send_minute(self):
+        """11:43Z is 17:28 NPT, and neither may reach the title.
+
+        This is the exact inverse of what this file used to assert. It is a
+        deliberate change of specification, not a loosened assertion: a push
+        that prints its own send minute cannot agree with a page written forty
+        minutes earlier, and the two must agree. The send instant is still
+        recorded -- in the ledger and in the ntfy payload's own fields -- where
+        it is a fact about the delivery rather than about the edition.
         """
         tmp = tempfile.mkdtemp(prefix="label-ntfy-")
         try:
-            got = run_ntfy(tmp, self._payload())
+            got = run_ntfy(tmp, self._payload(), kind="morning",
+                           now_utc="2026-11-05T11:43:00Z")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
         title = got["title"]
-        m = re.search(r"Digest · (\d{2}):(\d{2}) ·", title)
-        self.assertIsNotNone(
-            m, "the ntfy title carries no clock time at all: %r" % title)
-        npt_now = (datetime.datetime.now(datetime.timezone.utc).replace(
-            tzinfo=None) + NPT)
-        self.assertEqual(m.group(1), npt_now.strftime("%H"),
-                         "the title's HOUR is not the current Nepal hour, so "
-                         "the clock is not the push instant: %r" % title)
-        delta = abs(int(m.group(2)) - int(npt_now.strftime("%M")))
-        # 0-59 minutes apart; allow the minute boundary to roll.
-        self.assertTrue(delta <= 1 or delta >= 59,
-                        "the title's MINUTE is %s but Nepal is now %s -- the "
-                        "clock is not the push instant: %r"
-                        % (m.group(2), npt_now.strftime("%M"), title))
+        self.assertNotIn("17:28", title)
+        self.assertNotIn("11:43", title)
+        self.assertNotIn("Evening", title)
 
-    def test_the_title_word_is_one_of_the_eight_and_not_the_slot_word(self):
-        """Whatever the clock says, the word comes from the table.
+    def test_a_manual_run_at_any_hour_still_names_the_slot_it_asked_for(self):
+        """No clock is pinned here: the real instant is used.
 
-        The slot word can only be correct by coincidence now, so this asserts
-        the word is drawn from the table and that the title format no longer
-        interpolates the slot.
+        A manual dispatch means "build this slot now", so the slot is the
+        identity at 03:00 and at 15:00 alike. Pinning no clock is the point --
+        this has to hold whenever the suite runs, not at one chosen minute.
         """
         tmp = tempfile.mkdtemp(prefix="label-ntfy-")
         try:
-            got = run_ntfy(tmp, self._payload(), kind="morning")
+            got = run_ntfy(tmp, self._payload(), kind="evening")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-        title = got["title"]
-        self.assertRegex(title, r"Digest · \d{2}:\d{2} ·")
-        words = set(render_digest.LABEL_HOUR_BOUNDS[i][1]
-                    for i in range(len(render_digest.LABEL_HOUR_BOUNDS)))
-        self.assertTrue(
-            any(("%s Digest ·" % w) in title for w in words),
-            "the title's word is not one of %s: %r" % (sorted(words), title))
+        due = render_digest.slot_due_npt("evening")
+        self.assertIn("Evening Digest · due %s · " % due, got["title"])
+
+    def test_a_build_with_no_scheduled_slot_states_its_own_clock(self):
+        """`built 02:03` for anything that is not a morning or evening slot.
+
+        This is the owner's 02:03 case, kept honest rather than dropped: a
+        breaking build has no scheduled minute to quote, so it prints the
+        instant it was built and says so. It must never borrow 07:20.
+        """
+        tmp = tempfile.mkdtemp(prefix="label-ntfy-")
+        try:
+            got = run_ntfy(tmp, self._payload(), kind="breaking",
+                           now_utc="2026-10-11T20:18:00Z")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertIn("Late Night Digest · built 02:03 · ", got["title"])
+        self.assertNotIn("due 07:20", got["title"])
+        self.assertNotIn("due 19:20", got["title"])
+
+    def test_the_push_title_and_the_page_name_the_same_edition(self):
+        """Two surfaces, one payload, executed from the shipped bytes.
+
+        The push is run from the workflow's own heredoc and the page is built by
+        the real renderer, so this compares the two implementations rather than
+        two expectations written in this file. A push that agrees only with a
+        literal here would pass a weaker test and still show the owner one
+        edition in the shade and another on the page.
+        """
+        meta = {"source_health": {"state": "ok", "source_results": [],
+                                  "by_category": {}}}
+        for kind in ("morning", "evening"):
+            with self.subTest(kind=kind):
+                tmp = tempfile.mkdtemp(prefix="label-ntfy-")
+                try:
+                    title = run_ntfy(tmp, self._payload(), kind=kind,
+                                     now_utc="2026-11-05T11:43:00Z")["title"]
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
+                label = render_digest.delivery_label(kind, "2026-11-05 06:41")[0]
+                self.assertIn(label, title,
+                              "the push does not carry the label the page will "
+                              "print (%r): %r" % (label, title))
+                page = render_digest.render_page(
+                    [], kind, "2026-11-05", "2026-11-05 06:41", meta)
+                self.assertIn(
+                    "Personal News Informer — %s — 2026-11-05" % label, page)
 
     def test_the_workflow_step_names_the_tests_slice_out_are_unchanged(self):
         """Renaming either step breaks all 26 ntfy tests with an IndexError.
@@ -1337,12 +1413,19 @@ class TestNtfyTitle(unittest.TestCase):
                          "the ntfy heredoc calls the naive local clock; a "
                          "local-time label is hours out in Nepal")
 
-    def test_the_heredoc_no_longer_builds_a_title_from_the_slot_word(self):
+    def test_the_word_is_looked_up_by_the_due_minute_not_by_the_slot_name(self):
+        """`Morning` is what the 07:20 row of the table says, not `kind.title()`.
+
+        Capitalising the slot happens to give the right word today, which is
+        exactly why it is worth forbidding: the table is what the page, the
+        email and the icon are all read from, and a second derivation of the
+        same word is a second thing to keep in step.
+        """
         code = ntfy_source()
         self.assertNotIn(
             "kind.capitalize()", code,
-            "a push title is still being built from the SLOT word; that is the "
-            "defect this change exists to remove")
+            "a push label is being built from the SLOT name rather than from the "
+            "boundary table that the other two surfaces read")
 
     def test_the_push_title_variable_is_not_shadowed_by_the_two_local_labels(self):
         """The title's variable cannot be the bare name `label`.
@@ -1394,8 +1477,8 @@ class TestNtfyTitle(unittest.TestCase):
         a payload predating `summary_counts` still has to admit itself.
         """
         code = ntfy_source()
-        self.assertIn("send_label = '%s Digest · %s' % (label_word, label_clock)",
-                      code)
+        self.assertIn("send_label, label_word = send_label_for(kind, "
+                      "send_now_utc())", code)
         # Counted as AST Name nodes, NOT as raw text: a comment that mentions
         # the variable (as the comment explaining the rename does) would
         # otherwise change the count and make this test lie about what it
@@ -1420,35 +1503,34 @@ class TestWorstCaseBudgets(unittest.TestCase):
 
     #: The shipped push-title format, reproduced here rather than imported,
     #: because the budget belongs to the TITLE STRING and the string is what a
-    #: phone truncates. `emoji <word> Digest · HH:MM · <date> · <n> items`.
+    #: phone truncates. `emoji <word> Digest · due HH:MM · <date> · <n> items`.
     @staticmethod
     def _title(emoji, word, hhmm, n):
-        return "%s %s · 2026-10-12 · %d %s" % (
-            emoji, render_digest.digest_label(word, hhmm), n,
-            "item" if n == 1 else "items")
+        return "%s %s Digest · due %s · 2026-10-12 · %d %s" % (
+            emoji, word, hhmm, n, "item" if n == 1 else "items")
 
     @staticmethod
     def _worst_title():
         """`(length, title)` for the longest push title that can actually exist.
 
-        Per band, because a word can only ever be paired with the hours it
-        covers; crossing every word with every clock would report a worst case
-        the table cannot produce.
+        THE VOCABULARY IS TWO WORDS, NOT EIGHT. `daily-news.yml` is FATAL on any
+        digest_time other than morning or evening (the date step refuses it),
+        so a real push always carries one of two pairs: 07:20/Morning or
+        19:20/Evening. The other six words can only reach a title through the
+        `built` fallback, which this workflow cannot produce -- and
+        `test_the_fallback_shape_also_fits` measures that shape on its own
+        rather than letting it inflate this figure.
+
+        The clock is the slot's DUE minute, so there is no longest-minute search
+        any more: the pair is fixed by the slot.
         """
         longest, longest_title = 0, ""
-        for hour, word in enumerate(EXPECTED_WORD_BY_HOUR):
-            end_hour = hour
-            for probe in range(hour, 24):
-                if EXPECTED_WORD_BY_HOUR[probe] != word:
-                    break
-                end_hour = probe
-            last_minute = "%02d:59" % end_hour
-            for emoji in EXPECTED_WORD_EMOJI.values():
-                for n in (1, 12, 999):
-                    title = TestWorstCaseBudgets._title(emoji, word,
-                                                        last_minute, n)
-                    if len(title) > longest:
-                        longest, longest_title = len(title), title
+        for word, hhmm in (("Morning", "07:20"), ("Evening", "19:20")):
+            for n in (1, 12, 999):
+                title = TestWorstCaseBudgets._title(
+                    EXPECTED_WORD_EMOJI[word], word, hhmm, n)
+                if len(title) > longest:
+                    longest, longest_title = len(title), title
         return longest, longest_title
 
     def test_the_worst_case_title_fits_a_phone_notification(self):
@@ -1488,7 +1570,7 @@ class TestWorstCaseBudgets(unittest.TestCase):
             % (longest, self.TITLE_MAX_CHARS, len(EXPECTED_WORD_EMOJI),
                ascii(longest_title)))
 
-    def test_a_reason_clause_still_fits_after_the_clock_was_added(self):
+    def test_a_reason_clause_still_fits_after_the_slot_word_was_added(self):
         """The escalation clause is the thing the 72 cap actually protects.
 
         The clause is only appended while the WHOLE title fits, so a longer word
@@ -1498,8 +1580,8 @@ class TestWorstCaseBudgets(unittest.TestCase):
         so the owner's normal morning push lost the clause that tells him why
         his phone just went loud.
 
-        Asserted for BOTH slots at a realistic item count, because the morning
-        push is the one a long word would have hurt.
+        `due ` is four characters more than the bare clock the band table used
+        to print, which is why this is measured rather than assumed.
         """
         for slot_word, clock in (("Morning", "07:20"), ("Evening", "19:20")):
             with self.subTest(slot_word=slot_word):
@@ -1512,27 +1594,26 @@ class TestWorstCaseBudgets(unittest.TestCase):
                     "would silently lose the reason it escalated (%d chars): %r"
                     % (slot_word.lower(), len(title) + len(reason) + 3, title))
 
-    def test_the_worst_case_word_does_not_shrink_the_clause_budget(self):
-        """The clause survives for every word, not just the two slot words.
+    def test_the_fallback_shape_also_fits(self):
+        """`built HH:MM` for a slot with no schedule, measured at its longest.
 
-        A vocabulary change is allowed to make a title longer; it is not allowed
-        to make the escalation clause disappear for most of the day. This
-        measures, for all eight words at a 12-item digest, whether the clause
-        still fits -- which is the real cost of a long word, and the reason
-        "Early Morning" was not kept.
+        The fallback keeps all eight words, so its worst case is four characters
+        longer than a slot title. It has no reason clause to protect -- an
+        unnamed build has nothing to escalate about -- so the only guarantee it
+        owes is the 72-character shade itself.
         """
-        dropped = []
+        longest, sample = 0, ""
         for hour, word in enumerate(EXPECTED_WORD_BY_HOUR):
-            title = self._title(EXPECTED_WORD_EMOJI[word], word,
-                                "%02d:00" % hour, 12)
-            reason = "3 deadlines due"
-            if len(title) + len(reason) + 3 > self.TITLE_MAX_CHARS:
-                dropped.append((word, len(title) + len(reason) + 3))
-        self.assertEqual(
-            dropped, [],
-            "these words push the 12-item title past the point where the "
-            "escalation clause still fits, so a digest in that part of the day "
-            "would go loud with no reason given: %r" % (dropped,))
+            title = "%s %s Digest · built %02d:59 · 2026-10-12 · 12 items" % (
+                EXPECTED_WORD_EMOJI[word], word, hour)
+            if len(title) > longest:
+                longest, sample = len(title), title
+        self.assertLessEqual(
+            longest, self.TITLE_MAX_CHARS,
+            "the fallback title is %d characters: %r" % (longest, sample))
+        sys.stderr.write(
+            "\n    [label] worst fallback title = %d/%d chars: %s\n"
+            % (longest, self.TITLE_MAX_CHARS, ascii(sample)))
 
 
 # ===========================================================================
@@ -1689,34 +1770,32 @@ class TestTheEmojiFollowsTheWord(unittest.TestCase):
                          "push and a 23:59 push look identical: %r"
                          % (night_icons,))
 
-    def test_the_real_push_title_carries_the_icons_word(self):
+    def test_the_real_push_title_carries_the_slots_word_and_icon(self):
         """Run the actual heredoc and read the title it really produced.
 
-        Everything above is about the source; this is about the bytes. The
-        rendered title's leading glyph must be the icon the map gives the word
-        that the same title names, checked against the current Nepal clock
-        rather than a constant that could rot.
+        Everything above is about the source; this is about the bytes. The push
+        is executed at a pinned 17:28 NPT -- an hour whose own word is
+        `Evening` -- for a MORNING slot, so a title that followed the clock
+        would pass a weaker test and fail this one.
         """
         tmp = tempfile.mkdtemp(prefix="label-emoji-")
         try:
-            got = run_ntfy(tmp, self._payload())
+            got = run_ntfy(tmp, self._payload(), kind="morning",
+                           now_utc="2026-11-05T11:43:00Z")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
         title = got["title"]
-        npt_now = datetime.datetime.now(datetime.timezone.utc).astimezone(
-            render_digest.NPT_TZ)
-        expected_word = render_digest.label_word_for_hour(npt_now.hour)
-        # The clock can cross an hour boundary between the heredoc's read and
-        # this one; accept either word the two neighbouring hours produce.
-        for hour in {npt_now.hour, (npt_now.hour - 1) % 24}:
-            word = render_digest.label_word_for_hour(hour)
-            if ("%s Digest · " % word) in title:
-                self.assertTrue(
-                    title.startswith(EXPECTED_WORD_EMOJI[word]),
-                    "the title %r does not begin with the icon the map gives "
-                    "%r (%r)" % (title, word, EXPECTED_WORD_EMOJI[word]))
-                return
-        self.fail("the rendered title %r carries no word from the table" % title)
+        word = render_digest.label_word_for_hour(
+            int(render_digest.slot_due_npt("morning").split(":")[0]))
+        expected = "%s %s Digest" % (EXPECTED_WORD_EMOJI[word], word)
+        self.assertTrue(
+            title.startswith(expected),
+            "the title %r does not begin with the icon and word the morning "
+            "slot gives (%r) -- the label is still read off the send hour"
+            % (title, expected))
+        # And the word is the ledger's own identity, lowercased, so the shade
+        # and the archive path can never name two different editions.
+        self.assertEqual(word.lower(), "morning")
 
     def _payload(self, count=3):
         payload = validated_payload("ok")

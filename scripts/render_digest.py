@@ -333,10 +333,13 @@ NPT_TZ = datetime.timezone(KATHMANDU_UTC_OFFSET)
 #: ceiling. Tests/render/test_digest_label.py measures both tables' titles so
 #: this cannot be re-litigated on opinion.
 #:
-#: WHAT THE WORDS ARE NOT. Not the slot, and not a forecast: the morning slot
-#: firing at 02:03 says Late Night, and the evening slot firing at 07:20 says
-#: Morning. The slot is structural identity -- see `digest_time` -- and it has
-#: never been allowed to speak for the clock.
+#: WHAT THIS TABLE IS APPLIED TO, AND WHAT IT IS NOT. It is a clock -> word map
+#: and nothing else. `delivery_label` applies it to a slot's DUE minute when the
+#: committed schedule names one, and to the build/send instant only when it does
+#: not (`built 02:03` then says Late Night, correctly). So a morning push that
+#: leaves at 17:28 reads "Morning Digest · due 07:20": the word is the 07:20 row,
+#: and the clock beside it is the same minute. The slot has still never been
+#: allowed to speak for the clock -- the clock is read, and the word follows it.
 LABEL_HOUR_BOUNDS = (
     (0, "Midnight"),
     (1, "Late Night"),
@@ -438,9 +441,11 @@ def label_from_npt_stamp(stamp):
 def digest_label(word, clock):
     """The rendered label for a MEASURED instant: `'Evening Digest · 19:25'`.
 
-    Used by the surfaces that really do know the instant they are naming -- the
-    ntfy push, which renders microseconds before the POST. A page built during
-    the prebuild does NOT use this one; it uses `delivery_label`.
+    The plain shape for a caller naming an instant it read rather than a slot it
+    was told about. No shipped surface uses it any more: the page, the email and
+    the ntfy push all name the slot and the minute it is due, through
+    `delivery_label`. Kept because the shape is pinned by the tests that compare
+    the three copies of the boundary table.
     """
     return "%s Digest · %s" % (word, clock)
 
