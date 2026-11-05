@@ -55,8 +55,14 @@ SUMMARY_MAX_CHARS = 240
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "config")
 
-NOTE = ("Unsummarised edition: %s, so the text under each headline is the "
-        "publisher's own description, not a summary written for you.")
+NOTE = ("Unsummarised edition: %s; the text is the publisher's own "
+        "description, not a summary.")
+
+#: The note is capped at 240 chars of text by BOTH renderers (render_digest and
+#: build_email each carry their own NOTE_LIMIT), and run 41995372308 shipped the
+#: sentence cut mid-word at "…they are not in". So the sentence is composed to
+#: fit with room to spare: it is never allowed to reach either cap.
+NOTE_BUDGET = 236
 
 #: The same note when SOME stories did get a written summary. Saying "the text
 #: under each headline is the publisher's description" over an AI sentence is
@@ -73,11 +79,39 @@ NOTE_SUMMARISED = ("Fallback edition: an AI wrote the summary for %d of %d "
 REASON_QUOTA = "quota_exhausted"
 REASON_NOT_CONFIGURED = "not_configured"
 REASON_ALL_FAILED = "all_failed"
+#: Run 41995372308 needed these two: the keyed rungs ANSWERED, and the three
+#: replies the parser threw away were the only thing standing between the page
+#: and a quota sentence that was not even true that morning.
+REASON_PARSE = "unreadable_reply"
+REASON_TIMEOUT = "model_timeout"
 
 REASON_TEXT = {
     REASON_QUOTA: "every AI model this build reached refused on its provider's quota",
     REASON_NOT_CONFIGURED: "no AI model was configured or reachable for this build",
     REASON_ALL_FAILED: "every AI model this build tried failed to produce a digest",
+    REASON_PARSE: "every AI model that answered sent a reply this build could not read",
+    REASON_TIMEOUT: "every AI model this build reached ran out of time before answering",
+}
+
+#: summarise_stories' own cause names, most actionable first. They are the
+#: answer to "why did these stories get no summary" from the component that
+#: asked the models, so they outrank the walk's attempt log whenever they exist.
+CAUSE_ORDER = ("unreadable_reply", "provider_refusal", "model_timeout",
+               "runner_fault")
+
+#: How each cause is named to a reader, and which reason it maps to.
+CAUSE_PHRASE = {
+    "unreadable_reply": "an unreadable reply",
+    "provider_refusal": "a quota refusal",
+    "model_timeout": "a timeout",
+    "runner_fault": "a crashed model runner",
+}
+
+CAUSE_REASON = {
+    "unreadable_reply": REASON_PARSE,
+    "provider_refusal": REASON_QUOTA,
+    "model_timeout": REASON_TIMEOUT,
+    "runner_fault": REASON_ALL_FAILED,
 }
 
 #: The walk's failure kinds that mean "the allowance is spent", not "the rung
@@ -114,14 +148,78 @@ def providers_in(text):
     return names
 
 
-def note_for(reason, attempts_text=""):
-    """The page's own sentence for WHY no model wrote this edition."""
-    detail = REASON_TEXT.get(reason, REASON_TEXT[REASON_ALL_FAILED])
+def rank_causes(causes):
+    """(stories lost, cause) pairs, most costly first, ties in priority order."""
+    ranked = [(int(count), cause) for cause, count in (causes or {}).items()
+              if int(count) > 0]
+    return sorted(ranked, key=lambda pair: (-pair[0],
+                                            CAUSE_ORDER.index(pair[1])
+                                            if pair[1] in CAUSE_ORDER
+                                            else len(CAUSE_ORDER)))
+
+
+def reason_from_causes(causes):
+    """WHY no model wrote the edition, from the summariser's own outcomes.
+
+    Run 41995372308 is the reason this exists. The walk's attempt log said
+    "quota" and the page printed it, while the keyed Gemini rungs had in fact
+    answered -- the parser refused three good replies. The component that asked
+    the models knows that, so its causes win over a log written by a different
+    component about a different set of calls.
+    """
+    ranked = rank_causes(causes)
+    if not ranked:
+        return REASON_ALL_FAILED
+    return CAUSE_REASON.get(ranked[0][1], REASON_ALL_FAILED)
+
+
+def _cause_prose(ranked, keep=None):
+    """`6 stories lost their summary to X and 3 to Y`, for `ranked` causes."""
+    shown = ranked if keep is None else ranked[:keep]
+    parts = []
+    for position, (count, cause) in enumerate(shown):
+        phrase = CAUSE_PHRASE.get(cause, CAUSE_PHRASE["runner_fault"])
+        if position == 0:
+            parts.append("%d stor%s lost %s summary to %s"
+                         % (count, "y" if count == 1 else "ies",
+                            "its" if count == 1 else "their", phrase))
+        else:
+            parts.append("%d to %s" % (count, phrase))
+    remaining = ranked[len(shown):]
+    if remaining:
+        parts.append("%d to %d other cause%s"
+                     % (sum(count for count, _ in remaining), len(remaining),
+                        "" if len(remaining) == 1 else "s"))
+    if len(parts) == 1:
+        return parts[0]
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def note_for(reason, attempts_text="", causes=None):
+    """The page's own sentence for WHY no model wrote this edition.
+
+    When the summariser recorded causes, each cause is reported with the number
+    of STORIES it cost. The sentence is composed longest-first and the first
+    form that fits NOTE_BUDGET wins, so a held-back clause appended afterwards can
+    never be the thing that gets cut.
+    """
+    details = []
+    ranked = rank_causes(causes)
+    if ranked:
+        details = [_cause_prose(ranked), _cause_prose(ranked, 2),
+                   _cause_prose(ranked, 1),
+                   CAUSE_PHRASE.get(ranked[0][1], CAUSE_PHRASE["runner_fault"])]
+    fallback = REASON_TEXT.get(reason, REASON_TEXT[REASON_ALL_FAILED])
     if reason == REASON_QUOTA:
         names = providers_in(attempts_text)
         if names:
-            detail = "%s (%s)" % (detail, ", ".join(names))
-    return NOTE % detail
+            fallback = "%s (%s)" % (fallback, ", ".join(names))
+    details.append(fallback)
+    for detail in details:
+        note = NOTE % detail
+        if len(note) <= NOTE_BUDGET:
+            return note
+    return NOTE % details[-1]
 
 
 def title_tokens(title):
@@ -340,12 +438,14 @@ def main(argv=None):
     # Only what the model wrote, never which stories ship: a refused batch
     # leaves those stories with the publisher's text.
     written = 0
+    causes = {}
     if args.summarise and stories:
         # Imported here, not at module level: the deriver is used offline by
         # tests and by hand, and it must not need the summariser to import.
         import summarise_stories
         result = summarise_stories.summarise(stories)
         written = apply_summaries(stories, result.get("summaries"))
+        causes = result.get("causes") or {}
         for refusal in result.get("refusals") or []:
             print("  refusal: %s" % refusal)
         print("  %-24s %d of %d (model %s)"
@@ -376,15 +476,17 @@ def main(argv=None):
                 attempts_text = fh.read()
         except OSError:
             attempts_text = ""
-    reason = reason_from_attempts(attempts_text)
-    print("  %-24s %s (%d attempt row(s))"
-          % ("no-AI reason", reason, len(re.findall(r"\bkind=", attempts_text))))
+    reason = reason_from_causes(causes) if causes else reason_from_attempts(
+        attempts_text)
+    print("  %-24s %s (%d attempt row(s)%s)"
+          % ("no-AI reason", reason, len(re.findall(r"\bkind=", attempts_text)),
+             "" if not causes else ", %d summariser cause(s)" % len(causes)))
 
-    notes = note_for(reason, attempts_text)
+    notes = note_for(reason, attempts_text, causes=causes)
     if written:
         notes = NOTE_SUMMARISED % (written, len(stories))
     if held_n:
-        notes = notes + " " + english_text.held_back_note(held_n)
+        notes = english_text.replace_held_back(notes, held_n)
     payload = {
         "date": args.today,
         # STILL `unsummarised`, even when every story got a written summary.
@@ -395,6 +497,10 @@ def main(argv=None):
         "edition_kind": "unsummarised",
         # The count the page needs to be honest about its own text.
         "summary_counts": {"summarised": written, "total": len(stories)},
+        # How many stories this stage withheld for their script, as DATA. The
+        # validator adds its own drops to this number and rewrites the sentence,
+        # so both renderers read one count instead of each re-reading the prose.
+        "held_back": {"count": held_n, "reason": "not_english"},
         # No model wrote this edition; naming the deriver as the writer is what
         # lets the seal report how the digest was produced.
         "writer": {"rung": "derived", "attempt": None, "model": None},

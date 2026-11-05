@@ -232,16 +232,21 @@ def _parse_json_array(text):
             return obj
     except (json.JSONDecodeError, ValueError):
         pass
-    # Embedded: find first '[' ... last ']' for the outermost array.
+    # Embedded: the first COMPLETE array, asked of the decoder rather than
+    # sliced first-'['..last-']'. Same shape as the defect run 41995372308 hit:
+    # a slice taken between two brackets stops somewhere the decoder would
+    # never stop, so a bracket in the prose around the answer breaks a reply
+    # that is otherwise valid JSON.
+    decoder = json.JSONDecoder()
     start = text.find("[")
-    end = text.rfind("]")
-    if start >= 0 and end > start:
+    while start >= 0:
         try:
-            obj = json.loads(text[start : end + 1])
-            if isinstance(obj, list):
-                return obj
+            obj, _end = decoder.raw_decode(text, start)
         except (json.JSONDecodeError, ValueError):
-            pass
+            obj = None
+        if isinstance(obj, list):
+            return obj
+        start = text.find("[", start + 1)
     return None
 
 

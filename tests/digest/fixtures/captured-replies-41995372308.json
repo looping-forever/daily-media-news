@@ -1,0 +1,47 @@
+{
+  "source": "run 41995372308 state/summarise-debug.json -- the three keyed replies recorded as `not_json`",
+  "captured": [
+    {
+      "model": "gemini/gemini-3.5-flash-lite",
+      "raw": "\u001b[0m\n> build \u00b7 gemini-3.5-flash-lite\n\u001b[0m\n```json\n[\n  {\n    \"url\": \"https://iost.tu.edu.np/notices/16029\",\n    \"summary\": \"\"\n  },\n  {\n    \"url\": \"https://english.nepalnews.com/s/diplomacy/australian-ambassador-ernst-discusses-investment-opportunities-with-investment-board-ceo-ukyab/\",\n    \"summary\": \"Australian Ambassador to Nepal Simon Ernst and two Austrade officials met with Investment Board Nepal CEO Yanki Ukyab to discuss expanding bilateral trade and investment opportunities.\"\n  },\n  {\n    \"url\": \"https://english.nepalnews.com/s/nation/sanskrit-university-plans-research-center-named-after-yogi-naraharinath/\",\n    \"summary\": \"Nepal Sanskrit University decided to move forward with a proposal to establish a research and innovation center named after its founder and indigenous researcher, Rashtraguru Yogi Naraharinath.\"\n  },\n  {\n    \"url\": \"https://dev.to/tom_8d160ea57bf5c0395981d/normalize-parcel-dimensions-before-they-reach-a-shipping-adapter-1e1\",\n    \"summary\": \"Parcel dimensions must be normalized with known units before reaching a shipping adapter to prevent misinterpretation between units like centimeters and millimeters.\"\n  },\n  {\n    \"url\": \"https://dev.to/richicodes/ai-crawlers-dont-run-your-javascript-fp2\",\n    \"summary\": \"AI crawlers behind tools like ChatGPT, Claude, and Perplexity download HTML and may see an empty shell if a page builds its content with browser JavaScript.\"\n  },\n  {\n    \"url\": \"https://dev.to/amzsellerforum2026/how-to-reply-to-a-negative-amazon-review-calmly-4b8d\",\n    \"summary\": \"Public replies to negative Amazon reviews should thank the reviewer, refer to their specific point, and acknowledge it without disputing since future buyers will read them.\"\n  }\n]\n```\n",
+      "rows": 6,
+      "expected_summaries": 5,
+      "urls": [
+        "https://iost.tu.edu.np/notices/16029",
+        "https://english.nepalnews.com/s/diplomacy/australian-ambassador-ernst-discusses-investment-opportunities-with-investment-board-ceo-ukyab/",
+        "https://english.nepalnews.com/s/nation/sanskrit-university-plans-research-center-named-after-yogi-naraharinath/",
+        "https://dev.to/tom_8d160ea57bf5c0395981d/normalize-parcel-dimensions-before-they-reach-a-shipping-adapter-1e1",
+        "https://dev.to/richicodes/ai-crawlers-dont-run-your-javascript-fp2",
+        "https://dev.to/amzsellerforum2026/how-to-reply-to-a-negative-amazon-review-calmly-4b8d"
+      ]
+    },
+    {
+      "model": "gemini/gemini-3.1-flash-lite",
+      "raw": "\u001b[0m\n> build \u00b7 gemini-3.1-flash-lite\n\u001b[0m\n[\n  {\n    \"url\": \"https://iost.tu.edu.np/notices/16029\",\n    \"summary\": \"\"\n  },\n  {\n    \"url\": \"https://english.nepalnews.com/s/diplomacy/australian-ambassador-ernst-discusses-investment-opportunities-with-investment-board-ceo-ukyab/\",\n    \"summary\": \"Australian Ambassador to Nepal Simon Ernst met with Investment Board Nepal CEO Yanki Ukyab to discuss expanding bilateral trade and investment.\"\n  },\n  {\n    \"url\": \"https://english.nepalnews.com/s/nation/sanskrit-university-plans-research-center-named-after-yogi-naraharinath/\",\n    \"summary\": \"The Nepal Sanskrit University has decided to proceed with establishing a research and innovation center named after its founder, Yogi Naraharinath.\"\n  },\n  {\n    \"url\": \"https://dev.to/tom_8d160ea57bf5c0395981d/normalize-parcel-dimensions-before-they-reach-a-shipping-adapter-1e1\",\n    \"summary\": \"Shipping adapters require normalized parcel dimensions because numeric values without known units can be misinterpreted.\"\n  },\n  {\n    \"url\": \"https://dev.to/richicodes/ai-crawlers-dont-run-your-javascript-fp2\",\n    \"summary\": \"AI crawlers behind tools like ChatGPT, Claude, and Perplexity often see only empty shells for pages that rely on client-side JavaScript to build content.\"\n  },\n  {\n    \"url\": \"https://dev.to/amzsellerforum2026/how-to-reply-to-a-negative-amazon-review-calmly-4b8d\",\n    \"summary\": \"When replying to negative Amazon reviews, sellers should thank the reviewer, refer to specific points, and acknowledge feedback calmly rather than arguing.\"\n  }\n]\n",
+      "rows": 6,
+      "expected_summaries": 5,
+      "urls": [
+        "https://iost.tu.edu.np/notices/16029",
+        "https://english.nepalnews.com/s/diplomacy/australian-ambassador-ernst-discusses-investment-opportunities-with-investment-board-ceo-ukyab/",
+        "https://english.nepalnews.com/s/nation/sanskrit-university-plans-research-center-named-after-yogi-naraharinath/",
+        "https://dev.to/tom_8d160ea57bf5c0395981d/normalize-parcel-dimensions-before-they-reach-a-shipping-adapter-1e1",
+        "https://dev.to/richicodes/ai-crawlers-dont-run-your-javascript-fp2",
+        "https://dev.to/amzsellerforum2026/how-to-reply-to-a-negative-amazon-review-calmly-4b8d"
+      ]
+    },
+    {
+      "model": "gemini/gemini-3.1-flash-lite",
+      "raw": "\u001b[0m\n> build \u00b7 gemini-3.1-flash-lite\n\u001b[0m\n[\n  {\n    \"url\": \"https://english.nepalnews.com/s/sports/lumbini-set-150-run-target-for-janakpur-after-posting-149-8/\",\n    \"summary\": \"Lumbini Lions scored 149 runs for eight wickets in their 20 overs, setting a 150-run target for Janakpur Bolts in a Nepal Premier League match.\"\n  },\n  {\n    \"url\": \"https://www.videogameschronicle.com/news/sony-says-playstation-6-development-is-progressing-as-scheduled-as-ps5-sales-hit-97-9m/\",\n    \"summary\": \"Sony announced that PlayStation 6 development is progressing as scheduled while PS5 sales have reached 97.9 million units.\"\n  },\n  {\n    \"url\": \"https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9lNU5sZlFLZkJpdm1XR0pjZWdSODVoSUY5bWFlZW1BTjRVOFFMTGNIaXl5VU9relRxVWtqU0JVckNHeldBUS1HekwyR25taG11SFBkSlhaQ19mVmFEQld4Mi1sclFCeFU?oc=5\",\n    \"summary\": \"KFC is featuring a global menu takeover by the character Doctor Doom.\"\n  },\n  {\n    \"url\": \"https://www.bbc.co.uk/news/articles/cwp9g3rlp8jlo?at_medium=RSS&at_campaign=rss\",\n    \"summary\": \"Joshua Wong, a prominent figure in Hong Kong's pro-democracy protests, has been jailed for 10 years under the national security law.\"\n  },\n  {\n    \"url\": \"https://news.google.com/rss/articles/CBMinwFBVV95cUxNdklrNDVzNGVOanhQSF9SZjRpS2lBOXpOTTY3aHRpZTZYQnZBYzZMOElYQ0xWT1NtU3B3MHZNNGpiMUdRRFlMV0FueUxkeGhVVmlITkF6VEVvbVgyaXpwa3FFZ01jS1huTGhSb2FEMkhNb0pKZm00OWNSbG1kSld2c3dhamFTREFWQWoyVkJRN3ZXUW9kWW9QS1JyTU1sM1k?oc=5\",\n    \"summary\": \"\"\n  },\n  {\n    \"url\": \"https://www.bbc.co.uk/news/articles/cx4g1qy6gq9mo?at_medium=RSS&at_campaign=rss\",\n    \"summary\": \"An Italian chef working at an Australian restaurant was fired after refusing to put pineapple on pizza, which he deemed offensive to Italian culture.\"\n  }\n]\n",
+      "rows": 6,
+      "expected_summaries": 5,
+      "urls": [
+        "https://english.nepalnews.com/s/sports/lumbini-set-150-run-target-for-janakpur-after-posting-149-8/",
+        "https://www.videogameschronicle.com/news/sony-says-playstation-6-development-is-progressing-as-scheduled-as-ps5-sales-hit-97-9m/",
+        "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9lNU5sZlFLZkJpdm1XR0pjZWdSODVoSUY5bWFlZW1BTjRVOFFMTGNIaXl5VU9relRxVWtqU0JVckNHeldBUS1HekwyR25taG11SFBkSlhaQ19mVmFEQld4Mi1sclFCeFU?oc=5",
+        "https://www.bbc.co.uk/news/articles/cwp9g3rlp8jlo?at_medium=RSS&at_campaign=rss",
+        "https://news.google.com/rss/articles/CBMinwFBVV95cUxNdklrNDVzNGVOanhQSF9SZjRpS2lBOXpOTTY3aHRpZTZYQnZBYzZMOElYQ0xWT1NtU3B3MHZNNGpiMUdRRFlMV0FueUxkeGhVVmlITkF6VEVvbVgyaXpwa3FFZ01jS1huTGhSb2FEMkhNb0pKZm00OWNSbG1kSld2c3dhamFTREFWQWoyVkJRN3ZXUW9kWW9QS1JyTU1sM1k?oc=5",
+        "https://www.bbc.co.uk/news/articles/cx4g1qy6gq9mo?at_medium=RSS&at_campaign=rss"
+      ]
+    }
+  ]
+}

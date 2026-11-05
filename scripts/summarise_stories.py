@@ -273,6 +273,65 @@ def _accepted(story_by_url, url, text):
     return text
 
 
+#: The CLI's own decoration, which is NOT the answer. CSI covers `\x1b[0m` and
+#: the colour forms; OSC covers window titles and hyperlinks, ending in BEL or
+#: ST. Both are removed BEFORE any bracket is looked for, because `\x1b[0m`
+#: contains the character this module used to slice from -- run 41995372308 lost
+#: three good keyed replies to exactly that.
+ANSI_CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+ANSI_OSC_RE = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+#: The CLI's status line: `> build \u00b7 gemini-3.5-flash-lite`.
+BUILD_BANNER_RE = re.compile(r"^[ \t]*>[ \t]*build[^\n]*$", re.M)
+#: A fenced block, with or without a language tag.
+FENCED_BLOCK_RE = re.compile(r"```[ \t]*(?:json)?[ \t]*\r?\n(.*?)```", re.S | re.I)
+
+
+def clean_reply(text):
+    """The model's actual answer: no escape sequences, no CLI chrome."""
+    out = ANSI_OSC_RE.sub("", str(text or ""))
+    out = ANSI_CSI_RE.sub("", out)
+    out = BUILD_BANNER_RE.sub("", out)
+    return out.strip()
+
+
+def _first_json_list(text):
+    """The first COMPLETE JSON array anywhere in `text`, or None.
+
+    `raw_decode` is asked from every "[" rather than a slice being taken to the
+    last "]": it knows where an array ends, so a stray bracket -- in a preamble,
+    in a note, in a url -- can neither start the slice too early nor end it too
+    late.
+    """
+    decoder = json.JSONDecoder()
+    index = text.find("[")
+    while index >= 0:
+        try:
+            value, _end = decoder.raw_decode(text, index)
+        except ValueError:
+            value = None
+        if isinstance(value, list):
+            return value
+        index = text.find("[", index + 1)
+    return None
+
+
+def reply_rows(text):
+    """The array a reply carries, preferring a fenced block when it has one."""
+    cleaned = clean_reply(text)
+    if not cleaned:
+        return None
+    for block in FENCED_BLOCK_RE.findall(cleaned):
+        rows = _first_json_list(block)
+        if rows is not None:
+            return rows
+    return _first_json_list(cleaned)
+
+
+def _looks_like_json(cleaned):
+    """True when the reply was TRYING to be an array and did not finish."""
+    return cleaned.startswith("[") or cleaned.startswith("```")
+
+
 def parse_reply(text, batch):
     """{url: summary} for the entries this module is willing to print.
 
@@ -280,14 +339,7 @@ def parse_reply(text, batch):
     dropped: a url it invented has no story to attach to, and a url from
     another batch would silently overwrite that batch's own answer.
     """
-    body = (text or "").strip()
-    start, end = body.find("["), body.rfind("]")
-    if start >= 0 and end > start:
-        body = body[start:end + 1]
-    try:
-        rows = json.loads(body)
-    except (TypeError, ValueError):
-        return {}
+    rows = reply_rows(text)
     if not isinstance(rows, list):
         return {}
     by_url = {(s.get("source_url") or s.get("url") or ""): s for s in batch}
@@ -328,25 +380,19 @@ def classify_reply(text, batch=None):
         no_usable_row            a valid array, none of it safe to print
         ok                       at least one summary is printable
     """
-    body = (text or "").strip()
-    if not body:
+    cleaned = clean_reply(text)
+    if not cleaned:
         return "empty_content"
-    if _truncation_marker(body):
+    if _truncation_marker(cleaned):
         return "truncated_at_max_tokens"
-    start, end = body.find("["), body.rfind("]")
-    if start >= 0 and end < start:
-        return "partial_json"
-    if start < 0:
-        return "not_json"
-    try:
-        rows = json.loads(body[start:end + 1])
-    except (TypeError, ValueError):
-        return "not_json"
-    if not isinstance(rows, list):
-        return "not_json"
+    rows = reply_rows(cleaned)
+    if rows is None:
+        # A reply that STARTS as an array and does not finish is cut; prose that
+        # happens to contain a bracket is only prose.
+        return "partial_json" if _looks_like_json(cleaned) else "not_json"
     if batch is None:
         return "ok" if rows else "no_usable_row"
-    return "ok" if parse_reply(body, batch) else "no_usable_row"
+    return "ok" if parse_reply(cleaned, batch) else "no_usable_row"
 
 
 #: Key-shaped strings that must never reach an artifact. Each replacement keeps
@@ -536,19 +582,50 @@ class Pacer:
         return slept
 
 
+#: WHY a batch produced no summary, most actionable first. A model that ANSWERED
+#: and could not be read is the parser's own defect and the one that cost run
+#: 41995372308 its edition, so it outranks the rest: a provider refusal, a model
+#: that never answered, and a runner that broke all explain themselves, while an
+#: unreadable answer silently looks like "no summary available".
+CAUSE_ORDER = ("unreadable_reply", "provider_refusal", "model_timeout",
+               "runner_fault")
+
+
+def dominant_cause(causes):
+    """The most actionable cause in `causes`, or "" when there are none."""
+    for cause in CAUSE_ORDER:
+        if cause in causes:
+            return cause
+    return ""
+
+
+def refusal_cause(kind, message):
+    """Which cause a refused call is, for the edition's own note."""
+    if kind == "timeout":
+        return "model_timeout"
+    if is_refusal(message):
+        return "provider_refusal"
+    if kind in ("empty_content", "not_json", "partial_json"):
+        return "unreadable_reply"
+    return "runner_fault"
+
+
 def summarise(stories, models=None, run=None, sleep=None, clock=None,
               log=print, budget=INPUT_TOKEN_BUDGET_PER_MINUTE,
               budget_seconds=TOTAL_BUDGET_SECONDS):
     """Summarise *stories* in paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
-             "requests": int, "waits": [s], "refusals": [str], "debug": [dict]}.
+             "requests": int, "waits": [s], "refusals": [str], "debug": [dict],
+             "causes": {cause: stories lost}}.
 
     Nothing here raises for a model problem: an edition with no summaries is a
     valid outcome that the caller labels, and a crash here would cost the
     edition itself. `debug` is one record per failed attempt -- model, reason,
     the provider's own metadata and a bounded, redacted copy of the raw answer --
-    so a run that produced nothing can say why without being re-run.
+    so a run that produced nothing can say why without being re-run. `causes`
+    counts the STORIES each cause cost, because that is what the page has to
+    report; the walk's attempt log is a different question and a different file.
     """
     stories = [s for s in (stories or []) if (s.get("source_url") or s.get("url"))]
     run = run or opencode_run
@@ -558,7 +635,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
     pacer.deadline = clock() + float(budget_seconds)
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
-           "refusals": [], "debug": []}
+           "refusals": [], "debug": [], "causes": {}}
 
     def note(model, raw, reason, timeout, exit_code=None):
         """Keep one failed attempt, bounded, so the artifact can explain it."""
@@ -586,6 +663,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         pacer.wait_for(prompt_tokens)
         answered = False
         ran_out = False
+        causes = set()
         for rung, model in enumerate(models):
             remaining = pacer.deadline - clock()
             if remaining <= 0:
@@ -605,6 +683,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     "refused" if is_refusal(str(exc)) else "failed")
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
+                causes.add(refusal_cause(kind, str(exc)))
                 if not is_refusal(str(exc)):
                     log("  batch %d/%d: %s %s within %ds (%s); trying the next "
                         "model" % (index, len(plan), model, kind, timeout,
@@ -638,6 +717,8 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     note(model, getattr(again, "raw", "") or str(again),
                          getattr(again, "kind", "") or "refused", retry_timeout,
                          exit_code=getattr(again, "exit_code", None))
+                    causes.add(refusal_cause(
+                        getattr(again, "kind", "") or "refused", str(again)))
                     log("  batch %d/%d: %s refused again after the wait; "
                         "trying the next model" % (index, len(plan), model))
                     continue
@@ -645,6 +726,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 out["requests"] += 1
                 out["refusals"].append(str(exc).strip()[:300])
                 note(model, str(exc), "runner_error", timeout)
+                causes.add("runner_fault")
                 log("  batch %d/%d: %s errored (%s); trying the next model"
                     % (index, len(plan), model, str(exc).strip()[:120]))
                 continue
@@ -652,6 +734,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             if not got:
                 reason = classify_reply(text, batch)
                 note(model, text, reason, timeout)
+                causes.add("unreadable_reply")
                 log("  batch %d/%d: %s answered but gave no usable summary "
                     "(%s)" % (index, len(plan), model, reason))
                 continue
@@ -661,6 +744,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             log("  batch %d/%d ok: %d of %d stories summarised by %s"
                 % (index, len(plan), len(got), len(batch), model))
             break
+        if not answered and causes:
+            cause = dominant_cause(causes)
+            out["causes"][cause] = out["causes"].get(cause, 0) + len(batch)
+            log("  batch %d/%d: %d stories lost to %s"
+                % (index, len(plan), len(batch), cause))
         if ran_out:
             log("  the job's %ds summarising budget is spent; the remaining "
                 "stories keep the publisher's text" % budget_seconds)

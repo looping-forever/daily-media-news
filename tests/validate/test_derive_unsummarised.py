@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from . import REPO_ROOT, SCRIPTS  # noqa: F401  (SCRIPTS is put on sys.path there)
 
 import derive_unsummarised as dut  # noqa: E402
+import english_text  # noqa: E402
 import validate_stories as vs  # noqa: E402
 
 NOW = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
@@ -312,6 +313,94 @@ class FloorAndPayload(unittest.TestCase):
         self.assertEqual(rc, 1)
 
 
+class TheHeldBackCountIsData(unittest.TestCase):
+    """The count the page prints must come from the payload, not from its prose.
+
+    Two stages withhold stories for their script -- the deriver and the validator --
+    and each used to append its own sentence to `notes`. Run 41995372308's page
+    ended up stating two different counts for one edition. The number now travels
+    as a field, and the sentence is rewritten rather than stacked.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="derive_held_")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def run_main(self, candidates):
+        path = os.path.join(self.tmp, "candidates.json")
+        out = os.path.join(self.tmp, "stories.json")
+        log = os.path.join(self.tmp, "agent-attempts.log")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"collected_at": "2026-10-28 09:00",
+                       "candidates": candidates}, fh)
+        with open(log, "w", encoding="utf-8") as fh:
+            fh.write("")
+        rc = dut.main(["--candidates", path, "--out", out, "--today", "2026-10-28",
+                       "--slot", "morning", "--attempts", log])
+        self.assertEqual(rc, 0)
+        with open(out, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def candidates(self):
+        rows = [cand(DISTINCT[n], "https://a.example/%d" % n,
+                     category=("world_major" if n < 3 else "local_city"))
+                for n in range(5)]
+        # Devanagari headline: readable, but not English, so the deriver withholds it.
+        rows.append(cand("काठमाडौंमा आज बाढी आयो र धेरै परिवार प्रभावित भए",
+                         "https://a.example/nepali", category="local_city"))
+        return rows
+
+    def test_the_payload_carries_the_count_the_page_prints(self):
+        payload = self.run_main(self.candidates())
+        self.assertEqual({"count": 1, "reason": "not_english"},
+                         payload.get("held_back"),
+                         "the page has no count to print unless the deriver states "
+                         "it as data")
+        self.assertEqual(1, len(english_text._HELD_BACK_RE.findall(payload["notes"])))
+
+    def test_nothing_held_still_states_zero(self):
+        payload = self.run_main(
+            [cand(DISTINCT[n], "https://a.example/%d" % n,
+                  category=("world_major" if n < 3 else "local_city"))
+             for n in range(5)])
+        self.assertEqual(0, payload["held_back"]["count"])
+        self.assertNotIn("held back", payload["notes"])
+
+
+class TheValidatorDoesNotAppendASecondCount(unittest.TestCase):
+    """Validation withholds a few more stories; the total must be one number."""
+
+    def test_it_adds_its_own_drops_to_the_carried_count(self):
+        self.assertEqual(6, vs.held_back_total({"held_back": {"count": 5}}, 1),
+                         "the page's count must be the whole edition's, not one "
+                         "stage's share of it")
+
+    def test_a_payload_without_the_field_starts_from_zero(self):
+        self.assertEqual(2, vs.held_back_total({}, 2))
+        self.assertEqual(2, vs.held_back_total({"held_back": "6"}, 2))
+
+    def test_a_malformed_count_is_not_trusted(self):
+        for record in ({"count": "many"}, {"count": None}, {"held_back": True}):
+            self.assertEqual(1, vs.held_back_total(record, 1), "record %r" % (record,))
+
+
+class OneSentenceHoweverManyStagesWriteIt(unittest.TestCase):
+    def test_replacing_never_stacks_two_numbers(self):
+        notes = english_text.replace_held_back("Research note.", 5)
+        notes = english_text.replace_held_back(notes, 6)
+        self.assertEqual(1, len(english_text._HELD_BACK_RE.findall(notes)),
+                         "two stages wrote the same sentence twice, so two readers "
+                         "can quote two different numbers")
+        self.assertIn("6 stories were held back", notes)
+        self.assertNotIn("5 stories", notes)
+
+    def test_zero_removes_the_sentence(self):
+        notes = english_text.replace_held_back(
+            "Research note. 5 stories were held back because they are not in English.",
+            0)
+        self.assertEqual("Research note.", notes)
+
+
 class NoAIReason(unittest.TestCase):
     """The note must name WHY no model wrote the edition.
 
@@ -521,6 +610,119 @@ class SummarisedFallback(unittest.TestCase):
         self.assertFalse(os.path.exists(out),
                          "nothing is written below the floor, so nothing should "
                          "have been spent on prose for it")
+
+
+class TheBannerNamesTheRealCause(unittest.TestCase):
+    """Run 41995372308 line 515 of the page, measured, not paraphrased:
+
+        "Unsummarised edition: every AI model this build reached refused on its
+         provider's quota, so the text under each headline is the publisher's
+         own description, not a summary written for you. 5 stories were held
+         back because they are not in…"
+
+    Two things were wrong with that sentence. The reason was the agentic walk's
+    log, although the keyed Gemini rungs had ANSWERED in this run -- three
+    replies the parser threw away -- so the page blamed a quota that was still
+    there. And the sentence was cut mid-word at the renderer's 240-char cap,
+    because it grew a held-back clause it had no room for.
+    """
+
+    QUOTA_LOG = NoAIReason.QUOTA_LOG
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="derive_cause_")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def run_main(self, causes, attempts=None, summarised=0):
+        path = os.path.join(self.tmp, "candidates.json")
+        out = os.path.join(self.tmp, "stories.json")
+        log = os.path.join(self.tmp, "agent-attempts.log")
+        candidates = [cand(DISTINCT[n], "https://a.example/%d" % n,
+                           category=("world_major" if n < 3 else "local_city"))
+                      for n in range(5)]
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"candidates": candidates}, fh)
+        if attempts is not None:
+            with open(log, "w", encoding="utf-8") as fh:
+                fh.write(attempts)
+        import unittest.mock as mock
+        import summarise_stories
+        result = {"summaries": {}, "model": "gemini/gemini-3.5-flash-lite",
+                  "requests": 2, "waits": [], "refusals": [], "debug": [],
+                  "causes": causes}
+        with mock.patch.object(summarise_stories, "summarise",
+                               return_value=result):
+            rc = dut.main(["--candidates", path, "--out", out,
+                           "--today", "2026-11-05", "--slot", "morning",
+                           "--attempts", log, "--summarise"])
+        self.assertEqual(0, rc)
+        with open(out, encoding="utf-8") as fh:
+            return json.load(fh)["notes"]
+
+    def test_the_summarisers_own_causes_outrank_the_walk_log(self):
+        notes = self.run_main({"unreadable_reply": 5}, self.QUOTA_LOG)
+        self.assertNotIn("quota", notes,
+                         "the keyed rungs answered in this run; the walk's "
+                         "log must not outrank what they said")
+        self.assertIn("unreadable reply", notes)
+        self.assertIn("5 stories", notes)
+
+    def test_every_cause_costs_its_own_stories_in_the_note(self):
+        notes = self.run_main({"unreadable_reply": 3, "model_timeout": 2})
+        self.assertIn("3 stories", notes)
+        self.assertIn("2", notes)
+        self.assertIn("timeout", notes)
+
+    def test_a_parse_failure_never_blames_a_quota(self):
+        note = dut.note_for(dut.REASON_PARSE, self.QUOTA_LOG,
+                            causes={"unreadable_reply": 5})
+        self.assertEqual(dut.REASON_PARSE, dut.reason_from_causes(
+            {"unreadable_reply": 5}))
+        self.assertNotIn("quota", note)
+
+    def test_the_note_still_says_the_text_is_the_publishers_own(self):
+        note = dut.note_for(dut.REASON_PARSE, "", causes={"unreadable_reply": 5})
+        self.assertIn("publisher's own description", note)
+
+    def test_the_walk_path_still_names_the_quota(self):
+        note = dut.note_for(dut.REASON_QUOTA, self.QUOTA_LOG)
+        self.assertIn("refused on its provider's quota (gemini, opencode)", note)
+
+    def test_the_note_is_complete_at_both_rendering_widths(self):
+        import build_email
+        import english_text
+        import render_digest
+        shapes = (
+            {"unreadable_reply": 1},
+            {"unreadable_reply": 9},
+            {"unreadable_reply": 19, "model_timeout": 19},
+            {"unreadable_reply": 29, "model_timeout": 19,
+             "provider_refusal": 9},
+            {"provider_refusal": 29},
+            {"model_timeout": 2, "runner_fault": 3},
+        )
+        for causes in shapes:
+            for held in (0, 1, 29):
+                note = dut.note_for(dut.reason_from_causes(causes), "",
+                                    causes=causes)
+                if held:
+                    note += " " + english_text.held_back_note(held)
+                for module in (render_digest, build_email):
+                    shown = render_digest.reader_note_text(note)
+                    self.assertLessEqual(
+                        len(shown), module.NOTE_LIMIT,
+                        "%r is %d chars at %s's cap"
+                        % (causes, len(shown), module.__name__))
+                    self.assertFalse(
+                        module.capped_note(note).endswith("\u2026"),
+                        "%r still gets cut at %s's cap"
+                        % (causes, module.__name__))
+
+    def test_a_cause_with_no_stories_is_not_reported(self):
+        self.assertEqual(dut.REASON_ALL_FAILED,
+                         dut.reason_from_causes({}))
+        self.assertEqual(dut.REASON_ALL_FAILED,
+                         dut.reason_from_causes({"runner_fault": 0}))
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ and the three rules that keep the fix honest:
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -533,6 +534,109 @@ class TheChildIsActuallyKilled(unittest.TestCase):
         proc.kill.assert_called_once()
         self.assertEqual("timeout", caught.exception.kind)
         self.assertIn("summ", caught.exception.raw)
+
+
+class TheReplyIsClean(unittest.TestCase):
+    """Run 41995372308: three good keyed replies were thrown away.
+
+    Measured in that run's state/summarise-debug.json -- not inferred:
+
+        gemini/gemini-3.5-flash-lite  reason=not_json
+        raw starts  "\\x1b[0m\\n> build \\u00b7 gemini-3.5-flash-lite\\n..."
+        and inside the fence is a complete JSON array, every row intact.
+
+    The extractor sliced from the first "[" in the reply and the reply begins
+    with the CLI's own escape sequence, `\\x1b[0m` -- a "[" that belongs to the
+    terminal, not to the answer. So the slice started one character early and
+    json.loads refused text that was valid JSON all along.
+    """
+
+    BANNER = "\x1b[0m\n> build \u00b7 gemini-3.5-flash-lite\n\x1b[0m\n"
+
+    def test_a_reply_wrapped_in_cli_chrome_still_parses(self):
+        batch = [story(1), story(2)]
+        raw = self.BANNER + "```json\n" + reply_for(batch) + "\n```\n"
+        self.assertEqual(2, len(ss.parse_reply(raw, batch)))
+
+    def test_colour_inside_the_answer_does_not_move_the_slice(self):
+        batch = [story(1), story(2)]
+        raw = "\x1b[91m[\x1b[0m" + reply_for(batch)[1:-1] + "\x1b[0m]"
+        self.assertEqual(2, len(ss.parse_reply(raw, batch)))
+
+    def test_a_reply_that_is_only_cli_chrome_is_empty_content(self):
+        # The banner is not an answer. Once the chrome is stripped there is
+        # nothing left, which is `empty_content` -- more precise than calling
+        # the CLI's own decoration "text that failed to parse".
+        self.assertEqual("empty_content", ss.classify_reply(self.BANNER))
+
+    def test_prose_around_a_bare_array_is_still_read(self):
+        batch = [story(1)]
+        raw = "Here is the JSON you asked for:\n" + reply_for(batch) + "\nDone."
+        self.assertEqual(1, len(ss.parse_reply(raw, batch)))
+
+    def test_prose_with_no_array_is_not_json(self):
+        self.assertEqual("not_json", ss.classify_reply(
+            "I could not reach the model for this batch."))
+
+    def test_an_unterminated_array_is_partial_json(self):
+        raw = self.BANNER + ('```json\n[{"url": "https://example.com/1", '
+                             '"summary": "a sentence that stops')
+        self.assertEqual("partial_json", ss.classify_reply(raw))
+
+    def test_a_bracket_in_the_preamble_is_not_mistaken_for_the_answer(self):
+        batch = [story(1)]
+        raw = "Note [draft]:\n" + reply_for(batch)
+        self.assertEqual(1, len(ss.parse_reply(raw, batch)))
+
+
+class CapturedReplies(unittest.TestCase):
+    """The three replies the run threw away, replayed from the artifact.
+
+    tests/digest/fixtures/captured-replies-41995372308.json holds them verbatim,
+    ASCII-escaped. They are the evidence that the parser fix addresses the real
+    failure and not a guess about it.
+    """
+
+    FIXTURE = os.path.join(_HERE, "fixtures",
+                           "captured-replies-41995372308.json")
+
+    def captured(self):
+        with open(self.FIXTURE, encoding="utf-8") as fh:
+            return json.load(fh)["captured"]
+
+    def test_all_three_parse_into_the_summaries_they_contained(self):
+        rows = self.captured()
+        self.assertEqual(3, len(rows), "three replies were recorded as not_json")
+        for captured in rows:
+            batch = [{"source_url": url, "category": "world_major"}
+                     for url in captured["urls"]]
+            parsed = ss.parse_reply(captured["raw"], batch)
+            self.assertEqual(captured["expected_summaries"], len(parsed),
+                             "%s: %d of %d rows should be printable"
+                             % (captured["model"], len(parsed),
+                                captured["rows"]))
+            self.assertEqual("ok", ss.classify_reply(captured["raw"], batch),
+                             captured["model"])
+
+    def test_no_captured_reply_is_classified_as_a_parse_failure(self):
+        for captured in self.captured():
+            self.assertIn(ss.classify_reply(captured["raw"]),
+                          ("ok", "no_usable_row"),
+                          "%s still looks unreadable" % captured["model"])
+
+    def test_the_fixture_loads_from_any_working_directory(self):
+        """The path is anchored to THIS file, never to the caller's cwd.
+
+        The runner starts these suites from the repository root, but a developer
+        running one file from its own folder must get the same evidence, and a test
+        that quietly found zero fixtures would pass forever.
+        """
+        previous = os.getcwd()
+        self.addCleanup(os.chdir, previous)
+        os.chdir(tempfile.gettempdir())
+        rows = self.captured()
+        self.assertEqual(3, len(rows),
+                         "the fixture was not found from %s" % os.getcwd())
 
 
 if __name__ == "__main__":

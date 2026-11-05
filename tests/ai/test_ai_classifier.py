@@ -192,6 +192,12 @@ def test_parse_json_array():
     # Embedded in surrounding text.
     wrapped = "Here is the result:\n" + json.dumps(arr) + "\nDone."
     assert ac._parse_json_array(wrapped) == arr
+    # A bracket in the PROSE must not move where the array starts. This is the
+    # shape that cost run 41995372308 three good Gemini replies over in
+    # summarise_stories: a slice taken first-'['..last-']' starts inside the
+    # wrong bracket and the answer that follows is thrown away.
+    bracketed = "Note [draft]:\n" + json.dumps(arr) + "\nDone."
+    assert ac._parse_json_array(bracketed) == arr
     # Garbage.
     assert ac._parse_json_array("no json here") is None
     # Object, not array.
