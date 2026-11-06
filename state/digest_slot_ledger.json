@@ -1,40 +1,6 @@
 {
-  "as_of": "2026-11-05T13:00:00Z",
+  "as_of": "2026-11-06T01:10:08Z",
   "days": {
-    "2026-10-30": {
-      "evening": {
-        "actions_dispatch_at": "2026-10-30T13:35:26Z",
-        "actions_dispatch_reason": null,
-        "attempts": 1,
-        "build": "723ebbf",
-        "deduped_via": null,
-        "edition": "unsummarised",
-        "first_ntfy_sent_at": "2026-10-30T13:41:16Z",
-        "kind": "unsummarised",
-        "ntfy_sent_at": "2026-10-30T13:41:16Z",
-        "pending_at": "2026-10-30T13:35:26Z",
-        "scheduled_instant": "2026-10-30T13:35:00Z",
-        "sequence_id": "dmn-2026-10-30-evening",
-        "state": "sent",
-        "trigger_source": "worker"
-      },
-      "morning": {
-        "attempts": 1,
-        "build": "723ebbf",
-        "edition": "unsummarised",
-        "edition_kind": "unsummarised",
-        "first_ntfy_sent_at": "2026-10-30T01:35:34Z",
-        "http_status": 200,
-        "is_partial": true,
-        "kind": "unsummarised",
-        "ntfy_failed": false,
-        "ntfy_sent_at": "2026-10-30T01:35:34Z",
-        "pending_at": "2026-10-30T01:35:25Z",
-        "scheduled_instant": "2026-10-30T01:35:00Z",
-        "sequence_id": "dmn-2026-10-30-morning",
-        "state": "sent"
-      }
-    },
     "2026-10-31": {
       "evening": {
         "actions_dispatch_at": "2026-10-31T13:35:25Z",
@@ -213,9 +179,20 @@
     },
     "2026-11-05": {
       "evening": {
-        "built_at": "2026-11-05T12:59:53Z",
-        "source_health_state": "ok",
-        "story_count": 15
+        "attempts": 1,
+        "build": "723ebbf",
+        "edition": "partial",
+        "edition_kind": "partial",
+        "first_ntfy_sent_at": "2026-11-05T13:35:27Z",
+        "http_status": 200,
+        "is_partial": true,
+        "kind": "partial",
+        "ntfy_failed": false,
+        "ntfy_sent_at": "2026-11-05T13:35:27Z",
+        "pending_at": "2026-11-05T13:35:26Z",
+        "scheduled_instant": "2026-11-05T13:35:00Z",
+        "sequence_id": "dmn-2026-11-05-evening",
+        "state": "sent"
       },
       "morning": {
         "actions_dispatch_at": "2026-11-05T01:35:26Z",
@@ -239,6 +216,13 @@
         "scheduled_instant": "2026-11-05T01:35:00Z",
         "sequence_id": "dmn-2026-11-05-morning-full",
         "state": "sent"
+      }
+    },
+    "2026-11-06": {
+      "morning": {
+        "built_at": "2026-11-06T01:10:01Z",
+        "source_health_state": "ok",
+        "story_count": 6
       }
     }
   },
