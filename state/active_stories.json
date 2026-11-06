@@ -3493,7 +3493,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3503,7 +3503,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-4214bb6b9df0",
@@ -3521,7 +3521,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3531,7 +3531,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-8241e7916937",
@@ -3549,7 +3549,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3559,7 +3559,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-b000e15da227",
@@ -3577,7 +3577,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3587,7 +3587,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-980c40f4d73f",
@@ -3605,7 +3605,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3615,7 +3615,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-c5a2084d60c3",
@@ -3633,7 +3633,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3643,7 +3643,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-f2148151f810",
@@ -3661,7 +3661,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3671,7 +3671,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-5f85947faa16",
@@ -3689,7 +3689,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3699,7 +3699,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-ef396f3f2bc9",
@@ -3717,7 +3717,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3727,7 +3727,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-7f8a5490d508",
@@ -3745,7 +3745,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3755,7 +3755,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-064947d37b8f",
@@ -3773,7 +3773,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3783,7 +3783,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-5e0b23080b0f",
@@ -3801,7 +3801,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3811,7 +3811,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-9073c95e4796",
@@ -3829,7 +3829,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3839,7 +3839,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-3611edad9c9e",
@@ -3857,7 +3857,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3867,7 +3867,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-567054b0a4cf",
@@ -3885,7 +3885,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3895,7 +3895,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-428eb2993537",
@@ -3913,7 +3913,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3923,7 +3923,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-ac90d57c9a21",
@@ -3941,7 +3941,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3951,7 +3951,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-8eb45d740a2e",
@@ -3969,7 +3969,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -3979,7 +3979,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-a4a20e4ea82e",
@@ -3997,7 +3997,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4007,7 +4007,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-48aad35ab81d",
@@ -4025,7 +4025,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4035,7 +4035,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T06:41:12+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-d9b5377a096e",
@@ -4053,7 +4053,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -4063,7 +4063,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:12:55+05:45",
+      "updated_at": "2026-11-06T06:49:37+05:45",
       "last_confidence": "HIGH",
       "detection_source": "google-news"
     },
@@ -4083,7 +4083,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4093,7 +4093,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-5da53f31f0fc",
@@ -4111,7 +4111,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4121,7 +4121,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-fb0108c2a5bf",
@@ -4139,7 +4139,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4149,7 +4149,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-fc1f4b5ed545",
@@ -4167,7 +4167,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4177,7 +4177,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-6541c8964a5d",
@@ -4195,7 +4195,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4205,7 +4205,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-65d80e2490ca",
@@ -4223,7 +4223,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4233,7 +4233,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-e551223f257a",
@@ -4251,7 +4251,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4261,7 +4261,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-1d72872dcd97",
@@ -4279,7 +4279,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4289,7 +4289,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-f27208bb1019",
@@ -4307,7 +4307,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4317,7 +4317,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-c52b13935582",
@@ -4335,7 +4335,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4345,7 +4345,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-560c5793f8a9",
@@ -4363,7 +4363,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4373,7 +4373,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-c147f015359a",
@@ -4391,7 +4391,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4401,7 +4401,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-fa7b630ea15e",
@@ -4419,7 +4419,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4429,7 +4429,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T07:21:38+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-e0e929c42216",
@@ -4447,7 +4447,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4457,7 +4457,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-85ede2f0544c",
@@ -4475,7 +4475,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4485,7 +4485,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-e9fe29ae074b",
@@ -4503,7 +4503,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4513,7 +4513,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-8793324dc9b8",
@@ -4531,7 +4531,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4541,7 +4541,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-61bf59ff1cb6",
@@ -4559,7 +4559,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4569,7 +4569,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-d16fcd8b1527",
@@ -4587,7 +4587,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4597,7 +4597,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-3a7d84eabd01",
@@ -4615,7 +4615,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4625,7 +4625,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-18953f1d8d18",
@@ -4643,7 +4643,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4653,7 +4653,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-75054599ed68",
@@ -4671,7 +4671,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4681,7 +4681,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-35abc8265704",
@@ -4699,7 +4699,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4709,7 +4709,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-4b45d4541fbc",
@@ -4727,7 +4727,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4737,7 +4737,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-0043eec49658",
@@ -4755,7 +4755,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4765,7 +4765,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-aac599cd18b4",
@@ -4783,7 +4783,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4793,7 +4793,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-4a333debc989",
@@ -4811,7 +4811,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4821,7 +4821,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-e297a566d6f6",
@@ -4839,7 +4839,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4849,7 +4849,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-633da397107c",
@@ -4867,7 +4867,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4877,7 +4877,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-7908e1c8de7d",
@@ -4895,7 +4895,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4905,7 +4905,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-30d82c540c2f",
@@ -4923,7 +4923,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4933,7 +4933,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-6190338b1894",
@@ -4951,7 +4951,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4961,7 +4961,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-100b08582481",
@@ -4979,7 +4979,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -4989,7 +4989,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-1d9260520ae4",
@@ -5035,7 +5035,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5045,7 +5045,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-c42b1719b74e",
@@ -5063,7 +5063,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5073,7 +5073,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-094f36c8ef54",
@@ -5091,7 +5091,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5101,7 +5101,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-11aedc4afded",
@@ -5119,7 +5119,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5129,7 +5129,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T18:41:02+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-29d5166c2a10",
@@ -5147,7 +5147,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5157,7 +5157,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-42f74f2a18c0",
@@ -5175,7 +5175,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5185,7 +5185,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-fa892a0ed4fc",
@@ -5203,7 +5203,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5213,7 +5213,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-94caaea4c553",
@@ -5231,7 +5231,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5241,7 +5241,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-ee8f60936c10",
@@ -5259,7 +5259,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5269,7 +5269,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-3ad81e8b0d8b",
@@ -5287,7 +5287,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5297,7 +5297,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-ce4357b37d0f",
@@ -5315,7 +5315,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5325,7 +5325,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-cd984da77e5d",
@@ -5343,7 +5343,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5353,7 +5353,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-7d8081379de2",
@@ -5371,7 +5371,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5381,7 +5381,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-6f33133b5564",
@@ -5399,7 +5399,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5409,7 +5409,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-bc5cab5a2cee",
@@ -5427,7 +5427,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5437,7 +5437,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-e65722eeff9f",
@@ -5455,7 +5455,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5465,7 +5465,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-186c69186564",
@@ -5483,7 +5483,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5493,7 +5493,7 @@
       "in_evening": "2026-10-29",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-29T19:21:16+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-6ade07d2c365",
@@ -11861,7 +11861,7 @@
       "canonical_title": "Queens delivers stunning road comeback that should put the rest of the College Basketball on notice - Busting Brackets",
       "category": "college_local",
       "first_seen": "2026-11-05",
-      "last_seen": "2026-11-05",
+      "last_seen": "2026-11-06",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -11881,7 +11881,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-f372bd56834d",
@@ -12085,7 +12085,7 @@
       "canonical_title": "TCU coach Sonny Dykes: didn't notice the boos and calls for him to be fired - NBC 5 Dallas-Fort Worth",
       "category": "college_local",
       "first_seen": "2026-11-05",
-      "last_seen": "2026-11-05",
+      "last_seen": "2026-11-06",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -12105,7 +12105,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-ef27775759bb",
@@ -12169,7 +12169,7 @@
       "canonical_title": "TU’s 700 ropanis of land not reclaimed as education minister claims - OnlineKhabar English News",
       "category": "education_tu",
       "first_seen": "2026-11-05",
-      "last_seen": "2026-11-05",
+      "last_seen": "2026-11-06",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -12189,7 +12189,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-06T06:49:37+05:45"
     },
     {
       "event_id": "evt-cffa7512bf65",
@@ -12498,6 +12498,510 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-05T18:44:19+05:45"
+    },
+    {
+      "event_id": "evt-69ad694c0874",
+      "event_key": null,
+      "canonical_title": "Is SSH Password Auth Really Off on Your Server? Hardening sshd_config and Proving It From the Outside",
+      "category": "tech_career",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/eme_gug_0821b41b948be6516/is-ssh-password-auth-really-off-on-your-server-hardening-sshdconfig-and-proving-it-from-the-2cdd"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "An Alpine Linux security advisory regarding an OpenSSH-server password authentication bypass vulnerability climbed to the top of Hacker News with hundreds of comments.",
+      "latest_development": "An Alpine Linux security advisory regarding an OpenSSH-server password authentication bypass vulnerability climbed to the top of Hacker News with hundreds of comments.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-037ef4e34e5c",
+      "event_key": null,
+      "canonical_title": "Run Vercel Cron more than once a day on the Hobby plan",
+      "category": "tech_career",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/greatworkco/run-vercel-cron-more-than-once-a-day-on-the-hobby-plan-1ggb"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "On Vercel's Hobby plan, cron jobs can run at most once a day, causing schedules like every 15 minutes to fail deployment with a limit error.",
+      "latest_development": "On Vercel's Hobby plan, cron jobs can run at most once a day, causing schedules like every 15 minutes to fail deployment with a limit error.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-e360e3024d74",
+      "event_key": null,
+      "canonical_title": "npm packages, types, and the quick-fix install",
+      "category": "tech_career",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/jslab/npm-packages-types-and-the-quick-fix-install-1hb5"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "JSLab, a JavaScript and TypeScript scratchpad for macOS, allows packages to be installed once so they can be imported across every tab using shortcut ⌘I.",
+      "latest_development": "JSLab, a JavaScript and TypeScript scratchpad for macOS, allows packages to be installed once so they can be imported across every tab using shortcut ⌘I.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-ec0e3432d6b7",
+      "event_key": null,
+      "canonical_title": "Major tech stocks plunge as US midterms add to fears of AI slowdown",
+      "category": "world_major",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/cmn04705rd8jo"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Financial markets reacted to potential tougher scrutiny of data centre construction and the artificial intelligence industry following US midterms.",
+      "latest_development": "Financial markets reacted to potential tougher scrutiny of data centre construction and the artificial intelligence industry following US midterms.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-6f2da7c3f275",
+      "event_key": null,
+      "canonical_title": "Road closure announced for Jonesboro - K8 News | Jonesboro, Arkansas",
+      "category": "local_city",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmidefvx3lxte04m1viwufrb2zqttdyzkz5z0qxzdf6wwniymnmakj1v1l1ukjstzuxvtjtx1zywg1tvhjxcem4azzncuzhqww3zuj0wwqtbzdrsgwwmmlht1htcwhhwxhgvgq0yvfwc2c0v2uxaddtxzd6n2ix0ggiaufvx3lxte0wddrfahlizl9xb2t3uvvnmzlbmwixqwvqylvmuuproxaxzfv5uvpxtk02z3zgm3lptnm4mlpiqvr2v2plynfasu9qn080dmpswc1fc2jwx1jqexnlz3c1lui1qkv6q1jltgzyvtlyrhjjukoyugtsclpitmnnadq4yvmyvk5wnu4"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-1bff3103f50e",
+      "event_key": null,
+      "canonical_title": "Club News: The Final Pitch (Nov. 5, 2026): Spotlighting Turnin2-Prospect Makenna Bareman, News, Commits, 'Beauty and the Beat' & Dr. Doom Appointment - Line Drive Media",
+      "category": "gaming",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmi_afbvv95cuxndhgwdw1lvlqtotrtbduwtnzbqw5sc1kyr0fxogxxz2pkn1v1d2hedezkt0dwwgvba0zwa3kzrgjkelbibxpatlzyzlq3sxl5egstsktoshdxcmfpa0gzs08xsdhjti1vbwzxc0nxdjbnngntc1vvvhn0ovjnejzsbdfynlh0xzjtazvasxray3ljc3jiq0q3bw9xnksyr2h3cdlvunnavvryc3m4cec5bmstzfvovlhum1f1ce9fyznodzq3rfnnvxe1tki0ni1hqwtks25ucjmwsfberklnym1evhotmmg3n1qzq3q2c0rqvgrozktddetpzfq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-2bd1c6768307",
+      "event_key": null,
+      "canonical_title": "Pope begins lengthy trip to Latin America weeks after lung cancer surgery",
+      "category": "world_major",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/cqn06j0y61k6o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Pope Leo, who had part of a lung removed last month, will visit Uruguay, Argentina and Peru.",
+      "latest_development": "Pope Leo, who had part of a lung removed last month, will visit Uruguay, Argentina and Peru.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-43db357c978c",
+      "event_key": null,
+      "canonical_title": "UNION ARENA: Every BLEACH Vol. 3 Deck, Ranked - Joseph Writer Anderson",
+      "category": "anime",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmijafbvv95cuxobfi0ade1ennqwwdld2gznexjdhmzrwvnqxbyrxdhd0zud1p3unflctzoewc2x2rewjm1t0fxwwzsrduyymhmtk5mvzztadnsc3niauc4s1rzqnk4muxudfl2bmxvr3byvuxfq0lobm90bkr3cv9tzmtzrhzdb2pls2tprhrbev9mewqyma"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-5531db7cd23a",
+      "event_key": null,
+      "canonical_title": "All Zora River, Domain, and Fountain Gold Skulltulas in Zelda: Ocarina of Time Switch 2",
+      "category": "gaming",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "videogameschronicle.com/guide/all-zora-river-domain-and-fountain-gold-skulltulas-in-zelda-ocarina-of-time-switch-2"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-86ac06c63f7e",
+      "event_key": null,
+      "canonical_title": "Vietnam vet leading opposition to Trump's arch calls it 'blasphemous' - ABC News - Breaking News, Latest News and Videos",
+      "category": "gaming",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmipwfbvv95cuxpuk45ytfer2owys1cslpnnxnunxfkwdvsse5rlvetofp4rexumgnnodbsnhhfv002rlbodhd1ag40tldmm0tdclexdhpvctjfc2l4bgdibs1kvwg5bxhznuhhd0rxmgxrrdfmlwtvyzbvr0zsamhurgtcy2vauglyvfzvtfppcgq1ttg5vm9hbwwtzkxfceyxbtrwa2plmxzjanrlcxlmsdibrafbvv95cuxplw9by0frwgnqzujfcg1mqtg3u2rru0lndenvwhhjbhnqthftbm5ks1hnadvjbhlwylhxcthbuxrkx2xnvlbizk8ytuxhsvribvh3c0n4nhblytvgwljemnh6tvn1vmprcm5mbzi3y29jd1dxqwzuqjeyshbocs1ttfm3evhpohytuw1geuz0u3y1lws3v0dcdelpd2dsodz4zk1rb3kztlltskx5"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-e5fe44ef03a3",
+      "event_key": null,
+      "canonical_title": "Democratic socialist defeats incumbent Karen Bass in Los Angeles mayor's race",
+      "category": "world_major",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/c6e3xxwk3k11o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The results mean America's two most populous cities - New York and Los Angeles - will be led by democratic socialists.",
+      "latest_development": "The results mean America's two most populous cities - New York and Los Angeles - will be led by democratic socialists.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-20e7ef255689",
+      "event_key": null,
+      "canonical_title": "Serious crash closes Oracle southbound at Linda Vista - KOLD",
+      "category": "local_city",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiiwfbvv95cuxnchbytxhst2vyswrdetjls1lmqmveq0rit0nhwgpxnxhyohjrowlvudrgymn2ejz3d2t4rg84mxvrnmdrekdtzkpgqu5xv3q5wetqcwpaqjvydxhuwfy4dmfpu1numktsyi0xqw5izi01bvliaekzadbyoxg4mnqxqwrvbmdceed2x0e4"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-c280f462d85f",
+      "event_key": null,
+      "canonical_title": "‘A man’s man’: Remembering Gold Coast F1 legend Jones - InDaily Queensland",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmigafbvv95cuxpow04etj3behjufnfymtvyjdnm2xwdlvceetrbhbtuzbvd3vyzuj1luo3cl9aoehnetvmahlluudktdlnbxnzme9ra0tway1jceq1n1zzsl8yvjbsy1zxntg0akg4ctzmetjllxnbn0pxb2rrzk5gvw1hbfhrweplca"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-3f54b0a9a83a",
+      "event_key": null,
+      "canonical_title": "New AGCO liquor sales license application undergoing public notice - Stittsville Central",
+      "category": "local_city",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmioafbvv95cuxpb3vflxlebk04mhp1wvbpbkhjqnd3metlndnmnuuzd3zlluj2mvhztjlcoxa0d2z0bk5ob2lftzuzu20wzhrkejv1ymm4s2vrzxptttbsufv4ts13mlplzflotthpb3fkwgw2dei0dxp6qnhrmgvvow5qszndn0nvnms1albxsjlkwhljlxbrogjssdlhd2fta2rqdmxavxl1"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-5859b8fa3da0",
+      "event_key": null,
+      "canonical_title": "Urban Meyer Puts College Football Playoff Contender on Notice with Stark Warning - Yahoo Sports",
+      "category": "college_local",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiigfbvv95cuxqqnd6mezfaxfwyjvivzjfm01zzvrtbm9it18tzdlluhdfdxvurutjmdr5ug5rbfjwa1bbaktfvgu1edf4wwyxynhube5zywhwttjlrdlwbdlwzexwclrkdnzux1fzzuxmr3fmwtyzchnms09ovgzjumtvudnxu1pvyxbwdxyyuxb1bnc"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-565526ca7eb2",
+      "event_key": null,
+      "canonical_title": "Banks brace for tighter oversight from US Congress after Democrats sweep - The Spokesman-Review",
+      "category": "bank_local",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmingfbvv95cuxnsxp2tdvnwenwlwpxudfjqm5dcvhyqxy1qvfvnmzadllvegfome4wahzhstf6m1zsswrcqjv2bu14yncws29lvhqzvfdxudrdzfrgei1swmpnzgliovb0mgwtsmdxve5azk9fagoxymrltwfgmgx5wjhzelrmrs1qvgttymdfyvvtnedrmmtlt3nylxbivnduqxbsyzyzqq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-703ed59e1fa9",
+      "event_key": null,
+      "canonical_title": "Paraguay President Resigns As Lawmakers Vote 78-0 To Impeach - Dallas Express",
+      "category": "bank_local",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbminafbvv95cuxqovplb2rdnk9tlxaxywvyuvvpqwf2atfjsez5dxrsvkdkcur3rnlrdmnvqljtu3jqqxnntxfdsdbyt2tnrmiyt0tvvjbyduszmtdrcdr3cmiwouzjugwzsxawthllu0fmoxvamlqxq2d3quqtcmzqawg1rw1vvv9ilw0ytlm4qudlykvgt1htbkznb2r6t3lseu1dduc"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
+    },
+    {
+      "event_id": "evt-388600f924f1",
+      "event_key": null,
+      "canonical_title": "Claims of TU land recovery spark controversy amid ongoing encroachments - The Kathmandu Post",
+      "category": "education_tu",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiuafbvv95cuxnq1pta3jisjvsnjrazgp2n25utgszeerqynnzrfvgzc1wyjhxyln6zlffexr1bxvruvloquqwou5rxy1usfjlv0vxtgdwvldbcms3dvnktne4ckryy3z1aty3ovk3wm1fwwrdcmdxvgxcstllb3pzshzivhr3dur0tdlbsm1fvxdfys1izghlzm5trjzvumxodlbxd3lhqwjhefrmnghqdc00ntnfn1oyzurxmghorgdi"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T06:49:37+05:45"
     }
   ],
   "archived": []
