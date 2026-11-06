@@ -213,6 +213,9 @@ jobs:
           # never a guess.
           OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The second Google project. Its own rungs and its own free allowance;
+          # an absent secret removes them rather than costing an attempt.
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           # THE THREE KEYED HTTP FALLBACKS, between Gemini and the free pool.
           # scripts/breaking_monitor.py routes `groq/`, `openrouter/` and
           # `mistral/` rungs straight to the provider (one HTTPS POST, no CLI),

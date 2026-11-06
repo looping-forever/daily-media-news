@@ -248,6 +248,24 @@ def _reachable_prefixes():
     return prefixes
 
 
+def _announce_second_key(seeds, log=print):
+    """Say why the second Google project has no rung, or stay quiet.
+
+    Its seeds live in the shared config, and an absent key removes them before
+    the walk ever sees them -- a repository with one key must read exactly as it
+    did before, but a run that LOST a key must not look like a shorter ladder
+    for no reason. Silence when the key is present: the rungs are visible.
+    """
+    prefix = llm_providers.GEMINI_KEY2_PROVIDER + "/"
+    if not any(str(m).startswith(prefix) for m in (seeds or ())):
+        return False
+    if llm_providers.configured(llm_providers.GEMINI_KEY2_PROVIDER):
+        return False
+    log("ai_classify: %s contributes no rung -- %s is not set"
+        % (llm_providers.GEMINI_KEY2_PROVIDER, llm_providers.GEMINI_KEY2_ENV))
+    return True
+
+
 def _ladder_for(seeds, prefixes):
     """The seed ladder, ordered, filtered to the providers reachable here.
 
@@ -1965,6 +1983,7 @@ def ai_classify(pending_path, runner=None, models=None,
         # order. The config file itself is untouched -- the digest walk still
         # uses every rung.
         cfg = dict(_opencode_config())
+        _announce_second_key(cfg.get("ladder") or [])
         cfg["ladder"] = list(AI_LADDER)
         try:
             selected, info = model_selector.select(

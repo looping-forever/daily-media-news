@@ -710,61 +710,63 @@ class AllFailBoundTests(unittest.TestCase):
     def test_the_arithmetic_of_a_silent_all_fail_walk(self):
         """THE SILENCE BOUND, COMPUTED FROM THE TABLE.
 
-            gemini x2 60 + 60            <- unmeasured rungs, default window
+            gemini x4 60 + 60 + 60 + 60 = 240   <- two keys, unmeasured rungs
             deepseek 60 + beam 240 + mimo 60 + nemotron 60 + glm 60 + flint 60
-                = 660s = 11 min
+                = 540s
+            = 780s = 13 min
 
         Before the per-model table every rung cost one global window; before
         the watchdog a dead rung cost its full cap. The point of computing it
         FROM the table is that adding, removing or re-measuring a model moves
         this number without anyone editing a test -- which is exactly what
-        happened on 2026-10-30 when two rungs joined carrying no measurement.
+        happened on 2026-10-30 when two rungs joined carrying no measurement,
+        and again on 2026-11-06 when the second Gemini key added two more.
         """
         ladder = ms.ladder_model_ids()
-        self.assertEqual(8, len(ladder), ladder)
-        self.assertEqual(660, ms.worst_case_all_fail_sec(ladder))
-        self.assertEqual(660, ms.worst_case_all_fail_sec(),
+        self.assertEqual(10, len(ladder), ladder)
+        self.assertEqual(780, ms.worst_case_all_fail_sec(ladder))
+        self.assertEqual(780, ms.worst_case_all_fail_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(690, ms.worst_case_all_fail_sec(ladder,
+        self.assertEqual(810, ms.worst_case_all_fail_sec(ladder,
                                                         overhead_sec=30))
-        # A ninth, unmeasured rung costs only the default window.
-        self.assertEqual(720, ms.worst_case_all_fail_sec(
+        # An eleventh, unmeasured rung costs only the default window.
+        self.assertEqual(840, ms.worst_case_all_fail_sec(
             ladder + ["opencode/some-new-free"]))
-        self.assertLess(660, 1800,
+        self.assertLess(780, 1800,
                         "the all-silent bound must stay inside the walk budget")
-        self.assertLess(660, 8 * ms.WALK_PER_ATTEMPT_SEC)
+        self.assertLess(780, len(ladder) * ms.WALK_PER_ATTEMPT_SEC)
 
     def test_a_ladder_without_beam_is_cheaper_which_proves_the_table_is_read(self):
         """If the table were ignored, dropping beam would change nothing."""
         ladder = [m for m in ms.ladder_model_ids()
                   if m != "opencode/beam-free"]
         # beam's 240s window is the only measured one above the default, so
-        # removing it must take exactly 240s off the 660s total.
-        self.assertEqual(420, ms.worst_case_all_fail_sec(ladder))
-        self.assertLess(ms.worst_case_all_fail_sec(ladder), 660)
+        # removing it must take exactly 240s off the 780s total.
+        self.assertEqual(540, ms.worst_case_all_fail_sec(ladder))
+        self.assertLess(ms.worst_case_all_fail_sec(ladder), 780)
 
     def test_the_arithmetic_of_an_emit_then_stall_walk(self):
         """THE OTHER WORST CASE, and a different number from the silence bound.
 
         An attempt that never opens the model call costs its FIRST-OUTPUT window
-        (660s over the eight rungs). An attempt that opens the call and then goes
+        (780s over the ten rungs). An attempt that opens the call and then goes
         quiet is measured from its last LOG line, so it costs
         first-output + INTER_TOKEN, truncated by the per-attempt cap:
 
             deepseek   min( 60 + 420, 480) = 480
             beam       min(240 + 420, 480) = 480   <- the cap is binding
-            the other six                  = 480 each
-            = 3840s
+            the other eight                = 480 each
+            = 4800s
 
         Longer than the 1800s walk budget, which is the honest reading: in this
         mode the budget and the cap bound the run, not the windows.
         """
         ladder = ms.ladder_model_ids()
-        self.assertEqual(8, len(ladder), ladder)
-        self.assertEqual(3840, ms.worst_case_emit_then_stall_sec(ladder))
-        self.assertEqual(3840, ms.worst_case_emit_then_stall_sec(),
+        self.assertEqual(10, len(ladder), ladder)
+        self.assertEqual(4800, ms.worst_case_emit_then_stall_sec(ladder))
+        self.assertEqual(4800, ms.worst_case_emit_then_stall_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(3870, ms.worst_case_emit_then_stall_sec(
+        self.assertEqual(4830, ms.worst_case_emit_then_stall_sec(
             ladder, overhead_sec=30))
         self.assertEqual(
             480,
@@ -775,7 +777,7 @@ class AllFailBoundTests(unittest.TestCase):
                            ms.worst_case_all_fail_sec(ladder),
                            "emitting then stalling must cost MORE than silence")
         self.assertLessEqual(ms.worst_case_emit_then_stall_sec(ladder),
-                             8 * ms.WALK_PER_ATTEMPT_SEC)
+                             len(ladder) * ms.WALK_PER_ATTEMPT_SEC)
 
     def test_the_arithmetic_of_a_rejected_all_fail_walk(self):
         """THE OBSERVED 2026-10-25 MODE: every model rejected at ~1s.
@@ -1045,9 +1047,13 @@ class LadderPurityTests(unittest.TestCase):
 
     # CHANGED 2026-10-30: the two free Gemini rungs lead, because they are a
     # SEPARATE free bucket that is not the shared pool the opencode rungs share.
+    # CHANGED 2026-11-06: `GEMINI_API_KEY_2` is a SECOND free project, so its two
+    # rungs sit directly behind the first key's and ahead of that shared pool.
     EXPECTED = [
         "gemini/gemini-3.5-flash-lite",
         "gemini/gemini-3.1-flash-lite",
+        "gemini-key2/gemini-3.5-flash-lite",
+        "gemini-key2/gemini-3.1-flash-lite",
         "opencode/deepseek-v4.1-flash-free",
         "opencode/beam-free",
         "opencode/mimo-v2.6-flash-free",

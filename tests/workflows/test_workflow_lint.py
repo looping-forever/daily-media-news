@@ -158,6 +158,11 @@ ALLOWED_SECRETS = frozenset({
     # the C9 preflight warns and the walk runs the `opencode/*` pool alone, so
     # a repository without it still produces a digest.
     "GEMINI_API_KEY",
+    # The SECOND Google project's key. Same provider, separate free allowance,
+    # so its two rungs sit behind the first project's two and cool on their own
+    # ids. Absence contributes no rung; config/opencode-cli.json names it, and
+    # every workflow that walks the CLI passes it through.
+    "GEMINI_API_KEY_2",
     "GITHUB_TOKEN",
     "GMAIL_APP_PASSWORD",
     "GMAIL_RECEIVER",

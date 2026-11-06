@@ -58,6 +58,8 @@ jobs:
       - name: List models and ask each provider for one word
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The same provider, a second project's key: two rows, two quotas.
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}

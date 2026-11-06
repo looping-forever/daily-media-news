@@ -37,6 +37,11 @@ record or an artifact.
 existing keyed `opencode` CLI rung (`OPENCODE_CONFIG` + `{env:GEMINI_API_KEY}`),
 which the digest and breaking walks already resolve; routing `gemini/*` through
 this adapter as well would give one provider two code paths and two timeouts.
+
+`gemini-key2` is the SAME provider called with a SECOND Google project's key
+(`GEMINI_API_KEY_2`). It is also a CLI rung, and it is in this table only so the
+probe can report both accounts' quotas. The two projects have separate free
+allowances, so one 429 must not cool the other's rungs.
 """
 
 import json
@@ -91,12 +96,28 @@ class Provider:
 #: being flattened into one hardcoded list that can rot (the 2026-10-13 lesson).
 LADDER_PROVIDERS = ("groq", "openrouter", "mistral")
 
+#: The second Google project. Same endpoint and models as `gemini`, different
+#: account and free allowance. Named with a dash so `provider_of()` keeps
+#: returning None and the rungs stay on the CLI path.
+GEMINI_KEY2_PROVIDER = "gemini-key2"
+GEMINI_KEY2_ENV = "GEMINI_API_KEY_2"
+GEMINI_PREFIXES = ("gemini/", GEMINI_KEY2_PROVIDER + "/")
+
 PROVIDERS = {
     "gemini": Provider(
         "gemini",
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         "https://generativelanguage.googleapis.com/v1beta/openai/models",
         "GEMINI_API_KEY",
+        ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
+        60,
+    ),
+    # Probe-only, exactly like `gemini`: production walks the CLI rung.
+    "gemini-key2": Provider(
+        "gemini-key2",
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "https://generativelanguage.googleapis.com/v1beta/openai/models",
+        GEMINI_KEY2_ENV,
         ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
         60,
     ),
@@ -903,7 +924,7 @@ def probe_rows(transport=None, environ=None, sleep=None):
     so the pinned row shape never changes.
     """
     rows = []
-    for name in ("gemini",) + LADDER_PROVIDERS:
+    for name in ("gemini", GEMINI_KEY2_PROVIDER) + LADDER_PROVIDERS:
         got = probe(name, transport=transport, environ=environ, sleep=sleep)
         rows.append("%s | key=%s | models=%d | chosen=%s | status=%s | "
                     "ms=%d | verdict=%s"
@@ -1050,12 +1071,17 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
 
 def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
                    resolve=False, log=None):
-    """`seeds` re-ordered as: Gemini, then Groq/OpenRouter/Mistral, then the rest.
+    """`seeds` re-ordered as: both Gemini keys, then Groq/OpenRouter/Mistral, then the rest.
 
     Gemini rungs stay first because they are the owner's stated preference,
     and the free OpenCode pool stays LAST because its shared bucket is the one
     that answers `payment_required` for every id at once -- a rung worth trying
     only when a keyed or free-keyed provider has already declined.
+
+    The second Gemini project is a SEPARATE rung, not a retry of the first: its
+    `gemini-key2/*` seeds sit directly behind `gemini/*` while `GEMINI_API_KEY_2`
+    is set, and disappear with one log line when it is not. That is the same
+    behaviour a repository with one key has today.
 
     `prefixes` is the existing CLI-reachability filter: an empty tuple means
     "no filter" (the summariser, which owns no CLI), and a non-empty tuple keeps
@@ -1064,9 +1090,17 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
     is the point of having them.
     """
     seeds = [m for m in (seeds or ()) if isinstance(m, str) and m]
+    if not configured(GEMINI_KEY2_PROVIDER, environ):
+        second = [m for m in seeds
+                  if m.startswith(GEMINI_KEY2_PROVIDER + "/")]
+        if second:
+            if log:
+                log("llm_providers: %s contributes no rung -- %s is not set"
+                    % (GEMINI_KEY2_PROVIDER, GEMINI_KEY2_ENV))
+            seeds = [m for m in seeds if m not in second]
     if prefixes:
         seeds = [m for m in seeds if m.startswith(tuple(prefixes))]
-    gemini = [m for m in seeds if m.startswith("gemini/")]
-    rest = [m for m in seeds if not m.startswith("gemini/")]
+    gemini = [m for m in seeds if m.startswith(GEMINI_PREFIXES)]
+    rest = [m for m in seeds if not m.startswith(GEMINI_PREFIXES)]
     return tuple(gemini) + ladder_rungs(environ, transport=transport,
                                         resolve=resolve, log=log) + tuple(rest)

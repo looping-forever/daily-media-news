@@ -530,10 +530,13 @@ def ladder_models(transport=None, environ=None, log=None):
     `record_refusal` (a rung that answered NOTHING) is reordered by
     `demoted_order`, which is a different fact about a different failure.
 
-    THE ORDER IS GEMINI, THEN THE KEYED FALLBACKS, THEN THE FREE POOL (measured
-    2026-11-05: Gemini's free tier spent its minute in 13.4s and every OpenCode
-    free id shared the same refusal, so one account's allowance ended the
-    edition). The three HTTP providers are inserted by `llm_providers`, which
+    THE ORDER IS BOTH GEMINI PROJECTS, THEN THE KEYED FALLBACKS, THEN THE FREE
+    POOL (measured 2026-11-05: Gemini's free tier spent its minute in 13.4s and
+    every OpenCode free id shared the same refusal, so one account's allowance
+    ended the edition). `GEMINI_API_KEY_2` is a second project with its own
+    allowance, so its two rungs sit behind the first project's two and cool on
+    their own ids; with the second key unset they contribute nothing, exactly
+    as before. The three HTTP providers are inserted by `llm_providers`, which
     skips any provider with no key configured -- so a repository with none of
     those secrets set gets byte-identical behaviour to before.
 

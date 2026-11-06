@@ -669,6 +669,75 @@ def test_the_config_seed_is_still_the_first_preference():
     assert selected == list(cfg["ladder"]), (selected, cfg["ladder"])
 
 
+def test_a_cli_provider_with_no_key_contributes_no_rung():
+    """GEMINI_API_KEY_2 is a second project, and an absent key is a setting.
+
+    The digest walk reads config/opencode-cli.json through OPENCODE_CONFIG. A
+    seed may name a `gemini-key2/*` rung, but the walk drops it when the env var
+    it points at is unset -- exactly as the workflow preflight already drops a
+    `gemini/*` rung whose key is absent.
+    """
+    sd = tempfile.mkdtemp(prefix="clikey_")
+    path = os.path.join(sd, "opencode-cli.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"provider": {
+            "gemini": {"options": {"apiKey": "{env:DMNEWS_T_KEY1}"}},
+            "gemini-key2": {"options": {"apiKey": "{env:DMNEWS_T_KEY2}"}},
+        }}, fh)
+    cfg = {"provider": PROVIDER,
+           "ladder": ["gemini/a", "gemini-key2/a", SEED_BIG_PICKLE]}
+    saved = dict(os.environ)
+    try:
+        os.environ["OPENCODE_CONFIG"] = path
+        os.environ["DMNEWS_T_KEY1"] = "present"
+        os.environ.pop("DMNEWS_T_KEY2", None)
+        first, _info = ms.select(cfg, ms.load_health(None), cache_path=None,
+                                 max_models=None, now=1.0,
+                                 discover_fn=lambda p: ([], {"source": "live"}))
+        assert first == ["gemini/a", SEED_BIG_PICKLE], first
+
+        os.environ["DMNEWS_T_KEY2"] = "present"
+        second, _info = ms.select(cfg, ms.load_health(None), cache_path=None,
+                                  max_models=None, now=1.0,
+                                  discover_fn=lambda p: ([], {"source": "live"}))
+        assert second == ["gemini/a", "gemini-key2/a", SEED_BIG_PICKLE], second
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+        shutil.rmtree(sd, ignore_errors=True)
+
+
+def test_the_second_gemini_key_is_announced_when_it_is_absent():
+    """The breaking walk never sees a dropped seed, so it must say so itself.
+
+    `_reachable_prefixes` removes an unreachable CLI provider BEFORE the ladder
+    is built; without this line a run that lost GEMINI_API_KEY_2 would simply
+    walk three rungs and give no reason.
+    """
+    seeds = ["gemini/a", "gemini-key2/a", SEED_BIG_PICKLE]
+    saved = dict(os.environ)
+    try:
+        os.environ.pop("GEMINI_API_KEY_2", None)
+        said = []
+        assert bm._announce_second_key(seeds, log=said.append) is True
+        assert len(said) == 1 and "GEMINI_API_KEY_2" in said[0], said
+
+        os.environ["GEMINI_API_KEY_2"] = "present"
+        quiet = []
+        assert bm._announce_second_key(seeds, log=quiet.append) is False
+        assert quiet == [], quiet
+
+        # A ladder that never named the second project stays silent whatever
+        # the environment holds: a repository with one key is unchanged.
+        os.environ.pop("GEMINI_API_KEY_2", None)
+        other = []
+        assert bm._announce_second_key(["gemini/a"], log=other.append) is False
+        assert other == [], other
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 def test_selection_is_deterministic():
     """Same inputs, same order — always. A watchdog must not change its mind
     between two runs of the same evidence."""

@@ -19,8 +19,9 @@ keep it from becoming a way to silence the ladder:
   1. SKIP -- a cooled model is removed from the attempt list, and the walk
      falls through to the next ranked model rather than ending;
   2. COST -- a not-found cools for 24h (the id is wrong), an outage for 15
-     minutes and only after TWO hits (it is transient), and a quota never
-     cools at all (the pool shares it);
+     minutes and only after TWO hits (it is transient), and a quota for 6h on a
+     KEYED provider only (that account's allowance is gone; the free pool shares
+     one bucket, so cooling its ids would empty the ladder);
   3. LOUD -- if every model is cooled the selection is EMPTY and the CLI exits
      non-zero naming the cooldown. It never reports an empty ladder it does
      not have.
@@ -442,19 +443,30 @@ class CommittedCooldownTests(unittest.TestCase):
             problems.append("`pool` is %s, not an object" % type(pool).__name__)
             pool = None
         for model, row in models.items():
-            if not str(model).startswith(PROVIDER + "/"):
+            # ANY provider, not just the pool: since run 42144852087 a keyed
+            # provider's own quota is vetoed in this same file.
+            if not ms.MODEL_ID_RE.match(str(model)):
                 problems.append("%r is not a fully-qualified model id" % (model,))
             if not isinstance(row, dict):
                 problems.append("%r carries no row" % (model,))
                 continue
-            if row.get("reason") not in ms.COOLDOWN_SEC:
+            reason = row.get("reason")
+            if reason not in ms.COOLDOWN_SEC:
                 problems.append(
                     "%r: reason %r is not one of the cooled classes (%r), so "
                     "nothing says how long it lasts"
                     % (model, row.get("reason"), sorted(ms.COOLDOWN_SEC)))
+                continue
+            # A row still BELOW its class's hit threshold is a pending hit, not a
+            # cooldown: `record_cooldown` writes no `until` and `prune_cooldown`
+            # keeps it for COOLDOWN_HIT_TTL_SEC waiting for its pair.
+            hits = row.get("hits")
+            if isinstance(hits, int) and hits < ms.HITS_BEFORE_COOLDOWN.get(
+                    reason, 1):
+                continue
             # `until` is ABSOLUTE. now=0 makes every real future stamp true, so
             # an unreadable stamp fails here instead of quietly expiring.
-            elif not ms.on_hard_cooldown(doc, model, 0.0):
+            if not ms.on_hard_cooldown(doc, model, 0.0):
                 problems.append("%r carries no readable `until`: %r"
                                 % (model, row))
         # `_epoch` returns 0.0 for a stamp it cannot read, so `<= 0` is the

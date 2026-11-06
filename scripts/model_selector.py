@@ -189,6 +189,9 @@ def read_pinned_models(info):
 #: --verbose record and to validate a plain listing.
 MODEL_ID_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.-]*)/([A-Za-z0-9][A-Za-z0-9._-]*)$")
 
+#: A CLI provider's key reference: `"apiKey": "{env:GEMINI_API_KEY_2}"`.
+CLI_KEY_ENV_RE = re.compile(r"^\{env:([A-Za-z_][A-Za-z0-9_]*)\}$")
+
 
 def parse_verbose_models(text, provider):
     """(models, unparsed_ids) from `opencode models <p> --verbose` stdout.
@@ -1637,6 +1640,36 @@ def rank_models(candidates, seed=(), health=None, now=0, release=None):
     return sorted(candidates, key=key)
 
 
+def _cli_reachable(seed):
+    """Drop seeds whose CLI provider's key is absent.
+
+    config/opencode-cli.json declares each CLI provider with
+    `apiKey: "{env:VAR}"`. A provider whose VAR is unset cannot answer, so its
+    rungs do not belong in the walk; the workflow preflight discovers the same
+    fact AFTER trying one. A seed with no provider block (the opencode pool) is
+    untouched, and no OPENCODE_CONFIG means "nothing to check".
+
+    This is what makes an absent `GEMINI_API_KEY_2` byte-identical to a
+    repository that never configured a second project.
+    """
+    path = os.environ.get("OPENCODE_CONFIG") or ""
+    if not path:
+        return tuple(seed)
+    providers = load_config(path).get("provider") or {}
+    if not isinstance(providers, dict):
+        return tuple(seed)
+    absent = set()
+    for name, block in providers.items():
+        options = block.get("options") if isinstance(block, dict) else None
+        ref = options.get("apiKey") if isinstance(options, dict) else ""
+        match = CLI_KEY_ENV_RE.match(str(ref or ""))
+        if match and not (os.environ.get(match.group(1)) or "").strip():
+            absent.add("%s/" % name)
+    if not absent:
+        return tuple(seed)
+    return tuple(m for m in seed if not m.startswith(tuple(absent)))
+
+
 def select(config, health, cache_path=None, state_note=None, max_models=4,
            now=None, discover_fn=None, cooldown=None, cooldown_path=None,
            role="other"):
@@ -1666,6 +1699,7 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
 
     now = _time.time() if now is None else now
     seed = tuple(m for m in (config.get("ladder") or []) if isinstance(m, str))
+    seed = _cli_reachable(seed)
     provider = config.get("provider") or _provider_of(seed)
 
     live, disc = ((discover_fn(provider) if discover_fn

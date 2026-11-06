@@ -1225,6 +1225,10 @@ jobs:
           # without it every gemini rung fails as "model not found".
           OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The SECOND Google project, a separate free allowance with its own
+          # provider block in config/opencode-cli.json. Absent means its two
+          # rungs contribute nothing, exactly as this step worked before.
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
         run: |
           set -eo pipefail
           # The floor comes from the workflow-level env, and a run that lost it
@@ -1269,17 +1273,33 @@ jobs:
           # Gemini is a fallback, never a failure.
           LADDER_CONFIG=config/opencode.json
           GEMINI_PREFIX="gemini/"
+          GEMINI_KEY2_PREFIX="gemini-key2/"
+          DROP_PREFIXES=""
           if opencode models 2>/dev/null | grep -q "^${GEMINI_PREFIX}"; then
             echo "Provider preflight: a ${GEMINI_PREFIX}* model resolves; the free Gemini rungs are live."
           else
             echo "::warning::Provider preflight FAILED: no ${GEMINI_PREFIX}* model resolves, so OPENCODE_CONFIG, the provider block in config/opencode-cli.json or GEMINI_API_KEY is not reaching the CLI. Skipping the Gemini rungs and walking the opencode pool, rather than spending two attempts per run to learn it."
+            DROP_PREFIXES="$DROP_PREFIXES $GEMINI_PREFIX"
+          fi
+          # The second project is a SEPARATE account, so it is checked and
+          # dropped on its own. An unset secret is a repository setting, not a
+          # failure: its rungs simply contribute nothing.
+          if [ -z "${GEMINI_API_KEY_2:-}" ]; then
+            echo "Provider preflight: ${GEMINI_KEY2_PREFIX}* contributes no rung -- GEMINI_API_KEY_2 is not set."
+          elif opencode models 2>/dev/null | grep -q "^${GEMINI_KEY2_PREFIX}"; then
+            echo "Provider preflight: a ${GEMINI_KEY2_PREFIX}* model resolves; the second Gemini project is a separate rung."
+          else
+            echo "::warning::Provider preflight: GEMINI_API_KEY_2 is set but no ${GEMINI_KEY2_PREFIX}* model resolves, so the second project's rungs are skipped."
+            DROP_PREFIXES="$DROP_PREFIXES $GEMINI_KEY2_PREFIX"
+          fi
+          if [ -n "$DROP_PREFIXES" ]; then
             POOL_DIR="${RUNNER_TEMP:-state}"
             mkdir -p "$POOL_DIR"
-            if [ -f "$LADDER_CONFIG" ] && python3 -c "import json,sys;d=json.load(open(sys.argv[1]));d['ladder']=[m for m in (d.get('ladder') or []) if not str(m).startswith(sys.argv[2])];json.dump(d,open(sys.argv[3],'w'))" "$LADDER_CONFIG" "$GEMINI_PREFIX" "$POOL_DIR/opencode.pool.json" 2>/dev/null; then
+            if [ -f "$LADDER_CONFIG" ] && DROP_PREFIXES="$DROP_PREFIXES" python3 -c "import json,os,sys;d=json.load(open(sys.argv[1]));p=os.environ['DROP_PREFIXES'].split();d['ladder']=[m for m in (d.get('ladder') or []) if not str(m).startswith(tuple(p))];json.dump(d,open(sys.argv[2],'w'))" "$LADDER_CONFIG" "$POOL_DIR/opencode.pool.json" 2>/dev/null; then
               LADDER_CONFIG="$POOL_DIR/opencode.pool.json"
-              echo "Provider preflight: seed ladder re-resolved without the Gemini rungs ($LADDER_CONFIG)."
+              echo "Provider preflight: seed ladder re-resolved without${DROP_PREFIXES} ($LADDER_CONFIG)."
             else
-              echo "::warning::Provider preflight: could not write a pool-only ladder; keeping $LADDER_CONFIG (the Gemini rungs may still be tried and will fail fast)."
+              echo "::warning::Provider preflight: could not write a pool-only ladder; keeping $LADDER_CONFIG (the dropped rungs may still be tried and will fail fast)."
             fi
           fi
           START=$(date +%s)
@@ -1839,6 +1859,9 @@ jobs:
           # gemini rung fails as an auth error.
           OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The second Google project: a separate free allowance. Unset means
+          # its two rungs contribute nothing, exactly as before.
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           # The three keyed HTTP fallbacks behind Gemini, read by
           # scripts/llm_providers.py at CALL time. Absent ones are skipped
           # silently, so a repository without any of them behaves exactly as it
@@ -2067,6 +2090,8 @@ jobs:
           # the key every gemini rung fails as an auth error.
           OPENCODE_CONFIG: ${{ github.workspace }}/config/opencode-cli.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The same second project the deriver walks. Unset contributes nothing.
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}

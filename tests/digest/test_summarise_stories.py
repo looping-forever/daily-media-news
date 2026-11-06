@@ -949,5 +949,43 @@ class ADemotionSurvivesTheProcess(unittest.TestCase):
                          saved["models"]["gemini/gemini-3.5-flash-lite"]["reason"])
 
 
+#: The second Google project's rung. Same model, different key and bucket.
+KEY2 = "gemini-key2/gemini-3.5-flash-lite"
+
+
+class TwoGeminiKeysAreIndependentRungs(unittest.TestCase):
+    """One project's 429 may not cool the other project's rung.
+
+    Health memory is keyed by model id, and the provider prefix makes the two
+    ids different, so the rows can never collide. This pins that at the
+    summariser boundary, where the cooldown is written.
+    """
+
+    def setUp(self):
+        self.cool = {"schema_version": 1, "models": {}, "pool": {}}
+
+    def test_each_key_cools_on_its_own_row(self):
+        ss.record_refusal(self.cool, BROKEN, "quota_notice", now=1_800_000_000.0)
+        self.assertEqual({BROKEN}, set(self.cool["models"]))
+        ss.record_refusal(self.cool, KEY2, "quota_notice", now=1_800_000_000.0)
+        self.assertEqual({BROKEN, KEY2}, set(self.cool["models"]))
+        self.assertEqual("quota_exhausted", self.cool["models"][KEY2]["reason"])
+
+    def test_a_refused_first_key_does_not_stop_the_second(self):
+        run = FakeRun([
+            ss.Refusal("%s: quota exhausted" % BROKEN, kind="quota_notice"),
+            reply_for([story(1)]),
+        ])
+        out = ss.summarise([story(1)], models=[BROKEN, KEY2], run=run,
+                           sleep=lambda *_a: None, cooldown=self.cool,
+                           clock=lambda: 1_800_000_000.0)
+        self.assertEqual([BROKEN, KEY2], [model for _p, model in run.calls],
+                         "the second project is the next rung, not a retry")
+        self.assertIn(BROKEN, self.cool["models"])
+        self.assertNotIn(KEY2, self.cool["models"],
+                         "the second project's rung answered and stays clean")
+        self.assertEqual(1, len(out["summaries"]))
+
+
 if __name__ == "__main__":
     unittest.main()

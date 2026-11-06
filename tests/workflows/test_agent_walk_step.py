@@ -460,6 +460,9 @@ class AgentWalkHarness(unittest.TestCase):
                 # the stub never reads it. NEVER a real credential.
                 text = text.replace("${{ secrets.GEMINI_API_KEY }}",
                                     "test-gemini-key")
+                # The second Google project, a separate secret and allowance.
+                text = text.replace("${{ secrets.GEMINI_API_KEY_2 }}",
+                                    "test-gemini-key2")
                 # The simulation switch. Empty and `workflow_dispatch` are what
                 # every ORDINARY run sees: the input is unset on a real dispatch
                 # and the event name is the manual one here because the harness
@@ -511,7 +514,9 @@ class AgentWalkHarness(unittest.TestCase):
             # the missing-provider path passes STUB_OPENCODE_MODELS="" through
             # extra_env, which is also how a real run sees it.
             "STUB_OPENCODE_MODELS": "gemini/gemini-3.5-flash-lite "
-                                    "gemini/gemini-3.1-flash-lite",
+                                    "gemini/gemini-3.1-flash-lite "
+                                    "gemini-key2/gemini-3.5-flash-lite "
+                                    "gemini-key2/gemini-3.1-flash-lite",
             "STUB_OPENCODE_LOG": str(log),
             "STUB_TIMEOUT_LOG": str(timeout_log),
             "STUB_SLEEP_LOG": str(sleep_log),

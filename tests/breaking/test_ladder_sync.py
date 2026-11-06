@@ -67,9 +67,16 @@ EXPECTED_PROVIDER = "opencode"
 # most likely to answer, and the opencode pool stays as the fallback -- the
 # same six rungs, unchanged and still in their measured order. Seeds lead;
 # discovery only appends (see model_selector.select).
+# A SECOND PROJECT JOINED 2026-11-06: GEMINI_API_KEY_2 is a separate Google
+# account with its own free allowance, so its two rungs sit directly behind the
+# first project's two. They are real rungs, not a retry: a 429 on one project
+# cools only its own model id. With the secret unset the seeds contribute
+# nothing and the ladder is byte-identical to before.
 EXPECTED_LADDER = [
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
+    "gemini-key2/gemini-3.5-flash-lite",
+    "gemini-key2/gemini-3.1-flash-lite",
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",
     "opencode/mimo-v2.6-flash-free",

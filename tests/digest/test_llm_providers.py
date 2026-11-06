@@ -50,11 +50,18 @@ KEYS = {
     "GEMINI_API_KEY": "test-gemini-key",
 }
 
+#: The second Google project's key. Separate from KEYS on purpose: the existing
+#: order tests pin what a repository with ONE Gemini key does today, and the
+#: second-key tests opt in explicitly.
+KEYS_BOTH = dict(KEYS, GEMINI_API_KEY_2="test-gemini-key2")
+
 OK_BODY = json.dumps({"choices": [{"message": {"content": "OK"}}]})
 
 CONFIG_LADDER = (
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
+    "gemini-key2/gemini-3.5-flash-lite",
+    "gemini-key2/gemini-3.1-flash-lite",
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",
 )
@@ -110,6 +117,10 @@ class RequestShapeTests(unittest.TestCase):
             ("gemini",
              "https://generativelanguage.googleapis.com/v1beta/openai/"
              "chat/completions"),
+            # A second project, so the same endpoint and a different key.
+            ("gemini-key2",
+             "https://generativelanguage.googleapis.com/v1beta/openai/"
+             "chat/completions"),
         ):
             with self.subTest(provider=name):
                 spec = lp.request_spec(name, None, "hello", "k-123", timeout=30)
@@ -155,14 +166,19 @@ class MissingKeyTests(unittest.TestCase):
 
     def test_an_unconfigured_provider_is_absent_from_both_ladders(self):
         with mock.patch.dict(os.environ, {}, clear=False):
-            for name in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY"):
+            for name in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY",
+                         "GEMINI_API_KEY_2"):
                 os.environ.pop(name, None)
             self.assertEqual((), lp.ladder_rungs())
+            # THE SEEDS THAT NEED NO KEY, EXACTLY. A `gemini-key2/*` seed names
+            # a second Google project and disappears without its own key, which
+            # is why the comparison is the seed minus those two entries.
             self.assertEqual(
-                tuple(CONFIG_LADDER),
+                tuple(m for m in CONFIG_LADDER
+                      if not m.startswith(lp.GEMINI_KEY2_PROVIDER + "/")),
                 lp.ordered_ladder(list(CONFIG_LADDER)),
-                "with no provider keys the ladder must be exactly the seeds, so "
-                "a repository without the secrets behaves as it did before")
+                "with no provider keys the ladder must be the seeds that need "
+                "none, so a repository without the secrets behaves as before")
 
 
 class StatusMappingTests(unittest.TestCase):
@@ -291,7 +307,71 @@ class LadderOrderTests(unittest.TestCase):
 
     def test_gemini_keeps_its_existing_cli_path(self):
         self.assertIsNone(lp.provider_of("gemini/gemini-3.5-flash-lite"))
+        self.assertIsNone(lp.provider_of("gemini-key2/gemini-3.5-flash-lite"))
         self.assertEqual("groq", lp.provider_of("groq/llama-3.3-70b-versatile"))
+
+
+class SecondGeminiKeyTests(unittest.TestCase):
+    """A second Google project is an INDEPENDENT rung, never a replacement.
+
+    `gemini-key2` is a CLI provider exactly like `gemini`: both rungs come from
+    the seed, both are keyed, and an absent key contributes nothing.
+    """
+
+    def test_the_second_key_is_its_own_rung_right_after_the_first(self):
+        got = lp.ordered_ladder(list(CONFIG_LADDER), environ=KEYS_BOTH)
+        self.assertEqual(
+            ("gemini/gemini-3.5-flash-lite",
+             "gemini/gemini-3.1-flash-lite",
+             "gemini-key2/gemini-3.5-flash-lite",
+             "gemini-key2/gemini-3.1-flash-lite",
+             "groq/" + lp.PROVIDERS["groq"].models[0],
+             "openrouter/" + lp.PROVIDERS["openrouter"].models[0],
+             "mistral/" + lp.PROVIDERS["mistral"].models[0],
+             "opencode/deepseek-v4.1-flash-free",
+             "opencode/beam-free"),
+            tuple(got))
+
+    def test_the_second_key_is_a_cli_rung_not_a_fourth_http_provider(self):
+        self.assertEqual(2, len([m for m in
+                                 lp.ordered_ladder(list(CONFIG_LADDER),
+                                                   environ=KEYS_BOTH)
+                                 if m.startswith("gemini-key2/")]))
+        self.assertEqual(2, len([m for m in
+                                 lp.ordered_ladder(list(CONFIG_LADDER),
+                                                   environ=KEYS_BOTH)
+                                 if m.startswith("gemini/")]))
+
+    def test_an_absent_second_key_contributes_no_rung_and_says_why(self):
+        log = []
+        got = lp.ordered_ladder(list(CONFIG_LADDER), environ=KEYS,
+                                log=log.append)
+        self.assertEqual([], [m for m in got if m.startswith("gemini-key2/")])
+        self.assertEqual(2, len([m for m in got if m.startswith("gemini/")]),
+                         "the first key's rungs must be untouched")
+        self.assertTrue(any("GEMINI_API_KEY_2" in line for line in log),
+                        "an absent second key is a setting, not a failure, but "
+                        "the run log has to name it: %r" % (log,))
+
+    def test_an_empty_second_key_is_the_same_as_an_absent_one(self):
+        got = lp.ordered_ladder(list(CONFIG_LADDER),
+                                environ=dict(KEYS, GEMINI_API_KEY_2="   "))
+        self.assertEqual([], [m for m in got if m.startswith("gemini-key2/")])
+
+    def test_the_probe_prints_a_row_for_each_gemini_key(self):
+        def send(spec):
+            if spec["url"].endswith("/models"):
+                return 200, json.dumps(
+                    {"data": [{"id": "gemini-3.1-flash-lite"}]})
+            return 200, OK_BODY
+
+        rows = lp.probe_rows(transport=send, environ=KEYS_BOTH)
+        keyed = [r for r in rows if "| key=" in r]
+        self.assertEqual(5, len(keyed),
+                         "one row per provider: two Gemini keys and the three "
+                         "HTTP providers -- got %r" % (rows,))
+        self.assertTrue([r for r in rows if r.startswith("gemini-key2 | ")],
+                        rows)
 
 
 class FailureVocabularyTests(unittest.TestCase):
@@ -373,7 +453,8 @@ class ProbeTests(unittest.TestCase):
                 "groq | key=present | models=1 | chosen=llama-3.3-70b-versatile "
                 "| status=200 | ms=")])
         self.assertRegex(groq_row, r"ms=\d+ \| verdict=ok$")
-        self.assertEqual(4, len([r for r in rows if "| key=" in r]))
+        # FIVE: gemini, the second Google project, and the three HTTP providers.
+        self.assertEqual(5, len([r for r in rows if "| key=" in r]))
 
     def test_an_absent_key_reports_not_configured_and_makes_no_request(self):
         send, calls = self._router()
