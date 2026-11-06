@@ -1,0 +1,23 @@
+{"ts":"2026-11-06T17:49:15.564Z","event":"created","entity":"ledger","id":"ledger","actor":"user","note":"project ledger initialised at C:\\src\\dmnews-public\\.project; generated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:50:33.688Z","event":"created","entity":"decision","id":"D-001","actor":"agent","to":"IDEA","note":"Rejected on measured grounds: CPU-only runners, download cost, and small-model summary quality. Viable only as a repair lane on the owner's machine."}
+{"ts":"2026-11-06T17:50:33.722Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:03.581Z","event":"created","entity":"feature","id":"F-001","actor":"agent","to":"IDEA","note":"Wire models.github.ai into the digest as a further AI family using the workflow's own token, reachable from the walk, with a probe row proving it answers."}
+{"ts":"2026-11-06T17:51:03.679Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:04.197Z","event":"created","entity":"feature","id":"F-002","actor":"agent","to":"IDEA","note":"Make the second Gemini project key a rung of the digest walk across the five wiring points, skipped cleanly when absent."}
+{"ts":"2026-11-06T17:51:04.251Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:04.706Z","event":"created","entity":"feature","id":"F-003","actor":"agent","to":"IDEA","note":"Resolve each provider's model from its catalogue at run time so a retired id self-heals on the next run."}
+{"ts":"2026-11-06T17:51:04.751Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:05.196Z","event":"created","entity":"feature","id":"F-004","actor":"agent","to":"IDEA","note":"A scheduled weekly probe of every AI family that exits non-zero with one actionable line naming the family and the fix."}
+{"ts":"2026-11-06T17:51:05.254Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:05.670Z","event":"created","entity":"milestone","id":"M-001","actor":"agent","to":"IDEA","note":"Steady state: news always ships, no card is ever blank, and any AI degradation is reported in one actionable line."}
+{"ts":"2026-11-06T17:51:05.724Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:15.514Z","event":"linked","entity":"milestone","id":"M-001","actor":"agent","note":"M-001 depends-on F-001, F-002, F-003, F-004, D-001","relation":"depends-on","targets":["F-001","F-002","F-003","F-004","D-001"]}
+{"ts":"2026-11-06T17:51:15.562Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:16.068Z","event":"linked","entity":"feature","id":"F-001","actor":"agent","note":"F-001 related-to F-003, F-004","relation":"related-to","targets":["F-003","F-004"]}
+{"ts":"2026-11-06T17:51:16.107Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:16.497Z","event":"linked","entity":"feature","id":"F-002","actor":"agent","note":"F-002 related-to F-001, F-003, F-004","relation":"related-to","targets":["F-001","F-003","F-004"]}
+{"ts":"2026-11-06T17:51:16.549Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:24.210Z","event":"linked","entity":"feature","id":"F-003","actor":"agent","note":"F-003 related-to F-004","relation":"related-to","targets":["F-004"]}
+{"ts":"2026-11-06T17:51:24.281Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}
+{"ts":"2026-11-06T17:51:24.858Z","event":"linked","entity":"decision","id":"D-001","actor":"agent","note":"D-001 related-to F-001, F-004","relation":"related-to","targets":["F-001","F-004"]}
+{"ts":"2026-11-06T17:51:24.903Z","event":"note","entity":"ledger","id":"-","actor":"agent","note":"regenerated PROJECT-STATUS.md and current-state.json"}

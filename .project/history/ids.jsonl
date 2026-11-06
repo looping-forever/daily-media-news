@@ -1,0 +1,6 @@
+{"id":"D-001","type":"decision","issued_at":"2026-11-06T17:50:33.688Z","title":"Local LLM inference inside GitHub Actions is rejected","file":"decisions/D-001.md","state":"issued"}
+{"id":"F-001","type":"feature","issued_at":"2026-11-06T17:51:03.581Z","title":"Add GitHub Models as an independent AI provider family","file":"features/F-001.md","state":"issued"}
+{"id":"F-002","type":"feature","issued_at":"2026-11-06T17:51:04.197Z","title":"Wire the second Gemini project key as a first-class ladder rung","file":"features/F-002.md","state":"issued"}
+{"id":"F-003","type":"feature","issued_at":"2026-11-06T17:51:04.706Z","title":"Replace pinned model ids with catalogue-driven discovery","file":"features/F-003.md","state":"issued"}
+{"id":"F-004","type":"feature","issued_at":"2026-11-06T17:51:05.196Z","title":"Weekly canary that fails loudly when a provider family goes dark","file":"features/F-004.md","state":"issued"}
+{"id":"M-001","type":"milestone","issued_at":"2026-11-06T17:51:05.670Z","title":"The digest never fails to deliver news and never ships a blank card; AI degradation is visible and one-line diagnosable","file":"milestones/M-001.md","state":"issued"}

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencode.local/ledger/milestone.schema.json",
+  "title": "Ledger milestone record",
+  "description": "Frontmatter contract for .project/milestones/M-NNN.md. A milestone groups features; it may itself be DONE while members are not, so milestone completion is asserted by a human and is reported distinctly from machine verification.",
+  "type": "object",
+  "required": ["id", "type", "title", "status", "created_by", "created_at", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^M-[0-9]{3,}$" },
+    "type": { "const": "milestone" },
+    "title": { "type": "string", "minLength": 3, "maxLength": 200 },
+    "summary": { "type": "string", "maxLength": 1000 },
+    "status": { "$ref": "#/$defs/status" },
+    "created_by": { "$ref": "#/$defs/created_by" },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "approval": { "$ref": "#/$defs/approval" },
+    "promotion_authorised": {
+      "type": "string",
+      "enum": ["true"],
+      "description": "D9. Set ONLY by an authorised promotion of an agent-authored record. Meaningless without user_instruction: the flag and the evidence are one assertion and are never separable."
+    },
+    "user_instruction": {
+      "type": "string",
+      "minLength": 1,
+      "description": "D9. The user's verbatim instruction, the evidence for promotion_authorised. Whitespace-collapsed to a single line."
+    },
+    "dependencies": { "$ref": "#/$defs/ref_list" },
+    "blocked_by": { "$ref": "#/$defs/ref_list" },
+    "blocks": { "type": "array", "items": { "$ref": "#/$defs/ref" }, "description": "DERIVED, never written to the file. A record that STORES it is a contract violation: validate reports derived_field_stored." },
+    "related_to": { "$ref": "#/$defs/ref_list" },
+    "supersedes": { "$ref": "#/$defs/ref_list" },
+    "milestone": { "$ref": "#/$defs/ref" },
+    "affected_areas": { "$ref": "#/$defs/free_list" },
+    "verification_profile": { "$ref": "#/$defs/profile" },
+    "verification": { "$ref": "#/$defs/verification" },
+    "completion_basis": { "$ref": "#/$defs/completion_basis" },
+    "known_limitations": { "type": "string" },
+    "next_action": { "type": "string" },
+    "blocker_type": { "$ref": "#/$defs/blocker_type" },
+    "blocker_reason": { "type": "string" },
+    "affected_features": { "$ref": "#/$defs/ref_list" },
+    "includes": { "$ref": "#/$defs/free_list" },
+    "excludes": { "$ref": "#/$defs/free_list" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "BLOCKED" } }, "required": ["status"] },
+      "then": { "required": ["blocker_type", "blocker_reason"] }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["PLANNED", "READY", "IN_PROGRESS", "TESTING", "DONE"] } }, "required": ["status"] },
+      "then": {
+        "required": ["approval", "created_by"],
+        "anyOf": [
+          {
+            "description": "Origin is the user. The ordinary case.",
+            "required": ["created_by"],
+            "properties": { "created_by": { "const": "user" } }
+          },
+          {
+            "description": "D9: an agent-authored record may sit at a commitment status ONLY when the promotion carries recorded evidence of the user's instruction. created_by stays agent -- the agent recorded the idea, and that provenance is never rewritten. The flag alone is not enough; the pair is one assertion.",
+            "required": ["promotion_authorised", "user_instruction"],
+            "properties": {
+              "promotion_authorised": { "const": "true" },
+              "user_instruction": { "type": "string", "minLength": 1 }
+            }
+          }
+        ],
+        "properties": {
+          "approval": { "const": "approved" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "DONE" } }, "required": ["status"] },
+      "then": { "required": ["completion_basis"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "IN_PROGRESS" } }, "required": ["status"] },
+      "then": { "required": ["next_action"] }
+    }
+  ],
+  "$defs": {
+    "status": {
+      "enum": ["IDEA", "PLANNED", "READY", "IN_PROGRESS", "TESTING", "DONE", "BLOCKED", "DEFERRED", "CANCELLED"]
+    },
+    "created_by": { "enum": ["user", "agent", "system"] },
+    "approval": { "enum": ["pending", "approved", "rejected"] },
+    "completion_basis": { "enum": ["verified", "user_asserted", "manually_accepted"] },
+    "blocker_type": { "enum": ["code", "environment", "provider", "user_decision", "dependency", "external"] },
+    "profile": {
+      "enum": ["doc-only", "unit", "module", "app", "ui-browser", "security-sensitive", "release"]
+    },
+    "ref": { "type": "string", "pattern": "^[FBDM]-[0-9]{3,}$" },
+    "timestamp": { "type": "string", "format": "date-time", "minLength": 20 },
+    "ref_list": { "type": "array", "items": { "$ref": "#/$defs/ref" }, "uniqueItems": true },
+    "free_list": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "gate_status": { "enum": ["passed", "failed", "not_run", "blocked", "skipped"] },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/gate_status" },
+        "evidence": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "reviewer": { "type": "string" }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "compile": { "$ref": "#/$defs/gate" },
+        "automated_tests": { "$ref": "#/$defs/gate" },
+        "e2e": { "$ref": "#/$defs/gate" },
+        "review": { "$ref": "#/$defs/gate" },
+        "security_audit": { "$ref": "#/$defs/gate" },
+        "documentation": { "$ref": "#/$defs/gate" },
+        "release_readiness": { "$ref": "#/$defs/gate" }
+      }
+    }
+  }
+}
