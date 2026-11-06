@@ -11881,7 +11881,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-f372bd56834d",
@@ -12105,7 +12105,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-ef27775759bb",
@@ -12189,7 +12189,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-cffa7512bf65",
@@ -12618,8 +12618,8 @@
       "category": "local_city",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12633,11 +12633,11 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-1bff3103f50e",
@@ -12814,8 +12814,8 @@
       "category": "local_city",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12829,11 +12829,11 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-c280f462d85f",
@@ -12842,8 +12842,8 @@
       "category": "manga_manhwa_manhua",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12857,11 +12857,11 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-3f54b0a9a83a",
@@ -12898,8 +12898,8 @@
       "category": "college_local",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12913,11 +12913,11 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-565526ca7eb2",
@@ -12926,8 +12926,8 @@
       "category": "bank_local",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12941,11 +12941,11 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-703ed59e1fa9",
@@ -12954,8 +12954,8 @@
       "category": "bank_local",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12969,11 +12969,11 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
     },
     {
       "event_id": "evt-388600f924f1",
@@ -12982,8 +12982,8 @@
       "category": "education_tu",
       "first_seen": "2026-11-06",
       "last_seen": "2026-11-06",
-      "first_reported": null,
-      "last_reported": null,
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
       "importance": 0,
       "personal_relevance": 0,
       "sources": [
@@ -12997,11 +12997,235 @@
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
-      "in_morning": null,
+      "in_morning": "2026-11-06",
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-72a5c3d25dee",
+      "event_key": null,
+      "canonical_title": "GBase Database(GBase 8c): Why Three Deployment Layouts Have Different Configuration Fields",
+      "category": "tech_career",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/mmllllzcn/gbase-databasegbase-8c-why-three-deployment-layouts-have-different-configuration-fields-1lbl"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-a6a163592bf1",
+      "event_key": null,
+      "canonical_title": "Building a Spatial Interface for the Protein Data Bank: Notes on NexoPeek",
+      "category": "tech_career",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/ashish_624379625242c5d263/building-a-spatial-interface-for-the-protein-data-bank-notes-on-nexopeek-5fp9"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Opening a 4.2 GB cryo-EM map three years ago crashed the author's laptop viewer and sparked the creation of NexoPeek.",
+      "latest_development": "Opening a 4.2 GB cryo-EM map three years ago crashed the author's laptop viewer and sparked the creation of NexoPeek.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-8754940d2062",
+      "event_key": null,
+      "canonical_title": "Qwen3.8-Max vs Alibaba international",
+      "category": "tech_career",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/iteracomputeai/qwen38-max-vs-alibaba-international-3fmk"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Alibaba's Singapore list prices Qwen3.8-Max at $2.00 for input, $0.25 for cached input, and $6.00 for output per 1M tokens.",
+      "latest_development": "Alibaba's Singapore list prices Qwen3.8-Max at $2.00 for input, $0.25 for cached input, and $6.00 for output per 1M tokens.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-966f7547dfee",
+      "event_key": null,
+      "canonical_title": "Limited-Edition Avengers Dr. Doom Citizen Watch Now Available Online - WDW News Today",
+      "category": "gaming",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmimgfbvv95cuxpuglhugtsnuhfznj0zy12a0jzotctdhp5m01my1ywnkxyeddryvnrvhrsekmxenprtgxace1muuzuvwx6yvrisnrtqtnxalfmeuuxm3d3vlu1szlgcnlqyzytv2tjlxnesmrordrfve9wvtdzu3bpzjmzblo4quhrbkj2vfpyuhjxzhbxuxvqckctoer0m0i3vwjb"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-9566c939347b",
+      "event_key": null,
+      "canonical_title": "Fallen powerline forces brief Redwood Road closure in Bluffdale - KUTV",
+      "category": "local_city",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmijgfbvv95cuxomvzeu2u1mnlumzy4exmwcedpd2rqstvtzmv1sjjdndrnauhqmde3cnpkvuntn0t4enz4zwl4vzvnrwzdd3d2ywzrsnrqcxd3qu5su2dqegpku2heqmxuduhloxrzcg9jndldr1u5zwgwylfzm3rwdgi1ttvnmxhzu0dss2rectc3qmhjb3rr"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-f921b4461166",
+      "event_key": null,
+      "canonical_title": "Ninja Skooler Anime Unveils Pilot Film, Images, Song",
+      "category": "anime",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-05/ninja-skooler-anime-unveils-pilot-film-images-song/.243571"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Shunsuke Takarai will direct the light-hearted ninja anime based on a concept by Kinema Citrus.",
+      "latest_development": "Shunsuke Takarai will direct the light-hearted ninja anime based on a concept by Kinema Citrus.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-0a5ac29a085c",
+      "event_key": null,
+      "canonical_title": "People Are Acting Weird As Hell During Fortnite’s Treasure Hunt",
+      "category": "gaming",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "gamespot.com/articles/people-are-acting-weird-as-hell-during-fortnites-treasure-hunt"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Fortnite's player counts are five times higher than last week as players search for Tim Sweeney's golden ticket during the Treasure Hunters season.",
+      "latest_development": "Fortnite's player counts are five times higher than last week as players search for Tim Sweeney's golden ticket during the Treasure Hunters season.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
+    },
+    {
+      "event_id": "evt-52096e1ea1db",
+      "event_key": null,
+      "canonical_title": "10 One Piece Characters Who've Changed the Most Since the Beginning - Comic Book Resources",
+      "category": "anime",
+      "first_seen": "2026-11-06",
+      "last_seen": "2026-11-06",
+      "first_reported": "2026-11-06",
+      "last_reported": "2026-11-06",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmibkfvx3lxte8yr1poqlpxsjnnwno2agpmzmp4mkqwvgqws2nlvudut2hgsuzraullyll6mw4tnkmxdu1qm3pdtdhzdxvlv1zpshnvumfxv0nnbwhlbxzsquk3dtfimvvplup3cm5jtli4bnpbdfn3"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-06",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-06T07:23:01+05:45"
     }
   ],
   "archived": []
