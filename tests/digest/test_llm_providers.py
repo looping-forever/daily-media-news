@@ -653,10 +653,10 @@ class ProbeTests(unittest.TestCase):
         groq_row = [r for r in rows if r.startswith("groq | ")][0]
         self.assertEqual(
             "groq | key=present | models=1 | chosen=llama-3.3-70b-versatile | "
-            "status=200 | ms=",
+            "tried=1 | status=200 | ms=",
             groq_row[:len(
                 "groq | key=present | models=1 | chosen=llama-3.3-70b-versatile "
-                "| status=200 | ms=")])
+                "| tried=1 | status=200 | ms=")])
         self.assertRegex(groq_row, r"ms=\d+ \| verdict=ok$")
         # FIVE: gemini, the second Google project, and the three HTTP providers.
         self.assertEqual(5, len([r for r in rows if "| key=" in r]))
@@ -904,6 +904,77 @@ class ChatCapableSelectionTests(unittest.TestCase):
         self.assertEqual(
             "nvidia/nemotron-3-ultra-550b-a55b:free",
             lp.probe("openrouter", transport=send, environ=KEYS)["chosen"])
+
+    #: A 400 that names the id we sent: `_model_caused_400` turns it into
+    #: `model_rejected`, so the probe may step to the next candidate.
+    REJECTED = ('{"error": {"message": "The model `%s` does not support chat '
+                'completions", "type": "invalid_request_error"}}')
+
+    def _catalogue_then(self, name, ids, rejects):
+        """(transport, calls): `name` serves `ids`; `rejects` answer 400."""
+        calls = []
+
+        def send(spec):
+            calls.append(spec)
+            if spec["url"].endswith("/models"):
+                if spec["url"] == lp.PROVIDERS[name].models_url:
+                    return 200, json.dumps({"data": [{"id": i} for i in ids]})
+                return 200, json.dumps({"data": []})
+            model = json.loads(spec["body"])["model"]
+            if model in rejects:
+                return 400, self.REJECTED % model
+            return 200, OK_BODY
+
+        return send, calls
+
+    def _posts(self, calls):
+        return [c for c in calls if c["method"] == "POST"]
+
+    def test_the_measured_tts_family_is_not_chat_capable(self):
+        # Probe 42253421839: `canopylabs/orpheus-v1-english` earned a 400 on a
+        # chat POST because it is a text-to-speech id, and no marker caught it.
+        self.assertFalse(lp.is_chat_model("canopylabs/orpheus-v1-english"))
+        self.assertFalse(lp.is_chat_model("canopylabs/orpheus-arabic-saudi"))
+
+    def test_a_rejected_candidate_is_replaced_by_the_next_one(self):
+        send, calls = self._catalogue_then(
+            "groq", ["acme/alpha-chat", "acme/bravo-chat"],
+            {"acme/alpha-chat"})
+        got = lp.probe("groq", transport=send, environ=KEYS)
+        self.assertEqual("acme/bravo-chat", got["chosen"])
+        self.assertEqual(2, got["tried"])
+        self.assertEqual("ok", got["verdict"])
+        self.assertEqual(2, len(self._posts(calls)))
+
+    def test_three_rejected_candidates_end_the_probe_and_name_them_all(self):
+        ids = ["acme/aaa-chat", "acme/bbb-chat", "acme/ccc-chat"]
+        send, calls = self._catalogue_then("groq", ids, set(ids))
+        got = lp.probe("groq", transport=send, environ=KEYS)
+        self.assertEqual(3, got["tried"])
+        self.assertEqual("model_rejected", got["verdict"])
+        self.assertEqual(3, len(self._posts(calls)),
+                         "a fourth candidate is never asked")
+
+        send, _ = self._catalogue_then("groq", ids, set(ids))
+        rows = lp.probe_rows(transport=send, environ=KEYS)
+        row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertIn("tried=3", row)
+        self.assertIn("verdict=model_rejected", row)
+        for model in ids:
+            self.assertIn(model, row)
+        note = [r for r in rows if r.strip().startswith("groq note:")][0]
+        self.assertIn("ALL 3", note)
+        for model in ids:
+            self.assertIn(model, note)
+
+    def test_a_first_try_answer_still_reports_tried_one(self):
+        send, calls = self._catalogue_then("groq", ["acme/alpha-chat"], set())
+        got = lp.probe("groq", transport=send, environ=KEYS)
+        self.assertEqual("acme/alpha-chat", got["chosen"])
+        self.assertEqual(1, got["tried"])
+        self.assertEqual("ok", got["verdict"])
+        self.assertEqual(1, len(self._posts(calls)),
+                         "one answering candidate means one request")
 
 
 class QuotaMovesOnTests(unittest.TestCase):

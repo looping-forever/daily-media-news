@@ -12,7 +12,7 @@ name: Provider probe
 #
 # WHAT IT PRINTS (one line per provider, plus that provider's own catalogue):
 #
-#   provider | key=present/absent | models=N | chosen=<id> | status=<code> | ms=<n> | verdict=<ok|auth|quota|model_not_found|timeout|network>
+#   provider | key=present/absent | models=N | chosen=<id> | tried=<n> | status=<code> | ms=<n> | verdict=<ok|auth|quota|model_not_found|timeout|network>
 #
 # The `available:` lines beneath each row are the evidence the candidate ids in
 # scripts/llm_providers.py are corrected from -- an account's real catalogue,

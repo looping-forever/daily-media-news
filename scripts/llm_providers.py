@@ -77,6 +77,14 @@ PROBE_PROMPT = "reply with the single word OK"
 #: "quota" off one sample sends the owner to the billing page for nothing.
 PROBE_RETRY_SECONDS = 2.0
 
+#: How many chat-capable ids ONE probe may try before it stops calling this
+#: provider. A name deny-list is always one family behind (2026-11-06, probe
+#: 42253421839: `canopylabs/orpheus-v1-english` is TTS and no marker caught it),
+#: so the probe PROVES a candidate instead of trusting its first guess. Three is
+#: the bound: enough to step over two refusals, and the whole sequence shares
+#: one provider-cap budget.
+PROBE_CANDIDATES = 3
+
 #: The free-id sweep's budget. 12 ids x 8s = 96s of worst case, and the sweep
 #: also stops itself at FREE_PROBE_WALL_SEC, so it cannot spend the job's third
 #: minute even if every id hangs to its own ceiling. A slow-but-working id is
@@ -265,10 +273,12 @@ PROBE_VERDICT = {
 #: publishes modality over `/models`, so the id is the only evidence there is.
 #: Measured 2026-11-06 (probe 42246453600): selection chose
 #: `whisper-large-v3-turbo` and blamed Groq for the 400 its audio model earned.
+#: Probe 42253421839 then chose `canopylabs/orpheus-v1-english`, a TTS family no
+#: earlier marker caught -- which is why the probe no longer trusts one guess.
 CHAT_EXCLUDE_MARKERS = (
-    "whisper", "tts", "audio", "transcribe", "speech", "embed", "embedding",
-    "rerank", "reranker", "guard", "moderation", "ocr",
-    "dall-e", "flux", "stable-diffusion", "sdxl", "bge-", "gte-",
+    "audio", "bge-", "canopylabs/", "dall-e", "embed", "embedding", "flux",
+    "gte-", "guard", "moderation", "ocr", "orpheus", "rerank", "reranker",
+    "sdxl", "speech", "stable-diffusion", "transcribe", "tts", "whisper",
 )
 
 #: Name markers that make an id a POOR prose summariser, with how hard to avoid it.
@@ -896,6 +906,26 @@ def choose_model(name, discovered, environ=None):
     return ""
 
 
+def probe_candidates(name, discovered, limit=PROBE_CANDIDATES):
+    """Up to `limit` chat-capable ids for ONE probe, best first.
+
+    The catalogue decides when it could be read: the seeds the account serves
+    come first, then the rest in preference order. Nothing confirmed means the
+    configured seeds are the only evidence left. Empty means this provider has
+    no chat-capable id anywhere, so the probe makes no request at all.
+    """
+    record = provider(name)
+    served = [i for i in (discovered or [])
+              if is_chat_model(i)
+              and (not record.free_only or i.endswith(":free"))]
+    order = preference_order(served, record.models)
+    if not order:
+        order = [i for i in record.models
+                 if is_chat_model(i)
+                 and (not record.free_only or i.endswith(":free"))]
+    return order[:max(1, int(limit))]
+
+
 def _preference_key(model_id):
     """Sort key for a served id whose name is not one of the configured seeds.
 
@@ -1063,6 +1093,14 @@ def _probe_note(got):
                 % (got.get("models", 0),
                    ", ".join(got.get("available") or []) or "-"))
     if verdict == "model_rejected":
+        ids = got.get("attempted_ids") or [got.get("chosen") or "-"]
+        if len(ids) > 1:
+            return ("ALL %d chat-capable ids tried were refused (HTTP %s): %s "
+                    "-- none of them can chat, so this is OUR model choice and "
+                    "not a provider fault -- pick a chat-capable id from the "
+                    "`available` line"
+                    % (len(ids), got.get("status") or 400,
+                       ", ".join("%r" % i for i in ids)))
         return ("the provider refused the chosen id %r (HTTP %s): that id "
                 "cannot chat, so this is OUR model choice and not a provider "
                 "fault -- pick a chat-capable id from the `available` line"
@@ -1078,6 +1116,11 @@ def _probe_note(got):
     if verdict == "quota":
         return ("rate-limited after %d attempt(s): capacity, not a wrong id"
                 % got.get("attempts", 1))
+    if verdict == "ok" and got.get("tried", 1) > 1:
+        tried = got.get("attempted_ids") or []
+        return ("%r was refused as a non-chat model, so the probe asked the "
+                "next candidate -- %d tried: %s"
+                % (tried[0], len(tried), ", ".join(tried)))
     if verdict == "ok" and got.get("attempts", 1) > 1:
         return "answered on the second attempt after a 429"
     return ""
@@ -1089,27 +1132,37 @@ def probe(name, transport=None, environ=None, sleep=None):
     A 429 earns ONE retry after PROBE_RETRY_SECONDS: a per-minute window says
     nothing about whether the id works, and the wait is injected so a test never
     sleeps. The row records how many attempts it took.
+
+    A `model_rejected` candidate is REPLACED, not reported: a name marker can
+    never know every audio family (probe 42253421839), so at most
+    PROBE_CANDIDATES chat-capable ids are tried in catalogue order. Every
+    attempt shares ONE provider-cap budget measured from the start of this probe,
+    so a sequence of rejections cannot extend the probe's clock.
     """
     started = time.monotonic()
+    deadline = started + effective_timeout(name)
     key_present = configured(name, environ)
     discovered = ModelList([], 0, 0.0, "not_configured") \
         if not key_present else catalogue(name, transport=transport,
                                           environ=environ, refresh=True)
-    chosen = choose_model(name, discovered.ids, environ)
     if not key_present:
         return {
             "provider": name,
             "key": "absent",
             "models": 0,
             "chosen": "",
+            "tried": 0,
+            "attempted_ids": [],
             "status": 0,
             "ms": int((time.monotonic() - started) * 1000),
             "verdict": "not_configured",
             "available": [],
             "attempts": 0,
         }
-    if not chosen or (discovered.reason == "ok"
-                      and not any(is_chat_model(i) for i in discovered.ids)):
+    no_chat = (discovered.reason == "ok"
+               and not any(is_chat_model(i) for i in discovered.ids))
+    candidates = [] if no_chat else probe_candidates(name, discovered.ids)
+    if not candidates:
         # NO CHAT MODEL SERVED: a chat-completions call can only earn a 400
         # here, so none is made. The row says what is true -- the provider is
         # reachable and it is our model choice that has nowhere to go.
@@ -1118,31 +1171,49 @@ def probe(name, transport=None, environ=None, sleep=None):
             "key": "present",
             "models": len(discovered.ids),
             "chosen": "",
+            "tried": 0,
+            "attempted_ids": [],
             "status": 0,
             "ms": int((time.monotonic() - started) * 1000),
             "verdict": PROBE_VERDICT["no_chat_model"],
             "available": list(discovered.ids[:8]),
             "attempts": 0,
         }
-    result = call(name, PROBE_PROMPT, model_id=chosen,
-                  timeout=effective_timeout(name), transport=transport,
-                  environ=environ)
-    attempts = 1
-    if not result.ok and result.reason == "quota_notice":
-        (sleep or time.sleep)(PROBE_RETRY_SECONDS)
-        result = call(name, PROBE_PROMPT, model_id=chosen,
-                      timeout=effective_timeout(name), transport=transport,
-                      environ=environ)
-        attempts = 2
+    attempted = []
+    result = None
+    attempts = 0
+    spent = 0.0
+    for model_id in candidates:
+        remaining = deadline - time.monotonic()
+        if attempted and remaining <= 0:
+            break
+        attempted.append(model_id)
+        result = call(name, PROBE_PROMPT, model_id=model_id,
+                      timeout=effective_timeout(name, max(1.0, remaining)),
+                      transport=transport, environ=environ)
+        attempts = 1
+        spent += result.elapsed or 0.0
+        if not result.ok and result.reason == "quota_notice":
+            (sleep or time.sleep)(PROBE_RETRY_SECONDS)
+            result = call(name, PROBE_PROMPT, model_id=model_id,
+                          timeout=effective_timeout(
+                              name, max(1.0, deadline - time.monotonic())),
+                          transport=transport, environ=environ)
+            attempts = 2
+            spent += result.elapsed or 0.0
+        if result.ok or result.reason != "model_rejected":
+            break
     verdict = "ok" if result.ok else PROBE_VERDICT.get(result.reason,
                                                        result.reason)
     return {
         "provider": name,
         "key": "present",
         "models": len(discovered.ids),
-        "chosen": chosen,
+        "chosen": attempted[-1],
+        "tried": len(attempted),
+        "attempted_ids": attempted,
         "status": result.status,
-        "ms": int((result.elapsed or 0.0) * 1000),
+        "ms": int(spent * 1000),
         "verdict": verdict,
         "available": list(discovered.ids[:8]),
         "attempts": attempts,
@@ -1156,17 +1227,22 @@ def probe_rows(transport=None, environ=None, sleep=None):
 
     The `available=` line under each row is the EVIDENCE the model ids in this
     file are corrected from: it is the account's own catalogue, not a guess. The
+    `tried=` field and the `tried_ids=` list say how many candidates one row
+    really asked, so a rejection is never mistaken for one unlucky pick. The
     `note:` line carries anything explanatory -- refused key, wrong id, retry --
     so the pinned row shape never changes.
     """
     rows = []
     for name in ("gemini", GEMINI_KEY2_PROVIDER) + LADDER_PROVIDERS:
         got = probe(name, transport=transport, environ=environ, sleep=sleep)
-        rows.append("%s | key=%s | models=%d | chosen=%s | status=%s | "
-                    "ms=%d | verdict=%s"
-                    % (got["provider"], got["key"], got["models"],
-                       got["chosen"] or "-", got["status"] or "-", got["ms"],
-                       got["verdict"]))
+        row = ("%s | key=%s | models=%d | chosen=%s | tried=%d | status=%s | "
+               "ms=%d | verdict=%s"
+               % (got["provider"], got["key"], got["models"],
+                  got["chosen"] or "-", got["tried"], got["status"] or "-",
+                  got["ms"], got["verdict"]))
+        if got["tried"] > 1:
+            row += " | tried_ids=%s" % ", ".join(got["attempted_ids"])
+        rows.append(row)
         if got["available"]:
             rows.append("    %s available: %s"
                         % (got["provider"], ", ".join(got["available"])))
