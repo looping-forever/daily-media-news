@@ -1,11 +1,11 @@
 {
   "exit_code": 0,
-  "checked_at": "2026-11-05T12:24:10Z",
-  "last_poll_time": "2026-11-05",
+  "checked_at": "2026-11-06T12:09:30Z",
+  "last_poll_time": "2026-11-06",
   "hosts_down": {},
   "pending_overflow": false,
   "schema_version": 2,
-  "last_examined_notice_id": 16029,
+  "last_examined_notice_id": 16063,
   "deferred": [
     "15808",
     "15905"
