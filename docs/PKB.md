@@ -6,17 +6,16 @@ says so in place); nothing else was re-verified, so do not read this file's age
 as freshness. **2026-11-03:** §1's tip, §4's seed ladder and §33's advice table
 were re-checked, and §42 was added for the day's changes (digest story floor,
 weather AQI, breaking ladder, ladder probe, honesty gate, `commit_state.sh`).
+**2026-11-06:** §1's tip was re-checked, and §§43-44 were added for summary
+honesty and for the model ladder as it actually stands.
 Do not edit product source code from this file; record decisions here instead.
 
-## 1. Repo state (re-verified 2026-11-01; tip re-checked 2026-11-03)
+## 1. Repo state (re-verified 2026-11-01; tip re-checked 2026-11-06)
 
 - Repo: this repository (git, branch `master`). This section said `main` until
   2026-11-01; no ref of that name exists.
-- HEAD = `6d6170c` ("feat: keep the verdict a judgement actually returned") at
-  the 2026-11-03 check. **Superseded 2026-11-03:** this line said `a38165b`
-  until then; four commits from a concurrent actor had landed during the
-  2026-10-31/11-01 session (`29f98ca`, `e4a84f6`, `9450ef7`, `a38165b`). Treat
-  the tip as moving: read `git log --oneline`.
+- HEAD = `7c37a78` ("fix: a card must never be a heading over nothing") at the
+  2026-11-06 check. Treat the tip as moving: read `git log --oneline`.
 - Working tree MOVES DURING A SESSION, so a count here is not durable. Measured
   2026-11-03: `git status --porcelain` printed only `?? CON` at 15:31, then
   showed `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
@@ -2345,9 +2344,71 @@ exhausted — losing telemetry must not fail the job — but warns by name (`:24
   `:342-356`). Conflating them is what made five healthy rungs look like
   `harness_no_stream` in the 2026-11-02 probe (`:342-350`).
 
+## 43. Summary honesty (2026-11-06)
+
+- **One predicate decides what counts as a summary.** `is_real_summary`
+  (`scripts/validate_stories.py:1744`) is the judgement on every path: the model
+  writer, the repair stage (`scripts/summarise_stubs.py:53,134`), the deriver
+  (`scripts/derive_unsummarised.py:320,477`), and the publisher fallback.
+- **A body counted as a summary is never empty, never the headline restated,
+  never a snippet that fails the predicate.** When no real summary can be
+  written, the body is `edition_kind.NO_SUMMARY_TEXT` — `No summary available.`
+  (`scripts/edition_kind.py:37`). One exception is explicit: where the story
+  floor forbids dropping the card, the repair keeps the story's own non-empty
+  text and marks `summary_source: "none"` (`scripts/summarise_stubs.py:167-174`),
+  so a headline can survive as an unsummarised body but is never counted as a
+  summary.
+- **The counts travel with the payload.** `summarised` / `publisher` / `none`
+  are computed on every shipping path — validation
+  (`scripts/validate_stories.py:1826-1828`), derivation
+  (`scripts/derive_unsummarised.py:644`) and the repair
+  (`scripts/summarise_stubs.py:183-185`) — so the email subject
+  (`.github/workflows/daily-news.yml:2147`), the ntfy title (`:3544`, `:4731`),
+  the page hero (`scripts/validate_stories.py:2248,2254`) and the edition note
+  (`scripts/summarise_stubs.py:186-204`) all read the same numbers the payload
+  carries.
+
+## 44. Model ladder, as it actually stands (2026-11-06)
+
+- **The digest agent walk is CLI-only.** It runs `opencode run --model` against
+  `config/opencode.json`'s ladder, and that seed is Gemini's two free-tier rungs
+  followed by the free `opencode/*` pool. The summariser and repair add the
+  keyed HTTP fallbacks afterwards (`scripts/llm_providers.py:92,1051-1059`).
+- **Gemini's free tier and the shared `opencode` pool are the two CLI accounts
+  that answer today.** The Gemini free-tier quota measured in the tree is the
+  per-minute input-token allowance of 250,000
+  (`scripts/derive_unsummarised.py:81`); when it is spent the edition is
+  derived, and the repair pass then carries the summaries. The shared
+  `opencode/*` pool answers `payment_required`.
+- **Groq's key is present and refused with HTTP 403** — the secret is not
+  missing; the provider rejected its scope or the account's state
+  (`scripts/llm_providers.py:817-827`).
+- **Mistral answers HTTP 429** — capacity, not a wrong id
+  (`scripts/llm_providers.py:61-64,839-841`).
+- **OpenRouter free ids are the working fallback**, seeded with
+  `nvidia/nemotron-3-ultra-550b-a55b:free` first
+  (`scripts/llm_providers.py:142`). That id answered for the repair in run
+  `42188166101` on 2026-11-06; the evidence is that run's log, not the tree.
+
+**Repair and ladder guarantees.** The repair enforces one wall clock over the
+whole step (`summarise_stubs.main`, `summarise_stories.TOTAL_BUDGET_SECONDS`) and
+always writes its result plus one verdict line
+(`scripts/summarise_stubs.py:205-214,273-280`). A demotion is saved the moment it
+is recorded: `save_memory()` is called inside `record()`
+(`scripts/summarise_stories.py:872-926`). A quota refusal from a keyed provider
+cools that rung for six hours (`scripts/summarise_stories.py:566-601`;
+`scripts/model_selector.py:718`), while a shared-pool row is never cooled
+(`summarise_stories.py:590-595`). A provider-level `payment_required` ends that
+provider, not the walk — implemented in the walk at
+`scripts/breaking_monitor.py:2018,2278-2281` — and a provider contributing no
+rung logs why it did not
+(`scripts/llm_providers.py:1024,1034`).
+
 ---
 
-Newest section: §42 (2026-11-03, the digest story floor, weather AQI, the
+Newest section: §44 (2026-11-06, the model ladder as it actually stands and the
+repair/ladder guarantees), preceded by §43 (the same day: the single summary
+predicate and the counts every surface reads), then §42 (2026-11-03, the digest story floor, weather AQI, the
 breaking ladder and probe, honesty-gate recovery and `commit_state.sh`),
 followed by §41 (2026-10-10, the at-least-once delivery contract, the
 single-cron dispatcher, and the health check that hid a half-applied deploy),
@@ -2357,7 +2418,7 @@ cron arithmetic are corrected/superseded by §41**) and §38 (2026-10-03,
 digest archive origin access control). §§38-40 are the security control, the
 worker liveness contract and the open redesigns; §§31-37 are the
 personal-relevance, weather-engine, guardrail, operations and risk record;
-§§23-30 are the phase-1 reliability rebuild. Read §§23-42 first for current
+§§23-30 are the phase-1 reliability rebuild. Read §§23-44 first for current
 reality, and read **§38 before making any claim about the digest archive's
 privacy**.
 
