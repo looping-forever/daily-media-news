@@ -12,7 +12,8 @@ name: Provider probe
 #
 # WHAT IT PRINTS (one line per provider, plus that provider's own catalogue):
 #
-#   provider | key=present/absent | models=N | chosen=<id> | tried=<n> | status=<code> | ms=<n> | verdict=<ok|auth|quota|model_not_found|timeout|network>
+#   provider | key=present/absent | models=N | chosen=<id> | tried=<n> | status=<code> | ms=<n>
+#   | verdict=<ok|auth|quota|model_not_found|timeout|network|model_rejected|no_chat_model|empty>
 #
 # The `available:` lines beneath each row are the evidence the candidate ids in
 # scripts/llm_providers.py are corrected from -- an account's real catalogue,
@@ -72,7 +73,7 @@ jobs:
           import llm_providers
 
           rows = llm_providers.probe_rows()
-          print('provider | key | models | chosen | status | ms | verdict')
+          print('provider | key | models | chosen | tried | status | ms | verdict')
           for row in rows:
               print(row)
           # A provider-level row cannot tell a working id from a silent one:
