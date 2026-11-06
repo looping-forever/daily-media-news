@@ -1,0 +1,53 @@
+{
+  "models": {
+    "gemini/gemini-3.1-flash-lite": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:05:12.772057+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:05:12.772057+00:00"
+    },
+    "gemini/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-06T01:04:48.721665+00:00",
+      "reason": "rung_broken"
+    },
+    "groq/llama-3.3-70b-versatile": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:05:12.811110+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:05:12.811110+00:00"
+    },
+    "opencode/beam-free": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:09:05.160469+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:09:05.160469+00:00"
+    },
+    "opencode/deepseek-v4.1-flash-free": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:08:45.127918+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:08:45.127918+00:00"
+    },
+    "opencode/glm-5.3-flash-free": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:09:38.267925+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:09:38.267925+00:00"
+    },
+    "opencode/mimo-v2.6-flash-free": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:09:25.211884+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:09:25.211884+00:00"
+    },
+    "opencode/nemotron-3.5-lightning-free": {
+      "hits": 2,
+      "last_hit": "2026-11-06T01:09:37.249867+00:00",
+      "reason": "rung_broken",
+      "until": "2026-11-06T07:09:37.249867+00:00"
+    }
+  },
+  "pool": {},
+  "schema_version": 1
+}
