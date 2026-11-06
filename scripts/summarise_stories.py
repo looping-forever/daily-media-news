@@ -831,12 +831,14 @@ def refusal_cause(kind, message):
         # A 200 whose message carries no text is the model answering with
         # nothing, not a network fault: the reader sees an unreadable reply.
         return "unreadable_reply"
-    if kind in ("quota_notice", "auth", "model_not_found", "bad_request"):
-        # All four are the PROVIDER declining this request -- a spent allowance,
-        # a refused key, an id it does not serve, a body it would not accept.
-        # None of them is the parser's fault, and the page says "provider
-        # refusal" for each. Named here rather than folded into the text
-        # heuristic because a 401 carries no "quota" word at all.
+    if kind in ("quota_notice", "auth", "model_not_found", "bad_request",
+                "model_rejected"):
+        # All of these are the PROVIDER declining this request -- a spent
+        # allowance, a refused key, an id it does not serve or cannot chat with,
+        # a body it would not accept. None of them is the parser's fault, and
+        # the page says "provider refusal" for each. Named here rather than
+        # folded into the text heuristic because a 401 carries no "quota" word
+        # at all.
         return "provider_refusal"
     if kind == "blocked" or is_blocked(message):
         # The edge refused this NETWORK, not this rung: the request never

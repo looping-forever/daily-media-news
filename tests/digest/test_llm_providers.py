@@ -618,6 +618,8 @@ class FailureVocabularyTests(unittest.TestCase):
     def test_a_provider_quota_reads_as_a_provider_refusal_on_the_page(self):
         self.assertEqual("provider_refusal",
                          ss.refusal_cause("quota_notice", "429 too many"))
+        self.assertEqual("provider_refusal",
+                         ss.refusal_cause("model_rejected", "HTTP 400"))
         self.assertEqual("unreadable_reply", ss.refusal_cause("garbage", "{}"))
         self.assertEqual("model_timeout", ss.refusal_cause("timeout", ""))
 
@@ -846,6 +848,62 @@ class ProbeFindingTests(unittest.TestCase):
         self.assertIn("said nothing", note)
         self.assertIn("llama-3.3-70b-versatile", note,
                       "the note must name the id -- got %r" % note)
+
+
+class ChatCapableSelectionTests(unittest.TestCase):
+    """A probe row must name a model that can actually CHAT.
+
+    Measured 2026-11-06 (probe 42246453600): Groq served 11 ids and selection
+    chose `whisper-large-v3-turbo`, an audio model, so the chat POST answered
+    400 and the row blamed the provider with `verdict=network`.
+    """
+
+    def test_an_audio_model_is_not_chosen_over_a_chat_model(self):
+        send, _ = router({"groq": ["whisper-large-v3-turbo", "acme/chat-7b"]})
+        got = lp.probe("groq", transport=send, environ=KEYS)
+        self.assertEqual("acme/chat-7b", got["chosen"])
+
+    def test_a_catalogue_with_no_chat_model_says_so_and_posts_nothing(self):
+        send, calls = router({"groq": ["whisper-large-v3-turbo",
+                                       "tts-1", "text-embedding-3-small"]})
+        got = lp.probe("groq", transport=send, environ=KEYS)
+        self.assertEqual("no_chat_model", got["verdict"])
+        self.assertEqual("", got["chosen"])
+        self.assertEqual(0, got["attempts"])
+        self.assertEqual([], [c for c in calls if c["method"] == "POST"],
+                         "a catalogue with no chat model must not be called")
+        rows = lp.probe_rows(transport=send, environ=KEYS)
+        groq_row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertIn("verdict=no_chat_model", groq_row)
+        note = [r for r in rows if r.strip().startswith("groq note:")][0]
+        self.assertIn("no chat-capable model served", note)
+        self.assertNotIn("network", groq_row)
+
+    def test_a_400_naming_our_model_is_never_a_network_fault(self):
+        body = json.dumps({"error": {
+            "message": "The model `whisper-large-v3-turbo` does not support "
+                       "chat completions", "type": "invalid_request_error"}})
+        send, _ = transport_returning(400, body)
+        got = lp.call("groq", "p", model_id="whisper-large-v3-turbo",
+                      transport=send, environ=KEYS)
+        self.assertFalse(got.ok)
+        self.assertEqual("model_rejected", got.reason)
+        self.assertNotEqual("network", lp.PROBE_VERDICT.get(got.reason,
+                                                           got.reason))
+
+    def test_the_measured_catalogues_keep_their_working_choices(self):
+        gemini = ["gemini-3.5-flash", "gemini-3.5-flash-lite",
+                  "gemini-2.5-flash", "gemini-embedding-001"]
+        openrouter = ["nvidia/nemotron-3-ultra-550b-a55b:free",
+                      "nvidia/nemotron-3.5-lightning:free",
+                      "recursive/flint-v1.0:free"]
+        send, _ = router({"gemini": gemini, "openrouter": openrouter})
+        self.assertEqual(
+            "gemini-3.5-flash-lite",
+            lp.probe("gemini", transport=send, environ=KEYS)["chosen"])
+        self.assertEqual(
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            lp.probe("openrouter", transport=send, environ=KEYS)["chosen"])
 
 
 class QuotaMovesOnTests(unittest.TestCase):

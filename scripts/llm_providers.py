@@ -237,6 +237,7 @@ REASON_TEXT = {
     "empty_answer": "empty answer",
     "model_not_found": "model not found",
     "bad_request": "request refused",
+    "model_rejected": "chosen model refused",
     "not_configured": "key not configured",
 }
 
@@ -256,7 +257,19 @@ PROBE_VERDICT = {
     "garbage": "network",
     "empty_answer": "empty",
     "bad_request": "network",
+    "model_rejected": "model_rejected",
+    "no_chat_model": "no_chat_model",
 }
+
+#: Name markers for ids that CANNOT answer a chat-completion. No provider here
+#: publishes modality over `/models`, so the id is the only evidence there is.
+#: Measured 2026-11-06 (probe 42246453600): selection chose
+#: `whisper-large-v3-turbo` and blamed Groq for the 400 its audio model earned.
+CHAT_EXCLUDE_MARKERS = (
+    "whisper", "tts", "audio", "transcribe", "speech", "embed", "embedding",
+    "rerank", "reranker", "guard", "moderation", "ocr",
+    "dall-e", "flux", "stable-diffusion", "sdxl", "bge-", "gte-",
+)
 
 #: Name markers that make an id a POOR prose summariser, with how hard to avoid it.
 #: Only consulted for ids the configured seeds do not name.
@@ -579,6 +592,21 @@ def _reason_for_status(status, body=""):
     return "bad_request"
 
 
+def _model_caused_400(body, model_id):
+    """True when a 400 is OUR chosen id being refused, not a provider fault.
+
+    The body names the id we sent, or says that id cannot chat. Anything else
+    on a 400 keeps its existing `bad_request` reading.
+    """
+    text = str(body or "").lower()
+    if model_id and str(model_id).lower() in text:
+        return True
+    return any(m in text for m in (
+        "does not support chat", "not a chat model", "does not support text",
+        "not supported for chat", "unsupported model", "invalid model",
+    ))
+
+
 def _message_text(body):
     """`choices[0].message.content` out of a chat-completions body, or ""."""
     return answer_from_body(body)[0]
@@ -723,6 +751,10 @@ def call(name, prompt, model_id=None, timeout=None, max_tokens=MAX_TOKENS,
                               redact(_error_text(body), key)[:300])
     reason = _reason_for_status(status, body)
     block = classify_403(body)[1] if status == 403 else ""
+    if status == 400 and _model_caused_400(body, model_id):
+        # OUR CHOICE, NOT THE PROVIDER: an id we picked that cannot chat must
+        # never be reported as a network fault (probe 42246453600).
+        reason = "model_rejected"
     return ProviderResult(False, "", model_id, elapsed, status, reason,
                           redact(_error_text(body), key)[:300], "", block)
 
@@ -834,22 +866,34 @@ def list_models(name, transport=None, environ=None):
     return ModelList(ids, status, elapsed, "ok")
 
 
-def choose_model(name, discovered, environ=None):
-    """The id to probe: first candidate the provider actually serves.
+def is_chat_model(model_id):
+    """True when an id can answer a chat-completion, by name alone."""
+    text = str(model_id or "").lower()
+    return bool(text) and not any(m in text for m in CHAT_EXCLUDE_MARKERS)
 
-    Falls back to the discovered list's first id, then to the configured
-    candidate, so the probe always names SOMETHING and the row makes clear
-    whether the configured name was found.
+
+def choose_model(name, discovered, environ=None):
+    """The id to probe: first CHAT-CAPABLE candidate the provider serves.
+
+    An audio, embedding or classifier id is never chosen: chat-completions on
+    one earns a 400 that is OUR model choice, not a provider fault (probe
+    42246453600). Falls back to the first chat-capable discovered id, then to
+    the configured candidate, and returns "" when nothing chat-capable exists
+    so the caller can say that instead of calling chat-completions.
     """
     record = provider(name)
-    served = [i for i in (discovered or []) if not record.free_only
-              or i.endswith(":free")]
+    served = [i for i in (discovered or [])
+              if is_chat_model(i)
+              and (not record.free_only or i.endswith(":free"))]
     for candidate in record.models:
-        if candidate in served:
+        if is_chat_model(candidate) and candidate in served:
             return candidate
     if served:
         return served[0]
-    return record.models[0]
+    for candidate in record.models:
+        if is_chat_model(candidate):
+            return candidate
+    return ""
 
 
 def _preference_key(model_id):
@@ -1011,6 +1055,18 @@ def _probe_note(got):
     if verdict == "model_not_found":
         return ("the chosen id %r is not in this account's catalogue; seed from "
                 "the `available` line instead" % (got.get("chosen") or "-"))
+    if verdict == "no_chat_model":
+        return ("no chat-capable model served: the catalogue offered %d id(s) "
+                "(%s) and none can answer a chat-completion, so no request was "
+                "made -- the provider is reachable and the fault is our model "
+                "choice, not the provider"
+                % (got.get("models", 0),
+                   ", ".join(got.get("available") or []) or "-"))
+    if verdict == "model_rejected":
+        return ("the provider refused the chosen id %r (HTTP %s): that id "
+                "cannot chat, so this is OUR model choice and not a provider "
+                "fault -- pick a chat-capable id from the `available` line"
+                % (got.get("chosen") or "-", got.get("status") or 400))
     if verdict == "empty":
         # Measured 2026-11-05: xingchen-agi/xing4.0-29b-a4b answered 200 in
         # 11.9s with empty content and no reasoning field. Saying nothing about
@@ -1050,6 +1106,22 @@ def probe(name, transport=None, environ=None, sleep=None):
             "ms": int((time.monotonic() - started) * 1000),
             "verdict": "not_configured",
             "available": [],
+            "attempts": 0,
+        }
+    if not chosen or (discovered.reason == "ok"
+                      and not any(is_chat_model(i) for i in discovered.ids)):
+        # NO CHAT MODEL SERVED: a chat-completions call can only earn a 400
+        # here, so none is made. The row says what is true -- the provider is
+        # reachable and it is our model choice that has nowhere to go.
+        return {
+            "provider": name,
+            "key": "present",
+            "models": len(discovered.ids),
+            "chosen": "",
+            "status": 0,
+            "ms": int((time.monotonic() - started) * 1000),
+            "verdict": PROBE_VERDICT["no_chat_model"],
+            "available": list(discovered.ids[:8]),
             "attempts": 0,
         }
     result = call(name, PROBE_PROMPT, model_id=chosen,
