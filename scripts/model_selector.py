@@ -709,6 +709,13 @@ COOLDOWN_SEC = {
     # long enough that the next scheduled run skips it, short enough that a
     # provider-side blip cannot park a working model for a day.
     "rung_broken": 6 * 3600,
+    # RUN 42144852087 (2026-11-06): a keyed provider's 429 was not a cooling
+    # kind, so gemini-3.5-flash-lite led the next run and spent its first
+    # attempt on a wall the account had already hit. Six hours, the same window
+    # as rung_broken, because both answer "this rung cannot work right now".
+    # ONLY a keyed provider is recorded: the free OpenCode pool shares one
+    # bucket, so cooling it would empty the ladder and end the edition.
+    "quota_exhausted": 6 * 3600,
 }
 
 #: A provider_outage is evidence only when it repeats. `rung_broken` too: one

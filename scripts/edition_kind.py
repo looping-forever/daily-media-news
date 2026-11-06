@@ -32,6 +32,10 @@ NOTE_NONE_SURVIVED = ("Fallback edition: no AI summary survived validation for "
 #: The phrase both count sentences share, so a stale one can be recognised.
 NOTE_COUNT_MARKER = "an AI wrote the summary"
 
+#: A card with no text at all renders as a headline and a bare `Link:`. This is
+#: what goes in its place -- still counted `none`, because nobody wrote it.
+NO_SUMMARY_TEXT = "No summary available."
+
 
 def _carry(n):
     return "carries no summary" if n == 1 else "carry no summary"

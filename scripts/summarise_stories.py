@@ -567,16 +567,36 @@ DEMOTING_KINDS = frozenset({"other", "auth", "transport", "timeout",
                             "model_not_found", "refused", "failed",
                             "exit_nonzero", "empty_content"})
 
+#: A 429 from a KEYED provider is this account's allowance ending, which is a
+#: durable fact about the rung, not a shared-pool refusal. The free OpenCode
+#: pool is excluded deliberately: every one of its ids draws on the same bucket,
+#: so cooling them would empty the ladder (run 42144852087).
+QUOTA_KINDS = frozenset({"quota_notice", "quota_or_rate_limited"})
+
 
 def record_refusal(cooldown, model, kind, now=None):
     """Demote `model` after a refusal that was not about capacity.
 
     Two of them inside a day set a six-hour cooldown (model_selector's
     `rung_broken`); one only records the hit. Returns the row, or None.
+
+    A KEYED provider's quota refusal cools immediately as `quota_exhausted`
+    (run 42144852087): `gemini-3.5-flash-lite` answered 429, kept the front
+    position, and burned the next run's first attempt on the same wall.
     """
-    if cooldown is None or kind not in DEMOTING_KINDS:
+    if cooldown is None:
         return None
     import model_selector
+    if kind in QUOTA_KINDS:
+        # KEYED means everything except the free OpenCode pool. `provider_of`
+        # cannot answer this: gemini is deliberately a CLI rung there, and so is
+        # opencode -- the difference is the ACCOUNT, not the transport.
+        if str(model).split("/", 1)[0] == "opencode":
+            return None
+        return model_selector.record_cooldown(cooldown, model,
+                                              "quota_exhausted", at=now)
+    if kind not in DEMOTING_KINDS:
+        return None
     return model_selector.record_cooldown(cooldown, model, "rung_broken",
                                           at=now)
 
@@ -660,7 +680,13 @@ def opencode_run(prompt, model, timeout=KEYED_REQUEST_TIMEOUT):
         out, _ = proc.communicate(prompt.encode("utf-8"), timeout=timeout)
     except subprocess.TimeoutExpired:
         proc.kill()
-        out, _ = proc.communicate()
+        # BOUNDED, because a child tree that inherited the pipe can keep the
+        # second call waiting far past the timeout (run 42144852087's step then
+        # died at its own 8-minute cap). Whatever was printed is still kept.
+        try:
+            out, _ = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            out = b""
         raise Refusal("%s: no answer in %ss (killed)" % (model, timeout),
                       kind="timeout", raw=_decode(out))
     text = _decode(out)
@@ -823,9 +849,18 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     if cooldown is None and cooldown_path:
         import model_selector
         cooldown = model_selector.load_cooldown(cooldown_path)
-    base = list(models) if models is not None else ladder_models(log=log)
-    order = demoted_order(base, cooldown, log=log) if cooldown is not None \
-        else list(base)
+    # THE CLOCK STARTS BEFORE THE LADDER IS BUILT (run 42144852087). Resolving
+    # the ladder probes every provider's catalogue, and that cost used to sit
+    # OUTSIDE the allowance: 4.5 minutes of probes plus the walk overran the
+    # step's own 8-minute timeout, so nothing was written. Discovery is part of
+    # the step, so it is part of the budget; when it spends the allowance the
+    # loop below writes the fallback edition instead of starting a doomed call.
+    started = clock()
+    pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
+    pacer.deadline = started + float(budget_seconds)
+    out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
+           "refusals": [], "debug": [], "causes": {},
+           "budget_spent": False, "seconds": 0.0}
     #: Rungs demoted by a refusal IN THIS RUN. They are skipped for the rest of
     #: it (run 42070185644 paid the same broken rung in all three batches), but
     #: never removed outright: if every other rung refuses, the fallback is the
@@ -833,10 +868,6 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     #: late by a rung that had failed.
     dead = set()
     dirty = False
-    pacer = Pacer(budget=budget, sleep=sleep, clock=clock, log=log)
-    pacer.deadline = clock() + float(budget_seconds)
-    out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
-           "refusals": [], "debug": [], "causes": {}}
 
     def save_memory():
         """Persist the demotion ledger, pruned, where the caller asked for it."""
@@ -853,6 +884,19 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                                              timeout=timeout,
                                              exit_code=exit_code))
 
+    if clock() >= pacer.deadline:
+        # NO ALLOWANCE LEFT: resolving the ladder would spend the step's clock
+        # on probes for calls that cannot be made. The caller writes the
+        # fallback edition and says the budget was spent.
+        out["budget_spent"] = True
+        log("  total budget of %ds is spent before the ladder is resolved"
+            % budget_seconds)
+        save_memory()
+        return out
+    base = list(models) if models is not None else ladder_models(log=log)
+    order = demoted_order(base, cooldown, log=log) if cooldown is not None \
+        else list(base)
+
     if not stories or not base:
         if not base:
             log("summarise_stories: no model in the configured ladder; "
@@ -867,6 +911,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         if row is None:
             return False
         dirty = True
+        # WRITTEN IMMEDIATELY, not at the end (run 42144852087): seven rungs
+        # were demoted at 01:42:31, the step was killed by its 8-minute cap,
+        # and the persist step found nothing to commit. A demotion the process
+        # observed has to reach the file the next run reads.
+        save_memory()
         if cooldown is not None and _hard_cooled(cooldown, model):
             dead.add(model)
             # The same formatter that reorders the next run's ladder, called
@@ -879,6 +928,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     plan = batches(stories)[:MAX_REQUESTS]
     for index, batch in enumerate(plan, 1):
         if pacer.deadline - clock() <= 0:
+            out["budget_spent"] = True
             log("  total budget of %ds is spent before batch %d/%d"
                 % (budget_seconds, index, len(plan)))
             break
@@ -999,7 +1049,10 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             out["summaries"].update(got)
             out["model"] = model
             answered = True
-            promote_rung(cooldown, model, log=log)
+            if promote_rung(cooldown, model, log=log):
+                # A rung that answered is no longer demoted; the file the next
+                # run reads must say so now, not only when this step finishes.
+                save_memory()
             log("  batch %d/%d ok: %d of %d stories summarised by %s"
                 % (index, len(plan), len(got), len(batch), model))
             break
@@ -1009,6 +1062,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             log("  batch %d/%d: %d stories lost to %s"
                 % (index, len(plan), len(batch), cause))
         if ran_out:
+            out["budget_spent"] = True
             log("  the job's %ds summarising budget is spent; the remaining "
                 "stories keep the publisher's text" % budget_seconds)
             break
@@ -1017,6 +1071,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 "the publisher's text" % (index, len(plan), len(batch)))
 
     out["waits"].extend(pacer.waits)
+    out["seconds"] = round(max(0.0, clock() - started), 1)
     save_memory()
     log("summarise_stories: %d of %d stories summarised in %d request(s), "
         "%d wait(s), model %s"

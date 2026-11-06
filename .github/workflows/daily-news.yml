@@ -1606,9 +1606,8 @@ jobs:
                 fi
                 # RECORD THE REAL CLASS, never a generic "transport". The selector
                 # decides what each class costs: a not-found earns a 24h hard
-                # cooldown (the id is simply wrong), and a quota is recorded but
-                # deliberately NOT cooled down per model, because the whole free
-                # pool shares that limit.
+                # cooldown (the id is simply wrong), and a quota is recorded per
+                # model -- never as the shared pool row (see the keyed arm below).
                 python3 scripts/model_selector.py --record "$model" "$kind" || true
                 if [ "$kind" = "quota_or_rate_limited" ] \
                   && [ "${model%%/*}" != "opencode" ]; then
@@ -1618,7 +1617,14 @@ jobs:
                   # writing the row here would silence the fallback pool for the
                   # whole grace window on nothing more than one provider's
                   # daily allowance. Recorded per model, then the next rung.
-                  echo "Circuit breaker: $model -> $kind. That is the '${model%%/*}' provider's own free allowance, not the opencode bucket, so no shared-pool row is written; trying the next rung."
+                  #
+                  # RUN 42144852087: the health row alone is wiped each run, so
+                  # gemini-3.5-flash-lite led the next ladder and spent its first
+                  # attempt on the same wall. `quota_exhausted` is the durable
+                  # (6h, keyed-only) form of the same fact; the shared pool never
+                  # gets it.
+                  python3 scripts/model_selector.py --record "$model" quota_exhausted || true
+                  echo "Circuit breaker: $model -> $kind. That is the '${model%%/*}' provider's own free allowance, not the opencode bucket, so no shared-pool row is written; the rung is cooled for 6h and the next rung is tried."
                   last_err="$kind on $model"
                   continue
                 fi

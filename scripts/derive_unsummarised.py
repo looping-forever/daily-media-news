@@ -57,6 +57,12 @@ FRESH_HOURS = 12
 SUMMARY_MIN_CHARS = 24
 SUMMARY_MAX_CHARS = 240
 
+#: The body a card carries when neither a model nor the feed wrote prose.
+#: RUN 42144852087: eleven stories shipped with an EMPTY body, so the email read
+#: as a headline, a blank line, then `Link:`. One constant, shared with the
+#: validator, so no path can invent a second sentence for the same nothing.
+NO_SUMMARY_TEXT = edition_kind.NO_SUMMARY_TEXT
+
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "config")
 
@@ -356,9 +362,13 @@ def derive(candidates, now=None, held=None):
             continue
         host = host_of(url)
         published = cand.get("published")
+        body = lead_text(cand.get("snippet"), title, category)
         story = {
             "title": title,
-            "summary": lead_text(cand.get("snippet"), title, category),
+            # NEVER EMPTY. A real description is quoted; otherwise the card
+            # says so in one honest sentence and `summary_counts` calls it none.
+            "summary": body or NO_SUMMARY_TEXT,
+            "summary_source": "publisher" if body else "none",
             "source_name": host,
             "source_url": url,
             "published_at": published if isinstance(published, str) and published.strip() else None,
@@ -481,7 +491,13 @@ def apply_summaries(stories, summaries, snippets=None, model="", rejected=None):
                 "text": clip_text(text.strip()),
                 "reason": stub_reason(text.strip(), story.get("title"), snippet),
             })
-        story["summary_source"] = "publisher"
+        # The label the deriver set is KEPT: a fallback sentence is `none`, not
+        # the publisher's description, and relabelling it `publisher` is the
+        # false count run 42070185644 shipped.
+        if not story.get("summary_source"):
+            story["summary_source"] = ("publisher"
+                                       if str(story.get("summary") or "").strip()
+                                       else "none")
     return written
 
 
@@ -575,11 +591,20 @@ def main(argv=None):
         for story in stories:
             if story.get("summary_source") == "ai":
                 continue
-            if str(story.get("summary") or "").strip():
-                # A non-AI story with a body: the deriver wrote it from the
-                # feed's description, so it is publisher text.
+            source = story.get("summary_source")
+            if source == "none":
+                none += 1
+            elif source == "publisher":
+                publisher += 1
+            elif str(story.get("summary") or "").strip():
+                # A story from a caller that carries no label: non-empty text
+                # is publisher text, by the deriver's own contract.
                 publisher += 1
             else:
+                # SHOULD BE UNREACHABLE after `derive`, but a payload built by
+                # an older caller must still not be counted as written prose.
+                story["summary"] = NO_SUMMARY_TEXT
+                story["summary_source"] = "none"
                 none += 1
 
     # WHY, not merely THAT. The attempt log is the walk's own record, so the

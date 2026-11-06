@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -108,11 +109,16 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
     if not found:
         log("summarise_stubs: every story already has a written summary")
         return {"stubs": 0, "written": 0, "publisher": 0, "none": 0,
-                "dropped": 0}
+                "dropped": 0, "budget_spent": False}
 
     log("summarise_stubs: %d of %d stories have no written summary; asking the "
         "ladder (allowance %ds)" % (len(found), len(stories), spend))
-    result = (summarise or _ladder)(found, budget_seconds=spend)
+    try:
+        result = (summarise or _ladder)(found, budget_seconds=spend)
+    except Exception as exc:      # the edition must survive a broken ladder
+        log("summarise_stubs: the ladder raised (%s); writing the edition "
+            "without it" % exc)
+        result = {"summaries": {}, "requests": 0, "budget_spent": True}
     summaries = result.get("summaries") or {}
     model = str(result.get("model") or "")
     written = publisher = none = dropped = 0
@@ -162,7 +168,7 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
         # non-empty body) -- or its headline, which is true but not a summary.
         body = (str(story.get("summary") or "").strip()
                 or str(story.get("title") or "").strip()
-                or "No summary available.")
+                or derive_unsummarised.NO_SUMMARY_TEXT)
         story["summary"] = body
         story["summary_source"] = "none"
         none += 1
@@ -196,21 +202,40 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
         payload["notes"] = (sentence + " " + existing).strip()
     elif existing != str(payload.get("notes") or "").strip():
         payload["notes"] = existing
+    if result.get("budget_spent"):
+        # ONE VERDICT LINE. Run 42144852087 overran its allowance by 4.5
+        # minutes, was killed by the step's own cap, and said nothing at all;
+        # the step then reported success with no file written. This line is the
+        # evidence that the budget, not a crash, ended the repair. RUNGS, not
+        # requests: the failed run tried 14 of them, and that is the number a
+        # reader needs to see before deciding to widen the ladder.
+        rungs = len(result.get("debug") or []) or int(result.get("requests") or 0)
+        log("summarise_stubs: budget spent after %d rungs, %d repaired, %d left "
+            "\u2014 writing" % (rungs, written, max(0, len(found) - written)))
     log("summarise_stubs: replaced %d with written summaries, %d with publisher "
         "text, %d left without a summary, %d dropped; edition_kind=%s (%d of %d)"
         % (written, publisher, none, dropped, facts["edition_kind"],
            facts["summary_counts"]["summarised"],
            facts["summary_counts"]["total"]))
     return {"stubs": len(found), "written": written, "publisher": publisher,
-            "none": none, "dropped": dropped}
+            "none": none, "dropped": dropped,
+            "budget_spent": bool(result.get("budget_spent"))}
 
 
 def main(argv=None):
+    # THE ALLOWANCE IS MEASURED FROM HERE, not from inside the ladder call.
+    # Run 42144852087 spent ~4.5 minutes resolving 14 rungs, then started a
+    # fresh 300 s walk: 8m 12s against a 300 s allowance, killed by the step's
+    # own 8-minute cap before anything was written.
+    started = time.monotonic()
     ap = argparse.ArgumentParser(
         description="Summarise the stubs a digest shipped.")
     ap.add_argument("--in", dest="in_path",
                     default="state/stories.validated.json")
     ap.add_argument("--candidates", default="state/candidates.json")
+    ap.add_argument("--budget-seconds", type=float, default=None,
+                    help="wall clock for the whole step (default: the "
+                         "summariser's own TOTAL_BUDGET_SECONDS)")
     args = ap.parse_args(argv)
 
     try:
@@ -225,14 +250,28 @@ def main(argv=None):
     writer = payload.get("writer") if isinstance(payload.get("writer"), dict) else {}
     derived = str(writer.get("rung") or "") == "derived"
 
+    import summarise_stories
+    total = (summarise_stories.TOTAL_BUDGET_SECONDS
+             if args.budget_seconds is None else float(args.budget_seconds))
+    remaining = max(0.0, total - (time.monotonic() - started))
     debug_path = os.path.join(os.path.dirname(os.path.abspath(args.in_path))
                               or ".", "summarise-debug.json")
-    counts = repair(payload, validate_stories.snippet_index(args.candidates),
-                    log=lambda line: print(line, flush=True), derived=derived,
-                    debug_path=debug_path)
-    if not counts["stubs"]:
+    counts = {"stubs": 0, "written": 0, "publisher": 0, "none": 0,
+              "dropped": 0}
+    failed = False
+    try:
+        counts = repair(payload, validate_stories.snippet_index(args.candidates),
+                        log=lambda line: print(line, flush=True), derived=derived,
+                        budget_seconds=remaining, debug_path=debug_path)
+    except Exception as exc:      # a broken repair must not lose the edition
+        failed = True
+        print("summarise_stubs: repair failed (%s); writing %s unchanged"
+              % (exc, args.in_path), flush=True)
+    if not counts["stubs"] and not failed:
         return 0
 
+    # ALWAYS WRITE when there was work. A green step whose only artifact is a
+    # log line is how eleven blank cards shipped (run 42144852087).
     tmp = args.in_path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=2)

@@ -14,11 +14,19 @@ These tests pin the three things that close it:
 Offline: the summariser is injected, no provider is contacted.
 """
 
+import contextlib
+import io
+import json
+import os
+import shutil
+import tempfile
 import unittest
+from unittest import mock
 
 from . import REPO_ROOT  # noqa: F401  (REPO_ROOT puts scripts/ on sys.path)
 
 import summarise_stubs
+import summarise_stories
 import validate_stories as vs
 
 TITLE = ("Prepare for delay: TxDOT closing S.A. highway ramp in just hours "
@@ -556,6 +564,92 @@ class TheHeadlineParaphraseIsNotASummary(unittest.TestCase):
                 "four-hour meeting, with the health ministry receiving the "
                 "largest share of the increase.")
         self.assertTrue(vs.is_real_summary(body, title))
+
+
+class TheBudgetIsAWallClock(unittest.TestCase):
+    """RUN 42144852087: 01:38:01 -> 01:46:13 against a 300s allowance.
+
+    Fourteen rungs failed, the step was killed by its own 8-minute cap, nothing
+    was written and the step still reported success. These tests pin the three
+    things that cannot happen again: the allowance is measured from the step's
+    own start, a spent allowance still writes the edition and says so once, and
+    a raising ladder still writes it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="stubs_budget_")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.path = os.path.join(self.tmp, "stories.validated.json")
+        self.candidates = os.path.join(self.tmp, "candidates.json")
+        with open(self.candidates, "w", encoding="utf-8") as fh:
+            json.dump({"candidates": []}, fh)
+        with open(self.path, "w", encoding="utf-8") as fh:
+            json.dump({"notes": "",
+                       "stories": [story("https://a.example/%d" % n, "",
+                                         snippet=SNIPPET)
+                                   for n in range(6)]}, fh)
+
+    def run_main(self, ladder):
+        out = io.StringIO()
+        with mock.patch.object(summarise_stubs, "_ladder", ladder):
+            with contextlib.redirect_stdout(out):
+                rc = summarise_stubs.main(
+                    ["--in", self.path,
+                     "--candidates", self.candidates])
+        return rc, out.getvalue()
+
+    def test_a_spent_budget_writes_the_edition_and_says_so_once(self):
+        rc, out = self.run_main(
+            lambda stubs, budget_seconds=None: {
+                "summaries": {}, "model": None, "requests": 4,
+                "debug": [{}, {}, {}, {}], "budget_spent": True})
+        self.assertEqual(0, rc)
+        self.assertIn("summarise_stubs: budget spent after 4 rungs, "
+                      "0 repaired, 6 left \u2014 writing", out)
+        self.assertEqual(1, out.count("budget spent after"),
+                         "one verdict line, not one per rung")
+        with open(self.path, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        self.assertTrue(payload["stories"],
+                        "the floor still keeps stories in the edition")
+        for row in payload["stories"]:
+            self.assertTrue(str(row["summary"]).strip(),
+                            "a blank body shipped from the repair path")
+
+    def test_the_allowance_is_measured_from_the_steps_own_start(self):
+        seen = []
+
+        def note(stubs, budget_seconds=None):
+            seen.append(budget_seconds)
+            return {"summaries": {}, "requests": 0, "budget_spent": False}
+
+        rc, _ = self.run_main(note)
+        self.assertEqual(0, rc)
+        self.assertEqual(1, len(seen))
+        self.assertLessEqual(seen[0], summarise_stories.TOTAL_BUDGET_SECONDS)
+        self.assertGreater(seen[0], 0, "the walk must still get what is left")
+
+    def test_a_raising_ladder_still_writes_the_edition(self):
+        def boom(stubs, budget_seconds=None):
+            raise RuntimeError("catalogue exploded")
+
+        rc, out = self.run_main(boom)
+        self.assertEqual(0, rc, "a broken ladder must not fail the job")
+        self.assertIn("the ladder raised", out)
+        self.assertTrue(os.path.exists(self.path))
+        with open(self.path, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        self.assertTrue(all(str(row["summary"]).strip()
+                            for row in payload["stories"]))
+
+    def test_repair_reports_the_spent_budget_to_its_caller(self):
+        counts = summarise_stubs.repair(
+            {"notes": "", "stories": [story("https://a.example/1", "",
+                                            snippet=SNIPPET)]},
+            summarise=lambda stubs, budget_seconds=None: {
+                "summaries": {}, "requests": 2, "budget_spent": True},
+            log=lambda *_a: None)
+        self.assertTrue(counts["budget_spent"])
 
 
 if __name__ == "__main__":

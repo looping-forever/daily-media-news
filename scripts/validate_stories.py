@@ -698,10 +698,13 @@ def validate_story(story, index, normalised=None):
         return fail("non_english_title: %s" % script)
 
     # The SUMMARY is not the story: clear the unrenderable text, keep the story.
+    # Clearing it to "" is what shipped eleven blank cards on 2026-11-05 -- the
+    # page drew a headline and then nothing.
     summary = story.get("summary")
     if _is_str(summary) and summary.strip() and \
             not english_text.looks_english(summary):
-        story["summary"] = ""
+        story["summary"] = edition_kind.NO_SUMMARY_TEXT
+        story["summary_source"] = "none"
         repaired.append("summary_non_english")
 
     # Descriptive fields: repair, never drop. `spoiler_reason` is the one that

@@ -942,12 +942,21 @@ class ShippedWalkTests(AgentWalkHarness):
 
     def test_a_second_providers_quota_writes_no_pool_row(self):
         """C5's companion rule, proven: the pool row gates EVERY later walk, so
-        one provider's own 429 must not write it."""
+        one provider's own 429 must not write it.
+
+        RUN 42144852087: the health-only record was wiped each run, so the same
+        walled rung led the next walk. The keyed 429 is now ALSO a 6-hour
+        `quota_exhausted` row, which is what makes the next walk skip it -- and
+        the shared-pool row is still never written for another provider.
+        """
         proc, art = self.run_step(
             pool=["gemini/a", "opencode/c"],
             plan="gemini/a:quota opencode/c:ok")
         self.assertGreen(proc, "second provider quota")
         self.assertEqual(["gemini/a", "opencode/c"], art["models"])
+        self.assertIn(["gemini/a", "quota_exhausted"], art["records"],
+                      "a keyed provider's 429 has to survive to the next run: "
+                      "%r" % (art["records"],))
         calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
         self.assertNotIn("--pool-refused", calls, calls)
 
@@ -959,6 +968,9 @@ class ShippedWalkTests(AgentWalkHarness):
         self.assertEqual(1, proc.returncode)
         calls = (self.tmp / "record_calls.txt").read_text(encoding="utf-8")
         self.assertIn("--pool-refused", calls, calls)
+        self.assertNotIn("quota_exhausted", calls,
+                         "every opencode id shares one bucket: cooling the rung "
+                         "would empty the ladder")
 
     def test_the_preflight_warns_and_the_pool_still_runs(self):
         """C9: a provider that never resolved is a WARNING, not a failure.

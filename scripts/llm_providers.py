@@ -1015,6 +1015,14 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
     rungs = []
     for name in LADDER_PROVIDERS:
         if not configured(name, environ):
+            # STILL NOT A RUNGS, BUT NO LONGER SILENT. Run 42144852087 ended
+            # with "3 of 6 free models tried" and no fourth provider; the run
+            # log could not say that groq/openrouter/mistral were absent because
+            # their keys are absent. The rung set is identical; the explanation
+            # is now in the log.
+            if log:
+                log("llm_providers: %s contributes no rung -- no key configured"
+                    % name)
             continue
         if not resolve:
             rungs.append("%s/%s" % (name, model_for(name)))

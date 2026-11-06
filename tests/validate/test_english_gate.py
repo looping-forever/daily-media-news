@@ -160,8 +160,11 @@ class ValidatorDropsTheTitleAndClearsTheSummary(unittest.TestCase):
         s = story("Nepal budget passes after a long debate", DEVANAGARI)
         ok, reason = vs.validate_story(s, 0)
         self.assertTrue(ok, reason)
-        self.assertEqual("", s["summary"],
-                         "the summary is the defect, not the headline")
+        self.assertEqual(vs.edition_kind.NO_SUMMARY_TEXT, s["summary"],
+                         "cleared to '' is a blank card, which is the 2026-11-05 "
+                         "defect; the summary is the defect, not the headline")
+        self.assertEqual("none", s["summary_source"],
+                         "nobody wrote this text, so the count must say none")
 
     def test_an_english_story_is_untouched(self):
         s = story("Nepal budget passes after a long debate",
@@ -197,7 +200,9 @@ class DeriverHoldsBackNonEnglish(unittest.TestCase):
                  "https://a.example/1", snippet=DEVANAGARI * 3),
         ], now=NOW, held=held)
         self.assertEqual(1, len(stories))
-        self.assertEqual("", stories[0]["summary"])
+        self.assertEqual(dut.NO_SUMMARY_TEXT, stories[0]["summary"],
+                         "the page cannot draw the description, so the card "
+                         "carries the honest fallback instead of a blank body")
         self.assertEqual(0, held.get("non_english", 0),
                          "only a refused TITLE counts as a held-back story")
 

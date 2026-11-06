@@ -26,10 +26,12 @@ and the three rules that keep the fix honest:
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SCRIPTS = str(Path(__file__).resolve().parents[2] / "scripts")
@@ -325,6 +327,27 @@ class TheJobBudget(unittest.TestCase):
         self.assertEqual(1, len(out["summaries"]),
                          "the next model still gets the batch")
         self.assertEqual([], clock.slept)
+
+    def test_the_clock_starts_before_the_ladder_is_resolved(self):
+        """RUN 42144852087: 4.5 minutes of probes sat OUTSIDE the 300s allowance,
+        so a fresh 300s walk began after them and the step died at its 8-minute
+        cap with nothing written. Discovery is part of the step."""
+        clock = FakeClock()
+
+        def slow_ladder(log=None):
+            clock.now += 400          # catalogue probes cost more than the walk
+            return ["gemini/a"]
+
+        run = FakeRun([reply_for([story(1)])])
+        with mock.patch.object(ss, "ladder_models", slow_ladder):
+            out = ss.summarise([story(1)], models=None, run=run,
+                               sleep=clock.sleep, clock=clock,
+                               budget_seconds=300, log=lambda *a: None)
+        self.assertEqual([], run.calls,
+                         "no model call may start with the allowance spent")
+        self.assertEqual(0, out["requests"])
+        self.assertTrue(out["budget_spent"],
+                        "the caller has to be able to say why it stopped")
 
 
 class TheHintParser(unittest.TestCase):
@@ -757,13 +780,35 @@ class TheBrokenRungIsDemoted(unittest.TestCase):
                          ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
                                           now=self.now, log=lambda *_a: None))
 
-    def test_a_quota_refusal_never_cools_a_rung(self):
+    #: The free pool every one of its ids draws on. A quota refusal here is a
+    #: fact about the bucket, never about the rung.
+    SHARED = "opencode/deepseek-v4.1-flash-free"
+
+    def test_a_shared_pool_quota_refusal_never_cools_a_rung(self):
         for kind in ("quota_notice", "quota_or_rate_limited", "not_configured"):
             for _ in range(3):
-                ss.record_refusal(self.cool, BROKEN, kind, now=self.now)
+                ss.record_refusal(self.cool, self.SHARED, kind, now=self.now)
         self.assertEqual({}, self.cool["models"],
                          "the whole pool shares one allowance: cooling rungs for "
                          "it would remove every model and end the edition")
+
+    def test_a_keyed_provider_quota_refusal_cools_that_rung_for_six_hours(self):
+        """RUN 42144852087: gemini-3.5-flash-lite refused `quota_or_rate_limited`,
+        which cooled nothing, so it led the next run and burned its first attempt
+        on the same wall."""
+        row = ss.record_refusal(self.cool, BROKEN, "quota_notice", now=self.now)
+        self.assertIsNotNone(row)
+        self.assertEqual("quota_exhausted", row["reason"])
+        self.assertTrue(row.get("until"))
+        self.assertEqual([WORKS, THIRD, BROKEN],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=self.now),
+                         "the keyed rung moves behind the ones that may work")
+        later = self.now + 6 * 3600 + 1
+        self.assertEqual([BROKEN, WORKS, THIRD],
+                         ss.demoted_order([BROKEN, WORKS, THIRD], self.cool,
+                                          now=later),
+                         "six hours is the window, and it lapses on its own")
 
     def test_the_cooldown_lapses_and_the_rung_comes_back_with_a_line(self):
         for _ in range(2):
@@ -848,6 +893,60 @@ class TheOrderIsRecomputedBetweenBatches(unittest.TestCase):
         self.assertEqual(13, len(out["summaries"]),
                          "every story still gets a summary from the rung that "
                          "works")
+
+
+class ADemotionSurvivesTheProcess(unittest.TestCase):
+    """RUN 42144852087: seven rungs were demoted at 01:42:31, the step was killed
+    by its 8-minute cap at 01:46:13, `Persist model cooldowns` found nothing to
+    commit, and master kept the previous run's file. A demotion this process
+    observed has to be on disk before the process can be killed."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="cool_")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.path = os.path.join(self.tmp, "model_cooldown.json")
+
+    def test_a_demotion_reaches_the_file_before_the_run_ends(self):
+        plan = [ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other"),
+                ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other")]
+
+        def killed(prompt, model, timeout=None):
+            if plan:
+                raise plan.pop(0)
+            raise KeyboardInterrupt      # the step's own wall clock ending
+
+        with self.assertRaises(KeyboardInterrupt):
+            ss.summarise([story(n) for n in range(13)], models=[BROKEN],
+                         run=killed, sleep=lambda *_a: None, clock=FakeClock(),
+                         cooldown_path=self.path, log=lambda *_a: None)
+        with open(self.path, encoding="utf-8") as fh:
+            saved = json.load(fh)
+        row = saved["models"][BROKEN]
+        self.assertEqual("rung_broken", row["reason"])
+        self.assertTrue(row.get("until"),
+                        "the next run reads this file instead of paying the rung")
+        self.assertEqual(2, row["hits"])
+
+    def test_a_keyed_quota_demotion_is_saved_on_the_first_refusal(self):
+        seen = []
+
+        def quota_then_killed(prompt, model, timeout=None):
+            if not seen:
+                seen.append(1)
+                raise ss.Refusal("quota exceeded; retry in 5s",
+                                 kind="quota_notice")
+            raise KeyboardInterrupt
+
+        with self.assertRaises(KeyboardInterrupt):
+            ss.summarise([story(1)],
+                         models=["gemini/gemini-3.5-flash-lite"],
+                         run=quota_then_killed, sleep=lambda *_a: None,
+                         clock=FakeClock(), cooldown_path=self.path,
+                         log=lambda *_a: None)
+        with open(self.path, encoding="utf-8") as fh:
+            saved = json.load(fh)
+        self.assertEqual("quota_exhausted",
+                         saved["models"]["gemini/gemini-3.5-flash-lite"]["reason"])
 
 
 if __name__ == "__main__":

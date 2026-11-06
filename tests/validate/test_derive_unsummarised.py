@@ -173,7 +173,7 @@ class DerivedStorySurvivesTheValidator(unittest.TestCase):
                  category="nepal", published=FRESH),
         ], now=NOW)
         story = stories[0]
-        self.assertEqual(story["summary"], "")
+        self.assertEqual(dut.NO_SUMMARY_TEXT, story["summary"])
         self.assertNotIn("for_you", story)
         self.assertEqual(story["supporting_sources"], [])
         self.assertIsNone(story["personal_relevance"])
@@ -186,8 +186,9 @@ class TheFloorCarriesText(unittest.TestCase):
     """C8: an all-models-fail day must ship more than a headline.
 
     The text is QUOTED, never written: it is the feed's own description, so the
-    edition is still honestly labelled unsummarised. Every rule below returns ""
-    (the old bare-headline behaviour) rather than a weaker or invented string.
+    edition is still honestly labelled unsummarised. Every rule below refuses a
+    weaker or invented string and leaves the honest `NO_SUMMARY_TEXT` body --
+    RUN 42144852087: an empty body rendered as a headline over a blank line.
     """
 
     DESCRIPTION = ("The ministry said the new schedule starts next month and "
@@ -210,7 +211,7 @@ class TheFloorCarriesText(unittest.TestCase):
             cand(long_title("stub"), "https://kathmandupost.com/s",
                  category="nepal", snippet="Read more."),
         ], now=NOW)
-        self.assertEqual("", stories[0]["summary"])
+        self.assertEqual(dut.NO_SUMMARY_TEXT, stories[0]["summary"])
 
     def test_a_description_that_repeats_the_headline_is_dropped(self):
         title = long_title("repeat")
@@ -218,7 +219,7 @@ class TheFloorCarriesText(unittest.TestCase):
             cand(title, "https://kathmandupost.com/r", category="nepal",
                  snippet=title),
         ], now=NOW)
-        self.assertEqual("", stories[0]["summary"],
+        self.assertEqual(dut.NO_SUMMARY_TEXT, stories[0]["summary"],
                          "a repeat of the headline adds nothing to a headline")
 
     def test_a_description_that_is_a_headline_paraphrase_is_dropped(self):
@@ -234,7 +235,7 @@ class TheFloorCarriesText(unittest.TestCase):
                          "Dangers in My Heart has revealed an April 2027 "
                          "premiere window."),
         ], now=NOW)
-        self.assertEqual("", stories[0]["summary"],
+        self.assertEqual(dut.NO_SUMMARY_TEXT, stories[0]["summary"],
                          "a paraphrase of the headline adds nothing a headline "
                          "does not already say")
 
@@ -261,8 +262,50 @@ class TheFloorCarriesText(unittest.TestCase):
                  snippet="A report mentioning %s in passing, at length."
                          % keyword.upper()),
         ], now=NOW)
-        self.assertEqual("", stories[0]["summary"])
+        self.assertEqual(dut.NO_SUMMARY_TEXT, stories[0]["summary"])
         self.assertEqual(1, len(stories), "the story itself must survive")
+
+
+class NoCardIsEverBlank(unittest.TestCase):
+    """RUN 42144852087: eleven cards shipped as headline, blank line, `Link:`.
+
+    The repair path already refused to write an empty body; the deriver's own
+    `none` output did not, and the email faithfully rendered the hole.
+    """
+
+    def test_a_story_with_no_publisher_text_carries_an_honest_body(self):
+        stories, _, _ = dut.derive([
+            cand(long_title("bare"), "https://kathmandupost.com/b",
+                 category="nepal", published=FRESH),
+        ], now=NOW)
+        story = stories[0]
+        self.assertEqual(dut.NO_SUMMARY_TEXT, story["summary"])
+        self.assertEqual("none", story["summary_source"],
+                         "the fallback sentence is not the publisher's text")
+        ok, reason = vs.validate_story(story, 0)
+        self.assertTrue(ok, "a fallback body must still validate: %s" % reason)
+
+    def test_the_payload_never_writes_an_empty_body(self):
+        tmp = tempfile.mkdtemp(prefix="derive_blank_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        path = os.path.join(tmp, "candidates.json")
+        out = os.path.join(tmp, "stories.json")
+        candidates = [cand(DISTINCT[n], "https://a.example/%d" % n,
+                           category=("world_major" if n < 3 else "local_city"))
+                      for n in range(5)]
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"candidates": candidates}, fh)
+        rc = dut.main(["--candidates", path, "--out", out,
+                       "--today", "2026-10-28", "--slot", "morning",
+                       "--attempts", os.path.join(tmp, "attempts.log")])
+        self.assertEqual(0, rc)
+        with open(out, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        for story in payload["stories"]:
+            self.assertTrue(str(story["summary"]).strip(),
+                            "blank card: %r" % story.get("title"))
+        self.assertEqual(0, payload["summary_counts"]["summarised"],
+                         "nothing here was written by a model or a publisher")
 
 
 class FloorAndPayload(unittest.TestCase):
@@ -308,7 +351,7 @@ class FloorAndPayload(unittest.TestCase):
         self.assertEqual(payload["digest_time"], "morning")
         self.assertEqual(len(payload["stories"]), 5)
         for story in payload["stories"]:
-            self.assertEqual(story["summary"], "")
+            self.assertEqual(dut.NO_SUMMARY_TEXT, story["summary"])
             self.assertNotIn("for_you", story)
 
     def test_payload_names_the_deriver_as_the_writer(self):
@@ -718,9 +761,9 @@ class SummarisedFallback(unittest.TestCase):
         payload = self.payload_of(self.result(2))
         sources = [story.get("summary_source") for story in payload["stories"]]
         self.assertEqual(2, sources.count("ai"))
-        self.assertEqual(3, sources.count("publisher"),
+        self.assertEqual(3, sources.count("none"),
                          "the validator subtracts a dropped story by this mark, "
-                         "so every story has to carry one")
+                         "and a fallback body is not the publisher's text")
 
     def test_a_fully_summarised_edition_does_not_describe_a_remainder(self):
         payload = self.payload_of(self.result(5))
@@ -751,9 +794,9 @@ class SummarisedFallback(unittest.TestCase):
         payload = self.payload_of(self.result(2))
         self.assertEqual(5, len(payload["stories"]),
                          "a partial answer must not shrink the edition")
-        self.assertEqual("", payload["stories"][4]["summary"],
-                         "the unsummarised story keeps what the deriver wrote")
-
+        self.assertEqual(dut.NO_SUMMARY_TEXT,
+                         payload["stories"][4]["summary"],
+                         "the unsummarised story keeps a body the page can draw")
 
     def test_a_failed_batch_leaves_a_debug_record_beside_the_edition(self):
         debug = [{"model": "gemini/gemini-3.5-flash-lite",
