@@ -137,7 +137,8 @@ class RequestShapeTests(unittest.TestCase):
     def test_no_credential_appears_in_the_url_or_any_other_header(self):
         spec = lp.request_spec("groq", None, "hello", "secret-value", timeout=30)
         self.assertNotIn("secret-value", spec["url"])
-        self.assertEqual(["Accept", "Authorization", "Content-Type"],
+        self.assertEqual(["Accept", "Authorization", "Content-Type",
+                          "User-Agent"],
                          sorted(spec["headers"]))
         self.assertTrue(spec["headers"]["Authorization"].endswith("secret-value"))
 
@@ -179,6 +180,87 @@ class MissingKeyTests(unittest.TestCase):
                 lp.ordered_ladder(list(CONFIG_LADDER)),
                 "with no provider keys the ladder must be the seeds that need "
                 "none, so a repository without the secrets behaves as before")
+
+
+class _FakeResponse:
+    """Enough of an http.client response for `_http` to read."""
+
+    status = 200
+    will_close = False
+
+    def __init__(self, body=b'{"ok":1}'):
+        self._body = body
+
+    def read(self):
+        return self._body
+
+
+class _FakeConnection:
+    """Records requests instead of opening a socket."""
+
+    def __init__(self):
+        self.requests = []
+        self.closed = 0
+
+    def request(self, method, path, body=None, headers=None):
+        self.requests.append({"method": method, "path": path,
+                              "body": body, "headers": dict(headers or {})})
+
+    def getresponse(self):
+        return _FakeResponse()
+
+    def close(self):
+        self.closed += 1
+
+
+class ProjectIdentityTests(unittest.TestCase):
+    """Who we are on the wire, and one connection per origin.
+
+    MEASURED 2026-11-06: the adapter sent urllib's default `Python-urllib/3.x`
+    User-Agent, which is a standard bot-management trigger, and opened a fresh
+    socket for the catalogue read and then the chat call.
+    """
+
+    def test_every_request_carries_the_project_user_agent(self):
+        spec = lp.request_spec("groq", None, "p", "k", timeout=30)
+        self.assertEqual(lp.USER_AGENT, spec["headers"]["User-Agent"])
+        self.assertIn("dmnews-digest/1.0", lp.USER_AGENT)
+        self.assertIn("looping-forever/daily-media-news", lp.USER_AGENT)
+        self.assertNotIn("Mozilla", lp.USER_AGENT,
+                         "never a spoofed browser string")
+
+    def test_the_catalogue_request_carries_it_too(self):
+        seen, calls = transport_returning(200, '{"data":[]}')
+        lp.list_models("groq", transport=seen, environ=KEYS)
+        self.assertEqual(lp.USER_AGENT, calls[0]["headers"]["User-Agent"])
+
+    def test_one_connection_is_reused_instead_of_renegotiated(self):
+        made = []
+        conn = _FakeConnection()
+
+        def factory(host, port=None, timeout=None):
+            made.append((host, port, timeout))
+            return conn
+
+        lp._SESSIONS.clear()
+        self.addCleanup(lp._SESSIONS.clear)
+        first = {"url": "https://api.groq.com/openai/v1/models",
+                 "method": "GET", "timeout": 30,
+                 "headers": {"User-Agent": lp.USER_AGENT}}
+        second = {"url": "https://api.groq.com/openai/v1/chat/completions",
+                  "method": "POST", "body": "{}", "timeout": 30,
+                  "headers": {"User-Agent": lp.USER_AGENT}}
+        with mock.patch.object(lp.http_client, "HTTPSConnection", factory):
+            self.assertEqual((200, '{"ok":1}'), lp._http(first))
+            self.assertEqual((200, '{"ok":1}'), lp._http(second))
+        self.assertEqual(1, len(made),
+                         "a second call renegotiated TLS: %r" % (made,))
+        self.assertEqual(["GET", "POST"],
+                         [r["method"] for r in conn.requests])
+        self.assertEqual("/openai/v1/chat/completions",
+                         conn.requests[1]["path"])
+        self.assertIs(lp._session("https://api.groq.com/x", 30),
+                      lp._session("https://api.groq.com/y", 30))
 
 
 class StatusMappingTests(unittest.TestCase):
@@ -225,6 +307,127 @@ class StatusMappingTests(unittest.TestCase):
         with keys():
             got = lp.call("groq", "p", transport=send)
         self.assertEqual("model_not_found", got.reason)
+
+
+class BlockedEdgeTests(unittest.TestCase):
+    """A 403 is two different facts, and only the BODY says which.
+
+    MEASURED 2026-11-06 (probe run 42231449075): Groq answered 403 in 28 ms with
+    `models=0` for a key the console showed as never used. The same endpoint
+    returned the same JSON to an ANONYMOUS request from another network, under
+    three different User-Agents, so the credential was never examined at all.
+    """
+
+    CF_HTML = (
+        "<!DOCTYPE html><html><head><title>Attention Required! | "
+        "Cloudflare</title></head><body>Sorry, you have been blocked."
+        "<span>error code: 1010</span></body></html>")
+    POLICY_JSON = ('{"error":{"message":"Access denied. Please check your '
+                   'network settings."}}')
+    AUTH_JSON = ('{"error":{"code":"invalid_api_key","message":'
+                 '"Invalid API Key"}}')
+
+    def test_a_cloudflare_html_403_is_blocked_not_auth(self):
+        send, _ = transport_returning(403, self.CF_HTML)
+        with keys():
+            got = lp.call("groq", "p", transport=send)
+        self.assertEqual("blocked", got.reason)
+        self.assertEqual("cloudflare", got.block)
+        self.assertEqual(403, got.status)
+
+    def test_a_policy_json_403_is_blocked_and_blames_the_address(self):
+        send, _ = transport_returning(403, self.POLICY_JSON)
+        with keys():
+            got = lp.call("groq", "p", transport=send)
+        self.assertEqual("blocked", got.reason)
+        self.assertEqual("provider", got.block)
+
+    def test_a_provider_policy_403_reads_as_a_provider_block_not_a_runner_fault(self):
+        # The exact Groq body measured 2026-11-06. The old cause vocabulary had
+        # no blocked arm, so refusal_cause fell through to `runner_fault` and the
+        # edition note blamed our runner for the provider's network decision.
+        send, _ = transport_returning(403, self.POLICY_JSON)
+        with keys():
+            with self.assertRaises(lp.ProviderError) as caught:
+                lp.text_for("groq/llama-3.3-70b-versatile", "p",
+                            transport=send)
+        cause = ss.refusal_cause(caught.exception.kind, str(caught.exception))
+        self.assertEqual("provider_blocked", cause)
+        self.assertIn(cause, ss.CAUSE_ORDER)
+
+    def test_a_key_naming_403_still_resolves_to_auth(self):
+        send, _ = transport_returning(403, self.AUTH_JSON)
+        with keys():
+            with self.assertRaises(lp.ProviderError) as caught:
+                lp.text_for("groq/llama-3.3-70b-versatile", "p",
+                            transport=send)
+        self.assertEqual("auth", caught.exception.kind)
+        self.assertEqual("provider_refusal",
+                         ss.refusal_cause(caught.exception.kind,
+                                          str(caught.exception)))
+        # The same decision from TEXT alone: key wording outranks "Access denied".
+        self.assertEqual("provider_refusal",
+                         ss.refusal_cause("", "Access denied: invalid api key"))
+
+    def test_no_blocked_cause_ever_cools_a_rung(self):
+        cause = ss.refusal_cause("blocked", self.POLICY_JSON)
+        self.assertEqual("provider_blocked", cause)
+        self.assertNotIn(cause, ss.DEMOTING_KINDS)
+        self.assertNotIn(cause, ss.QUOTA_KINDS)
+        cool = {}
+        self.assertIsNone(ss.record_refusal(
+            cool, "groq/llama-3.3-70b-versatile", cause))
+        self.assertEqual({}, cool)
+        # The CLI rung states the same fact in text, with no `kind` to say so.
+        text_cause = ss.refusal_cause(
+            "refused", "groq/x: HTTP 403 blocked at the edge: Access denied")
+        self.assertEqual(cause, text_cause)
+        self.assertIsNone(ss.record_refusal(cool, "groq/x", text_cause))
+        self.assertEqual({}, cool)
+
+    def test_a_json_403_that_names_the_key_stays_auth(self):
+        send, _ = transport_returning(403, self.AUTH_JSON)
+        with keys():
+            got = lp.call("groq", "p", transport=send)
+        self.assertEqual("auth", got.reason)
+        self.assertEqual("", got.block)
+
+    def test_a_blocked_call_cools_nothing(self):
+        cool = {}
+        self.assertIsNone(ss.record_refusal(
+            cool, "groq/llama-3.3-70b-versatile", "blocked"))
+        self.assertEqual({}, cool)
+        self.assertNotIn("blocked", ss.DEMOTING_KINDS)
+        self.assertNotIn("blocked", ss.QUOTA_KINDS)
+
+    def test_the_text_classifier_lets_the_stated_cause_outweigh_the_number(self):
+        line = ("groq/llama-3.3-70b-versatile: HTTP 403 "
+                "blocked at the edge: Access denied")
+        self.assertEqual("blocked", model_selector.classify_failure(line, 1))
+        self.assertIn("blocked", model_selector.FAILURE_CLASSES)
+        self.assertEqual("auth",
+                         model_selector.classify_failure("HTTP 403 Forbidden", 1),
+                         "a bare numeric 403 with no stated cause is unchanged")
+
+    def test_the_probe_prints_blocked_and_names_the_edge(self):
+        send, _ = router(catalogues={"groq": ["llama-3.3-70b-versatile"]},
+                         chat=(403, self.CF_HTML))
+        rows = lp.probe_rows(transport=send, environ=KEYS_BOTH)
+        groq_row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertIn("verdict=blocked", groq_row)
+        note = [r for r in rows if "groq note:" in r][0]
+        self.assertIn("Cloudflare", note)
+        self.assertIn("error code: 1010", note,
+                      "the body must travel with the verdict: %r" % note)
+        self.assertNotIn("REFUSED the key", note)
+
+    def test_the_probe_says_a_provider_policy_is_not_fixable_here(self):
+        send, _ = router(catalogues={"groq": ["llama-3.3-70b-versatile"]},
+                         chat=(403, self.POLICY_JSON))
+        rows = lp.probe_rows(transport=send, environ=KEYS_BOTH)
+        note = [r for r in rows if "groq note:" in r][0]
+        self.assertIn("NOT fixable in this repository", note)
+        self.assertIn("regenerating the secret changes nothing", note)
 
 
 class PaidOpenRouterGuardTests(unittest.TestCase):
@@ -585,12 +788,11 @@ class ProbeFindingTests(unittest.TestCase):
         self.assertIn("llama-3.3-70b-versatile", note,
                       "the owner must see WHICH id was refused -- got %r" % note)
 
-    def test_a_refused_key_points_at_scope_and_account(self):
-        # Probe 42049082917: Groq answered 403 in 26 ms to a key regenerated
-        # minutes earlier. "Regenerate it" was advice ALREADY TAKEN, so the note
-        # must send the owner to the two things that were not tried.
+    def test_a_genuine_401_points_at_scope_and_account(self):
+        # Probe 42049082917: a refused KEY is about scope and account state, not
+        # about regenerating a secret the owner had already regenerated.
         rows = lp.probe_rows(transport=self._send(
-            403, '{"error":{"message":"forbidden"}}'), environ=KEYS)
+            401, '{"error":{"message":"invalid api key"}}'), environ=KEYS)
         row = [r for r in rows if r.startswith("groq | ")][0]
         self.assertTrue(row.endswith("verdict=auth"),
                         "the row shape stays pinned -- got %r" % row)
@@ -600,6 +802,22 @@ class ProbeFindingTests(unittest.TestCase):
         self.assertIn("account", note)
         self.assertNotIn("regenerat", note,
                          "the owner already regenerated it -- got %r" % note)
+
+    def test_a_blocked_edge_does_not_blame_the_key(self):
+        # Probe 42231449075: Groq answered 403 in 28 ms with `models=0` to a key
+        # the console showed as NEVER USED. This note used to send the owner to
+        # scope/account, which is advice about a credential the edge had not
+        # read; the same JSON comes back with no credential at all.
+        rows = lp.probe_rows(transport=self._send(
+            403, '{"error":{"message":"Access denied. Please check your network '
+                 'settings."}}'), environ=KEYS)
+        row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertTrue(row.endswith("verdict=blocked"),
+                        "the row shape stays pinned -- got %r" % row)
+        note = [r for r in rows if r.strip().startswith("groq note:")][0]
+        self.assertIn("IP/egress policy", note)
+        self.assertNotIn("REFUSED the key", note)
+        self.assertNotIn("scope", note)
 
     def test_a_429_is_retried_once_then_recorded(self):
         slept = []

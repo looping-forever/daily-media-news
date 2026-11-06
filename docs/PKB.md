@@ -2380,9 +2380,18 @@ exhausted — losing telemetry must not fail the job — but warns by name (`:24
   (`scripts/derive_unsummarised.py:81`); when it is spent the edition is
   derived, and the repair pass then carries the summaries. The shared
   `opencode/*` pool answers `payment_required`.
-- **Groq's key is present and refused with HTTP 403** — the secret is not
-  missing; the provider rejected its scope or the account's state
-  (`scripts/llm_providers.py:817-827`).
+- **Groq refuses the ADDRESS, not the key (2026-11-06).** `provider-probe` run
+  `42231449075` answered `status=403 | models=0 | ms=28`, and the same `/models`
+  endpoint returned the identical JSON
+  `{"error":{"message":"Access denied. Please check your network settings."}}`
+  from another network with three different User-Agents — including no explicit
+  one at all, and with **no credential sent**. A refused key cannot produce that
+  answer to an anonymous request, so this is an IP/egress policy at the provider
+  edge (`scripts/llm_providers.py`, `classify_403`): it is `blocked`, never
+  `auth`, and it cools nothing. The probe prints which edge refused the call —
+  `cloudflare` means the HTML bot check and is our request shape to fix;
+  `provider` means their address policy, which no code here can lift. The
+  console key stays valid and unused: **do not re-mint it**.
 - **Mistral answers HTTP 429** — capacity, not a wrong id
   (`scripts/llm_providers.py:61-64,839-841`).
 - **OpenRouter free ids are the working fallback**, seeded with

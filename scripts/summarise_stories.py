@@ -124,6 +124,19 @@ REFUSAL_PATTERNS = (
     "quota exceeded",
     "free usage limit",
     "too many requests",
+    # The provider's edge refused the CLIENT. Measured 2026-11-06: Groq returned
+    # this sentence to a request carrying no credential at all.
+    "blocked at the edge",
+    "access denied",
+)
+
+#: Wording that names the CREDENTIAL. It outranks the block words above: a body
+#: that says "invalid api key" is an auth fact, whatever else it also says.
+KEY_ERROR_MARKERS = (
+    "invalid api key",
+    "invalid_api_key",
+    "incorrect api key",
+    "authentication failed",
 )
 
 PROMPT = (
@@ -252,7 +265,20 @@ def estimate_tokens(text):
 def is_refusal(text):
     """True when *text* is a spent allowance rather than a broken request."""
     low = (text or "").lower()
+    if "access denied" in low and any(m in low for m in KEY_ERROR_MARKERS):
+        # "Access denied: invalid api key" names the KEY; it is not an allowance
+        # that a wait could restore, and before the block words were added it
+        # correctly earned no wait.
+        return False
     return any(pattern in low for pattern in REFUSAL_PATTERNS)
+
+
+def is_blocked(text):
+    """True when *text* says the provider's EDGE refused this network."""
+    low = (text or "").lower()
+    if any(pattern in low for pattern in KEY_ERROR_MARKERS):
+        return False
+    return "blocked at the edge" in low or "access denied" in low
 
 
 def retry_hint_seconds(text):
@@ -785,8 +811,8 @@ class Pacer:
 #: 41995372308 its edition, so it outranks the rest: a provider refusal, a model
 #: that never answered, and a runner that broke all explain themselves, while an
 #: unreadable answer silently looks like "no summary available".
-CAUSE_ORDER = ("unreadable_reply", "provider_refusal", "model_timeout",
-               "runner_fault")
+CAUSE_ORDER = ("unreadable_reply", "provider_refusal", "provider_blocked",
+               "model_timeout", "runner_fault")
 
 
 def dominant_cause(causes):
@@ -811,6 +837,14 @@ def refusal_cause(kind, message):
         # None of them is the parser's fault, and the page says "provider
         # refusal" for each. Named here rather than folded into the text
         # heuristic because a 401 carries no "quota" word at all.
+        return "provider_refusal"
+    if kind == "blocked" or is_blocked(message):
+        # The edge refused this NETWORK, not this rung: the request never
+        # reached a credential check (Groq's 403 body is identical with no key
+        # at all). Reading it as runner_fault blamed our runner for a provider
+        # decision, so it gets its own cause.
+        return "provider_blocked"
+    if any(marker in (message or "").lower() for marker in KEY_ERROR_MARKERS):
         return "provider_refusal"
     if is_refusal(message):
         return "provider_refusal"
@@ -976,7 +1010,15 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     continue
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
-                causes.add(refusal_cause(kind, str(exc)))
+                cause = refusal_cause(kind, str(exc))
+                causes.add(cause)
+                if cause == "provider_blocked":
+                    # A block on this network is not a fact about this rung:
+                    # cooling it would punish a healthy key for the provider's
+                    # decision, and a wait cannot lift an IP policy.
+                    log("  batch %d/%d: %s was blocked at the edge; trying the "
+                        "next model" % (index, len(plan), model))
+                    continue
                 if record(model, kind):
                     log("  batch %d/%d: %s produced nothing (%s); recorded for "
                         "the ladder memory" % (index, len(plan), model, kind))
@@ -1024,8 +1066,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     note(model, getattr(again, "raw", "") or str(again),
                          getattr(again, "kind", "") or "refused", retry_timeout,
                          exit_code=getattr(again, "exit_code", None))
-                    causes.add(refusal_cause(
-                        getattr(again, "kind", "") or "refused", str(again)))
+                    again_cause = refusal_cause(
+                        getattr(again, "kind", "") or "refused", str(again))
+                    causes.add(again_cause)
+                    if again_cause == "provider_blocked":
+                        continue
                     if record(model, getattr(again, "kind", "") or "refused"):
                         log("  batch %d/%d: %s produced nothing after the wait; "
                             "recorded for the ladder memory"

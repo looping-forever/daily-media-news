@@ -2183,6 +2183,26 @@ def ai_classify(pending_path, runner=None, models=None,
             # and stop.
             failure = model_selector.classify_failure(
                 "%s\n%s" % (out or "", err or ""), rc)
+            if failure == "blocked":
+                # THE EDGE REFUSED THE CLIENT, SO NOTHING WAS LEARNED ABOUT THE
+                # MODEL OR THE KEY. Measured 2026-11-06: Groq answered 403 in
+                # 28 ms with `models=0` to a key the console showed as never
+                # used, and the same JSON comes back to a request with no
+                # credential at all. Cooling the rung for six hours would
+                # punish a healthy key for someone else's address policy, so
+                # the attempt is recorded and the walk moves on.
+                errors.append("%s: blocked -- the request was refused at the "
+                              "edge (HTTP 403) before any credential check; the "
+                              "key is NOT cooled" % model)
+                _emit_attempt(on_attempt, model, attempt, timeout, wall_sec,
+                              "blocked", out, err,
+                              first_byte_sec=_runner_first_byte(runner),
+                              first_liveness_sec=_runner_first_liveness(runner))
+                print("ai_classify: %s -> blocked. The request was refused at "
+                      "the provider's edge before the key was examined, so this "
+                      "is an address/policy decision, not a bad credential; no "
+                      "cooldown written, trying the next rung." % model)
+                break
             if failure == "model_not_found":
                 # A DEAD ID IS A FACT ABOUT THE ID, NOT THE PROVIDER. Before
                 # this arm it fell through to the unparseable tail and was

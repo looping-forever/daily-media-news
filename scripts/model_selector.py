@@ -1304,6 +1304,11 @@ def inter_token_sec_for(model_id=None):
 #: process died.
 WATCHDOG_MARKER = "__WATCHDOG_NO_OUTPUT__"
 
+#: The sentence `llm_providers.cli_result` writes for a `blocked` call. The same
+#: line carries the numeric 403, so classification needs this marker to keep the
+#: status from outvoting the stated cause.
+BLOCKED_MARKER = "blocked at the edge"
+
 #: Every failed attempt maps to exactly one of these. The set is closed: a new
 #: class is a deliberate change, not a fallback string.
 FAILURE_CLASSES = (
@@ -1311,6 +1316,7 @@ FAILURE_CLASSES = (
     "payment_required",
     "quota_or_rate_limited",
     "auth",
+    "blocked",
     "provider_outage",
     "slow_or_stalled",
     "other",
@@ -1374,25 +1380,33 @@ def classify_failure(text, returncode=0):
          reports a missing model as `UnknownError: Unexpected server error`
          (~3s), which is the same text a real 5xx produces, so UnknownError
          alone must never be read as "this model is gone";
-      2. auth -- 401/403 and its wording. Terminal for the whole walk: retrying
+      2. blocked -- the edge refused the CLIENT, and `llm_providers` says so in
+         the line it writes ("blocked at the edge"). BEFORE auth on purpose: that
+         line also carries the numeric 403, and a numeric status must not
+         outweigh a sentence that states the credential was never examined;
+      3. auth -- 401/403 and its wording. Terminal for the whole walk: retrying
          another model with a bad credential only wastes the budget and hides
          the cause;
-      3. payment_required -- 402, or the plan saying "subscribe to OpenCode
+      4. payment_required -- 402, or the plan saying "subscribe to OpenCode
           Go". BEFORE quota on purpose: that refusal sentence also carries
-          "usage limit", and reading it as throttle walks the whole ladder to
+         "usage limit", and reading it as throttle walks the whole ladder to
          hear the same refusal from every rung;
-      4. quota_or_rate_limited -- 429/quota/Retry-After;
-      5. slow_or_stalled -- the watchdog marker, or rc 124 (what `timeout`
-          reports for its own kill);
-      6. provider_outage -- 5xx and `UnknownError` with NO not-found marker;
-      7. other -- everything else, including an exit 1 with no output.
+      5. quota_or_rate_limited -- 429/quota/Retry-After;
+      6. slow_or_stalled -- the watchdog marker, or rc 124 (what `timeout`
+         reports for its own kill);
+      7. provider_outage -- 5xx and `UnknownError` with NO not-found marker;
+      8. other -- everything else, including an exit 1 with no output.
     """
     low = (text or "").lower()
 
     if any(m in low for m in _NOT_FOUND_MARKERS):
         return "model_not_found"
 
+    if BLOCKED_MARKER.lower() in low:
+        return "blocked"
+
     codes = {int(c) for c in _HTTP_RE.findall(low)}
+
     if codes & {401, 403} or any(m in low for m in _AUTH_MARKERS):
         return "auth"
     if codes & {402} or any(m in low for m in _PAYMENT_MARKERS):

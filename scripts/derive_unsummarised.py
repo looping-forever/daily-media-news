@@ -100,13 +100,14 @@ REASON_TEXT = {
 #: summarise_stories' own cause names, most actionable first. They are the
 #: answer to "why did these stories get no summary" from the component that
 #: asked the models, so they outrank the walk's attempt log whenever they exist.
-CAUSE_ORDER = ("unreadable_reply", "provider_refusal", "model_timeout",
-               "runner_fault")
+CAUSE_ORDER = ("unreadable_reply", "provider_refusal", "provider_blocked",
+               "model_timeout", "runner_fault")
 
 #: How each cause is named to a reader, and which reason it maps to.
 CAUSE_PHRASE = {
     "unreadable_reply": "an unreadable reply",
     "provider_refusal": "a quota refusal",
+    "provider_blocked": "a block on this network by the provider",
     "model_timeout": "a timeout",
     "runner_fault": "a crashed model runner",
 }
@@ -114,6 +115,7 @@ CAUSE_PHRASE = {
 CAUSE_REASON = {
     "unreadable_reply": REASON_PARSE,
     "provider_refusal": REASON_QUOTA,
+    "provider_blocked": REASON_ALL_FAILED,
     "model_timeout": REASON_TIMEOUT,
     "runner_fault": REASON_ALL_FAILED,
 }

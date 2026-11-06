@@ -226,6 +226,42 @@ class Refusals(unittest.TestCase):
         self.assertEqual([], clock.slept)
         self.assertEqual(1, len(out["summaries"]))
 
+    def test_an_access_denied_key_error_does_not_earn_a_wait(self):
+        clock = FakeClock()
+        batch = [story(1)]
+        run = FakeRun([
+            ss.Refusal("groq/a: auth (HTTP 403) -- Access denied: invalid api key",
+                       kind="auth"),
+            reply_for(batch),
+        ])
+        out = ss.summarise(batch, models=["groq/a", "groq/b"], run=run,
+                           sleep=clock.sleep, clock=clock, log=lambda *a: None)
+        self.assertEqual([], clock.slept,
+                         "a key error is not an allowance a wait can restore")
+        self.assertEqual("provider_refusal", ss.refusal_cause(
+            "auth", "Access denied: invalid api key"))
+        self.assertEqual(1, len(out["summaries"]))
+
+    def test_a_blocked_edge_does_not_cool_the_rung_or_wait(self):
+        clock = FakeClock()
+        batch = [story(1)]
+        cool = {}
+        run = FakeRun([
+            ss.Refusal("groq/a: blocked (HTTP 403) -- Access denied. Please "
+                       "check your network settings.", kind="blocked"),
+            reply_for(batch),
+        ])
+        out = ss.summarise(batch, models=["groq/a", "groq/b"], run=run,
+                           sleep=clock.sleep, clock=clock, cooldown=cool,
+                           log=lambda *a: None)
+        self.assertEqual([], clock.slept,
+                         "no wait can lift a provider's IP policy")
+        self.assertEqual({}, cool,
+                         "the provider blocked the network, not this rung")
+        self.assertEqual(1, len(out["summaries"]))
+        self.assertEqual("provider_blocked", ss.refusal_cause(
+            "blocked", "Access denied. Please check your network settings."))
+
 
 class NeverInvent(unittest.TestCase):
     def test_a_url_outside_the_batch_is_dropped(self):

@@ -21,7 +21,9 @@ still owns health memory, cooldowns and failure classification; this module only
 turns (provider, prompt) into either text or ONE reason word from the existing
 vocabulary (`quota_notice`, `timeout`, `transport`, `auth`, `garbage`,
 `model_not_found`, plus `not_configured`, which the probe reports and the
-ladders filter out before a call is ever attempted).
+ladders filter out before a call is ever attempted). `blocked` is the one word
+added here: a 403 whose body shows the request was refused at an EDGE, so the
+credential was never judged and must not be cooled as if it had been.
 
 NO KEY IS EVER LOGGED, PRINTED OR WRITTEN. Each credential is read from the
 environment AT CALL TIME into a local, put in one request header, and dropped
@@ -50,8 +52,15 @@ import re
 import socket
 import time
 import urllib.error
-import urllib.request
+import urllib.parse
 from dataclasses import dataclass, field
+from http import client as http_client
+
+#: ONE honest identity on every outbound request. The library default
+#: (`Python-urllib/3.x`) is a known bot-management trigger, and a spoofed browser
+#: string is never acceptable: this says who is calling and where to complain.
+USER_AGENT = ("dmnews-digest/1.0 "
+              "(+https://github.com/looping-forever/daily-media-news)")
 
 #: One sentence's worth of answer is well under this. Named rather than inlined
 #: because the summariser needs ~6 summaries per request and the classifier one
@@ -185,10 +194,15 @@ PROVIDERS = {
 #: credit balance, and a spent balance arrives as 429 or 401 -- reading it as
 #: `quota_notice` keeps the walk moving to the next provider rather than
 #: treating a billing state as a broken request.
+#:
+#: 403 IS NOT IN THIS TABLE ON PURPOSE. A 403 has two meanings that look nothing
+#: alike in the body: the provider refusing the credential (JSON `error`), and an
+#: edge refusing the CLIENT before the credential is read (HTML with an error
+#: code, or a JSON network-policy sentence). Only the body can tell them apart,
+#: so 403 goes through `classify_403()`.
 STATUS_REASON = {
     400: "bad_request",
     401: "auth",
-    403: "auth",
     404: "model_not_found",
     408: "timeout",
     429: "quota_notice",
@@ -215,6 +229,7 @@ ANSWER_FIELDS = (
 
 REASON_TEXT = {
     "auth": "key refused",
+    "blocked": "blocked at the edge",
     "quota_notice": "quota refused",
     "timeout": "no answer in time",
     "transport": "transport failed",
@@ -229,8 +244,11 @@ REASON_TEXT = {
 #: a second vocabulary. `garbage` is reported as `network`: a 200 with no usable
 #: answer is a transport-shaped failure for an operator reading the table.
 #: `empty_answer` is NOT `network`: the provider answered, and said nothing.
+#: `blocked` is its own verdict because it is neither the key nor the model: the
+#: request never reached a credential check.
 PROBE_VERDICT = {
     "auth": "auth",
+    "blocked": "blocked",
     "quota_notice": "quota",
     "model_not_found": "model_not_found",
     "timeout": "timeout",
@@ -284,7 +302,12 @@ class ProviderError(Exception):
 
 @dataclass
 class ProviderResult:
-    """One call, described. `ok` is the only field a caller must branch on."""
+    """One call, described. `ok` is the only field a caller must branch on.
+
+    `block` names WHICH edge refused a `blocked` call: `cloudflare` (an HTML bot
+    check, our request shape to fix) or `provider` (an IP/policy decision on
+    their side, which no code here can lift).
+    """
 
     ok: bool
     text: str = ""
@@ -294,6 +317,7 @@ class ProviderResult:
     reason: str = ""
     detail: str = ""
     field: str = ""
+    block: str = ""
 
 
 @dataclass
@@ -409,9 +433,40 @@ def request_spec(name, model_id, prompt, key, timeout=None, max_tokens=MAX_TOKEN
             "Authorization": "Bearer %s" % key,
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": USER_AGENT,
         },
         "body": json.dumps(body),
     }
+
+
+#: One connection per (origin, timeout), kept for the life of the process. A
+#: probe asks `/models` and then the chat endpoint on the SAME origin, so this is
+#: one TLS handshake instead of two; urllib opens a fresh socket per request.
+_SESSIONS = {}
+
+
+def _session(url, timeout=None):
+    """The reusable connection for `url`'s origin. Connects on first request."""
+    parts = urllib.parse.urlsplit(url)
+    key = (parts.scheme, parts.netloc, timeout)
+    conn = _SESSIONS.get(key)
+    if conn is None:
+        factory = (http_client.HTTPSConnection if parts.scheme == "https"
+                   else http_client.HTTPConnection)
+        conn = factory(parts.hostname, parts.port, timeout=timeout)
+        _SESSIONS[key] = conn
+    return conn
+
+
+def _drop_session(url, timeout=None):
+    """Forget `url`'s connection after a fault or a server-side close."""
+    parts = urllib.parse.urlsplit(url)
+    conn = _SESSIONS.pop((parts.scheme, parts.netloc, timeout), None)
+    if conn is not None:
+        try:
+            conn.close()
+        except OSError:
+            pass
 
 
 def _http(spec):
@@ -420,25 +475,106 @@ def _http(spec):
     The socket timeout is the one in `spec`, set by `effective_timeout`, so the
     bound is enforced by the OS on the connection itself rather than by an outer
     deadline that only notices between calls.
+
+    A NON-2xx IS NOT AN EXCEPTION HERE. http.client hands back the status and the
+    body, which is what makes the 403 diagnosis possible at all: the body says
+    which edge refused the call, and urllib's HTTPError only carried it if a
+    caller remembered to read it.
     """
     data = spec.get("body")
-    req = urllib.request.Request(
-        spec["url"],
-        data=data.encode("utf-8") if data is not None else None,
-        headers=dict(spec.get("headers") or {}),
-        method=spec.get("method") or ("POST" if data is not None else "GET"),
-    )
+    body = data.encode("utf-8") if data is not None else None
+    parts = urllib.parse.urlsplit(spec["url"])
+    path = (parts.path or "/") + (("?" + parts.query) if parts.query else "")
+    timeout = spec.get("timeout")
+    conn = _session(spec["url"], timeout)
+    method = spec.get("method") or ("POST" if data is not None else "GET")
     try:
-        with urllib.request.urlopen(req, timeout=spec.get("timeout")) as resp:
-            return resp.status, resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as exc:
-        return exc.code, (exc.read() or b"").decode("utf-8", "replace")
+        conn.request(method, path, body=body,
+                     headers=dict(spec.get("headers") or {}))
+        resp = conn.getresponse()
+        payload = resp.read()
+    except (http_client.HTTPException, OSError):
+        _drop_session(spec["url"], timeout)
+        raise
+    if getattr(resp, "will_close", False):
+        _drop_session(spec["url"], timeout)
+    return int(getattr(resp, "status", 0) or 0), payload.decode("utf-8", "replace")
 
 
-def _reason_for_status(status):
+#: Cloudflare's edge block. The first marker is the documented 1010 body; the
+#: rest catch the interactive page and its headers when only the page is stored.
+_CLOUDFLARE_MARKERS = (
+    "error code: 1010",
+    "cf-error-details",
+    "attention required",
+    "cf-ray",
+    "cloudflare",
+)
+#: Codes a provider puts on a JSON 403 when the CREDENTIAL is the problem.
+_AUTH_ERROR_CODES = (
+    "invalid_api_key",
+    "invalid_api_key_error",
+    "authentication_error",
+    "unauthorized",
+    "permission_error",
+)
+#: The same fact in the provider's own sentence, for a body with no code.
+_AUTH_BODY_MARKERS = (
+    "invalid api key",
+    "invalid_api_key",
+    "incorrect api key",
+    "authentication",
+    "unauthorized",
+)
+
+
+def _looks_like_html(text):
+    head = str(text or "").lstrip()[:64].lower()
+    return head.startswith("<!doctype html") or head.startswith("<html")
+
+
+def classify_403(body):
+    """(reason, block) for a 403. The BODY decides, never the status alone.
+
+    MEASURED 2026-11-06: Groq answered 403 in 28 ms with `models=0` for a key the
+    console showed as never used, and the same 403 JSON came back from a machine
+    that sent NO credential at all -- `{"error":{"message":"Access denied. Please
+    check your network settings."}}`. A refused key cannot produce that answer to
+    an anonymous request, so 403-as-`auth` was a lie about the credential and it
+    cooled a healthy key for six hours.
+
+    `block` says whose edge refused it: `cloudflare` returns HTML with an error
+    code (our client shape, fixable here), `provider` returns JSON policy (an
+    IP/egress decision, NOT fixable here). Anything unreadable counts as
+    `provider`: the safe direction is to never punish the key for it.
+    """
+    text = str(body or "")
+    low = text.lower()
+    if _looks_like_html(text) or any(m in low for m in _CLOUDFLARE_MARKERS):
+        return "blocked", "cloudflare"
+    try:
+        doc = json.loads(text)
+    except (TypeError, ValueError):
+        return "blocked", "provider"
+    err = doc.get("error") if isinstance(doc, dict) else None
+    if isinstance(err, dict):
+        code = str(err.get("code") or err.get("type") or "").lower()
+        message = str(err.get("message") or "").lower()
+    else:
+        code = ""
+        message = str(err or "").lower()
+    if code in _AUTH_ERROR_CODES or any(m in message for m in _AUTH_BODY_MARKERS):
+        return "auth", ""
+    return "blocked", "provider"
+
+
+def _reason_for_status(status, body=""):
+    status = int(status or 0)
+    if status == 403:
+        return classify_403(body)[0]
     if status in STATUS_REASON:
         return STATUS_REASON[status]
-    if 500 <= int(status or 0) <= 599:
+    if 500 <= status <= 599:
         return "transport"
     return "bad_request"
 
@@ -585,9 +721,10 @@ def call(name, prompt, model_id=None, timeout=None, max_tokens=MAX_TOKENS,
                                   redact(_error_text(body), key)[:300], "")
         return ProviderResult(False, "", model_id, elapsed, status, "garbage",
                               redact(_error_text(body), key)[:300])
-    reason = _reason_for_status(status)
+    reason = _reason_for_status(status, body)
+    block = classify_403(body)[1] if status == 403 else ""
     return ProviderResult(False, "", model_id, elapsed, status, reason,
-                          redact(_error_text(body), key)[:300])
+                          redact(_error_text(body), key)[:300], "", block)
 
 
 def text_for(model_id, prompt, timeout=None, max_tokens=MAX_TOKENS,
@@ -671,7 +808,8 @@ def list_models(name, transport=None, environ=None):
         "method": "GET",
         "timeout": record.timeout,
         "headers": {"Authorization": "Bearer %s" % key,
-                    "Accept": "application/json"},
+                    "Accept": "application/json",
+                    "User-Agent": USER_AGENT},
         "body": None,
     }
     try:
@@ -683,7 +821,7 @@ def list_models(name, transport=None, environ=None):
     elapsed = time.monotonic() - started
     status = int(status or 0)
     if status != 200:
-        return ModelList([], status, elapsed, _reason_for_status(status))
+        return ModelList([], status, elapsed, _reason_for_status(status, body))
     try:
         doc = json.loads(body)
         rows = doc.get("data") if isinstance(doc, dict) else None
@@ -834,6 +972,30 @@ def _probe_note(got):
     summary table read, so an explanation goes on its own indented line.
     """
     verdict = got.get("verdict")
+    if verdict == "blocked":
+        # THE EDGE ANSWERED, NOT THE PROVIDER. The key was never examined, so
+        # nothing about the secret is being said here. WHICH edge decides what
+        # the owner can do: Cloudflare's HTML is our request shape; a provider's
+        # own policy JSON is an address decision no code in this repository can
+        # change, and re-minting the key would not move it.
+        if (got.get("block") or "") == "cloudflare":
+            return ("Cloudflare refused the CLIENT before the provider read the "
+                    "request (HTTP %s, HTML): the key was NOT examined. A library "
+                    "User-Agent is the usual trigger and this client now sends "
+                    "one honest identity, so re-run before changing anything "
+                    "about the key%s"
+                    % (got.get("status") or 403,
+                       (" -- body: %s" % got.get("detail"))
+                       if got.get("detail") else ""))
+        return ("the provider refused the request at its edge (HTTP %s, JSON): "
+                "an IP/egress policy decision, NOT a bad key and NOT fixable in "
+                "this repository -- the same refusal comes back to a request "
+                "with no credential at all, so regenerating the secret changes "
+                "nothing. Route the call from another address or wait for the "
+                "policy to change%s"
+                % (got.get("status") or 403,
+                   (" -- body: %s" % got.get("detail"))
+                   if got.get("detail") else ""))
     if verdict == "auth":
         # MEASURED 2026-11-05: Groq answered 403 in 26 ms to a key the owner had
         # just regenerated. "Regenerate it" was advice already taken, and it sent
@@ -912,6 +1074,8 @@ def probe(name, transport=None, environ=None, sleep=None):
         "verdict": verdict,
         "available": list(discovered.ids[:8]),
         "attempts": attempts,
+        "block": result.block,
+        "detail": result.detail,
     }
 
 
