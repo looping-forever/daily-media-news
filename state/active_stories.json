@@ -5007,7 +5007,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5017,7 +5017,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-3d56a5003f4c",
@@ -5511,7 +5511,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5521,7 +5521,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-9363ea0283b1",
@@ -5539,7 +5539,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5549,7 +5549,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-b6cb8d6d6ba3",
@@ -5567,7 +5567,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5577,7 +5577,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-53a625da3335",
@@ -5595,7 +5595,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5605,7 +5605,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-d5d27f6b19e4",
@@ -5623,7 +5623,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5633,7 +5633,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-76cac8e2d704",
@@ -5651,7 +5651,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5661,7 +5661,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-e2ee97627a49",
@@ -5679,7 +5679,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5689,7 +5689,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-d139ab154d85",
@@ -5707,7 +5707,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5717,7 +5717,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-2c6b6a6433b0",
@@ -5735,7 +5735,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5745,7 +5745,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-d6df8d528dd6",
@@ -5763,7 +5763,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5773,7 +5773,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-e4eb2187951c",
@@ -5791,7 +5791,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5801,7 +5801,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-6dddeefe7781",
@@ -5819,7 +5819,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5829,7 +5829,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-3d3f82c983e5",
@@ -5847,7 +5847,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5857,7 +5857,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-7c801a4b8f1c",
@@ -5875,7 +5875,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5885,7 +5885,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-91d0fb21b2fd",
@@ -5903,7 +5903,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5913,7 +5913,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-8f69e8f3536d",
@@ -5931,7 +5931,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5941,7 +5941,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-7961432600d2",
@@ -5959,7 +5959,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5969,7 +5969,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-2f994441deb1",
@@ -5987,7 +5987,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -5997,7 +5997,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-086bcd39777b",
@@ -6015,7 +6015,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "Lumbini Buddhist University’s faculty reclassification leaves engineering, management students worried about careers OnlineKhabar English News",
       "latest_development": "Lumbini Buddhist University’s faculty reclassification leaves engineering, management students worried about careers OnlineKhabar English News",
       "alerted": false,
@@ -6025,7 +6025,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-2c6bbd6f2d17",
@@ -6043,7 +6043,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6053,7 +6053,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T06:41:28+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-c960b7c6f500",
@@ -6071,7 +6071,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6081,7 +6081,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-899b75ca3e93",
@@ -6099,7 +6099,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6109,7 +6109,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-4be21d8c1984",
@@ -6127,7 +6127,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6137,7 +6137,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-09ac627500dd",
@@ -6155,7 +6155,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6165,7 +6165,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-0f589910985c",
@@ -6183,7 +6183,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6193,7 +6193,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-eb05bbb7b44f",
@@ -6211,7 +6211,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6221,7 +6221,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-c65ea5b4bd9f",
@@ -6239,7 +6239,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6249,7 +6249,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-2c66b4242fd9",
@@ -6267,7 +6267,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6277,7 +6277,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-adf902741800",
@@ -6295,7 +6295,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6305,7 +6305,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-ad415c41aaed",
@@ -6323,7 +6323,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6333,7 +6333,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-d3955529e259",
@@ -6351,7 +6351,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6361,7 +6361,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-67e5d02db620",
@@ -6379,7 +6379,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6389,7 +6389,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-f945b0324af0",
@@ -6407,7 +6407,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6417,7 +6417,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-bd7857b4bb18",
@@ -6435,7 +6435,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6445,7 +6445,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-7d24417452e6",
@@ -6463,7 +6463,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6473,7 +6473,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-f2459f54439d",
@@ -6491,7 +6491,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6501,7 +6501,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-382f1dbc6926",
@@ -6519,7 +6519,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6529,7 +6529,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-7a7454c1f90d",
@@ -6547,7 +6547,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6557,7 +6557,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-295e9d6b17e8",
@@ -6575,7 +6575,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6585,7 +6585,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-43e182d10a83",
@@ -6603,7 +6603,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6613,7 +6613,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-b8dd86f2245d",
@@ -6631,7 +6631,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6641,7 +6641,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-24c4ea494931",
@@ -6659,7 +6659,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6669,7 +6669,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-1e740d5257a2",
@@ -6687,7 +6687,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -6697,7 +6697,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T18:41:07+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-014cf033b708",
@@ -6715,7 +6715,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "Office of the Controller of Examinations Tribhuvan University",
       "latest_development": "Office of the Controller of Examinations Tribhuvan University",
       "alerted": false,
@@ -6725,7 +6725,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-b8974ab1745e",
@@ -6743,7 +6743,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Disclosure: Solo Soft builds Solo Router. AI assisted the wording of this tutorial. The offer details below were checked against the live offer page; the sample is not a performance benchmark. This walkthrough shows the three pieces needed…",
       "latest_development": "Disclosure: Solo Soft builds Solo Router. AI assisted the wording of this tutorial. The offer details below were checked against the live offer page; the sample is not a performance benchmark. This walkthrough shows the three pieces needed…",
       "alerted": false,
@@ -6753,7 +6753,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-d20faa2d7607",
@@ -6771,7 +6771,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "By Rokas Remeika. Published 16 October 2026. Your realtime provider is recycling long sessions on its own schedule, usually at the ten-minute mark. When the plugin reconnects, it replays the conversation so far into the new session setup…",
       "latest_development": "By Rokas Remeika. Published 16 October 2026. Your realtime provider is recycling long sessions on its own schedule, usually at the ten-minute mark. When the plugin reconnects, it replays the conversation so far into the new session setup…",
       "alerted": false,
@@ -6781,7 +6781,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-c92111310fb2",
@@ -6799,7 +6799,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "By Dean Vaugh | NumanCap Web-based financial accounts sit in an unusual security category. They are not just ordinary SaaS logins: they may contain personal information, payment details, account history, and access to actions with real…",
       "latest_development": "By Dean Vaugh | NumanCap Web-based financial accounts sit in an unusual security category. They are not just ordinary SaaS logins: they may contain personal information, payment details, account history, and access to actions with real…",
       "alerted": false,
@@ -6809,7 +6809,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-ad91ee5d3bdb",
@@ -6827,7 +6827,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: Persistent rain throughout Friday in Kathmandu has cast doubt over Saturday’s two Nepal Premier League (NPL) fixtures, with forecasters predicting further light showers through the evening. Lumbini Lions are scheduled to face…",
       "latest_development": "KATHMANDU: Persistent rain throughout Friday in Kathmandu has cast doubt over Saturday’s two Nepal Premier League (NPL) fixtures, with forecasters predicting further light showers through the evening. Lumbini Lions are scheduled to face…",
       "alerted": false,
@@ -6837,7 +6837,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-c3a34df16275",
@@ -6855,7 +6855,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: Police have arrested Bishwa Mani Subedi, a journalist with Nepal Press, from his office in New Baneshwar, Kathmandu, for questioning over a news report concerning Nepal Police Inspector General Dan Bahadur Karki. An officer at…",
       "latest_development": "KATHMANDU: Police have arrested Bishwa Mani Subedi, a journalist with Nepal Press, from his office in New Baneshwar, Kathmandu, for questioning over a news report concerning Nepal Police Inspector General Dan Bahadur Karki. An officer at…",
       "alerted": false,
@@ -6865,7 +6865,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-289dbc80f9fc",
@@ -6883,7 +6883,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "यी घटनाक्रमहरूमा सम्माननीय प्रधानमन्त्रीज्यू, सचिवालय र प्रधानमन्त्री तथा मन्त्रिपरिषद् कार्यालयको कुनै पनि संलग्नता छैन । हामीलाई यसबारे कुनै जानकारी छैन- दीपा दाहाल",
       "latest_development": "यी घटनाक्रमहरूमा सम्माननीय प्रधानमन्त्रीज्यू, सचिवालय र प्रधानमन्त्री तथा मन्त्रिपरिषद् कार्यालयको कुनै पनि संलग्नता छैन । हामीलाई यसबारे कुनै जानकारी छैन- दीपा दाहाल",
       "alerted": false,
@@ -6893,7 +6893,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-ab35faab5487",
@@ -6911,7 +6911,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "As we've previously covered, a vote on recognition of a union made up of UK-based Rockstar Games devs is set to take place around GTA 6 's console launch on November 19th. The Independent Workers of Great Britain (IWGB) union, whom the…",
       "latest_development": "As we've previously covered, a vote on recognition of a union made up of UK-based Rockstar Games devs is set to take place around GTA 6 's console launch on November 19th. The Independent Workers of Great Britain (IWGB) union, whom the…",
       "alerted": false,
@@ -6921,7 +6921,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-59079361c0ff",
@@ -6939,7 +6939,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "It is Pike's first public statement since she survived an execution attempt by lethal injection in September.",
       "latest_development": "It is Pike's first public statement since she survived an execution attempt by lethal injection in September.",
       "alerted": false,
@@ -6949,7 +6949,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-8c2963a7ac83",
@@ -6967,7 +6967,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Narrative-driven action-adventure game launches in 2027",
       "latest_development": "Narrative-driven action-adventure game launches in 2027",
       "alerted": false,
@@ -6977,7 +6977,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-f832c8500e44",
@@ -6995,7 +6995,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Fortnite reveals new season with Treasure Hunters theme and One Piece collab Radio Times",
       "latest_development": "Fortnite reveals new season with Treasure Hunters theme and One Piece collab Radio Times",
       "alerted": false,
@@ -7005,7 +7005,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-17deebbd6f67",
@@ -7023,7 +7023,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Most popular Pensacola Halloween costumes? See Google Frightgeist Pensacola News Journal",
       "latest_development": "Most popular Pensacola Halloween costumes? See Google Frightgeist Pensacola News Journal",
       "alerted": false,
@@ -7033,7 +7033,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-0b2aefe37c67",
@@ -7051,7 +7051,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "ONE PIECE、A$AP Rockyらがフォートナイト「トレジャーハンターズ」へ出航！史上最大の冒険が幕を開ける PR TIMES",
       "latest_development": "ONE PIECE、A$AP Rockyらがフォートナイト「トレジャーハンターズ」へ出航！史上最大の冒険が幕を開ける PR TIMES",
       "alerted": false,
@@ -7061,7 +7061,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-031e17496ea4",
@@ -7079,7 +7079,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "One Piece is taking over Fortnite for the next month as part of the game's now-annual November mini-season, which swaps out the current Battle Royale island for a smaller new pirate-themed one. Dubbed Fortnite Treasure Hunters, the new…",
       "latest_development": "One Piece is taking over Fortnite for the next month as part of the game's now-annual November mini-season, which swaps out the current Battle Royale island for a smaller new pirate-themed one. Dubbed Fortnite Treasure Hunters, the new…",
       "alerted": false,
@@ -7089,7 +7089,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-2c65305931c5",
@@ -7107,7 +7107,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Óscar Puente has been facing calls to resign after two high-speed trains collided earlier in the week, killing at least 69 people.",
       "latest_development": "Óscar Puente has been facing calls to resign after two high-speed trains collided earlier in the week, killing at least 69 people.",
       "alerted": false,
@@ -7117,7 +7117,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-d1e56e0c5a9d",
@@ -7135,7 +7135,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Reserve Bank of India (Know Your Customer) Amendment Directions, 2026: Protecting Victims Without Freezing Innocent Accounts CyberPeace Foundation",
       "latest_development": "The Reserve Bank of India (Know Your Customer) Amendment Directions, 2026: Protecting Victims Without Freezing Innocent Accounts CyberPeace Foundation",
       "alerted": false,
@@ -7145,7 +7145,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-314741b6c893",
@@ -7163,7 +7163,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Road closures announced as £4.4m town centre revamp nears completion Oxford Mail",
       "latest_development": "Road closures announced as £4.4m town centre revamp nears completion Oxford Mail",
       "alerted": false,
@@ -7173,7 +7173,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-3c18eaabc800",
@@ -7191,7 +7191,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Salisbury road closed for emergency water leak repairs with delays expected Salisbury Journal",
       "latest_development": "Salisbury road closed for emergency water leak repairs with delays expected Salisbury Journal",
       "alerted": false,
@@ -7201,7 +7201,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-1fae6ea9b70d",
@@ -7219,7 +7219,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Pune: Garden Chief Under Scanner Over Two Conflicting Reports on 52 Felled Trees, Gets Notice From Municipal Commissioner Punekar News",
       "latest_development": "Pune: Garden Chief Under Scanner Over Two Conflicting Reports on 52 Felled Trees, Gets Notice From Municipal Commissioner Punekar News",
       "alerted": false,
@@ -7229,7 +7229,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-723da5826dcb",
@@ -7247,7 +7247,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "PNB 35 crore fraud case: Bank promises to honour all genuine complaints, says 3 claims worth Rs 43 lakh settl India.com",
       "latest_development": "PNB 35 crore fraud case: Bank promises to honour all genuine complaints, says 3 claims worth Rs 43 lakh settl India.com",
       "alerted": false,
@@ -7257,7 +7257,7 @@
       "in_evening": "2026-10-30",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-aff04627f2ad",
@@ -7275,7 +7275,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Privacy Tip #514 – AI Agents Accessing Bank Accounts is “Horrifying” The National Law Review",
       "latest_development": "Privacy Tip #514 – AI Agents Accessing Bank Accounts is “Horrifying” The National Law Review",
       "alerted": false,
@@ -7285,7 +7285,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-10-30T19:25:54+05:45"
+      "updated_at": "2026-11-07T06:42:58+05:45"
     },
     {
       "event_id": "evt-3dc04e8ce324",
@@ -13450,6 +13450,678 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-06T18:41:23+05:45"
+    },
+    {
+      "event_id": "evt-fd3392514f4d",
+      "event_key": null,
+      "canonical_title": "I built 8 small, weird websites on the side",
+      "category": "tech_career",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": "2026-11-07",
+      "last_reported": "2026-11-07",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/hobbybuilder/i-built-8-small-weird-websites-on-the-side-21e4"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The developer built eight niche web applications using React and Vite hosted on Vercel, including a browser-based salvage game called salvage.run.",
+      "latest_development": "The developer built eight niche web applications using React and Vite hosted on Vercel, including a browser-based salvage game called salvage.run.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-07",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-43e7ee385ce4",
+      "event_key": null,
+      "canonical_title": "Understanding SSML for Better Voice AI Output",
+      "category": "tech_career",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/voice_developer/understanding-ssml-for-better-voice-ai-output-5bi7"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Why SSML Matters for Voice AI If you’ve been tinkering with text‑to‑speech (TTS) lately, you’ll know that the raw output can feel a bit flat. SSML (Speech Synthesis Markup Language) is the secret sauce that lets you turn plain text into a…",
+      "latest_development": "Why SSML Matters for Voice AI If you’ve been tinkering with text‑to‑speech (TTS) lately, you’ll know that the raw output can feel a bit flat. SSML (Speech Synthesis Markup Language) is the secret sauce that lets you turn plain text into a…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-0e7dd36fd03e",
+      "event_key": null,
+      "canonical_title": "What a Smart Contract Escrow Security Review Actually Verifies",
+      "category": "tech_career",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/brudy_dev24/what-a-smart-contract-escrow-security-review-actually-verifies-5can"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Originally published on SAAX Protocol: https://saax-protocol.com/blog/what-escrow-security-review-actually-verifies AI disclosure: this article was researched and written by an AI operator from publicly available documentation and SAAX's…",
+      "latest_development": "Originally published on SAAX Protocol: https://saax-protocol.com/blog/what-escrow-security-review-actually-verifies AI disclosure: this article was researched and written by an AI operator from publicly available documentation and SAAX's…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-7ffeb49baa9f",
+      "event_key": null,
+      "canonical_title": "Every GTA Game, Ranked by Metacritic Score",
+      "category": "gaming",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/gta-games-ranked-metacritic-scores"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-bc8254863f78",
+      "event_key": null,
+      "canonical_title": "Magic Knight Rayearth ‒ Episode 5",
+      "category": "anime",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": "2026-11-07",
+      "last_reported": "2026-11-07",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/review/magic-knight-rayearth/episode-5/.243594"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Even Fuu knows that Fuu is the best character here. Queen.",
+      "latest_development": "Even Fuu knows that Fuu is the best character here. Queen.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-07",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-f66a10ae0851",
+      "event_key": null,
+      "canonical_title": "Who Plays Crocodile in ‘One Piece’ Season 2? Meet Joe Manganiello - Parade Magazine",
+      "category": "anime",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiekfvx3lxtfaxblbevvdwqjbkd0i5ri0wm3vlndjvttv6adnitzftqunrtldhswthmnrzzdhqbuvsdg5qotvun3zfx0r5r0nlqm80ytniv3ncrex3tllxumq3wf9oqtvtsejzqwpubkpoemrkbktuvfpfvkremhi3a19n"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-657aacb90279",
+      "event_key": null,
+      "canonical_title": "‘We do not need sympathy; climate finance is our right’",
+      "category": "nepal",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.onlinekhabar.com/climate-finance-cop-geeta-chaudhary.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The 31st United Nations Climate Change Conference is scheduled to be held in Türkiye from November 9 to 20 to address the global climate crisis.",
+      "latest_development": "The 31st United Nations Climate Change Conference is scheduled to be held in Türkiye from November 9 to 20 to address the global climate crisis.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-e185e745f12f",
+      "event_key": null,
+      "canonical_title": "Hellblazer, Ramayana, Naruto and More! - CBSI Comics",
+      "category": "anime",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmigafbvv95cuxoa3fnztkxyjy1dl9punbzqtr6zxnlcerjovljvvrouunbwxj1efj6c1duyxznvnhrdkhrys00unl5aurptmjmmwowxzbamw0zcexloetfrunzylpeunbpbknbeldxquvdx19yvmnxm01pn3zkthnmywzgmjnts2ljug"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-c81c024fd79d",
+      "event_key": null,
+      "canonical_title": "The Chiefs road to the one-seed is not all doom and gloom - KC Kingdom",
+      "category": "gaming",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmilwfbvv95cuxptjhfn3c3u25ssmfru2lnq1hzcgvpzujlnuv3c3lxyzjxci1fnnnaog1jdja1me1mm25wnufhmg5vr3numzizzzrybentwgdfmvzvy1hdtvn0yllvvfnpyndlzzzertjxejc0dmrgte4xnmqtuxdss2f4wgnzve9annvyawzjtnbqwvfwrc1lyk9fcenidkkw"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-0172458600c5",
+      "event_key": null,
+      "canonical_title": "Marvel Cosmic Invasion DLC Shows Castle Doom Mode Gameplay - MonsterVine",
+      "category": "gaming",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmihwfbvv95cuxoqwjvblhebzdztlfrazrdzxhmrenztkfydgu3enozylo3enzuemv6dvbrdhjvsjbavkxmb3ffv2ktownzcvnhs1cyb2vzte1fvekwmmltdnbgchzkeef4ogu0de1um0f2bkfovhhrb2rpbvrmvhruqusxbdj1zvdttxfwuws1d3m"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-e03fb40e56cb",
+      "event_key": null,
+      "canonical_title": "Stephen A. Smith Puts Alabama’s Kalen DeBoer on Notice Ahead of LSU Showdown - Heavy.com",
+      "category": "college_local",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmipwfbvv95cuxnoflzlu9swg5inwdwrdvgrehvcgzmzjyxddrornbfyxp0ednldxnjuku0n2jrtwh4dxlysfvunudfme9cb2u5dmfkoxg0t1fxzudeyjgteelzsk5uq0jxd1fnrmnncjgzvzg4ntkyrtvhr1dume5mctrwmjr0q3djqjrsutdoztvkyzjha0njcgd0nw9echa3qupvzg9dv0hbnwrowxbftq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-f973d564baf7",
+      "event_key": null,
+      "canonical_title": "Federal appeals court finds Florida’s Medicaid termination letters insufficient - Florida Phoenix",
+      "category": "local_city",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiuafbvv95cuxqbvlnyzraetdjs2fry2xuu2twv0dlbhjnzmtlu1zfwtdwtdz0quk5zxjkdmtra0f3sthfsdr1m0jouxrrs3uxzklosevswdjnyvdwrle0cfj2nmnzx0furvn3s3flltdnmklfrzbuunngcgzsquz4q01jm0nhreh4dml4tfdywvpmnjfqszm4cllmogztyuf0rvlswvk4wwdpr3vvzzjrnlzzywkxlufjm3etlup0uw9p"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-9446bc1573a7",
+      "event_key": null,
+      "canonical_title": "Elon Musk appears to signal the end of the road for Cybertruck",
+      "category": "world_major",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": "2026-11-07",
+      "last_reported": "2026-11-07",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/cq1j33w7d232o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Elon Musk indicated Cybertruck production may end to prioritize manufacturing Cybercabs, which are described as autonomous taxis without a driver.",
+      "latest_development": "Elon Musk indicated Cybertruck production may end to prioritize manufacturing Cybercabs, which are described as autonomous taxis without a driver.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-07",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-868d02767aff",
+      "event_key": null,
+      "canonical_title": "Stephen A. Smith Puts Kalen DeBoer’s Alabama on Playoff Notice Before Lane Kiffin Clash: “They Disappoint” - EssentiallySports",
+      "category": "college_local",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmi9afbvv95cuxnd3z3v1l5cwxtunpvq3num0p0um01vkhroerjq0z2vld4a0jfcfhktermnkvucznlzwxlsxfdt0s3zu9nztzsckr4yzvdum1gwmrrqwf0wwc0rmgyytrvczzlce5dei1revdfaknnmhvmewpxzvr1sfneb1pizdrndud6v2x6bkzwzm01dgdqzngtqmhcb1nunwdpb1bqvk40clfmy1nqotdtddvfsezlzurud3b5nzfures4ms1mc292qzzhnlvnskuzddbkcklqu0o0thbctc1abetfnxnnuk1hzk9mevpzrgnbmk1cz0xvsjhi"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-1b60e579bf76",
+      "event_key": null,
+      "canonical_title": "Educational Highway closure extended in Champion Township - WFMJ",
+      "category": "local_city",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmi3afbvv95cuxnqnhitkxwamjiulzrddzsslbhytl1zlz2mfq5x01iunrsvmq4wgf2rxiwndzarvc5owlxvwlkddhhdjdcdnzmr2l1n1drsgq3neltykjseulbbtlnnjb5ne0ytxntt1ztvm56akzqexhzr0m5sdhluvv1dvp1zjzfrgrorfhizwvsoxjbofjox0jwrtjst0xhagtksvbsvuzxshnuaw9pudgtudnfawlvzxpstk04sknvulvvb05lrzrvcum4b3frrw5xmnryowrsvfc0qwvprko1uhzt"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-21328cf9c7e7",
+      "event_key": null,
+      "canonical_title": "AI stocks climb after trillions wiped from market values",
+      "category": "world_major",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": "2026-11-07",
+      "last_reported": "2026-11-07",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/c35ynnpzdq51o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "AI stocks rebounded following a major market sell-off driven by investor fears that a Democratic election victory would slow down artificial intelligence development.",
+      "latest_development": "AI stocks rebounded following a major market sell-off driven by investor fears that a Democratic election victory would slow down artificial intelligence development.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-07",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-4fb7d4c1818b",
+      "event_key": null,
+      "canonical_title": "Overturned semi caused hours-long Highway 1 closure in Rogers Pass: RCMP - Revelstoke Review",
+      "category": "local_city",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmisgfbvv95cuxnum9atkvqvdb1b0l4vgfrdujiwfkwcejsluh3wxjarmnvrznzvg9qzzbmamvdnlyzmdj2mxlnym5yz0g1eldnrnf1mzfjy3lqdv9zr3jny09icg9ubve4zutwy3dms1honjzhcjyzwgl5s3juqzlud0hqvm5kuudqdlnwudczaxdwytrtcy12lujdyky3umfycwndzu5eakzkdxhqcfjlzf91nf8wtxrsdm9n"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-926fb6a166db",
+      "event_key": null,
+      "canonical_title": "Paraguay Banking Crisis: What It Means for Gold - U.S. Gold Bureau",
+      "category": "bank_local",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiz0fvx3lxte9hquxdbkyxylngutk4x0dqmxfrtwtdwtntsnoyanbqu3pymxrjrtjixzhkaxhya1llquxtbwxuskf2svhfa0q5zfphuxp1mhpttljzduxmdjn0dvh2adzks1hetnb4sxc"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-74de01732176",
+      "event_key": null,
+      "canonical_title": "Spain's rail authorities face European fraud probe after Urda rail disaster",
+      "category": "world_major",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": "2026-11-07",
+      "last_reported": "2026-11-07",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/c6x2wwnz5445o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Prosecutors are investigating the misuse of EU funds intended for upgrading the Spanish railway line where a train crash killed 69 people.",
+      "latest_development": "Prosecutors are investigating the misuse of EU funds intended for upgrading the Spanish railway line where a train crash killed 69 people.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-07",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-48bf4b77fc1a",
+      "event_key": null,
+      "canonical_title": "Nubank Pauses Crypto Withdrawals and Deposits, Points to External Verification Provider - Disruption Banking",
+      "category": "bank_local",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmizafbvv95cuxpuuq1outysenbwxm2nk9sytl6b29qt09smg9rsk5rym5mchdwwgjueu9wzvy3x0k4rzq3m3htdzfosktzy0zvcvzvzeg5cmhiawfuykxpbjm5t044cw5pcfllbs1jamfhzdlka0tjyzrenjlwyxbgnm9lrwhxahdlc09tehlizhhmuelpwkv6dudhyxhfm29btuhqwwtqnuzzq2ntr19wzwwxwhhkaufyttdfewdqnvzurwnnt0yxeldssg1uum5lb0fvb1o"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-7a681696603e",
+      "event_key": null,
+      "canonical_title": "DRY TAPS ON NOTICE! NWSC rolls out six-month Kampala water rescue plan - Red Pepper",
+      "category": "bank_local",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiowfbvv95cuxnr3fjn2zmwuf0rjbamgnuwwjot3pmwglrum9jmu9szujhrxzrbgfzq1f4snq4nnjpns03d0hfev9gvxzudm9cmkf5us1qam5lbgh6ck9krmttn2vdv3lru3d6ufhwa096a3rbdg9enm0tsutnedfcel9nekdhohnin3jrzty2dkozctldvwxkx3zdmkrvowr5blzwr0lra2mtq1hv"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-7c167fed991e",
+      "event_key": null,
+      "canonical_title": "Eight Teams Gear Up for Crucial ICC Men’s Cricket World Cup Playoff - Asianet Newsable",
+      "category": "education_tu",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmixgfbvv95cuxpq2hgseezqk45z3jnrhlmn2uyt1hftgxxmjvdwfrrmwy0zw80nzqxyxbfuzzbweviyvpjthfbcupfwjz6c3hbqnoxb2djetnjd3rjbzhpz0zrq0mtb3hhni14rvdzoupoddr0nun6czbtmffhexk3awllm3nqqvbkrfzfskg3cvpftnizuufzzevtrtjurnrhuxywc2thy1pfdlhla29cefpdvnpoqm4wyuzpcup6bzdpnvjprlmzwvpiuzvqsmfsacsbqvvfexfmtwlsuzu2avq4vjvhqlf1q2rvrfd1ck1ibtrztzbta2dodnbqv2i5rvjnwwz0skk4duhgzzbrcdhmsnc5vgxwetnkvtkytjjeelnxs2q1avuyytzzejh3b0jxuextam1qaedpn3h3em5judqzauzszufhvxf5sldoouroec10z2l0sgpvumxdemznaetiddfkcgkwowlmbjr0uurnc0qyuufva0rjdtywy0n6b3rztlzjne1smfy5akgwb3p1qwfnz3dycve"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-491dbfd30a91",
+      "event_key": null,
+      "canonical_title": "Nepal to host ICC men’s Cricket World Cup qualifier playoff in December - The News Mill",
+      "category": "education_tu",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmipgfbvv95cuxntjzzwjh2nvrqduhtuhddq0twz19mz0zknlppuhvuzllhn0jiruu3cnnzbm1yytbruta2axfxb0szmlvhzzznm0voudk0tkrtx3nvcmfmehrasvgxngzcq3l4ufrjqv9aawg4qufpzgrprkytv05joevyx2rhdgzln01fwhbyx0d2btjxznnksu0ttjlynzhfmg1zu0tpvxewc1funu1b"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
+    },
+    {
+      "event_id": "evt-76b366f545d2",
+      "event_key": null,
+      "canonical_title": "'Yuru Camp△ Season 4' Reveals Additional Staff, Theme Songs, Main Promo, Spring 2027 Premiere",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-07",
+      "last_seen": "2026-11-07",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "myanimelist.net/news/74910044"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The official website of the Yuru Camp△ (Laid-Back Camp) anime series revealed additional staff, theme songs, main visual (pictured), and main promotional video for Season 4 on Friday. The new season adapting Afro's slice of life manga will…",
+      "latest_development": "The official website of the Yuru Camp△ (Laid-Back Camp) anime series revealed additional staff, theme songs, main visual (pictured), and main promotional video for Season 4 on Friday. The new season adapting Afro's slice of life manga will…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-07T06:42:58+05:45"
     }
   ],
   "archived": []
