@@ -1,17 +1,15 @@
 {
   "schema_version": 1,
-  "at_npt": "2026-11-06T17:54:31+0545",
-  "emitted": 1,
-  "deliveries_owed": 1,
-  "ntfy_delivered": 1,
-  "page_ok": true,
+  "at_npt": "2026-11-07T16:51:06+0545",
+  "emitted": 0,
+  "deliveries_owed": 0,
+  "ntfy_delivered": 0,
+  "page_ok": false,
   "dry_run": false,
   "ok": true,
-  "reason": "delivered",
+  "reason": "nothing_emitted",
   "degraded": false,
   "monitor_exit_code": "0",
   "degraded_payload_count": -1,
-  "payload_titles": [
-    "🎓 CSIT exam notice: semester 6"
-  ]
+  "payload_titles": []
 }
