@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-06T17:51:24.893Z",
+  "generated_at": "2026-11-07T12:01:29.789Z",
   "project": {
     "name": "dmnews-public",
     "repo_root": "C:\\src\\dmnews-public"
   },
   "counts": {
-    "IDEA": 6
+    "IDEA": 7
   },
   "active": [],
   "testing": [],
@@ -17,6 +17,10 @@
     {
       "id": "D-001",
       "title": "Local LLM inference inside GitHub Actions is rejected"
+    },
+    {
+      "id": "D-002",
+      "title": "GitHub Models must not be added back"
     },
     {
       "id": "F-001",
@@ -45,6 +49,11 @@
     {
       "id": "D-001",
       "title": "Local LLM inference inside GitHub Actions is rejected",
+      "status": "IDEA"
+    },
+    {
+      "id": "D-002",
+      "title": "GitHub Models must not be added back",
       "status": "IDEA"
     }
   ],

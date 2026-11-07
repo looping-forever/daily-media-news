@@ -5,9 +5,9 @@
 
 **Project** dmnews-public
 
-**Generated at** 2026-11-06T17:51:24.893Z
+**Generated at** 2026-11-07T12:01:29.789Z
 
-Counts: IDEA=6
+Counts: IDEA=7
 
 ## Current milestone
 
@@ -40,6 +40,7 @@ _none_
 ## Ideas
 
 - **D-001** Local LLM inference inside GitHub Actions is rejected
+- **D-002** GitHub Models must not be added back
 - **F-001** Add GitHub Models as an independent AI provider family
 - **F-002** Wire the second Gemini project key as a first-class ladder rung
 - **F-003** Replace pinned model ids with catalogue-driven discovery
@@ -49,6 +50,7 @@ _none_
 ## Open decisions
 
 - **D-001** Local LLM inference inside GitHub Actions is rejected -- basis=unset
+- **D-002** GitHub Models must not be added back -- basis=unset
 
 ## Next actions
 

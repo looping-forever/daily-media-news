@@ -4,3 +4,4 @@
 {"id":"F-003","type":"feature","issued_at":"2026-11-06T17:51:04.706Z","title":"Replace pinned model ids with catalogue-driven discovery","file":"features/F-003.md","state":"issued"}
 {"id":"F-004","type":"feature","issued_at":"2026-11-06T17:51:05.196Z","title":"Weekly canary that fails loudly when a provider family goes dark","file":"features/F-004.md","state":"issued"}
 {"id":"M-001","type":"milestone","issued_at":"2026-11-06T17:51:05.670Z","title":"The digest never fails to deliver news and never ships a blank card; AI degradation is visible and one-line diagnosable","file":"milestones/M-001.md","state":"issued"}
+{"id":"D-002","type":"decision","issued_at":"2026-11-07T12:01:06.599Z","title":"GitHub Models must not be added back","file":"decisions/D-002.md","state":"issued"}

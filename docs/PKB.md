@@ -7,15 +7,21 @@ as freshness. **2026-11-03:** §1's tip, §4's seed ladder and §33's advice tab
 were re-checked, and §42 was added for the day's changes (digest story floor,
 weather AQI, breaking ladder, ladder probe, honesty gate, `commit_state.sh`).
 **2026-11-06:** §1's tip was re-checked, and §§43-44 were added for summary
-honesty and for the model ladder as it actually stands.
+honesty and for the model ladder as it actually stands. **2026-11-07:** §1's
+HEAD was re-checked and §44 was amended for the GitHub Models retirement, the
+self-healing ladder, the repair prompt/clock changes and the provider canary.
 Do not edit product source code from this file; record decisions here instead.
 
-## 1. Repo state (re-verified 2026-11-01; tip re-checked 2026-11-06)
+## 1. Repo state (re-verified 2026-11-01; tip re-checked 2026-11-07)
 
 - Repo: this repository (git, branch `master`). This section said `main` until
   2026-11-01; no ref of that name exists.
-- HEAD = `7c37a78` ("fix: a card must never be a heading over nothing") at the
-  2026-11-06 check. Treat the tip as moving: read `git log --oneline`.
+- HEAD = `6c806d6` ("fix: remove the retired GitHub Models family") at the
+  2026-11-07 check. Treat the tip as moving: read `git log --oneline`.
+  **Superseded 2026-11-07:** this line recorded `7c37a78` at the 2026-11-06
+  check. Among the commits since: `71cf488` added the GitHub Models family,
+  `11cd7bd` moved its catalogue to `/catalog/models`, `d58b657` added the
+  provider canary, and `6c806d6` removed the family again (see §44).
 - Working tree MOVES DURING A SESSION, so a count here is not durable. Measured
   2026-11-03: `git status --porcelain` printed only `?? CON` at 15:31, then
   showed `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
@@ -2368,30 +2374,49 @@ exhausted — losing telemetry must not fail the job — but warns by name (`:24
   (`scripts/summarise_stubs.py:186-204`) all read the same numbers the payload
   carries.
 
-## 44. Model ladder, as it actually stands (2026-11-06)
+## 44. Model ladder, as it actually stands (2026-11-06; amended 2026-11-07)
 
 - **The digest agent walk is CLI-only.** It runs `opencode run --model` against
-  `config/opencode.json`'s ladder, and that seed is Gemini's two free-tier rungs
-  followed by the free `opencode/*` pool. The summariser and repair add the
-  keyed HTTP fallbacks afterwards (`scripts/llm_providers.py:92,1051-1059`).
-- **Gemini's free tier and the shared `opencode` pool are the two CLI accounts
-  that answer today.** The Gemini free-tier quota measured in the tree is the
+  `config/opencode.json`'s ladder — Gemini ×4, two keys in separate projects with
+  two models each: `gemini/gemini-3.5-flash-lite`, `gemini/gemini-3.1-flash-lite`,
+  then the same pair under `gemini-key2` (`config/opencode.json:5-16`, re-read
+  2026-11-07) — followed by the free `opencode/*` pool. **Superseded 2026-11-07:**
+  this bullet and §4's seed line said "Gemini's two free-tier rungs", and §42.3's
+  "two keyed Gemini rungs" is stale for the same reason. The HTTP families
+  (`groq`, `openrouter`, `mistral`) serve the summariser and repair only; they
+  never carry the tool-using digest walk
+  (`scripts/llm_providers.py:92,1051-1059`).
+- **Gemini's free tier and the shared `opencode` pool are the two CLI sources
+  that answer today.** The Gemini side is two keys in separate projects with
+  separate quotas. The Gemini free-tier quota measured in the tree is the
   per-minute input-token allowance of 250,000
   (`scripts/derive_unsummarised.py:81`); when it is spent the edition is
   derived, and the repair pass then carries the summaries. The shared
   `opencode/*` pool answers `payment_required`.
-- **Groq refuses the ADDRESS, not the key (2026-11-06).** `provider-probe` run
-  `42231449075` answered `status=403 | models=0 | ms=28`, and the same `/models`
-  endpoint returned the identical JSON
-  `{"error":{"message":"Access denied. Please check your network settings."}}`
-  from another network with three different User-Agents — including no explicit
-  one at all, and with **no credential sent**. A refused key cannot produce that
-  answer to an anonymous request, so this is an IP/egress policy at the provider
-  edge (`scripts/llm_providers.py`, `classify_403`): it is `blocked`, never
-  `auth`, and it cools nothing. The probe prints which edge refused the call —
-  `cloudflare` means the HTML bot check and is our request shape to fix;
-  `provider` means their address policy, which no code here can lift. The
-  console key stays valid and unused: **do not re-mint it**.
+- **GitHub Models is retired — fully — on 2026-07-30.** GitHub's docs and
+  changelog retire it, and the family was added, then removed: `71cf488` added
+  it, `11cd7bd` moved its catalogue to `/catalog/models`, and `6c806d6` removed
+  it. `models.github.ai` still answers **HTTP 200 with the plain text `OK`** for
+  `/`, `/catalog/models`, `/inference/models` and a POST to
+  `/inference/chat/completions` — with a valid token, an invalid one, or none.
+  No JSON, no ids, no completion, **so a status-code check reports success while
+  nothing works**. Probe `42364043037`: `models=0 | status=200 |
+  verdict=no_answer`, with a note naming endpoint and body.
+  `scripts/llm_providers.py` carries a comment saying why it must not return.
+  **Do not list it as available.** If the successor is mentioned, say Microsoft
+  Foundry is paid.
+- **Two diagnostics kept from that work because they serve every provider.** A
+  keyed provider that lists zero models gets a zero-catalogue note naming the
+  endpoint, the status, and the first 300 redacted body characters. A 200 that
+  carries no usable answer is `no_answer`; `transport` still reads `network`.
+- **Groq is NOT blocked (2026-11-07).** **Superseded 2026-11-07:** this bullet
+  recorded run `42231449075`'s `status=403 | models=0 | ms=28` and called the
+  refusal an address policy. Those 403s were address-dependent: `/v1/models` now
+  returns 11 ids, and `allam-2-7b` was verified `200`. A 403 whose body says
+  `Access denied. Please check your network settings.` is still classified
+  `provider_blocked` by its body (`scripts/llm_providers.py`, `classify_403`),
+  and it never cools a rung. The console key stays valid and unused: **do not
+  re-mint it**.
 - **Mistral answers HTTP 429** — capacity, not a wrong id
   (`scripts/llm_providers.py:61-64,839-841`).
 - **OpenRouter free ids are the working fallback**, seeded with
@@ -2413,10 +2438,34 @@ provider, not the walk — implemented in the walk at
 rung logs why it did not
 (`scripts/llm_providers.py:1024,1034`).
 
+**Self-healing ladder (2026-11-07).** `model_selector.rank_models` orders rungs by
+`(cooling, -health_score, seed_pos, -release, id)`, where
+`health_score = successes − (timeout + transport + garbage + quota_notice)`. A
+rung is dropped only when its exact id is missing from its own provider's
+non-empty catalogue **and** another rung of that provider survives; a failed or
+empty catalogue keeps the static ladder. One order line per run names each rung's
+source (`[health rank N]` / `[config]`). Run `42369763864` shows it working:
+Gemini lifted to ranks 1–2, `gemini/gemini-3.1-flash-lite` demoted to rank 9.
+
+**Repair (2026-11-07).** The prompt field is `evidence`; echoing it is explicitly
+forbidden and emptiness is allowed. A stub with no publisher text is never sent
+to the ladder. The clock floor is per call class — keyed 90 s, free 20 s — instead
+of a flat 20 s. Run `42369763864`: `6 of 15 stories have no written summary`;
+`replaced 1 with written summaries, 0 with publisher text, 0 left without a
+summary, 5 dropped; edition_kind=full (10 of 10)`.
+
+**Provider canary (2026-11-07).** `scripts/provider_canary.py` and
+`.github/workflows/provider-canary.yml` run Monday 05:20 UTC (11:05 NPT),
+read-only, with a six-minute cap. A family that should work and has stopped fails
+the run with a line naming the action to take; `quota` and `not_configured` are
+excused by name. **Its limitation, stated plainly:** the weekly cadence allows up
+to seven days of degraded editions before the alarm.
+
 ---
 
-Newest section: §44 (2026-11-06, the model ladder as it actually stands and the
-repair/ladder guarantees), preceded by §43 (the same day: the single summary
+Newest section: §44 (2026-11-06, amended 2026-11-07: the model ladder as it
+actually stands, the retired GitHub Models family, the self-healing ladder,
+repair and the provider canary), preceded by §43 (the same day: the single summary
 predicate and the counts every surface reads), then §42 (2026-11-03, the digest story floor, weather AQI, the
 breaking ladder and probe, honesty-gate recovery and `commit_state.sh`),
 followed by §41 (2026-10-10, the at-least-once delivery contract, the
