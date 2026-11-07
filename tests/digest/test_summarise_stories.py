@@ -120,10 +120,50 @@ class FakeClock:
         self.now += seconds
 
 
+class OneRowPerRequest:
+    """A model that answers exactly ONE of the stories it was asked for.
+
+    The measured shape (run 42369763864): `rows=6 seen, 1 written` on every
+    healthy rung. It reads the prompt, so the row it answers really is one of the
+    stories in that request -- which is what makes "the rest stay pending"
+    testable.
+    """
+
+    TEXT = "A model-written sentence about what happened today."
+
+    def __init__(self):
+        self.calls = []
+        self.asked = []
+
+    def __call__(self, prompt, model, timeout=None):
+        items = json.loads(prompt.split("Stories:\n", 1)[1])
+        self.calls.append((prompt, model))
+        self.asked.append(len(items))
+        return json.dumps([{"url": items[0]["url"], "summary": self.TEXT}])
+
+
+class AnswersEveryStory:
+    """A model that answers every story in the request."""
+
+    TEXT = "A model-written sentence about what happened today."
+
+    def __init__(self):
+        self.calls = []
+        self.asked = []
+
+    def __call__(self, prompt, model, timeout=None):
+        items = json.loads(prompt.split("Stories:\n", 1)[1])
+        self.calls.append((prompt, model))
+        self.asked.append(len(items))
+        return json.dumps([{"url": item["url"], "summary": self.TEXT}
+                           for item in items])
+
+
 class Batching(unittest.TestCase):
     def test_fifteen_stories_become_three_requests(self):
         self.assertEqual([6, 6, 3], [len(b) for b in ss.batches(
-            [story(n) for n in range(15)])])
+            [story(n) for n in range(15)], 6)],
+            "the helper splits at whatever size it is given")
 
     def test_the_request_carries_the_short_fields_only(self):
         batch = [story(1, snippet="x" * 900)]
@@ -174,7 +214,7 @@ class Pacing(unittest.TestCase):
 class Refusals(unittest.TestCase):
     def test_a_429_hint_is_honoured_and_the_same_batch_retried(self):
         clock = FakeClock()
-        batch = [story(n) for n in range(3)]
+        batch = [story(n) for n in range(2)]
         run = FakeRun([
             ss.Refusal("AI_APICallError: Quota exceeded for metric: "
                        "generativelanguage.googleapis.com/"
@@ -187,7 +227,7 @@ class Refusals(unittest.TestCase):
                            log=lambda *a: None)
         self.assertEqual([40], clock.slept,
                          "the provider asked for 40s and that is what it gets")
-        self.assertEqual(3, len(out["summaries"]))
+        self.assertEqual(2, len(out["summaries"]))
         self.assertEqual(["gemini/gemini-3.5-flash-lite"] * 2,
                          [model for _, model in run.calls],
                          "the retry is of the SAME model, and only one wait "
@@ -303,18 +343,19 @@ class NeverInvent(unittest.TestCase):
         self.assertEqual(ENOUGH, batch[1]["summary"],
                          "a story with no answer keeps the publisher's text")
 
-    def test_at_most_max_requests_are_made(self):
+    def test_no_request_asks_for_more_than_four_stories(self):
         batch = [story(n) for n in range(40)]
-        run = FakeRun([
-            reply_for(batch[0:6]), reply_for(batch[6:12]),
-            reply_for(batch[12:18]), reply_for(batch[18:24]),
-        ])
-        out = ss.summarise(batch, models=["opencode/a"], run=run,
+        run = AnswersEveryStory()
+        out = ss.summarise(batch, models=["gemini/a"], run=run,
                            sleep=lambda s: None, clock=FakeClock(),
                            log=lambda *a: None)
-        self.assertEqual(ss.MAX_REQUESTS, out["requests"],
-                         "a forty-story pool must not become seven requests")
-        self.assertEqual(24, len(out["summaries"]))
+        self.assertEqual(40, len(out["summaries"]),
+                         "a model that answers everything must finish the pool")
+        self.assertLessEqual(max(run.asked), ss.MAX_BATCH_SIZE,
+                             "a request carried %d stories: %r"
+                             % (max(run.asked), run.asked))
+        self.assertEqual(ss.MAX_BATCH_SIZE, max(run.asked),
+                         "a fully-answering model's ask has to grow to the cap")
 
 
 class TheJobBudget(unittest.TestCase):
@@ -477,7 +518,7 @@ class TheBudgetArithmetic(unittest.TestCase):
 
     def test_every_batch_still_gets_a_call_when_the_first_one_hangs(self):
         clock = FakeClock()
-        batch = [story(n) for n in range(24)]      # four batches of six
+        batch = [story(n) for n in range(24)]      # twelve small groups
         run = HangingRun(clock, reply_for(batch[:6]))
         out = ss.summarise(batch, models=["gemini/a"], run=run,
                            clock=clock, sleep=clock.sleep, log=lambda *a: None,
@@ -972,17 +1013,22 @@ class TheOrderIsRecomputedBetweenBatches(unittest.TestCase):
 
     def setUp(self):
         self.cool = {"schema_version": 1, "models": {}, "pool": {}}
-        self.stories = [story(n) for n in range(13)]     # 6 + 6 + 1
+        self.stories = [story(n) for n in range(13)]     # seven small groups
 
     def run_of(self):
-        batches = ss.batches(self.stories)
-        return FakeRun([
-            ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other"),
-            reply_for(batches[0]),
-            ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other"),
-            reply_for(batches[1]),
-            reply_for(batches[2]),
-        ])
+        calls, hits = [], []
+        answered = AnswersEveryStory()
+
+        def run(prompt, model, timeout=None):
+            calls.append(model)
+            if model == BROKEN:
+                hits.append(model)
+                raise ss.Refusal("%s: exit 1: internal error" % BROKEN,
+                                 kind="other")
+            return answered(prompt, model)
+
+        run.calls, run.hits = calls, hits
+        return run
 
     def test_a_rung_that_failed_twice_mid_run_is_skipped_for_the_rest(self):
         log = []
@@ -990,9 +1036,14 @@ class TheOrderIsRecomputedBetweenBatches(unittest.TestCase):
         out = ss.summarise(self.stories, models=[BROKEN, WORKS], run=run,
                            sleep=lambda *_a: None, cooldown=self.cool,
                            log=log.append)
-        self.assertEqual([BROKEN, WORKS, BROKEN, WORKS, WORKS],
-                         [model for _p, model in run.calls],
-                         "the third batch must not pay the broken rung again")
+        self.assertEqual(2, len(run.hits),
+                         "two failures demote; one is not enough to write a "
+                         "working rung off")
+        self.assertEqual([BROKEN, WORKS], run.calls[:2],
+                         "the ladder advances for the group in hand")
+        self.assertNotIn(BROKEN, run.calls[3:],
+                         "once demoted, the rung must not be paid for again: %r"
+                         % (run.calls,))
         self.assertTrue(any("ladder: %s demoted to the back until" % BROKEN
                             in line for line in log),
                         "the demotion has to be visible in the run that caused "
@@ -1013,19 +1064,21 @@ class ADemotionSurvivesTheProcess(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.path = os.path.join(self.tmp, "model_cooldown.json")
 
-    def test_a_demotion_reaches_the_file_before_the_run_ends(self):
-        plan = [ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other"),
-                ss.Refusal("%s: exit 1: internal error" % BROKEN, kind="other")]
+    def test_the_second_refusal_reaches_the_file_before_the_walk_ends(self):
+        calls = []
 
-        def killed(prompt, model, timeout=None):
-            if plan:
-                raise plan.pop(0)
-            raise KeyboardInterrupt      # the step's own wall clock ending
+        def refusing(prompt, model, timeout=None):
+            calls.append(model)
+            raise ss.Refusal("%s: exit 1: internal error" % BROKEN,
+                             kind="other")
 
-        with self.assertRaises(KeyboardInterrupt):
-            ss.summarise([story(n) for n in range(13)], models=[BROKEN],
-                         run=killed, sleep=lambda *_a: None, clock=FakeClock(),
-                         cooldown_path=self.path, log=lambda *_a: None)
+        out = ss.summarise([story(n) for n in range(13)], models=[BROKEN],
+                           run=refusing, sleep=lambda *_a: None,
+                           clock=FakeClock(), cooldown_path=self.path,
+                           log=lambda *_a: None)
+        self.assertEqual(2, len(calls),
+                         "the second failure demotes; a third call is waste: %r"
+                         % (calls,))
         with open(self.path, encoding="utf-8") as fh:
             saved = json.load(fh)
         row = saved["models"][BROKEN]
@@ -1033,6 +1086,7 @@ class ADemotionSurvivesTheProcess(unittest.TestCase):
         self.assertTrue(row.get("until"),
                         "the next run reads this file instead of paying the rung")
         self.assertEqual(2, row["hits"])
+        self.assertEqual(0, len(out["summaries"]))
 
     def test_a_keyed_quota_demotion_is_saved_on_the_first_refusal(self):
         seen = []
@@ -1176,18 +1230,74 @@ class TheOutcomeIsDiagnosable(unittest.TestCase):
                          "the rung that answered is the one that came closest")
         self.assertEqual(1, out["closest"]["accepted"])
 
-    def test_attempts_are_counted_past_the_debug_cap(self):
+    def test_every_failed_attempt_reaches_the_debug_dump(self):
         batch = [story(1)]
         run = FakeRun([reply_for(batch, "Too short.")])
-        models = ["gemini/m%d" % n for n in range(ss.DEBUG_MAX_RECORDS + 2)]
+        models = ["gemini/m%d" % n for n in range(15)]
         out = ss.summarise(batch, models=models, run=run, sleep=lambda *_a: None,
                            clock=FakeClock(), log=lambda *_a: None,
                            budget_seconds=600)
-        self.assertEqual(ss.DEBUG_MAX_RECORDS, len(out["debug"]),
-                         "the artifact keeps its bound")
-        self.assertEqual(len(models), out["attempts"],
-                         "the count must be the rungs the run actually paid for, "
-                         "not the size of the capped artifact")
+        self.assertEqual(15, out["attempts"])
+        self.assertEqual(15, len(out["debug"]),
+                         "the artifact must carry EVERY attempt: run 42369763864 "
+                         "recorded 12 of 15 failures because twelve was a cap")
+        self.assertEqual(len(models), len({row["model"] for row in out["debug"]}),
+                         "each record must name the rung that failed")
+
+
+class PartialAnswersAreProgress(unittest.TestCase):
+    """RUN 42369763864: every six-story request was answered `1 usable row`.
+
+    Those rungs were recorded as failures, so the ladder advanced and abandoned
+    the other five stories: fifteen models walked, nine of twenty-four stories
+    summarised, on models that were answering the whole time.
+    """
+
+    def test_six_stories_answered_one_per_request_keep_one_rung(self):
+        batch = [story(n) for n in range(6)]
+        run = OneRowPerRequest()
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b"], run=run,
+                           sleep=lambda *_a: None, clock=FakeClock(),
+                           log=lambda *_a: None)
+        self.assertEqual(6, len(out["summaries"]))
+        self.assertEqual({"gemini/a"}, {model for _prompt, model in run.calls},
+                         "a partial answer must be reused, not advanced past")
+        self.assertEqual(0, out["attempts"])
+        self.assertEqual([], out["debug"])
+
+    def test_a_partial_answer_is_not_recorded_as_a_failure(self):
+        batch = [story(1), story(2)]
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b"],
+                           run=OneRowPerRequest(), sleep=lambda *_a: None,
+                           clock=FakeClock(), log=lambda *_a: None)
+        self.assertEqual(2, len(out["summaries"]))
+        self.assertEqual({}, out["reasons"])
+        self.assertEqual([], out["debug"])
+
+    def test_a_rung_that_answers_nothing_advances_the_ladder(self):
+        batch = [story(1), story(2)]
+        run = FakeRun([reply_for([]), reply_for(batch)])
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b"], run=run,
+                           sleep=lambda *_a: None, clock=FakeClock(),
+                           log=lambda *_a: None)
+        self.assertEqual("gemini/b", out["model"])
+        self.assertEqual(2, len(out["summaries"]))
+        self.assertEqual(1, out["reasons"].get("no_usable_row"))
+
+    def test_the_budget_clamp_ends_the_walk_instead_of_overshooting(self):
+        clock = FakeClock()
+        models = ["gemini/m%d" % n for n in range(20)]
+        run = HangingRun(clock, "{}", hang=set(models))
+        out = ss.summarise([story(n) for n in range(20)], models=models, run=run,
+                           sleep=clock.sleep, clock=clock, log=lambda *_a: None,
+                           budget_seconds=300)
+        self.assertTrue(out["budget_spent"],
+                        "the clock, not a request count, has to end the walk")
+        self.assertLessEqual(clock.now - 1000.0, 300.0,
+                             "the walk spent %ss of a 300s budget"
+                             % (clock.now - 1000.0))
+        self.assertLess(len(run.seen), len(models),
+                        "it must stop on the clock, not walk every rung")
 
 
 if __name__ == "__main__":

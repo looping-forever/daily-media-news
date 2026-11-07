@@ -38,15 +38,23 @@ import english_text  # noqa: E402
 import llm_providers  # noqa: E402
 from validate_stories import crime_violation, spoiler_violation  # noqa: E402
 
-#: Stories per request. Six keeps one request near 2,000 tokens: small enough
-#: that three batches fit the per-minute allowance with room to spare, large
-#: enough that a fifteen-story edition costs three requests rather than fifteen.
-BATCH_SIZE = 6
+#: Stories per request, the DEFAULT ask. Measured 2026-11-07 (run 42369763864):
+#: six-story requests came back with ONE usable row each, and because a partial
+#: answer was read as a failure the ladder advanced and abandoned the other five.
+#: Two is small enough that a strict model still costs nothing to ask, and large
+#: enough that a fully-answering model halves the request count.
+BATCH_SIZE = 2
 
-#: Hard ceiling on requests for ONE edition. BATCH_SIZE * MAX_REQUESTS is the
-#: most stories this module will try to summarise; the rest keep their
-#: publisher text and are counted as not summarised.
-MAX_REQUESTS = 4
+#: The most stories one request may ever carry. A model that answers EVERY story
+#: it is asked for has its ask doubled for the next one, up to this. Four keeps a
+#: request near 1,400 tokens and bounds what one strict model can waste.
+MAX_BATCH_SIZE = 4
+
+#: How many times ONE model may be asked for the SAME story. A model that returns
+#: one story per request is reused for the rest of its group, but a story it keeps
+#: skipping is not retried forever: after this many asks it leaves that model's
+#: pool and waits for the next rung.
+STORY_ASKS_PER_MODEL = 2
 
 #: The measured Gemini free-tier limit, in INPUT tokens per minute. It is a
 #: named constant rather than a number in the loop because the whole point of
@@ -104,12 +112,15 @@ LEAD_RUNG_SECONDS = 90
 #: cannot leave the later batches with a call too short to answer.
 MIN_BATCH_SECONDS = 30
 
-#: How much of a failed answer is kept. 2 KB covers a partial JSON array and the
-#: metadata line that follows it, and cannot flood an artifact.
-DEBUG_RAW_LIMIT = 2048
+#: How much of a failed answer is kept. 8 KB because a full short reply -- an
+#: array of four summaries plus the metadata line -- was measured to be cut at
+#: 2,048 bytes in run 42369763864, exactly where the evidence mattered. Bounded
+#: rather than unlimited so one runaway reply cannot flood the artifact.
+DEBUG_RAW_LIMIT = 8192
 
-#: At most one record per failed attempt, and no more than this many in one run.
-DEBUG_MAX_RECORDS = 12
+#: EVERY failed attempt is kept (there is no record cap any more): the artifact
+#: said "12 of 15" in run 42369763864 because twelve was the cap, not the number
+#: of failures, and three attempts left no evidence at all.
 
 #: The refusal vocabulary. A 429 from Gemini arrives as prose inside the CLI's
 #: log line, and the OpenCode pool says "Free usage limit reached", so both
@@ -568,7 +579,7 @@ def debug_record(model, raw, reason, timeout=None, exit_code=None):
     """One failed attempt, described well enough to diagnose without the run.
 
     Redaction happens BEFORE the cut, so a key cannot survive as a fragment at
-    the 2 KB boundary.
+    the 8 KB boundary.
     """
     meta = extract_meta(raw)
     return {
@@ -940,7 +951,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
               log=print, budget=INPUT_TOKEN_BUDGET_PER_MINUTE,
               budget_seconds=TOTAL_BUDGET_SECONDS, cooldown=None,
               cooldown_path=None, snippets=None, health=None, health_path=None):
-    """Summarise *stories* in paced batches.
+    """Summarise *stories* in small, adaptive, paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
              "requests": int, "waits": [s], "refusals": [str], "debug": [dict],
@@ -949,19 +960,28 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
 
     Nothing here raises for a model problem: an edition with no summaries is a
     valid outcome that the caller labels, and a crash here would cost the
-    edition itself. `debug` is one record per failed attempt -- model, reason,
-    the provider's own metadata and a bounded, redacted copy of the raw answer --
-    so a run that produced nothing can say why without being re-run. `causes`
-    counts the STORIES each cause cost, because that is what the page has to
-    report; the walk's attempt log is a different question and a different file.
+    edition itself. `debug` is one record per failed attempt -- EVERY failed
+    attempt, model, reason, the provider's own metadata and a redacted copy of
+    the raw answer clipped at DEBUG_RAW_LIMIT -- so a run that produced nothing
+    can say why without being re-run. `causes` counts the STORIES each cause
+    cost, because that is what the page has to report; the walk's attempt log is
+    a different question and a different file.
+
+    A PARTIAL ANSWER IS PROGRESS. The model is asked for BATCH_SIZE stories; if
+    it returns some of them, those are kept and the SAME model is asked for the
+    rest of that group immediately. Only a request that returns NOTHING usable
+    is a failure, and only that advances the ladder. Measured 2026-11-07 (run
+    42369763864): every healthy rung answered "rows=6 seen, 1 written" and was
+    treated as broken, so fifteen models were walked and nine of twenty-four
+    stories were summarised.
 
     `attempts`, `reasons` and `closest` exist for the caller's ONE verdict line
     (run 42321136172 reported "budget spent after 12 rungs" -- 12 was the
     artifact's cap, not the number of attempts, and nothing named a reason or a
-    rung). `attempts` counts every failed attempt even past DEBUG_MAX_RECORDS;
-    `reasons` counts them by the module's own reason word; `closest` is the rung
-    that came nearest to writing something -- most accepted rows first, then a
-    rung that ANSWERED over one that went silent.
+    rung). `attempts` and `debug` now agree: every failed attempt is counted AND
+    recorded; `reasons` counts them by the module's own reason word; `closest` is
+    the rung that came nearest to writing something -- most accepted rows first,
+    then a rung that ANSWERED over one that went silent.
 
     `snippets` is the candidate index handed to `build_prompt`, so the model is
     given the publisher's description rather than a summary the validator has
@@ -1020,16 +1040,18 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         model_selector.save_cooldown(cooldown_path, cooldown)
 
     def note(model, raw, reason, timeout, exit_code=None):
-        """Keep one failed attempt, bounded, so the artifact can explain it."""
-        # COUNTED BEFORE THE CAP. A twelve-record artifact is a size bound, not a
-        # measurement, and printing its length as "after N rungs" under-reported
-        # the measured run (42321136172) by an unknown number of rungs.
+        """Keep one failed attempt, bounded, so the artifact can explain it.
+
+        THE COUNT AND THE RECORD AGREE. The old code stopped at twelve records
+        while `attempts` kept counting, so run 42369763864's artifact held 12 of
+        15 failures and could not say which three were missing. Every attempt is
+        now kept; only the per-record `raw` clip is bounded.
+        """
         out["attempts"] += 1
         out["reasons"][reason] = out["reasons"].get(reason, 0) + 1
-        if len(out["debug"]) < DEBUG_MAX_RECORDS:
-            out["debug"].append(debug_record(model, raw, reason,
-                                             timeout=timeout,
-                                             exit_code=exit_code))
+        out["debug"].append(debug_record(model, raw, reason,
+                                         timeout=timeout,
+                                         exit_code=exit_code))
 
     def closer(model, accepted, reason):
         """Keep the rung that came closest, so a 0-repaired run can name it."""
@@ -1085,50 +1107,42 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             dirty = False
         return True
 
-    plan = batches(stories)[:MAX_REQUESTS]
-    for index, batch in enumerate(plan, 1):
-        if pacer.deadline - clock() <= 0:
-            out["budget_spent"] = True
-            log("  total budget of %ds is spent before batch %d/%d"
-                % (budget_seconds, index, len(plan)))
-            break
-        if dirty and cooldown is not None:
-            # RECOMPUTED BETWEEN BATCHES: a rung that refused twice during the
-            # last one is reordered (and skipped, below) for the rest of this run.
-            order = ordered_ladder()
-            dirty = False
-        active = [m for m in order if m not in dead] or list(order)
-        prompt = build_prompt(batch, snippets)
-        prompt_tokens = estimate_tokens(prompt)
-        log("  batch %d/%d: %d stories, prompt ~%d tokens (budget %d/min)"
-            % (index, len(plan), len(batch), prompt_tokens, budget))
-        pacer.wait_for(prompt_tokens)
-        answered = False
-        ran_out = False
-        causes = set()
-        for rung, model in enumerate(active):
-            remaining = pacer.deadline - clock()
-            if remaining <= 0:
-                ran_out = True
+    pending = list(stories)
+    asked = {}          # (model, story url) -> asks that model has made for it
+    ask_sizes = {}      # model -> the size its NEXT request should carry
+    lost_causes = set()
+
+    def url_of(item):
+        return item.get("source_url") or item.get("url") or ""
+
+    def next_group(model, size):
+        """The next *size* stories *model* may still be asked for."""
+        group = []
+        for item in pending:
+            # WASTE BOUND: one model is asked at most STORY_ASKS_PER_MODEL times
+            # for the same story. After that the story leaves this model's pool
+            # and waits for the next rung instead of being retried forever.
+            if url_of(item) in blocked:
+                continue
+            if asked.get((model, url_of(item)), 0) >= STORY_ASKS_PER_MODEL:
+                continue
+            group.append(item)
+            if len(group) >= size:
                 break
-            # A CALL GIVEN LESS THAN THE RUNG NEEDS IS A GUARANTEED `timeout`,
-            # not an attempt. Run 42356298224: a ten-rung ladder cut each slice
-            # to ~30s and six of fifteen attempts died on the clock, including
-            # one on a model that answered from the lead's 90s slice. Stopping
-            # here leaves the clock for a rung that can still answer.
-            need = min_answer_seconds(model)
-            if remaining < need:
-                ran_out = True
-                log("  batch %d/%d: %.0fs left, less than the %ds %s needs; "
-                    "not starting a call that cannot answer"
-                    % (index, len(plan), remaining, need, model))
-                break
-            # THE CLOCK THE CHILD IS ACTUALLY GIVEN, recomputed per call: what
-            # this batch may use, and never more than the job has left. A
-            # provider's several served ids share ONE rung's slice, so the
-            # multi-id rung cannot outlive the rung it belongs to.
-            timeout = rung_timeout(active, rung, remaining,
-                                   len(plan) - index + 1)
+        return group
+
+    def attempt(prompt, model, group, timeout, batches_left, group_size):
+        """One request, with the provider's single bounded wait honoured.
+
+        Returns ({url: text}, reason). A PARTIAL answer is returned as the
+        progress it is and never reaches `note()`: measured 2026-11-07 (run
+        42369763864), every healthy rung answered "rows=6 seen, 1 written" and was
+        charged as a failure for it, so the walk advanced and threw the other
+        five stories away.
+        """
+        tries = 0
+        while True:
+            tries += 1
             try:
                 text = run(prompt, model, timeout=timeout)
                 out["requests"] += 1
@@ -1139,129 +1153,178 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     "refused" if is_refusal(str(exc)) else "failed")
                 if kind == "not_configured":
                     # A ladder built before the key was removed, or a caller
-                    # that named a provider directly. Silence is the contract:
-                    # this is a repository setting, not a model failure, and
-                    # counting it as one would page the owner about a secret.
-                    continue
+                    # that named a provider directly: a repository setting, not
+                    # a model failure, and counting it as one would page the
+                    # owner about a secret.
+                    return {}, "not_configured"
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
                 closer(model, 0, kind)
                 cause = refusal_cause(kind, str(exc))
-                causes.add(cause)
+                lost_causes.add(cause)
                 if cause == "provider_blocked":
                     # A block on this network is not a fact about this rung:
                     # cooling it would punish a healthy key for the provider's
                     # decision, and a wait cannot lift an IP policy.
-                    log("  batch %d/%d: %s was blocked at the edge; trying the "
-                        "next model" % (index, len(plan), model))
-                    continue
+                    log("  %s was blocked at the edge; trying the next model"
+                        % model)
+                    return {}, "provider_blocked"
                 if record(model, kind):
-                    log("  batch %d/%d: %s produced nothing (%s); recorded for "
-                        "the ladder memory" % (index, len(plan), model, kind))
+                    log("  %s produced nothing (%s); recorded for the ladder "
+                        "memory" % (model, kind))
                 if kind == "quota_notice" and llm_providers.provider_of(model):
-                    # A 429 from a keyed provider is THIS ACCOUNT'S capacity, not
-                    # a wrong id: waiting would keep the batch on a rung already
-                    # refused. Record it and move on.
-                    log("  batch %d/%d: %s is rate-limited (429); trying the "
-                        "next model" % (index, len(plan), model))
-                    continue
+                    # A 429 from a keyed provider is THIS ACCOUNT'S capacity, so
+                    # waiting would keep the request on a rung already refused.
+                    log("  %s is rate-limited (429); trying the next model"
+                        % model)
+                    return {}, kind
                 if not is_refusal(str(exc)):
-                    log("  batch %d/%d: %s %s within %ds (%s); trying the next "
-                        "model" % (index, len(plan), model, kind, timeout,
-                                   str(exc).strip()[:120]))
-                    continue
+                    log("  %s %s within %ds (%s); trying the next model"
+                        % (model, kind, timeout, str(exc).strip()[:120]))
+                    return {}, kind
+                if tries >= 2:
+                    return {}, kind
                 hint = retry_hint_seconds(str(exc))
                 delay = DEFAULT_WAIT_SECONDS if hint is None else hint
                 if delay > MAX_WAIT_SECONDS:
-                    log("  batch %d/%d: %s refused and asked for %ds, more "
-                        "than the %ds bound; trying the next model"
-                        % (index, len(plan), model, delay, MAX_WAIT_SECONDS))
-                    continue
+                    log("  %s refused and asked for %ds, more than the %ds "
+                        "bound; trying the next model"
+                        % (model, delay, MAX_WAIT_SECONDS))
+                    return {}, kind
                 # A SLOW CALL HAS EATEN SOME OF THE CLOCK since `remaining` was
-                # read, so the wait is clamped against a fresh reading: a 70s
-                # refusal followed by a stale 100s clamp would overshoot the
-                # allowance, and the allowance is what keeps the writer alive.
+                # read, so the wait is clamped against a fresh reading.
                 left = pacer.deadline - clock()
                 delay = min(delay, left)
                 if delay <= 0:
-                    ran_out = True
-                    break
-                log("  batch %d/%d: %s refused (%s); honouring the provider's "
-                    "hint: waiting %ds"
-                    % (index, len(plan), model,
-                       "quota" if hint is not None else "no hint", delay))
+                    return {}, "timeout"
+                log("  %s refused (%s); honouring the provider's hint: waiting "
+                    "%ds" % (model, "quota" if hint is not None else "no hint",
+                             delay))
                 sleep(delay)
                 out["waits"].append(delay)
-                retry_timeout = call_timeout(model, pacer.deadline - clock(),
-                                             len(plan) - index + 1, 1)
-                group = rung_group_size(active, rung)
-                if group > 1:
+                timeout = call_timeout(model, pacer.deadline - clock(),
+                                       batches_left, 1)
+                if group_size > 1:
                     # The retry is still this rung's time, not a fresh budget.
-                    retry_timeout = max(1, int(retry_timeout / group))
-                try:
-                    text = run(prompt, model, timeout=retry_timeout)
-                    out["requests"] += 1
-                except Refusal as again:
-                    out["requests"] += 1
-                    out["refusals"].append(str(again).strip()[:300])
-                    note(model, getattr(again, "raw", "") or str(again),
-                         getattr(again, "kind", "") or "refused", retry_timeout,
-                         exit_code=getattr(again, "exit_code", None))
-                    closer(model, 0, getattr(again, "kind", "") or "refused")
-                    again_cause = refusal_cause(
-                        getattr(again, "kind", "") or "refused", str(again))
-                    causes.add(again_cause)
-                    if again_cause == "provider_blocked":
-                        continue
-                    if record(model, getattr(again, "kind", "") or "refused"):
-                        log("  batch %d/%d: %s produced nothing after the wait; "
-                            "recorded for the ladder memory"
-                            % (index, len(plan), model))
-                    log("  batch %d/%d: %s refused again after the wait; "
-                        "trying the next model" % (index, len(plan), model))
-                    continue
+                    timeout = max(1, int(timeout / group_size))
+                continue
             except Exception as exc:      # a runner fault must not cost the edition
                 out["requests"] += 1
                 out["refusals"].append(str(exc).strip()[:300])
                 note(model, str(exc), "runner_error", timeout)
                 closer(model, 0, "runner_error")
-                causes.add("runner_fault")
-                log("  batch %d/%d: %s errored (%s); trying the next model"
-                    % (index, len(plan), model, str(exc).strip()[:120]))
-                continue
-            got = parse_reply(text, batch)
-            if not got:
-                reason = classify_reply(text, batch)
-                note(model, text, reason, timeout)
-                closer(model, 0, reason)
-                causes.add("unreadable_reply")
-                log("  batch %d/%d: %s answered but gave no usable summary "
-                    "(%s)" % (index, len(plan), model, reason))
-                continue
-            out["summaries"].update(got)
-            closer(model, len(got), "ok")
-            out["model"] = model
-            answered = True
-            if promote_rung(cooldown, model, log=log):
-                # A rung that answered is no longer demoted; the file the next
-                # run reads must say so now, not only when this step finishes.
-                save_memory()
-            log("  batch %d/%d ok: %d of %d stories summarised by %s"
-                % (index, len(plan), len(got), len(batch), model))
-            break
-        if not answered and causes:
-            cause = dominant_cause(causes)
-            out["causes"][cause] = out["causes"].get(cause, 0) + len(batch)
-            log("  batch %d/%d: %d stories lost to %s"
-                % (index, len(plan), len(batch), cause))
-        if ran_out:
+                lost_causes.add("runner_fault")
+                log("  %s errored (%s); trying the next model"
+                    % (model, str(exc).strip()[:120]))
+                return {}, "runner_error"
+            got = parse_reply(text, group)
+            if got:
+                return got, "ok"
+            reason = classify_reply(text, group)
+            note(model, text, reason, timeout)
+            closer(model, 0, reason)
+            lost_causes.add("unreadable_reply")
+            log("  %s answered but gave no usable summary (%s)"
+                % (model, reason))
+            return {}, reason
+
+    tried = set()       # rungs already asked for the group in hand
+    blocked = set()     # urls every rung has failed on, kept for the report
+    current = []        # the group in hand, retired when no rung is left for it
+    while pending:
+        # THE BUDGET GOVERNS, NOT A REQUEST COUNT. There is no fixed number of
+        # requests: each one is priced from what is left, and the loop stops the
+        # moment a call cannot be paid for. Smaller requests cost more calls, so
+        # the clock -- not a request budget -- is what has to hold.
+        remaining = pacer.deadline - clock()
+        if remaining <= 0:
             out["budget_spent"] = True
-            log("  the job's %ds summarising budget is spent; the remaining "
-                "stories keep the publisher's text" % budget_seconds)
+            log("  the job's %ds summarising budget is spent" % budget_seconds)
             break
-        if not answered:
-            log("  batch %d/%d: no summary for these %d stories -- they keep "
-                "the publisher's text" % (index, len(plan), len(batch)))
+        if dirty and cooldown is not None:
+            # RECOMPUTED ON DEMAND: a rung that refused twice during this run is
+            # reordered (and skipped below) for the rest of it.
+            order = ordered_ladder()
+            dirty = False
+        active = [m for m in order if m not in dead and m not in tried]
+        if not active:
+            # EVERY RUNG HAS NOW FAILED ON THIS GROUP. Retire its stories and
+            # reach the rest of the pool: a group no rung can answer must not sit
+            # at the front of `pending` and starve the walk for the whole budget.
+            if not current:
+                break
+            for item in current:
+                blocked.add(url_of(item))
+            current = []
+            tried.clear()
+            continue
+        model = active[0]
+        # A CALL GIVEN LESS THAN THE RUNG NEEDS IS A GUARANTEED `timeout`, not an
+        # attempt. Run 42356298224: a ten-rung ladder cut each slice to ~30s and
+        # six of fifteen attempts died on the clock.
+        need = min_answer_seconds(model)
+        if remaining < need:
+            out["budget_spent"] = True
+            log("  %.0fs left, less than the %ds %s needs; not starting a call "
+                "that cannot answer" % (remaining, need, model))
+            break
+        size = min(MAX_BATCH_SIZE, ask_sizes.get(model, BATCH_SIZE))
+        group = next_group(model, size)
+        if not group:
+            tried.add(model)
+            continue
+        current = group
+        batches_left = max(1, (len(pending) + MAX_BATCH_SIZE - 1)
+                           // MAX_BATCH_SIZE)
+        group_size = rung_group_size(active, 0)
+        timeout = rung_timeout(active, 0, remaining, batches_left)
+        prompt = build_prompt(group, snippets)
+        prompt_tokens = estimate_tokens(prompt)
+        log("  %s: asking for %d of %d stories, prompt ~%d tokens "
+            "(budget %d/min)"
+            % (model, len(group), len(pending), prompt_tokens, budget))
+        pacer.wait_for(prompt_tokens)
+        got, _reason = attempt(prompt, model, group, timeout, batches_left,
+                               group_size)
+        for item in group:
+            key = (model, url_of(item))
+            asked[key] = asked.get(key, 0) + 1
+        if not got:
+            # ONLY A REQUEST THAT RETURNED NOTHING USABLE ADVANCES THE LADDER.
+            tried.add(model)
+            continue
+        out["summaries"].update(got)
+        closer(model, len(got), "ok")
+        out["model"] = model
+        if promote_rung(cooldown, model, log=log):
+            # A rung that answered is no longer demoted; the file the next run
+            # reads must say so now, not only when this step finishes.
+            save_memory()
+        # ADAPT: a model that answered EVERY story it was asked for gets a bigger
+        # ask next (up to MAX_BATCH_SIZE); a model that answered fewer gets
+        # single-story requests, the shape measured to work.
+        ask_sizes[model] = (min(MAX_BATCH_SIZE, size * 2)
+                            if len(got) >= len(group) else 1)
+        answered_urls = set(got)
+        pending = [item for item in pending
+                   if url_of(item) not in answered_urls]
+        # THE GROUP IS RESOLVED: the next group starts with the whole ladder
+        # again, so a rung that failed once -- a bad reply, not a broken key --
+        # gets its second hit here and is demoted only for failing twice.
+        current = []
+        tried.clear()
+        log("  %s: %d of %d stories summarised, %d still waiting"
+            % (model, len(got), len(group), len(pending)))
+
+    if pending:
+        if lost_causes:
+            cause = dominant_cause(lost_causes)
+            out["causes"][cause] = out["causes"].get(cause, 0) + len(pending)
+            log("  %d stories keep the publisher's text; dominant cause %s"
+                % (len(pending), cause))
+        else:
+            log("  %d stories keep the publisher's text: no request was made "
+                "for them" % len(pending))
 
     out["waits"].extend(pacer.waits)
     out["seconds"] = round(max(0.0, clock() - started), 1)
