@@ -91,8 +91,14 @@ class TheRequestTests(unittest.TestCase):
         record = lp.provider("github")
         self.assertEqual("https://models.github.ai/inference/chat/completions",
                          record.url)
-        self.assertEqual("https://models.github.ai/inference/models",
+        # THE CATALOGUE IS NOT ON THE /inference PATH. Probe 42363318770 asked
+        # /inference/models, got HTTP 200 with no ids, and printed no note: the
+        # row said models=0 and nothing else. GitHub publishes the catalogue at
+        # /catalog/models; the old path is the fallback, never the first ask.
+        self.assertEqual("https://models.github.ai/catalog/models",
                          record.models_url)
+        self.assertEqual("https://models.github.ai/inference/models",
+                         record.models_alt)
         self.assertEqual("GITHUB_TOKEN", record.env)
 
     def test_the_two_seed_ids_are_namespaced(self):
@@ -289,6 +295,68 @@ class ProbeRowTests(unittest.TestCase):
         names = [r.split(" | ", 1)[0] for r in rows if " | key=" in r]
         self.assertEqual(["gemini", "gemini-key2", "groq", "openrouter",
                           "mistral", "github"], names)
+
+
+class TheCatalogueSilenceTests(unittest.TestCase):
+    """A row that lists nothing must say WHAT it asked and WHAT came back.
+
+    Probe 42363318770 is the reason: `github | models=0 | status=200 |
+    verdict=network`, with no `available:` line and no note. Three separate
+    silences contributed -- the wrong catalogue URL, a zero-id listing that
+    printed nothing, and `garbage` reported as `network` -- so each one is
+    pinned here rather than only the first.
+    """
+
+    def test_the_documented_catalogue_is_asked_first_and_the_old_path_second(self):
+        lp.clear_catalogue()
+        urls = []
+
+        def send(spec):
+            urls.append(spec["url"])
+            if urls[-1].endswith("/catalog/models"):
+                return 200, json.dumps({"data": []})
+            return 200, json.dumps({"data": [{"id": "openai/gpt-4o-mini"}]})
+
+        got = lp.catalogue("github", transport=send,
+                           environ=dict(GITHUB_TOKEN), refresh=True)
+        self.assertEqual(["openai/gpt-4o-mini"], got.ids)
+        self.assertEqual(["https://models.github.ai/catalog/models",
+                          "https://models.github.ai/inference/models"], urls,
+                         "the documented catalogue is asked FIRST")
+
+    def test_a_catalogue_that_lists_nothing_names_its_endpoint_and_status(self):
+        send, _ = router()          # every catalogue answers {"data": []}
+        rows = lp.probe_rows(transport=send,
+                             environ=dict(KEYS, **GITHUB_TOKEN),
+                             sleep=lambda s: 0)
+        for name in ("github", "groq"):
+            notes = [r for r in rows if r.strip().startswith(name + " note:")]
+            self.assertTrue(notes, "%s printed no note for an empty catalogue "
+                                   "-- rows: %r" % (name, rows))
+            self.assertIn(lp.PROVIDERS[name].models_url, notes[0])
+            self.assertIn("HTTP 200", notes[0])
+            self.assertIn('"data"', notes[0], "the body snippet is the evidence")
+
+    def test_a_two_hundred_with_no_usable_answer_has_its_own_verdict(self):
+        self.assertEqual("no_answer", lp.PROBE_VERDICT["garbage"])
+        self.assertEqual("network", lp.PROBE_VERDICT["transport"],
+                         "`network` means a transport failure and nothing else")
+        send, _ = router(catalogues={"github": list(GITHUB_CATALOGUE)},
+                         chat=(200, "<html>not a reply</html>"))
+        rows = lp.probe_rows(transport=send, environ=dict(GITHUB_TOKEN),
+                             sleep=lambda s: 0)
+        row = [r for r in rows if r.startswith("github | ")][0]
+        self.assertIn("status=200", row)
+        self.assertIn("verdict=no_answer", row)
+        self.assertNotIn("verdict=network", row)
+
+    def test_a_successful_catalogue_still_publishes_available(self):
+        send, _ = router(catalogues={"github": list(GITHUB_CATALOGUE)},
+                         chat=(200, OK_BODY))
+        rows = lp.probe_rows(transport=send, environ=dict(GITHUB_TOKEN),
+                             sleep=lambda s: 0)
+        self.assertIn("    github available: openai/gpt-4o-mini, "
+                      "meta/llama-3.3-70b-instruct", rows)
 
 
 if __name__ == "__main__":

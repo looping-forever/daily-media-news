@@ -105,6 +105,7 @@ class Provider:
     models: tuple          # candidate ids, best first; corrected by the probe
     timeout: int           # the socket ceiling for ONE call, in seconds
     free_only: bool = False
+    models_alt: str = ""   # a SECOND catalogue URL, asked only when the first lists nothing
 
 
 #: THE LADDER ORDER, AND THE ONLY PLACE IT IS WRITTEN. Gemini is absent on
@@ -211,10 +212,15 @@ PROVIDERS = {
     "github": Provider(
         "github",
         "https://models.github.ai/inference/chat/completions",
-        "https://models.github.ai/inference/models",
+        # THE CATALOGUE IS NOT ON THE /inference PATH. Probe 42363318770 asked
+        # /inference/models and got HTTP 200 with no ids at all. /catalog/models
+        # is the published catalogue; the inference path stays as a second ask
+        # for the day GitHub moves it again.
+        "https://models.github.ai/catalog/models",
         "GITHUB_TOKEN",
         ("openai/gpt-4o-mini", "meta/llama-3.3-70b-instruct"),
         60,
+        models_alt="https://models.github.ai/inference/models",
     ),
 }
 
@@ -271,8 +277,11 @@ REASON_TEXT = {
 }
 
 #: What the PROBE prints. Closed on purpose -- a probe that invents verdicts is
-#: a second vocabulary. `garbage` is reported as `network`: a 200 with no usable
-#: answer is a transport-shaped failure for an operator reading the table.
+#: a second vocabulary. `network` MEANS A TRANSPORT FAILURE AND NOTHING ELSE.
+#: `garbage` used to print as `network`; probe 42363318770 printed exactly that
+#: for a 200, which sent the reader to the network for a reply problem. It is
+#: `no_answer` now: the request arrived and the body carried nothing usable.
+#: `bad_request` is our request shape, also not a transport fault.
 #: `empty_answer` is NOT `network`: the provider answered, and said nothing.
 #: `blocked` is its own verdict because it is neither the key nor the model: the
 #: request never reached a credential check.
@@ -283,9 +292,9 @@ PROBE_VERDICT = {
     "model_not_found": "model_not_found",
     "timeout": "timeout",
     "transport": "network",
-    "garbage": "network",
+    "garbage": "no_answer",
     "empty_answer": "empty",
-    "bad_request": "network",
+    "bad_request": "bad_request",
     "model_rejected": "model_rejected",
     "no_chat_model": "no_chat_model",
 }
@@ -372,6 +381,8 @@ class ModelList:
     status: int = 0
     elapsed: float = 0.0
     reason: str = ""
+    url: str = ""          # the endpoint actually asked, for the probe's note
+    detail: str = ""       # redacted body snippet, capped at 300 chars
 
 
 def provider_of(model_id):
@@ -874,8 +885,20 @@ def list_models(name, transport=None, environ=None):
     key = key_for(name, environ)
     if not key:
         return ModelList([], 0, 0.0, "not_configured")
+    got = _read_models(record, key, record.models_url, transport, started)
+    if not got.ids and record.models_alt:
+        # SECOND ASK, in the stated order: the documented catalogue first, this
+        # path only when the documented one listed nothing.
+        alt = _read_models(record, key, record.models_alt, transport, started)
+        if alt.ids:
+            got = alt
+    return got
+
+
+def _read_models(record, key, url, transport, started):
+    """One catalogue GET against `url`, described. Never raises for a fault."""
     spec = {
-        "url": record.models_url,
+        "url": url,
         "method": "GET",
         "timeout": record.timeout,
         "headers": {"Authorization": "Bearer %s" % key,
@@ -886,23 +909,25 @@ def list_models(name, transport=None, environ=None):
     try:
         status, body = (transport or _http)(spec)
     except (socket.timeout, TimeoutError) as exc:
-        return ModelList([], 0, time.monotonic() - started, "timeout")
+        return ModelList([], 0, time.monotonic() - started, "timeout", url)
     except (urllib.error.URLError, OSError):
-        return ModelList([], 0, time.monotonic() - started, "transport")
+        return ModelList([], 0, time.monotonic() - started, "transport", url)
     elapsed = time.monotonic() - started
     status = int(status or 0)
+    detail = " ".join(redact(body, key).split())[:300]
     if status != 200:
-        return ModelList([], status, elapsed, _reason_for_status(status, body))
+        return ModelList([], status, elapsed,
+                         _reason_for_status(status, body), url, detail)
     try:
         doc = json.loads(body)
         rows = doc.get("data") if isinstance(doc, dict) else None
         ids = [_bare_id(r.get("id")) for r in (rows or [])
                if isinstance(r, dict) and r.get("id")]
     except (TypeError, ValueError):
-        return ModelList([], status, elapsed, "garbage")
+        return ModelList([], status, elapsed, "garbage", url, detail)
     if record.free_only:
         ids = [i for i in ids if i.endswith(":free")]
-    return ModelList(ids, status, elapsed, "ok")
+    return ModelList(ids, status, elapsed, "ok", url, detail)
 
 
 def is_chat_model(model_id):
@@ -1068,6 +1093,24 @@ def served_models(name, limit=None, transport=None, environ=None,
     return got
 
 
+def _catalogue_note(got):
+    """The catalogue sentence for a row that listed nothing, or "".
+
+    SILENCE WAS THE DEFECT. Probe 42363318770 printed `github | models=0 |
+    status=200 | verdict=network` with no note at all: the row named neither the
+    endpoint it asked nor the body that came back, so the one fixable fact was
+    the one not on the page.
+    """
+    if got.get("key") != "present" or got.get("models"):
+        return ""
+    return ("the catalogue at %s answered HTTP %s with %r and listed 0 ids -- "
+            "nothing can be chosen from it, so this row proves the endpoint, "
+            "not the models"
+            % (got.get("catalogue_url") or "-",
+               got.get("catalogue_status") or "-",
+               (got.get("catalogue_detail") or "")[:300]))
+
+
 def _probe_note(got):
     """The plain-sentence line under a probe row, or "".
 
@@ -1114,7 +1157,7 @@ def _probe_note(got):
     if verdict == "model_not_found":
         return ("the chosen id %r is not in this account's catalogue; seed from "
                 "the `available` line instead" % (got.get("chosen") or "-"))
-    if verdict == "no_chat_model":
+    if verdict == "no_chat_model" and got.get("models"):
         return ("no chat-capable model served: the catalogue offered %d id(s) "
                 "(%s) and none can answer a chat-completion, so no request was "
                 "made -- the provider is reachable and the fault is our model "
@@ -1207,6 +1250,9 @@ def probe(name, transport=None, environ=None, sleep=None):
             "verdict": PROBE_VERDICT["no_chat_model"],
             "available": list(discovered.ids[:8]),
             "attempts": 0,
+            "catalogue_url": discovered.url,
+            "catalogue_status": discovered.status,
+            "catalogue_detail": discovered.detail,
         }
     attempted = []
     result = None
@@ -1248,6 +1294,9 @@ def probe(name, transport=None, environ=None, sleep=None):
         "attempts": attempts,
         "block": result.block,
         "detail": result.detail,
+        "catalogue_url": discovered.url,
+        "catalogue_status": discovered.status,
+        "catalogue_detail": discovered.detail,
     }
 
 
@@ -1275,6 +1324,9 @@ def probe_rows(transport=None, environ=None, sleep=None):
         if got["available"]:
             rows.append("    %s available: %s"
                         % (got["provider"], ", ".join(got["available"])))
+        note = _catalogue_note(got)
+        if note:
+            rows.append("    %s note: %s" % (got["provider"], note))
         note = _probe_note(got)
         if note:
             rows.append("    %s note: %s" % (got["provider"], note))
