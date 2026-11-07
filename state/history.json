@@ -1308,6 +1308,27 @@
       "title": "Spain's rail authorities face European fraud probe after Urda rail disaster",
       "category": "world_major",
       "date_sent": "2026-11-07"
+    },
+    {
+      "url_normalized": "tu.edu.np/notices/16097",
+      "title_hash": "f9352654b1810d0825b0cc25498025f9bb19c56b",
+      "title": "Tribhuvan University Issues Urgent Notice on Affiliated College Program and Quota Additions",
+      "category": "education_tu",
+      "date_sent": "2026-11-07"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cm4g1nq8158po",
+      "title_hash": "0b80368c2e9fdddaa0fd5d117520e2be69d04695",
+      "title": "Ukraine Power Network Suffers Additional Damage Following Fresh Strikes",
+      "category": "world_major",
+      "date_sent": "2026-11-07"
+    },
+    {
+      "url_normalized": "eurogamer.net/xbox-cloud-gaming-phone-controller-smart-tv-nano-cloud-connect",
+      "title_hash": "7986b8389de9307140fdb7f7dd7df57403b97f7e",
+      "title": "Xbox Testing New Cloud Gaming Features Including Phone Controls on Smart TVs",
+      "category": "gaming",
+      "date_sent": "2026-11-07"
     }
   ]
 }
