@@ -5,9 +5,9 @@
 
 **Project** dmnews-public
 
-**Generated at** 2026-11-07T12:01:29.789Z
+**Generated at** 2026-11-07T12:08:09.068Z
 
-Counts: IDEA=7
+Counts: CANCELLED=1 DONE=4 IDEA=2
 
 ## Current milestone
 
@@ -35,22 +35,19 @@ _none_
 
 ## Recently completed
 
-_none_
+- **D-002** GitHub Models must not be added back -- basis=manually_accepted
+- **F-004** Weekly canary that fails loudly when a provider family goes dark -- basis=manually_accepted
+- **F-003** Replace pinned model ids with catalogue-driven discovery -- basis=manually_accepted
+- **F-002** Wire the second Gemini project key as a first-class ladder rung -- basis=manually_accepted
 
 ## Ideas
 
 - **D-001** Local LLM inference inside GitHub Actions is rejected
-- **D-002** GitHub Models must not be added back
-- **F-001** Add GitHub Models as an independent AI provider family
-- **F-002** Wire the second Gemini project key as a first-class ladder rung
-- **F-003** Replace pinned model ids with catalogue-driven discovery
-- **F-004** Weekly canary that fails loudly when a provider family goes dark
 - **M-001** The digest never fails to deliver news and never ships a blank card; AI…
 
 ## Open decisions
 
 - **D-001** Local LLM inference inside GitHub Actions is rejected -- basis=unset
-- **D-002** GitHub Models must not be added back -- basis=unset
 
 ## Next actions
 

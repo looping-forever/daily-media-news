@@ -1,12 +1,14 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-07T12:01:29.789Z",
+  "generated_at": "2026-11-07T12:08:09.068Z",
   "project": {
     "name": "dmnews-public",
     "repo_root": "C:\\src\\dmnews-public"
   },
   "counts": {
-    "IDEA": 7
+    "IDEA": 2,
+    "DONE": 4,
+    "CANCELLED": 1
   },
   "active": [],
   "testing": [],
@@ -19,41 +21,41 @@
       "title": "Local LLM inference inside GitHub Actions is rejected"
     },
     {
-      "id": "D-002",
-      "title": "GitHub Models must not be added back"
-    },
-    {
-      "id": "F-001",
-      "title": "Add GitHub Models as an independent AI provider family"
-    },
-    {
-      "id": "F-002",
-      "title": "Wire the second Gemini project key as a first-class ladder rung"
-    },
-    {
-      "id": "F-003",
-      "title": "Replace pinned model ids with catalogue-driven discovery"
-    },
-    {
-      "id": "F-004",
-      "title": "Weekly canary that fails loudly when a provider family goes dark"
-    },
-    {
       "id": "M-001",
       "title": "The digest never fails to deliver news and never ships a blank card; AI degradation is visible and one-line diagnosable"
     }
   ],
-  "recently_completed": [],
+  "recently_completed": [
+    {
+      "id": "D-002",
+      "title": "GitHub Models must not be added back",
+      "completion_basis": "manually_accepted",
+      "verified": false
+    },
+    {
+      "id": "F-004",
+      "title": "Weekly canary that fails loudly when a provider family goes dark",
+      "completion_basis": "manually_accepted",
+      "verified": false
+    },
+    {
+      "id": "F-003",
+      "title": "Replace pinned model ids with catalogue-driven discovery",
+      "completion_basis": "manually_accepted",
+      "verified": false
+    },
+    {
+      "id": "F-002",
+      "title": "Wire the second Gemini project key as a first-class ladder rung",
+      "completion_basis": "manually_accepted",
+      "verified": false
+    }
+  ],
   "active_milestone": null,
   "unresolved_decisions": [
     {
       "id": "D-001",
       "title": "Local LLM inference inside GitHub Actions is rejected",
-      "status": "IDEA"
-    },
-    {
-      "id": "D-002",
-      "title": "GitHub Models must not be added back",
       "status": "IDEA"
     }
   ],
