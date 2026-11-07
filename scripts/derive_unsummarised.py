@@ -570,9 +570,11 @@ def main(argv=None):
     if args.summarise and stories:
         # Imported here, not at module level: the deriver is used offline by
         # tests and by hand, and it must not need the summariser to import.
+        import article_text
         import summarise_stories
         result = summarise_stories.summarise(
-            stories, health_path=args.model_health)
+            stories, health_path=args.model_health,
+            fetch_text=article_text.fetch_with_reason)
         rejected = []
         written = apply_summaries(stories, result.get("summaries"),
                                   snippet_index(args.candidates),

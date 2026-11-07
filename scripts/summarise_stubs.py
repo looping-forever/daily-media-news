@@ -69,9 +69,11 @@ def _ladder(stories, budget_seconds=None, snippets=None):
     model was asked to rewrite the sentence it was told to replace (run
     42321136172: a working rung, 299 s, 0 of 11 repaired).
     """
+    import article_text
     import summarise_stories
     return summarise_stories.summarise(stories, budget_seconds=budget_seconds,
-                                       snippets=snippets)
+                                       snippets=snippets,
+                                       fetch_text=article_text.fetch_with_reason)
 
 
 def _verdict(result, found, no_source, spend, rejected=()):

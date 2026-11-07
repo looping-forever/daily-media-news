@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import english_text  # noqa: E402
+import article_text  # noqa: E402
 import llm_providers  # noqa: E402
 from validate_stories import crime_violation, spoiler_violation  # noqa: E402
 
@@ -63,6 +64,14 @@ STORY_ASKS_PER_MODEL = 2
 #: Retiring is not dropping: the story keeps the publisher's text and still
 #: reaches the repair path.
 RETIRE_AFTER_RUNGS = 2
+
+#: The most article pages ONE run may fetch, and the wall clock that phase may
+#: spend. The phase exists to give a headline-only story real evidence, so it is
+#: bounded like everything else: 20 pages at a 5s timeout is 100s of network at
+#: worst, and the deadline is recomputed per request so it can never run past the
+#: job's own allowance. Once either bound is reached the rest stay skipped.
+MAX_ARTICLE_FETCHES = 20
+ARTICLE_FETCH_SECONDS = 120
 
 #: The measured Gemini free-tier limit, in INPUT tokens per minute. It is a
 #: named constant rather than a number in the loop because the whole point of
@@ -358,7 +367,14 @@ def batches(stories, size=BATCH_SIZE):
     return [list(stories[i:i + size]) for i in range(0, len(stories), size)]
 
 
-def build_prompt(batch, snippets=None):
+#: How much evidence reaches the prompt. A publisher snippet is a trimmed
+#: description, so 400 characters is all of it; a fetched article is prose, and
+#: 1200 lets the model read past the opening before it writes.
+EVIDENCE_CHARS = 400
+FETCHED_EVIDENCE_CHARS = 1200
+
+
+def build_prompt(batch, snippets=None, fetched=()):
     """The whole request for one batch: short fields only, never full text.
 
     `evidence` is the collector's trimmed description, not the article, so a
@@ -373,6 +389,10 @@ def build_prompt(batch, snippets=None):
     sending it costs: five answers quoted the snippet straight back and the
     validator refused every one. Without an index (the deriver, which runs
     before any summary exists) the story's own text is all there is.
+
+    `fetched` is the set of urls whose evidence came from the article itself, and
+    only those get the longer window: a publisher snippet keeps the 400 that is
+    proven today.
     """
     items = []
     for story in batch:
@@ -381,10 +401,11 @@ def build_prompt(batch, snippets=None):
             source = (snippets or {}).get(url) or ""
         else:
             source = story.get("summary") or ""
+        window = FETCHED_EVIDENCE_CHARS if url in (fetched or ()) else EVIDENCE_CHARS
         items.append({
             "url": url,
             "title": story.get("title") or "",
-            "evidence": str(source)[:400],
+            "evidence": str(source)[:window],
             "source": story.get("source_name") or "",
         })
     return PROMPT % json.dumps(items, ensure_ascii=False, indent=1)
@@ -955,10 +976,94 @@ def refusal_cause(kind, message):
     return "runner_fault"
 
 
+def story_url(item):
+    """The url a story is keyed by in the prompt, the answer and the artifacts."""
+    return item.get("source_url") or item.get("url") or ""
+
+
+def story_evidence(item, snippets=None):
+    """The publisher text the prompt would carry for this story."""
+    if snippets is not None:
+        return str((snippets or {}).get(story_url(item)) or "")
+    return str(item.get("summary") or "")
+
+
+def story_has_evidence(item, snippets=None):
+    """False when there is no publisher text, or it is the headline itself."""
+    if snippets is None and item.get("summary_source") == "none":
+        # The deriver's own marker for "the card carries no description", which
+        # is a placeholder sentence rather than an empty string.
+        return False
+    text = story_evidence(item, snippets).strip()
+    return bool(text) and text != str(item.get("title") or "").strip()
+
+
+def fetch_missing_text(items, snippets=None, log=print, clock=None, fetch=None,
+                       max_fetches=MAX_ARTICLE_FETCHES,
+                       seconds=ARTICLE_FETCH_SECONDS, deadline=None):
+    """({url: text}, stats) for stories that have no publisher text at all.
+
+    `fetch` is `article_text.fetch_with_reason` by default -- (text|None, reason)
+    -- and is injected so a test never opens a socket. A story that already has
+    publisher text is never fetched: its own description is better evidence than
+    a page scrape, and this phase exists only for the ones the skip line names.
+    """
+    clock = clock or time.monotonic
+    fetch = fetch or article_text.fetch_with_reason
+    texts = {}
+    stats = {"fetched": 0, "with_text": 0, "robots": 0, "failed": 0,
+             "stopped": ""}
+    started = clock()
+    stop = started + float(seconds)
+    if deadline is not None:
+        stop = min(stop, float(deadline))
+    seen = set()
+    for item in items:
+        url = story_url(item)
+        if not url or url in seen:
+            continue
+        if stats["fetched"] >= max_fetches:
+            stats["stopped"] = "the %d-fetch cap" % max_fetches
+            break
+        left = stop - clock()
+        if left <= 0:
+            stats["stopped"] = "the %ds budget" % int(seconds)
+            break
+        seen.add(url)
+        try:
+            text, reason = fetch(url, timeout=min(article_text.TIMEOUT_SECONDS,
+                                                  max(1, int(left))))
+        except Exception:      # a fetch must never cost the edition
+            text, reason = None, "error"
+        if reason == "robots":
+            stats["robots"] += 1
+            continue
+        stats["fetched"] += 1
+        if text:
+            texts[url] = text
+            stats["with_text"] += 1
+            # WHERE THE EVIDENCE CAME FROM, so a later investigation can tell a
+            # fetched article from the publisher's own snippet. The card is not
+            # changed by this: it still carries a summary or its honest fallback.
+            item["evidence_source"] = "fetched"
+            item["evidence_chars"] = len(text)
+        else:
+            stats["failed"] += 1
+    if stats["fetched"] or stats["robots"]:
+        log("  article text: %d fetched, %d with text, %d refused by robots, "
+            "%d failed" % (stats["fetched"], stats["with_text"],
+                           stats["robots"], stats["failed"]))
+    if stats["stopped"]:
+        log("  article fetch stopped at %s; the rest keep the publisher's text"
+            % stats["stopped"])
+    return texts, stats
+
+
 def summarise(stories, models=None, run=None, sleep=None, clock=None,
               log=print, budget=INPUT_TOKEN_BUDGET_PER_MINUTE,
               budget_seconds=TOTAL_BUDGET_SECONDS, cooldown=None,
-              cooldown_path=None, snippets=None, health=None, health_path=None):
+              cooldown_path=None, snippets=None, health=None, health_path=None,
+              fetch_text=None):
     """Summarise *stories* in small, adaptive, paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
@@ -995,6 +1100,15 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     given the publisher's description rather than a summary the validator has
     already refused.
 
+    A story with NO publisher text is not simply skipped: its article is fetched
+    first (bounded to MAX_ARTICLE_FETCHES and ARTICLE_FETCH_SECONDS) and that text
+    becomes prompt evidence, with `evidence_source: "fetched"` recorded on the
+    story. Fetching happens ONLY when a caller passes `fetch_text`; the default is
+    None, so nothing here can reach the network by accident. The caller's
+    `snippets` is COPIED, never mutated -- the repair path quotes it as the
+    publisher's own description afterwards, and fetched article text is not that.
+    `out["article_fetch"]` carries the phase's counts.
+
     `cooldown` / `cooldown_path` are the demotion memory: a rung that refuses
     without a quota reason twice is moved to the back of the ladder for six
     hours, and the next run reads that back instead of paying the same ~99s.
@@ -1030,7 +1144,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
            "refusals": [], "debug": [], "causes": {},
            "attempts": 0, "reasons": {}, "closest": None,
-           "retired": 0, "skipped_no_text": 0,
+           "retired": 0, "skipped_no_text": 0, "article_fetch": {},
            "budget_spent": False, "seconds": 0.0}
     #: Rungs demoted by a refusal IN THIS RUN. They are skipped for the rest of
     #: it (run 42070185644 paid the same broken rung in all three batches), but
@@ -1122,32 +1236,48 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     lost_causes = set()
 
     def url_of(item):
-        return item.get("source_url") or item.get("url") or ""
+        return story_url(item)
 
     def evidence_of(item):
         """The publisher text the prompt would carry for this story."""
-        if snippets is not None:
-            return str((snippets or {}).get(url_of(item)) or "")
-        return str(item.get("summary") or "")
+        return story_evidence(item, snippets)
 
     def has_evidence(item):
         """False when there is no publisher text, or it is the headline itself."""
-        if snippets is None and item.get("summary_source") == "none":
-            # The deriver's own marker for "the card carries no description",
-            # which is a placeholder sentence rather than an empty string.
-            return False
-        text = evidence_of(item).strip()
-        return bool(text) and text != str(item.get("title") or "").strip()
+        return story_has_evidence(item, snippets)
 
     # DO NOT ASK FOR A STORY WITH NOTHING TO SUMMARISE (run 42374040333: an empty
-    # snippet and a headline-only story were each walked down the ladder). They
-    # are not asked for at all; the caller keeps them and the downstream path
-    # gives them the publisher's text or drops them by its own rules.
-    pending = [item for item in stories if has_evidence(item)]
+    # snippet and a headline-only story were each walked down the ladder). Before
+    # giving up on them, read the articles themselves -- bounded, robots-honest,
+    # and only for the stories this line would otherwise name as skipped.
+    missing = [item for item in stories if not has_evidence(item)]
+    fetched_text = {}
+    if missing and fetch_text is not None:
+        fetched_text, out["article_fetch"] = fetch_missing_text(
+            missing, snippets=snippets, log=log, clock=clock,
+            fetch=fetch_text, deadline=pacer.deadline)
+    pending = [item for item in stories
+               if has_evidence(item) or url_of(item) in fetched_text]
     out["skipped_no_text"] = len(stories) - len(pending)
     if out["skipped_no_text"]:
         log("  %d stories skipped: no publisher text to summarise (empty, or "
             "the headline itself)" % out["skipped_no_text"])
+
+    def prompt_evidence(group):
+        """The prompt's evidence index: publisher text, then fetched text.
+
+        A copy, never the caller's dict: the repair path quotes `snippets` as the
+        publisher's own description afterwards, and fetched article text is NOT
+        that -- mislabelling it would change what the reader sees.
+        """
+        if snippets is not None:
+            index = dict(snippets)
+        else:
+            index = {url_of(item): str(item.get("summary") or "")
+                     for item in group}
+        if fetched_text:
+            index.update(fetched_text)
+        return index
 
     def next_group(model, size):
         """The next *size* stories *model* may still be asked for."""
@@ -1319,7 +1449,8 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                            // MAX_BATCH_SIZE)
         group_size = rung_group_size(active, 0)
         timeout = rung_timeout(active, 0, remaining, batches_left)
-        prompt = build_prompt(group, snippets)
+        prompt = build_prompt(group, prompt_evidence(group),
+                              fetched=fetched_text)
         prompt_tokens = estimate_tokens(prompt)
         log("  %s: asking for %d of %d stories, prompt ~%d tokens "
             "(budget %d/min)"
