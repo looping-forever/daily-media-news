@@ -68,7 +68,14 @@ def sourcing_note(kind, written, total, publisher, none, fallback=True):
         if none <= 0:
             return NOTE_NONE_SURVIVED if fallback else NOTE_MODEL_NONE
         pattern = NOTE_REST_FALLBACK if fallback else NOTE_REST_MODEL
-        return pattern % (coverage_phrase(publisher, none, total),)
+        # BOTH sentences carry two counts AND the coverage phrase. This branch
+        # passed only the phrase, so a model-written edition with 0 written,
+        # some publisher text and some stories with neither raised
+        # "TypeError: %d format: a real number is required" inside the repair's
+        # own note -- the one path whose whole job is to say why it repaired
+        # nothing.
+        return pattern % (written, total,
+                          coverage_phrase(publisher, none, total))
     if kind == FULL:
         return NOTE_ALL % total
     if none <= 0:

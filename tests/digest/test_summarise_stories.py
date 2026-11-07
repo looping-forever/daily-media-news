@@ -1023,5 +1023,84 @@ class TwoGeminiKeysAreIndependentRungs(unittest.TestCase):
         self.assertEqual(1, len(out["summaries"]))
 
 
+#: A publisher description the deriver may REFUSE to print (a veto, an excluded
+#: keyword) but which a model can still summarise safely. It is source text.
+DESCRIPTION = ("The Texas Department of Transportation says the Loop 1604 ramp "
+               "at Highway 90 closes at 21:00 on Thursday for resurfacing, and "
+               "westbound drivers should use the Frontage Road instead.")
+
+
+class ThePromptCarriesTheSourceText(unittest.TestCase):
+    """RUN 42321136172: the repair asked the model to rewrite the stub itself.
+
+    `build_prompt` sent `story["summary"]` as the snippet. On the repair path
+    that is the stub -- "Reported: <headline>", or the deriver's own "No
+    summary available." -- so the model was handed the sentence it was being
+    asked to replace, and the prompt's "never invent... use an empty string"
+    rule left it nothing to say. The candidate's publisher description is the
+    source text, and it was in `snippet_index` all along.
+    """
+
+    def test_the_candidate_snippet_beats_the_storys_own_summary(self):
+        batch = [story(1, snippet="Reported: " + ENOUGH)]
+        prompt = ss.build_prompt(batch, {"https://example.com/1": DESCRIPTION})
+        self.assertIn("Loop 1604", prompt)
+        self.assertNotIn("Reported: " + ENOUGH, prompt,
+                         "the stub must not be sent as the story's text")
+
+    def test_a_story_with_no_candidate_snippet_keeps_its_own_text(self):
+        batch = [story(1, snippet=ENOUGH)]
+        self.assertIn(ENOUGH[:40], ss.build_prompt(batch))
+        self.assertIn(ENOUGH[:40], ss.build_prompt(batch, {}))
+        self.assertIn(ENOUGH[:40], ss.build_prompt(batch, {"https://other/1": DESCRIPTION}),
+                      "a missing url must not silently empty the prompt")
+
+    def test_summarise_threads_the_snippet_index_into_the_prompt(self):
+        batch = [story(1, snippet="No summary available.")]
+        run = FakeRun([reply_for(batch)])
+        ss.summarise(batch, models=["gemini/a"], run=run, sleep=lambda *_a: None,
+                     clock=FakeClock(), log=lambda *_a: None,
+                     snippets={"https://example.com/1": DESCRIPTION})
+        self.assertIn("Loop 1604", run.calls[0][0])
+
+
+class TheOutcomeIsDiagnosable(unittest.TestCase):
+    """A failed run has to say WHY, and how close any rung came.
+
+    RUN 42321136172 reported "budget spent after 12 rungs, 0 repaired". Twelve
+    was the debug-record cap, not the number of attempts, and nothing in the log
+    named a reason or a rung.
+    """
+
+    def test_the_reasons_are_counted_per_attempt(self):
+        batch = [story(1)]
+        run = FakeRun([
+            ss.Refusal("gemini/a: no answer in 20s (killed)", kind="timeout"),
+            reply_for(batch, "Too short."),
+            reply_for(batch),
+        ])
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b", "gemini/c"],
+                           run=run, sleep=lambda *_a: None, clock=FakeClock(),
+                           log=lambda *_a: None, budget_seconds=100)
+        self.assertEqual({"timeout": 1, "no_usable_row": 1}, out["reasons"])
+        self.assertEqual(2, out["attempts"])
+        self.assertEqual("gemini/c", out["closest"]["model"],
+                         "the rung that answered is the one that came closest")
+        self.assertEqual(1, out["closest"]["accepted"])
+
+    def test_attempts_are_counted_past_the_debug_cap(self):
+        batch = [story(1)]
+        run = FakeRun([reply_for(batch, "Too short.")])
+        models = ["gemini/m%d" % n for n in range(ss.DEBUG_MAX_RECORDS + 2)]
+        out = ss.summarise(batch, models=models, run=run, sleep=lambda *_a: None,
+                           clock=FakeClock(), log=lambda *_a: None,
+                           budget_seconds=600)
+        self.assertEqual(ss.DEBUG_MAX_RECORDS, len(out["debug"]),
+                         "the artifact keeps its bound")
+        self.assertEqual(len(models), out["attempts"],
+                         "the count must be the rungs the run actually paid for, "
+                         "not the size of the capped artifact")
+
+
 if __name__ == "__main__":
     unittest.main()

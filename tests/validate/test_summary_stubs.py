@@ -18,6 +18,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ from unittest import mock
 
 from . import REPO_ROOT  # noqa: F401  (REPO_ROOT puts scripts/ on sys.path)
 
+import derive_unsummarised
 import summarise_stubs
 import summarise_stories
 import validate_stories as vs
@@ -600,7 +602,7 @@ class TheBudgetIsAWallClock(unittest.TestCase):
 
     def test_a_spent_budget_writes_the_edition_and_says_so_once(self):
         rc, out = self.run_main(
-            lambda stubs, budget_seconds=None: {
+            lambda stubs, budget_seconds=None, snippets=None: {
                 "summaries": {}, "model": None, "requests": 4,
                 "debug": [{}, {}, {}, {}], "budget_spent": True})
         self.assertEqual(0, rc)
@@ -619,7 +621,7 @@ class TheBudgetIsAWallClock(unittest.TestCase):
     def test_the_allowance_is_measured_from_the_steps_own_start(self):
         seen = []
 
-        def note(stubs, budget_seconds=None):
+        def note(stubs, budget_seconds=None, snippets=None):
             seen.append(budget_seconds)
             return {"summaries": {}, "requests": 0, "budget_spent": False}
 
@@ -630,7 +632,7 @@ class TheBudgetIsAWallClock(unittest.TestCase):
         self.assertGreater(seen[0], 0, "the walk must still get what is left")
 
     def test_a_raising_ladder_still_writes_the_edition(self):
-        def boom(stubs, budget_seconds=None):
+        def boom(stubs, budget_seconds=None, snippets=None):
             raise RuntimeError("catalogue exploded")
 
         rc, out = self.run_main(boom)
@@ -650,6 +652,200 @@ class TheBudgetIsAWallClock(unittest.TestCase):
                 "summaries": {}, "requests": 2, "budget_spent": True},
             log=lambda *_a: None)
         self.assertTrue(counts["budget_spent"])
+
+
+def reading_rung(prompt, model=None, timeout=None):
+    """A rung that writes only what the input gives it, exactly as PROMPT says.
+
+    It names the first clock time it can find (else any figure) and an empty
+    string when the input carries none -- the prompt's own rule ("never invent",
+    "use an empty string when there is too little text"). A stub is by
+    definition a text with no such detail, so a rung fed the stub can only
+    answer "".
+    """
+    items = json.loads(prompt.split("Stories:\n", 1)[1])
+    rows = []
+    for item in items:
+        text = str(item.get("snippet") or "")
+        figure = re.search(r"\d{1,2}:\d{2}", text) or re.search(r"\d[\d:.]*", text)
+        sentence = ""
+        if figure:
+            sentence = ("Reported: the notice puts the change at %s and tells "
+                        "drivers to use the alternative route meanwhile."
+                        % figure.group(0))
+        rows.append({"url": item["url"], "summary": sentence})
+    return json.dumps(rows)
+
+
+class TheWorkingRungIsGivenSomethingToSummarise(unittest.TestCase):
+    """RUN 42321136172: 3.1 wrote 6 summaries for the derive stage and then the
+    repair spent its whole 299 s allowance over rungs and repaired 0 of 11.
+
+    The rung was healthy. `summarise_stories.build_prompt` read
+    `story["summary"]`, and in the repair path that IS the stub -- the text the
+    repair exists to replace -- so the model was asked to summarise the sentence
+    it was told to replace and, under the prompt's own "never invent" rule,
+    answered with nothing. This is the model-written edition's shape
+    (RUN 42056457121): the payload carries a headline restatement, the candidate
+    carries the publisher's real description, and only the second was never sent.
+    """
+
+    def payload(self):
+        return {"writer": {"rung": "gemini/gemini-3.1-flash-lite"},
+                "stories": [story("https://x/%d" % n, PROSE)
+                            for n in range(1, 4)]
+                           + [story("https://x/4", "Reported: " + TITLE)]}
+
+    def repair(self, payload, snippets):
+        calls = []
+
+        def rung(prompt, model=None, timeout=None):
+            calls.append(prompt)
+            return reading_rung(prompt)
+
+        with mock.patch.object(summarise_stories, "ladder_models",
+                               lambda log=None: ["gemini/gemini-3.1-flash-lite"]), \
+                mock.patch.object(summarise_stories, "run_model", rung), \
+                mock.patch.dict(os.environ, {"MODEL_COOLDOWN_PATH": ""}):
+            counts = summarise_stubs.repair(payload, snippets,
+                                            log=lambda *_a: None, floor=4)
+        return counts, calls
+
+    def test_a_repair_run_with_a_working_rung_repairs_a_stub(self):
+        payload = self.payload()
+        counts, calls = self.repair(payload, {"https://x/4": DESCRIPTION})
+        self.assertEqual(1, counts["written"],
+                         "the rung demonstrably answers; 0 repaired means the "
+                         "repair never gave it the publisher's text: %r" % (calls,))
+        self.assertEqual("ai", payload["stories"][3]["summary_source"])
+        self.assertIn("21:00", payload["stories"][3]["summary"])
+
+    def test_the_model_is_given_the_publishers_description_not_the_stub(self):
+        payload = self.payload()
+        _counts, calls = self.repair(payload, {"https://x/4": DESCRIPTION})
+        self.assertTrue(calls, "the ladder was never asked")
+        self.assertIn("Loop 1604", calls[0],
+                      "the prompt carried the stub instead of the description")
+        self.assertNotIn("Reported: " + TITLE, calls[0],
+                         "the repair cannot ask a model to rewrite the stub")
+
+
+class TheVerdictNamesWhyAndHowClose(unittest.TestCase):
+    """"0 repaired" alone is not a diagnosis; the line has to carry the reason."""
+
+    def test_a_run_where_every_rung_refuses_says_why_and_names_the_closest(self):
+        lines = []
+        payload = self.payload_stub()
+        counts = summarise_stubs.repair(
+            payload, {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, budget_seconds=None: {
+                "summaries": {}, "model": None, "requests": 3, "attempts": 3,
+                "debug": [{}, {}, {}],
+                "reasons": {"no_usable_row": 1, "timeout": 2},
+                "closest": {"model": "gemini/gemini-3.1-flash-lite",
+                            "accepted": 0, "answered": 1,
+                            "reason": "no_usable_row"},
+                "budget_spent": True},
+            log=lines.append)
+        self.assertEqual(0, counts["written"],
+                         "a run where every rung refused still reports 0")
+        verdict = [line for line in lines if "budget spent after" in line]
+        self.assertEqual(1, len(verdict), "one verdict line: %r" % (lines,))
+        line = verdict[0]
+        self.assertIn("0 repaired", line)
+        self.assertIn("no_usable_row=1", line)
+        self.assertIn("timeout=2", line)
+        self.assertIn("gemini/gemini-3.1-flash-lite", line,
+                      "the rung that came closest is what an owner acts on: %r"
+                      % (line,))
+
+    def test_a_zero_repair_that_stopped_for_another_reason_still_says_why(self):
+        lines = []
+        counts = summarise_stubs.repair(
+            self.payload_stub(), {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, budget_seconds=None: {
+                "summaries": {}, "requests": 2, "attempts": 2,
+                "reasons": {"partial_json": 2}, "budget_spent": False},
+            log=lines.append)
+        self.assertEqual(0, counts["written"])
+        said = [line for line in lines if "repaired" in line and "why:" in line]
+        self.assertEqual(1, len(said), "one diagnosis line: %r" % (lines,))
+        self.assertIn("partial_json=2", said[0])
+
+    def test_the_stubs_with_no_source_text_are_named_as_such(self):
+        """The measured run: 10 of the 11 stubs had no publisher snippet at all,
+        so no rung could ever have written them. Blaming the ladder for that is
+        what made the run undiagnosable."""
+        lines = []
+        stories = [story("https://x/%d" % n, "Reported: " + TITLE)
+                   for n in range(1, 4)]
+        summarise_stubs.repair(
+            {"stories": stories}, {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, budget_seconds=None: {
+                "summaries": {}, "attempts": 1, "reasons": {"timeout": 1},
+                "budget_spent": True},
+            log=lines.append)
+        said = [line for line in lines if "budget spent after" in line][0]
+        self.assertIn("no source text=2 of 3", said,
+                      "two stubs carried no publisher snippet: %r" % (said,))
+
+    def test_an_answer_the_validator_refuses_is_named_as_the_reason(self):
+        """The ladder can succeed and the repair still refuse: a rung that quotes
+        the publisher's own snippet back is not a summary. That answer never
+        reaches the ladder's reason counts, so the verdict must name it."""
+        lines = []
+        counts = summarise_stubs.repair(
+            self.payload_stub(), {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, budget_seconds=None: {
+                "summaries": {"https://x/1": DESCRIPTION}, "model": "gemini/a",
+                "requests": 1, "attempts": 0,
+                "closest": {"model": "gemini/a", "accepted": 1, "answered": 1,
+                            "reason": "ok"},
+                "budget_spent": False},
+            log=lines.append)
+        self.assertEqual(0, counts["written"])
+        said = [line for line in lines if "0 repaired" in line][0]
+        self.assertIn("validator rejected 1 answer(s)", said)
+        self.assertIn("it is the publisher's snippet copied verbatim", said)
+
+    def payload_stub(self):
+        return {"stories": [story("https://x/1", "Reported: " + TITLE)]}
+
+
+class PublisherTextIsStillTheFallback(unittest.TestCase):
+    """The guarantee that must survive every change: never a blank body."""
+
+    def test_a_stub_with_only_publisher_text_ends_with_publisher_text(self):
+        stories = [story("https://x/%d" % n, PROSE) for n in range(1, 4)]
+        # The deriver's own placeholder, which is what a derived stub carries.
+        stories.append(story("https://x/4", derive_unsummarised.NO_SUMMARY_TEXT))
+        payload = {"stories": stories}
+        counts = summarise_stubs.repair(
+            payload, {"https://x/4": DESCRIPTION},
+            summarise=lambda rows, **_kw: {}, log=lambda *_a: None, floor=4)
+        row = payload["stories"][3]
+        self.assertEqual(1, counts["publisher"])
+        self.assertEqual(DESCRIPTION, row["summary"])
+        self.assertEqual("publisher", row["summary_source"])
+        for item in payload["stories"]:
+            self.assertTrue(str(item.get("summary") or "").strip(),
+                            "a blank body shipped: %r" % (item,))
+
+
+class TheStubPredicateIsUnchanged(unittest.TestCase):
+    """A PIN, not a change. The repair may never be made to pass by loosening
+    `validate_stories.is_real_summary` or its 40 % stemmed-overlap rule, so the
+    exact verdict on four known strings is asserted as a boolean, not as truthy.
+    """
+
+    def test_two_known_good_samples_are_prose(self):
+        self.assertIs(True, vs.is_real_summary(PROSE, TITLE, SNIPPET))
+        self.assertIs(True, vs.is_real_summary(DEUSI, DEUSI_TITLE))
+
+    def test_two_known_bad_samples_are_stubs(self):
+        self.assertIs(False,
+                      vs.is_real_summary("Reported: " + TITLE, TITLE, SNIPPET))
+        self.assertIs(False, vs.is_real_summary(ANIME, ANIME_TITLE))
 
 
 if __name__ == "__main__":

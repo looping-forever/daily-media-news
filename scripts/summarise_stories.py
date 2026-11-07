@@ -313,20 +313,30 @@ def batches(stories, size=BATCH_SIZE):
     return [list(stories[i:i + size]) for i in range(0, len(stories), size)]
 
 
-def build_prompt(batch):
+def build_prompt(batch, snippets=None):
     """The whole request for one batch: short fields only, never full text.
 
     `snippet` is the collector's trimmed description, not the article, so a
     request carries no more than it must. The url is the key the answer is
     matched back on, which is why it is repeated in the prompt rather than
     implied by position.
+
+    `snippets` is the candidate index (`url -> the publisher's own description`).
+    It outranks the story's own text because on the REPAIR path `story["summary"]`
+    is the stub the repair exists to replace -- run 42321136172 fed the model
+    "Reported: <headline>" as its only source, and the prompt's own "never
+    invent" rule left it nothing to say. Absent, empty or unknown url falls back
+    to what the story already carries.
     """
+    snippets = snippets or {}
     items = []
     for story in batch:
+        url = story.get("source_url") or story.get("url") or ""
+        source = snippets.get(url) or story.get("summary") or ""
         items.append({
-            "url": story.get("source_url") or story.get("url") or "",
+            "url": url,
             "title": story.get("title") or "",
-            "snippet": (story.get("summary") or "")[:400],
+            "snippet": str(source)[:400],
             "source": story.get("source_name") or "",
         })
     return PROMPT % json.dumps(items, ensure_ascii=False, indent=1)
@@ -860,12 +870,13 @@ def refusal_cause(kind, message):
 def summarise(stories, models=None, run=None, sleep=None, clock=None,
               log=print, budget=INPUT_TOKEN_BUDGET_PER_MINUTE,
               budget_seconds=TOTAL_BUDGET_SECONDS, cooldown=None,
-              cooldown_path=None):
+              cooldown_path=None, snippets=None):
     """Summarise *stories* in paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
              "requests": int, "waits": [s], "refusals": [str], "debug": [dict],
-             "causes": {cause: stories lost}}.
+             "causes": {cause: stories lost}, "attempts": int,
+             "reasons": {reason: failed attempts}, "closest": dict|None}.
 
     Nothing here raises for a model problem: an edition with no summaries is a
     valid outcome that the caller labels, and a crash here would cost the
@@ -874,6 +885,18 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     so a run that produced nothing can say why without being re-run. `causes`
     counts the STORIES each cause cost, because that is what the page has to
     report; the walk's attempt log is a different question and a different file.
+
+    `attempts`, `reasons` and `closest` exist for the caller's ONE verdict line
+    (run 42321136172 reported "budget spent after 12 rungs" -- 12 was the
+    artifact's cap, not the number of attempts, and nothing named a reason or a
+    rung). `attempts` counts every failed attempt even past DEBUG_MAX_RECORDS;
+    `reasons` counts them by the module's own reason word; `closest` is the rung
+    that came nearest to writing something -- most accepted rows first, then a
+    rung that ANSWERED over one that went silent.
+
+    `snippets` is the candidate index handed to `build_prompt`, so the model is
+    given the publisher's description rather than a summary the validator has
+    already refused.
 
     `cooldown` / `cooldown_path` are the demotion memory: a rung that refuses
     without a quota reason twice is moved to the back of the ladder for six
@@ -899,6 +922,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     pacer.deadline = started + float(budget_seconds)
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
            "refusals": [], "debug": [], "causes": {},
+           "attempts": 0, "reasons": {}, "closest": None,
            "budget_spent": False, "seconds": 0.0}
     #: Rungs demoted by a refusal IN THIS RUN. They are skipped for the rest of
     #: it (run 42070185644 paid the same broken rung in all three batches), but
@@ -918,10 +942,24 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
 
     def note(model, raw, reason, timeout, exit_code=None):
         """Keep one failed attempt, bounded, so the artifact can explain it."""
+        # COUNTED BEFORE THE CAP. A twelve-record artifact is a size bound, not a
+        # measurement, and printing its length as "after N rungs" under-reported
+        # the measured run (42321136172) by an unknown number of rungs.
+        out["attempts"] += 1
+        out["reasons"][reason] = out["reasons"].get(reason, 0) + 1
         if len(out["debug"]) < DEBUG_MAX_RECORDS:
             out["debug"].append(debug_record(model, raw, reason,
                                              timeout=timeout,
                                              exit_code=exit_code))
+
+    def closer(model, accepted, reason):
+        """Keep the rung that came closest, so a 0-repaired run can name it."""
+        answered = 1 if reason in ("ok", "no_usable_row") else 0
+        row = out["closest"] or {}
+        if (int(accepted), answered) > (int(row.get("accepted") or 0),
+                                        int(row.get("answered") or 0)):
+            out["closest"] = {"model": model, "accepted": int(accepted),
+                              "answered": answered, "reason": reason or ""}
 
     if clock() >= pacer.deadline:
         # NO ALLOWANCE LEFT: resolving the ladder would spend the step's clock
@@ -977,7 +1015,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             order = demoted_order(base, cooldown, log=log)
             dirty = False
         active = [m for m in order if m not in dead] or list(order)
-        prompt = build_prompt(batch)
+        prompt = build_prompt(batch, snippets)
         prompt_tokens = estimate_tokens(prompt)
         log("  batch %d/%d: %d stories, prompt ~%d tokens (budget %d/min)"
             % (index, len(plan), len(batch), prompt_tokens, budget))
@@ -1012,6 +1050,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     continue
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
+                closer(model, 0, kind)
                 cause = refusal_cause(kind, str(exc))
                 causes.add(cause)
                 if cause == "provider_blocked":
@@ -1068,6 +1107,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     note(model, getattr(again, "raw", "") or str(again),
                          getattr(again, "kind", "") or "refused", retry_timeout,
                          exit_code=getattr(again, "exit_code", None))
+                    closer(model, 0, getattr(again, "kind", "") or "refused")
                     again_cause = refusal_cause(
                         getattr(again, "kind", "") or "refused", str(again))
                     causes.add(again_cause)
@@ -1084,6 +1124,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 out["requests"] += 1
                 out["refusals"].append(str(exc).strip()[:300])
                 note(model, str(exc), "runner_error", timeout)
+                closer(model, 0, "runner_error")
                 causes.add("runner_fault")
                 log("  batch %d/%d: %s errored (%s); trying the next model"
                     % (index, len(plan), model, str(exc).strip()[:120]))
@@ -1092,11 +1133,13 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             if not got:
                 reason = classify_reply(text, batch)
                 note(model, text, reason, timeout)
+                closer(model, 0, reason)
                 causes.add("unreadable_reply")
                 log("  batch %d/%d: %s answered but gave no usable summary "
                     "(%s)" % (index, len(plan), model, reason))
                 continue
             out["summaries"].update(got)
+            closer(model, len(got), "ok")
             out["model"] = model
             answered = True
             if promote_rung(cooldown, model, log=log):

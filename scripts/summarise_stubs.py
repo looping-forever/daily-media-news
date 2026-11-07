@@ -60,9 +60,65 @@ def _by_importance(stories):
     return sorted(stories, key=lambda s: -int(s.get("priority") or 0))
 
 
-def _ladder(stories, budget_seconds=None):
+def _ladder(stories, budget_seconds=None, snippets=None):
+    """The summariser, with the publisher's own description as its source text.
+
+    `snippets` is the SAME candidate index the caller judges with and quotes
+    from. Without it `summarise_stories.build_prompt` falls back to
+    `story["summary"]` -- which on this path IS the stub being repaired, so the
+    model was asked to rewrite the sentence it was told to replace (run
+    42321136172: a working rung, 299 s, 0 of 11 repaired).
+    """
     import summarise_stories
-    return summarise_stories.summarise(stories, budget_seconds=budget_seconds)
+    return summarise_stories.summarise(stories, budget_seconds=budget_seconds,
+                                       snippets=snippets)
+
+
+def _verdict(result, found, no_source, spend, rejected=()):
+    """One line: WHY nothing was repaired, and how close a rung came.
+
+    RUN 42321136172 printed `budget spent after 12 rungs, 0 repaired, 11 left`
+    and nothing else. Twelve was the debug artifact's record cap, not the number
+    of attempts; no reason was named; and the rung that had written six
+    summaries in the same run seven minutes earlier was not mentioned. An owner
+    should not have to download an artifact to learn any of that.
+    """
+    attempts = int(result.get("attempts") or len(result.get("debug") or [])
+                   or int(result.get("requests") or 0))
+    why = []
+    if no_source:
+        why.append("no source text=%d of %d stubs (headline only)"
+                   % (no_source, len(found)))
+    reasons = result.get("reasons") or {}
+    ranked = sorted(reasons.items(), key=lambda kv: (-int(kv[1]), str(kv[0])))
+    why.extend("%s=%d" % (name, count) for name, count in ranked[:3])
+    if rejected:
+        # THE SECOND GATE. The ladder can return text the repair's predicate
+        # refuses -- most often the publisher's own snippet quoted back -- and
+        # that answer never reaches `reasons` because the model call succeeded.
+        # Without this a 0-repaired run would name no reason at all.
+        counts = {}
+        for row in rejected:
+            reason = str(row.get("reason") or "no reason recorded")
+            counts[reason] = counts.get(reason, 0) + 1
+        top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+        why.append("validator rejected %d answer(s): %s" % (len(rejected), top))
+    if not why:
+        why.append("no rung returned a summary and none gave a reason")
+    closest = result.get("closest") or {}
+    if closest.get("model"):
+        if closest.get("accepted"):
+            near = "%s accepted %d row(s)" % (closest["model"],
+                                              int(closest["accepted"]))
+        else:
+            near = "%s answered, nothing accepted (%s)" % (
+                closest["model"], closest.get("reason") or "no usable row")
+    else:
+        near = "no rung answered"
+    return ("%d attempt(s), %ds of %ds spent; why: %s; closest: %s"
+            % (attempts, int(result.get("seconds") or 0),
+               int(result.get("budget_seconds") or spend or 0),
+               "; ".join(why), near))
 
 
 def _without_count_sentence(notes):
@@ -98,6 +154,11 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
     it. A stub with no publisher text is now DROPPED while the edition still
     clears its floor, and otherwise KEPT with its own non-empty body and marked
     unsummarised -- never an empty string, never invented prose.
+
+    `snippets` is the candidate index, and it is now handed to the model as its
+    source text as well as used to judge and to quote. It was never passed
+    through before, so the ladder was asked to rewrite the very stub it was
+    meant to replace.
     """
     import summarise_stories
     snippets = snippets or {}
@@ -113,12 +174,21 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
 
     log("summarise_stubs: %d of %d stories have no written summary; asking the "
         "ladder (allowance %ds)" % (len(found), len(stories), spend))
+    # How many stubs have nothing to summarise FROM: no candidate snippet. The
+    # measured run's 10 "No summary available." stubs were exactly these, and no
+    # line ever said so.
+    no_source = sum(1 for story in found
+                    if not str(snippets.get(_url(story)) or "").strip())
     try:
-        result = (summarise or _ladder)(found, budget_seconds=spend)
+        if summarise is not None:
+            result = summarise(found, budget_seconds=spend)
+        else:
+            result = _ladder(found, budget_seconds=spend, snippets=snippets)
     except Exception as exc:      # the edition must survive a broken ladder
         log("summarise_stubs: the ladder raised (%s); writing the edition "
             "without it" % exc)
-        result = {"summaries": {}, "requests": 0, "budget_spent": True}
+        result = {"summaries": {}, "requests": 0, "budget_spent": True,
+                  "attempts": 1, "reasons": {"ladder_error": 1}}
     summaries = result.get("summaries") or {}
     model = str(result.get("model") or "")
     written = publisher = none = dropped = 0
@@ -202,16 +272,27 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
         payload["notes"] = (sentence + " " + existing).strip()
     elif existing != str(payload.get("notes") or "").strip():
         payload["notes"] = existing
-    if result.get("budget_spent"):
+    if result.get("budget_spent") or written == 0:
         # ONE VERDICT LINE. Run 42144852087 overran its allowance by 4.5
         # minutes, was killed by the step's own cap, and said nothing at all;
         # the step then reported success with no file written. This line is the
         # evidence that the budget, not a crash, ended the repair. RUNGS, not
         # requests: the failed run tried 14 of them, and that is the number a
         # reader needs to see before deciding to widen the ladder.
-        rungs = len(result.get("debug") or []) or int(result.get("requests") or 0)
-        log("summarise_stubs: budget spent after %d rungs, %d repaired, %d left "
-            "\u2014 writing" % (rungs, written, max(0, len(found) - written)))
+        why = _verdict(result, found, no_source, spend, rejected)
+        if result.get("budget_spent"):
+            attempts = int(result.get("attempts")
+                           or len(result.get("debug") or [])
+                           or int(result.get("requests") or 0))
+            log("summarise_stubs: budget spent after %d rungs, %d repaired, "
+                "%d left \u2014 writing | %s"
+                % (attempts, written, max(0, len(found) - written), why))
+        else:
+            # REPAIRED NOTHING AND NOT FOR THE BUDGET: the rung is named too, or
+            # a working model that answered nothing looks identical to a broken
+            # ladder (run 42321136172: 0 of 11, one log line, no reason).
+            log("summarise_stubs: 0 repaired, %d left \u2014 %s"
+                % (max(0, len(found) - written), why))
     log("summarise_stubs: replaced %d with written summaries, %d with publisher "
         "text, %d left without a summary, %d dropped; edition_kind=%s (%d of %d)"
         % (written, publisher, none, dropped, facts["edition_kind"],
