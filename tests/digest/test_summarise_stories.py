@@ -130,10 +130,14 @@ class Batching(unittest.TestCase):
         prompt = ss.build_prompt(batch)
         self.assertIn("https://example.com/1", prompt)
         self.assertIn("Story number 1", prompt)
-        self.assertLess(len(prompt), 1400,
-                        "the snippet must be trimmed to the 400-char cap, not "
-                        "sent whole")
         self.assertNotIn("x" * 500, prompt)
+        self.assertIn("x" * 400, prompt)
+        self.assertNotIn("x" * 401, prompt,
+                         "the source text is trimmed to the 400-char cap, not "
+                         "sent whole")
+        longer = ss.build_prompt([story(1, snippet="x" * 4000)])
+        self.assertEqual(len(prompt), len(longer),
+                         "a longer source must not make a longer request")
 
     def test_one_request_stays_small(self):
         batch = [story(n, snippet="y" * 399) for n in range(6)]
@@ -335,13 +339,23 @@ class TheJobBudget(unittest.TestCase):
         self.assertTrue(out["waits"], "the storm must have waited, not looped")
 
     def test_a_hint_is_clamped_to_what_is_left(self):
+        """A call that ate the clock cannot then wait on a stale reading.
+
+        The 60s hint is cut to what the deadline still holds, and the total
+        stays inside the job's own allowance.
+        """
         clock = FakeClock()
-        batch = [story(1)]
-        run = FakeRun([ss.Refusal("quota exceeded; retry in 40s")])
-        ss.summarise(batch, models=["gemini/a"], run=run, sleep=clock.sleep,
-                     clock=clock, log=lambda *a: None, budget_seconds=10)
-        self.assertEqual([10], clock.slept,
-                         "10s of budget cannot buy a 40s wait")
+
+        def run(prompt, model, timeout=None):
+            clock.now += 70          # most of the 100s is gone
+            raise ss.Refusal("quota exceeded; retry in 60s")
+
+        ss.summarise([story(1)], models=["gemini/a"], run=run,
+                     sleep=clock.sleep, clock=clock, log=lambda *a: None,
+                     budget_seconds=100)
+        self.assertEqual([30], clock.slept,
+                         "the 60s hint cannot outlive the 30s left")
+        self.assertLessEqual(sum(clock.slept), 100)
 
     def test_a_pacing_wait_is_clamped_by_the_deadline(self):
         clock = FakeClock()
@@ -413,15 +427,26 @@ class TheBudgetArithmetic(unittest.TestCase):
     with zero bytes.
     """
 
-    def test_a_request_cannot_outlive_the_remaining_budget(self):
+    def test_a_call_is_never_granted_more_than_the_clock_left(self):
         clock = FakeClock()
         run = FakeRun([reply_for([story(1)])])
         ss.summarise([story(1)], models=["gemini/a"], run=run,
                      sleep=clock.sleep, clock=clock, log=lambda *a: None,
-                     budget_seconds=10)
-        self.assertLessEqual(run.timeouts[0], 10,
-                             "a 10s budget cannot grant a %ss call"
+                     budget_seconds=100)
+        self.assertLessEqual(run.timeouts[0], 100,
+                             "a 100s job cannot grant a %ss call"
                              % (run.timeouts[0],))
+
+    def test_a_clock_that_cannot_fund_a_keyed_call_starts_none(self):
+        """10s is not a keyed attempt, it is a guaranteed `timeout`."""
+        clock = FakeClock()
+        run = FakeRun([reply_for([story(1)])])
+        out = ss.summarise([story(1)], models=["gemini/a"], run=run,
+                           sleep=clock.sleep, clock=clock, log=lambda *a: None,
+                           budget_seconds=10)
+        self.assertEqual([], run.timeouts,
+                         "no call can be given the 90s a keyed rung needs")
+        self.assertTrue(out["budget_spent"])
 
     def test_a_hanging_first_rung_leaves_time_for_the_second(self):
         clock = FakeClock()
@@ -429,7 +454,7 @@ class TheBudgetArithmetic(unittest.TestCase):
         run = HangingRun(clock, reply_for(batch))
         out = ss.summarise(batch, models=["gemini/a", "gemini/b"], run=run,
                            clock=clock, sleep=clock.sleep, log=lambda *a: None,
-                           budget_seconds=100)
+                           budget_seconds=200)
         self.assertEqual(1, len(out["summaries"]),
                          "the second rung must still get a call: %r"
                          % (run.seen,))
@@ -456,7 +481,7 @@ class TheBudgetArithmetic(unittest.TestCase):
         run = HangingRun(clock, reply_for(batch[:6]))
         out = ss.summarise(batch, models=["gemini/a"], run=run,
                            clock=clock, sleep=clock.sleep, log=lambda *a: None,
-                           budget_seconds=120)
+                           budget_seconds=450)
         self.assertGreater(len(run.seen), 1,
                            "one hanging rung must not consume the whole job: "
                            "%r" % (run.seen,))
@@ -474,9 +499,55 @@ class TheBudgetArithmetic(unittest.TestCase):
                   + ["opencode/m%d-free" % n for n in range(6)])
         lead = ss.rung_timeout(ladder, 0, seconds_left=300, batches_left=2)
         self.assertEqual(ss.LEAD_RUNG_SECONDS, lead)
-        fallback = ss.rung_timeout(ladder, 1, seconds_left=300, batches_left=2)
-        self.assertLess(fallback, lead,
-                        "the lead's budget must not starve the rungs behind it")
+        free_fallback = ss.rung_timeout(ladder, 2, seconds_left=300,
+                                        batches_left=2)
+        self.assertLess(free_fallback, lead,
+                        "a free rung is a different, faster call and keeps the "
+                        "shorter floor, so the pool is still reachable behind "
+                        "the lead")
+
+    def test_a_keyed_fallback_is_not_cut_below_a_six_story_need(self):
+        """RUN 42356298224: ten rungs split 299s into ~30s slices and six of the
+        fifteen attempts were `timeout` -- while the same run's lead slice, at
+        90s, answered. A fallback keyed rung is the same six-story call and gets
+        the same clock; only a free rung is shorter."""
+        ladder = (["gemini/gemini-3.5-flash-lite", "gemini/gemini-3.1-flash-lite"]
+                  + ["opencode/m%d-free" % n for n in range(8)])
+        self.assertEqual(ss.LEAD_RUNG_SECONDS,
+                         ss.rung_timeout(ladder, 1, seconds_left=300,
+                                         batches_left=2))
+        self.assertEqual(ss.FREE_REQUEST_TIMEOUT,
+                         ss.rung_timeout(ladder, 5, seconds_left=300,
+                                         batches_left=2))
+
+    def test_a_rung_that_answers_within_its_clock_records_no_timeout(self):
+        """The 40s rung of RUN 42356298224's shape: granted 30s it dies, granted
+        the keyed floor it answers, and no timeout is recorded."""
+        class SlowFallback:
+            def __init__(self, clock, batch):
+                self.clock = clock
+                self.answer = reply_for(batch)
+
+            def __call__(self, prompt, model, timeout=None):
+                if model == "gemini/lead":
+                    return reply_for([story(1)], "Too short.")
+                if float(timeout or 0) < 40:
+                    self.clock.now += float(timeout or 0)
+                    raise ss.Refusal("%s: no answer in %ss (killed)"
+                                     % (model, timeout), kind="timeout")
+                self.clock.now += 40
+                return self.answer
+
+        clock = FakeClock()
+        ladder = (["gemini/lead", "gemini/gemini-3.1-flash-lite"]
+                  + ["opencode/m%d-free" % n for n in range(8)])
+        out = ss.summarise([story(1)], models=ladder, run=SlowFallback(clock, [story(1)]),
+                           clock=clock, sleep=clock.sleep, log=lambda *a: None,
+                           budget_seconds=300)
+        self.assertNotIn("timeout", out["reasons"],
+                         "a rung that answers inside its grant cannot be a "
+                         "timeout: %r" % (out["reasons"],))
+        self.assertEqual(1, len(out["summaries"]))
 
     def test_the_lead_rungs_budget_never_exceeds_the_job(self):
         ladder = ["gemini/gemini-3.5-flash-lite", "gemini/other"]
@@ -1051,9 +1122,26 @@ class ThePromptCarriesTheSourceText(unittest.TestCase):
     def test_a_story_with_no_candidate_snippet_keeps_its_own_text(self):
         batch = [story(1, snippet=ENOUGH)]
         self.assertIn(ENOUGH[:40], ss.build_prompt(batch))
-        self.assertIn(ENOUGH[:40], ss.build_prompt(batch, {}))
-        self.assertIn(ENOUGH[:40], ss.build_prompt(batch, {"https://other/1": DESCRIPTION}),
-                      "a missing url must not silently empty the prompt")
+
+    def test_an_index_is_the_only_evidence_and_a_missing_url_sends_none(self):
+        """RUN 42356298224: with an index in hand, a story the index does not
+        know must send NO evidence. The fallback was `story["summary"]`, which on
+        the repair path IS the stub -- five answers quoted the snippet straight
+        back and the checker refused every one."""
+        batch = [story(1, snippet=ENOUGH)]
+        prompt = ss.build_prompt(batch, {"https://other/1": DESCRIPTION})
+        items = json.loads(prompt.split("Stories:\n", 1)[1])
+        self.assertEqual("", items[0]["evidence"],
+                         "the stub must never be sent as evidence: %r" % (prompt,))
+        self.assertNotIn(ENOUGH[:40], prompt)
+
+    def test_the_prompt_forbids_copying_the_evidence_verbatim(self):
+        """The rule has to be stated, not merely implied by "never invent"."""
+        self.assertIn("NEVER copy, quote or lightly reorder the evidence",
+                      ss.PROMPT)
+        self.assertIn("refused by the checker", ss.PROMPT)
+        self.assertIn("`evidence`", ss.PROMPT)
+        self.assertIn("adds nothing to the title", ss.PROMPT)
 
     def test_summarise_threads_the_snippet_index_into_the_prompt(self):
         batch = [story(1, snippet="No summary available.")]

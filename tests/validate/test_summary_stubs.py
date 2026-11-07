@@ -249,13 +249,17 @@ class RepairTests(unittest.TestCase):
                                story("https://x/2", PROSE)]}
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "stories.validated.json")
+            candidates = os.path.join(tmp, "candidates.json")
+            with open(candidates, "w", encoding="utf-8") as fh:
+                json.dump({"candidates": [{"url": "https://x/1",
+                                           "snippet": DESCRIPTION}]}, fh)
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(payload, fh)
             with mock.patch.object(summarise_stubs, "_ladder",
                                    return_value={"summaries":
                                                  {"https://x/1": PROSE}}):
                 rc = summarise_stubs.main(
-                    ["--in", path, "--candidates", os.path.join(tmp, "absent.json")])
+                    ["--in", path, "--candidates", candidates])
             self.assertEqual(0, rc)
             with open(path, encoding="utf-8") as fh:
                 after = json.load(fh)
@@ -300,7 +304,9 @@ class RepairTests(unittest.TestCase):
             dict(story("https://x/3", "Reported: " + TITLE), priority=5)])
         asked = []
         summarise_stubs.repair(
-            payload, {}, summarise=lambda rows, **_kw: asked.extend(
+            payload, {"https://x/1": DESCRIPTION, "https://x/2": DESCRIPTION,
+                      "https://x/3": DESCRIPTION},
+            summarise=lambda rows, **_kw: asked.extend(
                 r["source_url"] for r in rows) or {},
             log=lambda *_a: None, derived=True)
         self.assertEqual(["https://x/2", "https://x/3", "https://x/1"], asked,
@@ -448,7 +454,8 @@ class TheNoteMatchesWhatTheStoriesCarry(unittest.TestCase):
                    story("https://x/3", "Reported: " + TITLE)]
         payload = self.repair(
             stories,
-            lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}}, {})
+            lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
+            {"https://x/1": DESCRIPTION})
         notes = payload["notes"]
         self.assertIn("an AI wrote the summary for 1 of 3 stories", notes)
         self.assertIn("2 carry no summary", notes)
@@ -584,7 +591,9 @@ class TheBudgetIsAWallClock(unittest.TestCase):
         self.path = os.path.join(self.tmp, "stories.validated.json")
         self.candidates = os.path.join(self.tmp, "candidates.json")
         with open(self.candidates, "w", encoding="utf-8") as fh:
-            json.dump({"candidates": []}, fh)
+            json.dump({"candidates": [
+                {"url": "https://a.example/%d" % n, "snippet": SNIPPET}
+                for n in range(6)]}, fh)
         with open(self.path, "w", encoding="utf-8") as fh:
             json.dump({"notes": "",
                        "stories": [story("https://a.example/%d" % n, "",
@@ -648,6 +657,7 @@ class TheBudgetIsAWallClock(unittest.TestCase):
         counts = summarise_stubs.repair(
             {"notes": "", "stories": [story("https://a.example/1", "",
                                             snippet=SNIPPET)]},
+            {"https://a.example/1": DESCRIPTION},
             summarise=lambda stubs, budget_seconds=None: {
                 "summaries": {}, "requests": 2, "budget_spent": True},
             log=lambda *_a: None)
@@ -666,7 +676,7 @@ def reading_rung(prompt, model=None, timeout=None):
     items = json.loads(prompt.split("Stories:\n", 1)[1])
     rows = []
     for item in items:
-        text = str(item.get("snippet") or "")
+        text = str(item.get("evidence") or item.get("snippet") or "")
         figure = re.search(r"\d{1,2}:\d{2}", text) or re.search(r"\d[\d:.]*", text)
         sentence = ""
         if figure:
@@ -810,6 +820,41 @@ class TheVerdictNamesWhyAndHowClose(unittest.TestCase):
 
     def payload_stub(self):
         return {"stories": [story("https://x/1", "Reported: " + TITLE)]}
+
+
+class OnlyStubsWithEvidenceAreAsked(unittest.TestCase):
+    """RUN 42321136172 paid for ten stubs whose only text was the headline.
+    RUN 42356298224 showed the other half: the stub itself was sent as evidence,
+    and five answers came back as the snippet copied verbatim."""
+
+    def test_a_stub_with_no_publisher_text_is_not_sent_to_the_ladder(self):
+        asked = []
+        payload = {"stories": [story("https://x/1", "Reported: " + TITLE),
+                               story("https://x/2", "Reported: " + TITLE)]}
+        lines = []
+        summarise_stubs.repair(
+            payload, {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, **_kw: asked.append(rows) or {},
+            log=lines.append, floor=1)
+        self.assertEqual(1, len(asked), "one call, for the one stub with text")
+        self.assertEqual(["https://x/1"],
+                         [row["source_url"] for row in asked[0]])
+        self.assertTrue([line for line in lines
+                         if "no source text=1 of 2" in line],
+                        "the skipped stub must be counted: %r" % (lines,))
+
+    def test_an_answer_that_copies_the_evidence_is_refused(self):
+        payload = {"stories": [story("https://x/1", "Reported: " + TITLE)]}
+        counts = summarise_stubs.repair(
+            payload, {"https://x/1": DESCRIPTION},
+            summarise=lambda rows, **_kw: {
+                "summaries": {"https://x/1": DESCRIPTION}, "model": "gemini/a",
+                "requests": 1, "attempts": 0},
+            log=lambda *_a: None, floor=1)
+        self.assertEqual(0, counts["written"])
+        self.assertEqual(DESCRIPTION, payload["stories"][0]["summary"],
+                         "the publisher's text, not the model's echo")
+        self.assertEqual("publisher", payload["stories"][0]["summary_source"])
 
 
 class PublisherTextIsStillTheFallback(unittest.TestCase):

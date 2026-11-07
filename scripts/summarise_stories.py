@@ -141,14 +141,21 @@ KEY_ERROR_MARKERS = (
 
 PROMPT = (
     "You are summarising news stories for a personal morning digest.\n"
-    "For each story below, write ONE plain sentence (at most 40 words) that "
-    "says what happened, using only the title and snippet given.\n"
-    "The sentence MUST carry at least one concrete detail the headline does "
-    "not: a number, a named person, a place, a date, or a specific claim. A "
-    "sentence that only restates the headline in different words is not a "
-    "summary -- leave it empty instead.\n"
+    "Each story below has a title, which the page already prints above the "
+    "summary, and an `evidence` field: raw text copied from the publisher's "
+    "feed. Evidence is NOT prose and is NOT a draft answer.\n"
+    "For each story, write ONE plain sentence (at most 40 words) that says what "
+    "happened, using only the title and evidence given.\n"
+    "NEVER copy, quote or lightly reorder the evidence, and never repeat the "
+    "title. An answer that does either is refused by the checker and counts as "
+    "nothing -- it is the most common way this task fails.\n"
+    "The sentence MUST carry at least one concrete detail the title does not: a "
+    "number, a named person, a place, a date, or a specific claim that appears "
+    "ONLY in the evidence. A sentence that only restates the headline in different "
+    "words is not a summary -- leave it empty instead.\n"
     "Never invent a fact, a number, a name or a quote that is not in the input. "
-    "If a story has too little text to summarise, use an empty string.\n\n"
+    "If the evidence adds nothing to the title, or is empty, use an empty "
+    "string.\n\n"
     "Return ONLY a JSON array, one object per story, with exactly these keys:\n"
     '  {"url": "<the story\'s url, copied exactly>", "summary": "<one sentence>"}\n\n'
     "Stories:\n%s\n"
@@ -183,6 +190,20 @@ def is_free_rung(model):
 def timeout_for_rung(model):
     """The cap one call to *model* may never exceed, before the budget bites."""
     return FREE_REQUEST_TIMEOUT if is_free_rung(model) else KEYED_REQUEST_TIMEOUT
+
+
+def min_answer_seconds(model):
+    """The least clock a rung of *model*'s class needs, or it cannot answer.
+
+    RUN 42356298224: a ten-rung ladder divided 299s into ~30s slices and six of
+    fifteen attempts came back `timeout` -- including a model that answered in
+    the same run out of the LEAD rung's 90s slice. The fallback rung is not a
+    faster call; it is the same six-story keyed batch, so it needs the same
+    clock that was measured to work. A free pool rung is a different call: it
+    answers in seconds or not at all (FREE_REQUEST_TIMEOUT is the point at which
+    waiting longer was measured to gain nothing), so 20s is a real attempt.
+    """
+    return MIN_RUNG_SECONDS if is_free_rung(model) else LEAD_RUNG_SECONDS
 
 
 def rung_group_size(models, index):
@@ -242,14 +263,19 @@ def call_timeout(model, seconds_left, batches_left, rungs_left, lead=False):
         cap      min(rung cap, share), floored at the rung's floor,
                  never more than seconds_left
 
-    The floor is LEAD_RUNG_SECONDS for the batch's first rung and
-    MIN_RUNG_SECONDS for the fallbacks. With four batches and 300s: batch 1
-    reserves 90s, so its five rungs share 210s -> 42s each instead of 120s, and
-    batches 2-4 still get a turn.
+    The floor is LEAD_RUNG_SECONDS for the batch's first rung and the rung's own
+    CLASS minimum (`min_answer_seconds`) for the fallbacks -- a keyed fallback
+    is still a six-story keyed call, not a faster one. With four batches and
+    300s: batch 1 reserves 90s, so its five rungs share 210s, and a keyed rung
+    keeps its 90s rather than being cut to 42s.
+
+    A share below the class minimum is not granted at all: `summarise` stops the
+    batch with `budget_spent` instead of starting a call that can only time out
+    (run 42356298224 spent six of its fifteen attempts that way).
     """
     batches_left = max(1, int(batches_left))
     rungs_left = max(1, int(rungs_left))
-    floor = LEAD_RUNG_SECONDS if lead else MIN_RUNG_SECONDS
+    floor = LEAD_RUNG_SECONDS if lead else min_answer_seconds(model)
     reserve = (batches_left - 1) * MIN_BATCH_SECONDS
     usable = max(floor, float(seconds_left) - reserve)
     share = usable / rungs_left
@@ -316,27 +342,30 @@ def batches(stories, size=BATCH_SIZE):
 def build_prompt(batch, snippets=None):
     """The whole request for one batch: short fields only, never full text.
 
-    `snippet` is the collector's trimmed description, not the article, so a
+    `evidence` is the collector's trimmed description, not the article, so a
     request carries no more than it must. The url is the key the answer is
     matched back on, which is why it is repeated in the prompt rather than
     implied by position.
 
     `snippets` is the candidate index (`url -> the publisher's own description`).
-    It outranks the story's own text because on the REPAIR path `story["summary"]`
-    is the stub the repair exists to replace -- run 42321136172 fed the model
-    "Reported: <headline>" as its only source, and the prompt's own "never
-    invent" rule left it nothing to say. Absent, empty or unknown url falls back
-    to what the story already carries.
+    When it is given -- which is every repair call -- it is the ONLY evidence:
+    a missing url sends an empty string, never `story["summary"]`. On the repair
+    path that field IS the stub being replaced, and run 42356298224 shows what
+    sending it costs: five answers quoted the snippet straight back and the
+    validator refused every one. Without an index (the deriver, which runs
+    before any summary exists) the story's own text is all there is.
     """
-    snippets = snippets or {}
     items = []
     for story in batch:
         url = story.get("source_url") or story.get("url") or ""
-        source = snippets.get(url) or story.get("summary") or ""
+        if snippets is not None:
+            source = (snippets or {}).get(url) or ""
+        else:
+            source = story.get("summary") or ""
         items.append({
             "url": url,
             "title": story.get("title") or "",
-            "snippet": str(source)[:400],
+            "evidence": str(source)[:400],
             "source": story.get("source_name") or "",
         })
     return PROMPT % json.dumps(items, ensure_ascii=False, indent=1)
@@ -1028,6 +1057,18 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             if remaining <= 0:
                 ran_out = True
                 break
+            # A CALL GIVEN LESS THAN THE RUNG NEEDS IS A GUARANTEED `timeout`,
+            # not an attempt. Run 42356298224: a ten-rung ladder cut each slice
+            # to ~30s and six of fifteen attempts died on the clock, including
+            # one on a model that answered from the lead's 90s slice. Stopping
+            # here leaves the clock for a rung that can still answer.
+            need = min_answer_seconds(model)
+            if remaining < need:
+                ran_out = True
+                log("  batch %d/%d: %.0fs left, less than the %ds %s needs; "
+                    "not starting a call that cannot answer"
+                    % (index, len(plan), remaining, need, model))
+                break
             # THE CLOCK THE CHILD IS ACTUALLY GIVEN, recomputed per call: what
             # this batch may use, and never more than the job has left. A
             # provider's several served ids share ONE rung's slice, so the
@@ -1082,7 +1123,12 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                         "than the %ds bound; trying the next model"
                         % (index, len(plan), model, delay, MAX_WAIT_SECONDS))
                     continue
-                delay = min(delay, remaining)
+                # A SLOW CALL HAS EATEN SOME OF THE CLOCK since `remaining` was
+                # read, so the wait is clamped against a fresh reading: a 70s
+                # refusal followed by a stale 100s clamp would overshoot the
+                # allowance, and the allowance is what keeps the writer alive.
+                left = pacer.deadline - clock()
+                delay = min(delay, left)
                 if delay <= 0:
                     ran_out = True
                     break

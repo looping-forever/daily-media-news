@@ -87,7 +87,7 @@ def _verdict(result, found, no_source, spend, rejected=()):
                    or int(result.get("requests") or 0))
     why = []
     if no_source:
-        why.append("no source text=%d of %d stubs (headline only)"
+        why.append("no source text=%d of %d stubs (not asked)"
                    % (no_source, len(found)))
     reasons = result.get("reasons") or {}
     ranked = sorted(reasons.items(), key=lambda kv: (-int(kv[1]), str(kv[0])))
@@ -174,16 +174,26 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
 
     log("summarise_stubs: %d of %d stories have no written summary; asking the "
         "ladder (allowance %ds)" % (len(found), len(stories), spend))
-    # How many stubs have nothing to summarise FROM: no candidate snippet. The
-    # measured run's 10 "No summary available." stubs were exactly these, and no
-    # line ever said so.
-    no_source = sum(1 for story in found
-                    if not str(snippets.get(_url(story)) or "").strip())
+    # ONLY THE STUBS WITH SOMETHING TO SUMMARISE FROM ARE SENT. A story with no
+    # publisher text has no evidence, and the prompt rightly refuses to invent --
+    # so asking the ladder about it can only buy a `no_usable_row` (run
+    # 42321136172 paid for ten of those). It also matters for the echo defect:
+    # with no index entry the prompt used to send `story["summary"]`, which on
+    # this path IS the stub, and the model handed it straight back.
+    askable = [story for story in found
+               if str(snippets.get(_url(story)) or "").strip()]
+    no_source = len(found) - len(askable)
+    if no_source:
+        log("summarise_stubs: %d of %d stubs carry no publisher text; they are "
+            "not sent (a model cannot summarise a headline)" % (no_source, len(found)))
     try:
-        if summarise is not None:
-            result = summarise(found, budget_seconds=spend)
+        if not askable:
+            result = {"summaries": {}, "requests": 0, "attempts": 0,
+                      "reasons": {}, "budget_spent": False}
+        elif summarise is not None:
+            result = summarise(askable, budget_seconds=spend)
         else:
-            result = _ladder(found, budget_seconds=spend, snippets=snippets)
+            result = _ladder(askable, budget_seconds=spend, snippets=snippets)
     except Exception as exc:      # the edition must survive a broken ladder
         log("summarise_stubs: the ladder raised (%s); writing the edition "
             "without it" % exc)
