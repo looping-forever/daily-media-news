@@ -517,6 +517,11 @@ def main(argv=None):
     # run may call a model" visible in the YAML.
     ap.add_argument("--summarise", action="store_true",
                     help="ask a model for one summary per story, in paced batches")
+    # The same health memory the model selector keeps. The digest ladder opens
+    # on the rung that has actually been answering instead of the one that
+    # failed first last time; a missing file simply means no memory.
+    ap.add_argument("--model-health", default="state/model_health.json",
+                    help="recorded model health (default: state/model_health.json)")
     args = ap.parse_args(argv)
 
     if not os.path.isfile(args.candidates):
@@ -566,7 +571,8 @@ def main(argv=None):
         # Imported here, not at module level: the deriver is used offline by
         # tests and by hand, and it must not need the summariser to import.
         import summarise_stories
-        result = summarise_stories.summarise(stories)
+        result = summarise_stories.summarise(
+            stories, health_path=args.model_health)
         rejected = []
         written = apply_summaries(stories, result.get("summaries"),
                                   snippet_index(args.candidates),

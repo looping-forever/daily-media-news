@@ -644,6 +644,12 @@ def record_failure(doc, model, kind="transport", at=None):
     that answers unusably is exactly as useless to this pipeline as one that
     never answers -- so it earns the same cooldown.
     """
+    if kind == "blocked":
+        # A BLOCK IS ABOUT THE ADDRESS, NOT THE RUNG (run 40280837914). Every
+        # provider behind one edge fails identically, so recording it would
+        # cool a model that never got to answer and hand the next run the same
+        # block one rung later. It is a fact about the runner, not this model.
+        return None
     if kind not in FAILURE_KINDS:
         kind = HEALTH_KIND_OF.get(kind, "transport")
     at = time.time() if at is None else float(at)
@@ -671,6 +677,30 @@ def on_cooldown(row, now):
         return float(until) > float(now)
     except (TypeError, ValueError):
         return False
+
+
+def health_score(row):
+    """Reliability of one health row: successes minus recorded failures.
+
+    Positive means the rung answered more often than it failed. Negative means
+    it cost more than it returned. Zero -- including a model with no row at all
+    -- is UNMEASURED, and therefore defers to the configured ladder order
+    rather than being treated as either good or bad.
+
+    This is one number on purpose: the brief is "most reliable first", and two
+    counters compared separately cannot answer that when a rung has both.
+    """
+    if not isinstance(row, dict):
+        return 0
+
+    def _int(value):
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    failures = sum(_int(row.get(kind)) for kind in FAILURE_KINDS)
+    return _int(row.get("success")) - failures
 
 
 # ---------------------------------------------------------------------------
@@ -1623,17 +1653,18 @@ def rank_models(candidates, seed=(), health=None, now=0, release=None):
 
     The sort key, in order, and WHY this order:
 
-      1. cooling down            -- a model that just cost us time goes last;
-      2. consecutive failures    -- least-recently-bad first;
-      3. the owner's seed order  -- big-pickle leads because the owner says
-           so. Proven-ness deliberately does NOT come before this: on a 6-hourly
-           cron a single extra success is noise, and letting it promote an
-           unknown model over the owner's stated first choice is exactly the
-           "not as good as big-pickle" outcome this is meant to prevent;
-      4. measured successes      -- the tiebreak WITHIN a seed position, so a
-           proven rung beats an unproven one at equal standing;
-      5. release date, then id   -- deterministic, and only ever separating
-           two models health memory has never distinguished.
+      1. cooling down  -- a model that just cost us time goes last, whatever
+           its history says. A cooling rung is a COST, not a preference.
+      2. health score  -- successes minus failures, highest first. A rung that
+           has answered outranks one that never has, and one that has failed
+           more than it answered falls behind an unmeasured rung. This is the
+           change measured on run 42061741326: eleven failures on the first
+           rung bought twelve more first attempts, while a working rung sat
+           behind it in the seed.
+      3. the owner's seed order -- only a TIE-BREAK now, between rungs health
+           cannot separate. big-pickle still leads an unknown field.
+      4. release date, then id -- deterministic, and only ever separating two
+           models health memory has never distinguished.
     """
     health = (health or {}).get("models") or {}
     release = release or {}
@@ -1643,12 +1674,11 @@ def rank_models(candidates, seed=(), health=None, now=0, release=None):
     def key(model):
         row = health.get(model) or {}
         return (
-            1 if on_cooldown(row, now) else 0,          # healthy first
-            int(row.get("consecutive_failures") or 0),  # least-recently-bad
-            seed_pos.get(model, unknown),               # owner's preference
-            -int(row.get("success") or 0),              # proven, as tiebreak
-            -int(release.get(model) or 0),              # untried: newer first
-            model,                                      # deterministic
+            1 if on_cooldown(row, now) else 0,   # a cooling rung ends the list
+            -health_score(row),                  # most reliable first
+            seed_pos.get(model, unknown),        # the owner breaks a tie
+            -int(release.get(model) or 0),       # untried: newer first
+            model,                               # deterministic
         )
 
     return sorted(candidates, key=key)
@@ -1682,6 +1712,116 @@ def _cli_reachable(seed):
     if not absent:
         return tuple(seed)
     return tuple(m for m in seed if not m.startswith(tuple(absent)))
+
+
+# ---------------------------------------------------------------------------
+# Catalogue pruning -- the provider's own list decides what is still real
+# ---------------------------------------------------------------------------
+
+def _provider_name(model):
+    """The provider half of `provider/model`, or "" when there is no slash."""
+    text = str(model or "")
+    return text.split("/", 1)[0] if "/" in text else ""
+
+
+def _seed_providers(seed):
+    """Every provider named in the seed, in first-seen order, once each."""
+    seen = []
+    for model in seed:
+        name = _provider_name(model)
+        if name and name not in seen:
+            seen.append(name)
+    return seen
+
+
+def catalogue_prune(seed, catalogues, info=None):
+    """Drop a seed rung whose exact id its own provider's catalogue lacks.
+
+    Returns `[{"model", "provider"}]` in seed order. Reversible by
+    construction: nothing here writes health, a cooldown, or the cache, so the
+    next run starts from the same configured ladder.
+
+    ONE CATALOGUE CAN NEVER EMPTY A PROVIDER. Pruning happens only while at
+    least one configured rung of that provider IS listed -- so an empty answer,
+    a failed call, or a listing sharing nothing with the config keeps the
+    static ladder exactly as written. That is the measured hazard from run
+    40280837914: the unauthenticated runner saw a smaller catalogue that
+    omitted five working models, and absence alone would have deleted them.
+    """
+    dropped = []
+    report = {}
+    for name in _seed_providers(seed):
+        configured = [m for m in seed if _provider_name(m) == name]
+        listed = catalogues.get(name)
+        if not listed:
+            report[name] = {"listed": 0, "present": 0, "dropped": 0,
+                            "note": "no catalogue -- static ladder kept"}
+            continue
+        listed_set = set(listed)
+        present = [m for m in configured if m in listed_set]
+        if not present:
+            report[name] = {"listed": len(listed_set), "present": 0,
+                            "dropped": 0,
+                            "note": "catalogue listed none of the configured "
+                                    "ids -- static ladder kept"}
+            continue
+        gone = [m for m in configured if m not in listed_set]
+        dropped.extend({"model": m, "provider": name} for m in gone)
+        report[name] = {"listed": len(listed_set), "present": len(present),
+                        "dropped": len(gone), "note": ""}
+    if info is not None:
+        info["catalogue_missing"] = dropped
+        info["catalogue"] = report
+    return dropped
+
+
+def _stamp_or_unknown(epoch):
+    """An absolute epoch as UTC text, or '?' when it cannot be read."""
+    try:
+        return _iso(float(epoch))
+    except (TypeError, ValueError, OSError):
+        return "?"
+
+
+def order_entries(ordered, rows, now=0, hard_cooled=(), cool=None,
+                  catalogue_missing=()):
+    """One entry per rung for the human-readable order line.
+
+    The reason is the point: a reader must be able to see WHY a rung moved
+    (health rank), was never tried (cooldown), or disappeared (catalogue).
+    """
+    hard = set(hard_cooled or ())
+    healthy = [m for m in ordered if m not in hard]
+    rank = {m: i + 1 for i, m in enumerate(healthy)}
+    entries = []
+    for model in ordered:
+        row = rows.get(model) or {}
+        if model in hard:
+            until = (((cool or {}).get("models") or {}).get(model) or {}).get("until")
+            entries.append({"model": model,
+                            "reason": "hard cooldown until %s" % (until or "?")})
+        elif on_cooldown(row, now):
+            entries.append({"model": model,
+                            "reason": "health cooldown until %s"
+                                      % _stamp_or_unknown(row.get("cooldown_until"))})
+        elif health_score(row) != 0:
+            entries.append({"model": model,
+                            "reason": "health rank %d" % rank.get(model, 0)})
+        else:
+            entries.append({"model": model, "reason": "config"})
+    for item in catalogue_missing or ():
+        entries.append({"model": item.get("model"),
+                        "reason": "catalogue-missing from %s"
+                                  % (item.get("provider") or "?")})
+    return entries
+
+
+def format_order_log(entries):
+    """The ONE ladder line: order, and the reason for every move."""
+    parts = ["%s [%s]" % (e.get("model"), e.get("reason"))
+             for e in (entries or ())]
+    return ("model_selector: ladder order: "
+            + (" > ".join(parts) if parts else "none"))
 
 
 def select(config, health, cache_path=None, state_note=None, max_models=4,
@@ -1728,16 +1868,42 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
             "unparsed": disc.get("unparsed") or [],
             "error": disc.get("error", ""),
             "dropped_seed": [], "dropped_seed_evidence": {}, "cooled_down": [],
-            "hard_cooled_down": [], "all_cooled": False}
+            "hard_cooled_down": [], "all_cooled": False,
+            "catalogue_missing": [], "catalogue": {}, "order": []}
+
+    # ONE CATALOGUE READ PER PROVIDER, NOT ONE PER RUNG. `discover()` memoises
+    # the answer inside a call and caches the primary provider in its own file,
+    # so a ladder of two Gemini projects plus the free pool still costs one
+    # request per provider. A provider the seed does not name is never asked.
+    catalogues = {provider: list(pool)}
+    for name in _seed_providers(seed):
+        if name in catalogues:
+            continue
+        try:
+            extra, _meta = (discover_fn(name) if discover_fn
+                            else discover(name, cache_path=None))
+        except Exception:
+            # An unreachable catalogue is silence, never a verdict: the static
+            # ladder is still the right answer when nothing can be proven.
+            continue
+        catalogues[name] = [m for m in (extra or [])
+                            if isinstance(m, str) and m]
+
+    dropped = catalogue_prune(seed, catalogues, info)
+    dropped_ids = {d["model"] for d in dropped}
 
     # THE CONFIGURED LADDER IS AUTHORITATIVE (run 40280837914). Discovery may
-    # APPEND, and may never reorder or remove a seed. The only removal is a
+    # APPEND, and may never reorder or remove a seed. The only removals are a
     # record that says the model is gone -- see GONE_STATUSES: absence from a
     # listing proves nothing, because the unauthenticated catalogue the runner
-    # sees is a different, smaller list that omits five working models.
+    # sees is a different, smaller list that omits five working models -- and
+    # the guarded catalogue prune above, which keeps a provider when it lists
+    # none of that provider's configured ids.
     status_by_id = disc.get("catalogue_status") or {}
     kept = []
     for m in seed:
+        if m in dropped_ids:
+            continue
         status = status_by_id.get(m)
         status = status.strip().lower() if isinstance(status, str) else ""
         if status in GONE_STATUSES:
@@ -1775,6 +1941,9 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
     cooled = set(info["hard_cooled_down"])
     attemptable = [m for m in ordered if m not in cooled]
     info["all_cooled"] = bool(ordered) and not attemptable
+    info["order"] = order_entries(ordered, rows, now=now,
+                                  hard_cooled=info["hard_cooled_down"],
+                                  cool=cool, catalogue_missing=dropped)
 
     if pool.get("blocked"):
         # THE POOL WALL IS NOT AN EMPTY LADDER. Returning ids here would invite
@@ -2021,6 +2190,10 @@ def _main(argv=None):
                  " no_work=yes" if args.no_work else ""), file=sys.stderr)
         print("model_selector: ranked ids=%s" % (", ".join(models) or "none"),
               file=sys.stderr)
+        # ONE LINE, AND IT SAYS WHY EACH RUNG MOVED. The order is the thing
+        # every later investigation asks about first, and a reorder nobody can
+        # explain is indistinguishable from a broken ladder.
+        print(format_order_log(info.get("order") or []), file=sys.stderr)
         # THE POOL VERDICT, ALWAYS. Either the call is being suppressed (named,
         # with its expiry) or a cooldown was deliberately ignored -- and the
         # second case is the trade the digest slot makes, so it is stated rather

@@ -625,6 +625,12 @@ def ladder_models(transport=None, environ=None, log=None):
 #: persists; unset means "no memory", which is what a test and a local run want.
 COOLDOWN_ENV = "MODEL_COOLDOWN_PATH"
 
+#: Where recorded health lives. The workflow already keeps this file for the
+#: model selector; reading the same file here is what makes the digest ladder
+#: open on the rung that has actually been answering. Unset means "no memory",
+#: which is what a test and a local run want.
+HEALTH_ENV = "MODEL_HEALTH_PATH"
+
 #: Refusal kinds that mean THIS RUNG produced nothing: no verdict, no bytes, an
 #: auth wall, a dead transport, a hit against its own clock, a CLI exit that
 #: carried no answer, an empty answer. Quota is excluded -- the whole pool shares
@@ -690,18 +696,29 @@ def _hard_cooled(cooldown, model):
     return model_selector.on_hard_cooldown(cooldown, model)
 
 
-def demoted_order(models, cooldown, now=None, log=None):
-    """The ladder with a demoted rung at the BACK -- never removed.
+def health_order(models, health=None, cooldown=None, now=None, log=None,
+                 announce=False):
+    """The ladder ordered by RECORDED HEALTH, then by the configured order.
 
-    model_selector's invariant is that this file may reorder a ladder but never
-    veto one: an edition with no summaries is worse than one written by the rung
-    that failed last time, so the demoted rung is still tried once everything
-    else has refused. Both ends are logged, because a run log that does not say
-    why the order changed is a run log that cannot explain its own 99 seconds.
+    A rung that has answered more often than it failed moves up; one that has
+    failed more than it answered moves down; a rung with no history sits level
+    with every other unmeasured rung, so the owner's order still decides that
+    tie. A HARD COOLDOWN always ranks last, whatever its health score: a
+    cooling rung is a known cost, not a preference.
+
+    Never removes anything. model_selector's invariant is that this file may
+    reorder a ladder but never veto one: an edition with no summaries is worse
+    than one written by the rung that failed last time, so a demoted rung is
+    still tried once everything else has refused.
+
+    `announce` prints the ONE order line per run. Per-rung demotion lines are
+    printed whenever a rung moves, because a run log that does not say why the
+    order changed is a run log that cannot explain its own 99 seconds.
     """
     log = log or (lambda *_a: None)
     import model_selector
     now = time.time() if now is None else float(now)
+    rows = (health or {}).get("models") or {}
     keeping, cooling = [], []
     for model in models:
         row = ((cooldown or {}).get("models") or {}).get(model)
@@ -715,7 +732,30 @@ def demoted_order(models, cooldown, now=None, log=None):
                 log("  ladder: %s promoted back (its cooldown ended %s)"
                     % (model, row["until"]))
             keeping.append(model)
-    return keeping + cooling
+    # list.sort is STABLE, so equal health keeps the configured order exactly.
+    keeping.sort(key=lambda m: -model_selector.health_score(rows.get(m)))
+    order = keeping + cooling
+    if announce:
+        rank = {m: i + 1 for i, m in enumerate(keeping)}
+        parts = []
+        for model in order:
+            score = model_selector.health_score(rows.get(model))
+            if model in cooling:
+                until = (((cooldown or {}).get("models") or {})
+                         .get(model) or {}).get("until")
+                reason = "cooldown until %s" % (until or "?")
+            elif score:
+                reason = "health rank %d" % rank.get(model, 0)
+            else:
+                reason = "config"
+            parts.append("%s [%s]" % (model, reason))
+        log("  ladder order: %s" % (" > ".join(parts) if parts else "none"))
+    return order
+
+
+def demoted_order(models, cooldown, now=None, log=None):
+    """The old name and the old behaviour: hard cooldown only, nothing else."""
+    return health_order(models, None, cooldown, now=now, log=log)
 
 
 def _decode(raw):
@@ -899,7 +939,7 @@ def refusal_cause(kind, message):
 def summarise(stories, models=None, run=None, sleep=None, clock=None,
               log=print, budget=INPUT_TOKEN_BUDGET_PER_MINUTE,
               budget_seconds=TOTAL_BUDGET_SECONDS, cooldown=None,
-              cooldown_path=None, snippets=None):
+              cooldown_path=None, snippets=None, health=None, health_path=None):
     """Summarise *stories* in paced batches.
 
     Returns {"summaries": {url: text}, "model": last model that answered,
@@ -930,6 +970,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     `cooldown` / `cooldown_path` are the demotion memory: a rung that refuses
     without a quota reason twice is moved to the back of the ladder for six
     hours, and the next run reads that back instead of paying the same ~99s.
+
+    `health` / `health_path` are the SAME memory the model selector keeps. The
+    ladder opens on the rung that has answered and drops one that has failed
+    more than it returned. Health only reorders; a hard cooldown still ranks
+    last, and nothing is ever removed.
     """
     stories = [s for s in (stories or []) if (s.get("source_url") or s.get("url"))]
     run = run or run_model
@@ -940,6 +985,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     if cooldown is None and cooldown_path:
         import model_selector
         cooldown = model_selector.load_cooldown(cooldown_path)
+    if health_path is None:
+        health_path = os.environ.get(HEALTH_ENV) or None
+    if health is None and health_path:
+        import model_selector
+        health = model_selector.load_health(health_path)
     # THE CLOCK STARTS BEFORE THE LADDER IS BUILT (run 42144852087). Resolving
     # the ladder probes every provider's catalogue, and that cost used to sit
     # OUTSIDE the allowance: 4.5 minutes of probes plus the walk overran the
@@ -1000,8 +1050,12 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         save_memory()
         return out
     base = list(models) if models is not None else ladder_models(log=log)
-    order = demoted_order(base, cooldown, log=log) if cooldown is not None \
-        else list(base)
+
+    def ordered_ladder(announce=False):
+        """Health first, hard cooldown last, and the one order line on request."""
+        return health_order(base, health, cooldown, log=log, announce=announce)
+
+    order = ordered_ladder(announce=True)
 
     if not stories or not base:
         if not base:
@@ -1027,7 +1081,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             # The same formatter that reorders the next run's ladder, called
             # only for its line: a demotion caused by THIS run has to be in THIS
             # run's log, not only in the next one's.
-            demoted_order(base, cooldown, log=log)
+            ordered_ladder()
             dirty = False
         return True
 
@@ -1041,7 +1095,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         if dirty and cooldown is not None:
             # RECOMPUTED BETWEEN BATCHES: a rung that refused twice during the
             # last one is reordered (and skipped, below) for the rest of this run.
-            order = demoted_order(base, cooldown, log=log)
+            order = ordered_ladder()
             dirty = False
         active = [m for m in order if m not in dead] or list(order)
         prompt = build_prompt(batch, snippets)
