@@ -56,6 +56,14 @@ MAX_BATCH_SIZE = 4
 #: pool and waits for the next rung.
 STORY_ASKS_PER_MODEL = 2
 
+#: Different rungs that may return NOTHING USABLE for the same story before it
+#: leaves the walk. Measured 2026-11-07 (run 42374040333): 16 empty answers
+#: covered only 6 unique stories, each re-asked by up to three models, and the
+#: walk spent 24 requests and 10.5 minutes on stories no model would write.
+#: Retiring is not dropping: the story keeps the publisher's text and still
+#: reaches the repair path.
+RETIRE_AFTER_RUNGS = 2
+
 #: The measured Gemini free-tier limit, in INPUT tokens per minute. It is a
 #: named constant rather than a number in the loop because the whole point of
 #: this module is that the arithmetic is visible: every request is charged
@@ -1022,6 +1030,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     out = {"summaries": {}, "model": None, "requests": 0, "waits": [],
            "refusals": [], "debug": [], "causes": {},
            "attempts": 0, "reasons": {}, "closest": None,
+           "retired": 0, "skipped_no_text": 0,
            "budget_spent": False, "seconds": 0.0}
     #: Rungs demoted by a refusal IN THIS RUN. They are skipped for the rest of
     #: it (run 42070185644 paid the same broken rung in all three batches), but
@@ -1107,13 +1116,38 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             dirty = False
         return True
 
-    pending = list(stories)
     asked = {}          # (model, story url) -> asks that model has made for it
     ask_sizes = {}      # model -> the size its NEXT request should carry
+    misses = {}         # story url -> rungs that ANSWERED with nothing usable
     lost_causes = set()
 
     def url_of(item):
         return item.get("source_url") or item.get("url") or ""
+
+    def evidence_of(item):
+        """The publisher text the prompt would carry for this story."""
+        if snippets is not None:
+            return str((snippets or {}).get(url_of(item)) or "")
+        return str(item.get("summary") or "")
+
+    def has_evidence(item):
+        """False when there is no publisher text, or it is the headline itself."""
+        if snippets is None and item.get("summary_source") == "none":
+            # The deriver's own marker for "the card carries no description",
+            # which is a placeholder sentence rather than an empty string.
+            return False
+        text = evidence_of(item).strip()
+        return bool(text) and text != str(item.get("title") or "").strip()
+
+    # DO NOT ASK FOR A STORY WITH NOTHING TO SUMMARISE (run 42374040333: an empty
+    # snippet and a headline-only story were each walked down the ladder). They
+    # are not asked for at all; the caller keeps them and the downstream path
+    # gives them the publisher's text or drops them by its own rules.
+    pending = [item for item in stories if has_evidence(item)]
+    out["skipped_no_text"] = len(stories) - len(pending)
+    if out["skipped_no_text"]:
+        log("  %d stories skipped: no publisher text to summarise (empty, or "
+            "the headline itself)" % out["skipped_no_text"])
 
     def next_group(model, size):
         """The next *size* stories *model* may still be asked for."""
@@ -1134,11 +1168,13 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     def attempt(prompt, model, group, timeout, batches_left, group_size):
         """One request, with the provider's single bounded wait honoured.
 
-        Returns ({url: text}, reason). A PARTIAL answer is returned as the
-        progress it is and never reaches `note()`: measured 2026-11-07 (run
+        Returns ({url: text}, reason, answered). A PARTIAL answer is returned as
+        the progress it is and never reaches `note()`: measured 2026-11-07 (run
         42369763864), every healthy rung answered "rows=6 seen, 1 written" and was
         charged as a failure for it, so the walk advanced and threw the other
-        five stories away.
+        five stories away. `answered` is True only when the model REPLIED: a
+        refusal, a timeout or a runner fault is not an answer, and a story is
+        retired for being answered emptily, never for a rung that said nothing.
         """
         tries = 0
         while True:
@@ -1156,7 +1192,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     # that named a provider directly: a repository setting, not
                     # a model failure, and counting it as one would page the
                     # owner about a secret.
-                    return {}, "not_configured"
+                    return {}, "not_configured", False
                 note(model, getattr(exc, "raw", "") or str(exc), kind, timeout,
                      exit_code=getattr(exc, "exit_code", None))
                 closer(model, 0, kind)
@@ -1168,7 +1204,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     # decision, and a wait cannot lift an IP policy.
                     log("  %s was blocked at the edge; trying the next model"
                         % model)
-                    return {}, "provider_blocked"
+                    return {}, "provider_blocked", False
                 if record(model, kind):
                     log("  %s produced nothing (%s); recorded for the ladder "
                         "memory" % (model, kind))
@@ -1177,26 +1213,26 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                     # waiting would keep the request on a rung already refused.
                     log("  %s is rate-limited (429); trying the next model"
                         % model)
-                    return {}, kind
+                    return {}, kind, False
                 if not is_refusal(str(exc)):
                     log("  %s %s within %ds (%s); trying the next model"
                         % (model, kind, timeout, str(exc).strip()[:120]))
-                    return {}, kind
+                    return {}, kind, False
                 if tries >= 2:
-                    return {}, kind
+                    return {}, kind, False
                 hint = retry_hint_seconds(str(exc))
                 delay = DEFAULT_WAIT_SECONDS if hint is None else hint
                 if delay > MAX_WAIT_SECONDS:
                     log("  %s refused and asked for %ds, more than the %ds "
                         "bound; trying the next model"
                         % (model, delay, MAX_WAIT_SECONDS))
-                    return {}, kind
+                    return {}, kind, False
                 # A SLOW CALL HAS EATEN SOME OF THE CLOCK since `remaining` was
                 # read, so the wait is clamped against a fresh reading.
                 left = pacer.deadline - clock()
                 delay = min(delay, left)
                 if delay <= 0:
-                    return {}, "timeout"
+                    return {}, "timeout", False
                 log("  %s refused (%s); honouring the provider's hint: waiting "
                     "%ds" % (model, "quota" if hint is not None else "no hint",
                              delay))
@@ -1216,20 +1252,25 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 lost_causes.add("runner_fault")
                 log("  %s errored (%s); trying the next model"
                     % (model, str(exc).strip()[:120]))
-                return {}, "runner_error"
+                return {}, "runner_error", False
             got = parse_reply(text, group)
             if got:
-                return got, "ok"
+                # A SUCCESS IS EVIDENCE TOO: the next investigation has to be
+                # able to read a working reply beside the failing ones in the
+                # same artifact, instead of inferring what worked from logs.
+                out["debug"].append(debug_record(model, text, "ok",
+                                                 timeout=timeout))
+                return got, "ok", True
             reason = classify_reply(text, group)
             note(model, text, reason, timeout)
             closer(model, 0, reason)
             lost_causes.add("unreadable_reply")
             log("  %s answered but gave no usable summary (%s)"
                 % (model, reason))
-            return {}, reason
+            return {}, reason, True
 
     tried = set()       # rungs already asked for the group in hand
-    blocked = set()     # urls every rung has failed on, kept for the report
+    blocked = set()     # urls no rung may be asked for again: retired group or story
     current = []        # the group in hand, retired when no rung is left for it
     while pending:
         # THE BUDGET GOVERNS, NOT A REQUEST COUNT. There is no fixed number of
@@ -1284,11 +1325,25 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
             "(budget %d/min)"
             % (model, len(group), len(pending), prompt_tokens, budget))
         pacer.wait_for(prompt_tokens)
-        got, _reason = attempt(prompt, model, group, timeout, batches_left,
-                               group_size)
+        got, _reason, answered = attempt(prompt, model, group, timeout,
+                                         batches_left, group_size)
         for item in group:
             key = (model, url_of(item))
             asked[key] = asked.get(key, 0) + 1
+        if answered:
+            for item in group:
+                url = url_of(item)
+                if url in got:
+                    continue
+                rungs = misses.setdefault(url, set())
+                rungs.add(model)
+                if len(rungs) >= RETIRE_AFTER_RUNGS and url not in blocked:
+                    # TWO RUNGS ANSWERED THIS STORY AND NEITHER WROTE A ROW, so
+                    # a third will not either. Retired from the WALK only: the
+                    # story still reaches the caller and the repair path with the
+                    # publisher's text it already had.
+                    blocked.add(url)
+                    out["retired"] += 1
         if not got:
             # ONLY A REQUEST THAT RETURNED NOTHING USABLE ADVANCES THE LADDER.
             tried.add(model)
@@ -1315,6 +1370,11 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
         tried.clear()
         log("  %s: %d of %d stories summarised, %d still waiting"
             % (model, len(got), len(group), len(pending)))
+
+    if out["retired"]:
+        log("  %d stories retired from the walk: two rungs answered with "
+            "nothing usable for them; they keep the publisher's text and still "
+            "reach the repair path" % out["retired"])
 
     if pending:
         if lost_causes:

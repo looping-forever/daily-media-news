@@ -1232,7 +1232,13 @@ class TheOutcomeIsDiagnosable(unittest.TestCase):
 
     def test_every_failed_attempt_reaches_the_debug_dump(self):
         batch = [story(1)]
-        run = FakeRun([reply_for(batch, "Too short.")])
+        # A REFUSING ladder, not an empty-answering one: an empty-answer walk is
+        # now bounded by retirement after two rungs (run 42374040333), so the
+        # fifteen-rung walk this pins can only be earned by rungs that REFUSE.
+        # The property under test is the artifact's cap, not the walk's length:
+        # every attempt the run paid for is kept, however many that is.
+        run = FakeRun([ss.Refusal("gemini/m0: exit 1: partial json",
+                                  kind="other")])
         models = ["gemini/m%d" % n for n in range(15)]
         out = ss.summarise(batch, models=models, run=run, sleep=lambda *_a: None,
                            clock=FakeClock(), log=lambda *_a: None,
@@ -1263,7 +1269,8 @@ class PartialAnswersAreProgress(unittest.TestCase):
         self.assertEqual({"gemini/a"}, {model for _prompt, model in run.calls},
                          "a partial answer must be reused, not advanced past")
         self.assertEqual(0, out["attempts"])
-        self.assertEqual([], out["debug"])
+        self.assertEqual([], [row for row in out["debug"]
+                              if row["reason"] != "ok"])
 
     def test_a_partial_answer_is_not_recorded_as_a_failure(self):
         batch = [story(1), story(2)]
@@ -1272,7 +1279,8 @@ class PartialAnswersAreProgress(unittest.TestCase):
                            clock=FakeClock(), log=lambda *_a: None)
         self.assertEqual(2, len(out["summaries"]))
         self.assertEqual({}, out["reasons"])
-        self.assertEqual([], out["debug"])
+        self.assertEqual([], [row for row in out["debug"]
+                              if row["reason"] != "ok"])
 
     def test_a_rung_that_answers_nothing_advances_the_ladder(self):
         batch = [story(1), story(2)]
@@ -1298,6 +1306,125 @@ class PartialAnswersAreProgress(unittest.TestCase):
                              % (clock.now - 1000.0))
         self.assertLess(len(run.seen), len(models),
                         "it must stop on the clock, not walk every rung")
+
+
+class StoriesThatCannotBeAnswered(unittest.TestCase):
+    """RUN 42374040333: 16 empty answers covered only 6 unique stories.
+
+    The same handful of stories was re-asked by rung after rung -- 22 rows with
+    `"summary": ""` and 6 with no `summary` key at all -- and the walk spent 24
+    requests and 10.5 minutes producing 9 summaries. Two of those stories had no
+    publisher text at all (an empty snippet; a headline repeated as the body),
+    and the rest were answered emptily by every rung asked.
+    """
+
+    def test_a_story_two_rungs_could_not_answer_is_not_offered_to_a_third(self):
+        batch = [story(1)]
+        run = FakeRun([reply_for(batch, "")])
+        out = ss.summarise(batch, models=["gemini/a", "gemini/b", "gemini/c"],
+                           run=run, sleep=lambda *_a: None, clock=FakeClock(),
+                           log=lambda *_a: None)
+        self.assertEqual(["gemini/a", "gemini/b"],
+                         [model for _prompt, model in run.calls],
+                         "the third rung must not be asked: %r"
+                         % (run.calls,))
+        self.assertEqual(1, out["retired"])
+        self.assertEqual({}, out["summaries"])
+
+    def test_a_retired_story_still_reaches_the_repair_path(self):
+        import summarise_stubs
+
+        published = "A road closure notice from the district office."
+        batch = [{"title": "Road closed", "summary": published,
+                  "source_name": "example.com",
+                  "source_url": "https://example.com/road", "category":
+                  "local_city"}]
+        snippets = {"https://example.com/road": published}
+        payload = {"stories": [dict(batch[0])],
+                   "edition_kind": "unsummarised"}
+        run = FakeRun([reply_for(batch, "")])
+        walked = {}
+
+        def summarise(stubs, budget_seconds=None):
+            walked.update(ss.summarise(stubs, models=["gemini/a", "gemini/b"],
+                                       run=run, snippets=snippets,
+                                       sleep=lambda *_a: None,
+                                       clock=FakeClock(), log=lambda *_a: None,
+                                       budget_seconds=120))
+            return walked
+
+        counts = summarise_stubs.repair(payload, snippets=snippets,
+                                        summarise=summarise, floor=1,
+                                        log=lambda *_a: None)
+        self.assertEqual(1, walked.get("retired"),
+                         "the walk must have retired the story: %r" % (walked,))
+        self.assertEqual(1, len(payload["stories"]),
+                         "retiring is not dropping: the story stays")
+        self.assertEqual("publisher", payload["stories"][0]["summary_source"])
+        self.assertTrue(str(payload["stories"][0]["summary"] or "").strip())
+        self.assertGreaterEqual(counts.get("publisher", 0), 1)
+
+    def test_a_story_with_an_empty_snippet_is_never_asked_for(self):
+        batch = [story(1), story(2)]
+        snippets = {"https://example.com/1": "   ",
+                    "https://example.com/2": ENOUGH}
+        run = FakeRun([reply_for([batch[1]])])
+        out = ss.summarise(batch, models=["gemini/a"], run=run,
+                           snippets=snippets, sleep=lambda *_a: None,
+                           clock=FakeClock(), log=lambda *_a: None)
+        self.assertEqual(1, out["skipped_no_text"])
+        self.assertEqual(1, len(run.calls))
+        self.assertNotIn("https://example.com/1", run.calls[0][0],
+                         "a story with no publisher text must not be in a prompt")
+        self.assertEqual({"https://example.com/2"}, set(out["summaries"]))
+
+    def test_a_story_whose_snippet_is_its_headline_is_never_asked_for(self):
+        batch = [story(1)]
+        snippets = {"https://example.com/1": batch[0]["title"]}
+        run = FakeRun([reply_for(batch)])
+        out = ss.summarise(batch, models=["gemini/a"], run=run,
+                           snippets=snippets, sleep=lambda *_a: None,
+                           clock=FakeClock(), log=lambda *_a: None)
+        self.assertEqual(1, out["skipped_no_text"])
+        self.assertEqual([], run.calls,
+                         "the headline is not evidence to summarise")
+        self.assertEqual({}, out["summaries"])
+
+    def test_a_deriver_story_marked_none_is_never_asked_for(self):
+        # The deriver fills `summary` with its own placeholder sentence and marks
+        # the card `summary_source: "none"`, so a non-empty summary is NOT proof
+        # of publisher text. Without an index, that marker is the only signal.
+        blank = {"title": "Flood closes highway", "summary": "No summary available.",
+                 "source_name": "example.com", "source_url":
+                 "https://example.com/1", "summary_source": "none"}
+        real = {"title": "Water supply restored", "summary": ENOUGH,
+                "source_name": "example.com", "source_url":
+                "https://example.com/2", "summary_source": "publisher"}
+        run = FakeRun([reply_for([{"title": real["title"],
+                                   "source_url": real["source_url"]}])])
+        out = ss.summarise([blank, real], models=["gemini/a"], run=run,
+                           sleep=lambda *_a: None, clock=FakeClock(),
+                           log=lambda *_a: None)
+        self.assertEqual(1, out["skipped_no_text"])
+        self.assertEqual(1, len(run.calls))
+        self.assertNotIn(blank["title"], run.calls[0][0],
+                         "a card with no description must not be in a prompt")
+        self.assertIn(real["title"], run.calls[0][0])
+
+    def test_the_debug_dump_records_an_accepted_reply(self):
+        batch = [story(1)]
+        run = FakeRun([reply_for(batch)])
+        out = ss.summarise(batch, models=["gemini/a"], run=run,
+                           sleep=lambda *_a: None, clock=FakeClock(),
+                           log=lambda *_a: None)
+        self.assertEqual(1, len(out["summaries"]))
+        accepted = [row for row in out["debug"] if row["reason"] == "ok"]
+        self.assertEqual(1, len(accepted),
+                         "a working reply must sit beside the failures: %r"
+                         % (out["debug"],))
+        self.assertIn("A model-written sentence", accepted[0]["raw"])
+        self.assertEqual(0, out["attempts"],
+                         "a success is not a failed attempt")
 
 
 if __name__ == "__main__":
