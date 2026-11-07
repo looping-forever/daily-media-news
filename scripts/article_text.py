@@ -8,6 +8,9 @@ gate still applies to the answer.
 
 Rules, each because of a way a page can hurt the run:
 
+  * a news.google.com link is resolved to the publisher url FIRST, offline
+    (`resolve_publisher_url`), and Google itself is never fetched. A link whose
+    id carries no url answers the empty string and is not fetched at all.
   * robots.txt is checked FIRST and a disallowed path is never requested. RFC
     9309: a 4xx answer means no rules were published, so it permits the fetch; a
     5xx or an unreachable robots.txt is refused, because an unreadable permission
@@ -21,6 +24,7 @@ Rules, each because of a way a page can hurt the run:
     A caller never has to guess whether the answer is usable.
 """
 
+import base64
 import re
 import urllib.error
 import urllib.request
@@ -163,6 +167,61 @@ def robots_url_for(url):
     return "%s://%s/robots.txt" % (parts.scheme, parts.netloc)
 
 
+GOOGLE_NEWS_HOST = "news.google.com"
+
+#: `/rss/articles/<id>` is what the RSS feed links to today; `/articles/<id>` is
+#: the older shape. Both carry the same base64url id.
+_GOOGLE_ARTICLE_RE = re.compile(r"^/(?:rss/)?articles/([A-Za-z0-9_-]+)")
+
+#: A url sitting inside the decoded id, cut at the first byte that cannot be one.
+_URL_IN_BYTES_RE = re.compile(rb"https?://[^\x00-\x20\"'<>\\`]+")
+
+
+def is_google_news(url):
+    """True when *url* is a news.google.com link."""
+    return (urlsplit(str(url or "")).hostname or "").lower() == GOOGLE_NEWS_HOST
+
+
+def _publisher_url(candidate):
+    """*candidate* if it is a real publisher url, else ""."""
+    parts = urlsplit(str(candidate or ""))
+    if parts.scheme not in ("http", "https"):
+        return ""
+    host = (parts.hostname or "").lower()
+    # Google is a redirector, never the publisher: a `news.google.com` or
+    # `*.google.com` answer is not the article and is refused.
+    if not host or host == "google.com" or host.endswith(".google.com"):
+        return ""
+    return str(candidate)
+
+
+def resolve_publisher_url(url):
+    """The publisher url a Google News article link points at, or "".
+
+    The id is base64url over a protobuf that USUALLY carries the target url as
+    plain text, so the decode is offline and needs nothing but the stdlib. A
+    modern id (`AU_yqL...`) is an encrypted payload with no url in it at all:
+    that resolves to "" and the caller counts it `undecodable` instead of
+    guessing a publisher address. A non-Google url is returned unchanged.
+    """
+    text = str(url or "")
+    if not is_google_news(text):
+        return text
+    match = _GOOGLE_ARTICLE_RE.match(urlsplit(text).path or "")
+    if not match:
+        return ""
+    ident = match.group(1)
+    try:
+        blob = base64.urlsafe_b64decode(ident + "=" * (-len(ident) % 4))
+    except Exception:
+        return ""
+    for raw in _URL_IN_BYTES_RE.findall(blob):
+        candidate = _publisher_url(raw.decode("latin-1").rstrip(".,;:!?)]}"))
+        if candidate:
+            return candidate
+    return ""
+
+
 def robots_allows(url, open_page=open_page, timeout=TIMEOUT_SECONDS):
     """True unless a published robots.txt disallows this path.
 
@@ -194,7 +253,9 @@ def robots_allows(url, open_page=open_page, timeout=TIMEOUT_SECONDS):
 
 
 def fetch_with_reason(url, timeout=TIMEOUT_SECONDS, open_page=open_page):
-    """(text|None, reason) -- `robots`, `http`, `type`, `empty` or `error`."""
+    """(text|None, reason) -- `robots`, `google`, `http`, `type`, `empty`, `error`."""
+    if is_google_news(url):
+        return None, "google"     # the redirector is never the article
     if not robots_allows(url, open_page=open_page, timeout=timeout):
         return None, "robots"
     try:

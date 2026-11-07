@@ -2970,6 +2970,87 @@ def collect_parallel(plans, cfg=None):
 # Post-processing: filters, dedup, caps
 # ---------------------------------------------------------------------------
 
+#: A Google News link is a redirect: short snippet, no article text. When the
+#: same story also arrived from a publisher feed, the direct item must survive.
+GOOGLE_NEWS_HOST = "news.google.com"
+#: Minimum characters one normalized headline must share to be "inside" another.
+STORY_OVERLAP_CHARS = 25
+_OUTLET_SUFFIX_RE = re.compile(
+    r"\s+[\-\u2013\u2014|]\s+[^\-\u2013\u2014|]{1,60}$")
+_NON_WORD_RE = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def normalise_headline(title):
+    """Lowercase, drop a trailing " - Outlet", drop punctuation, collapse spaces."""
+    text = clean_ws(str(title or "")).lower()
+    text = _OUTLET_SUFFIX_RE.sub("", text)
+    text = _NON_WORD_RE.sub(" ", text).replace("_", " ")
+    return clean_ws(text)
+
+
+def same_story(a, b):
+    """Equal normalized headlines, or one contained in the other with 25+ chars."""
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if len(a) < STORY_OVERLAP_CHARS or len(b) < STORY_OVERLAP_CHARS:
+        return False
+    return a in b or b in a
+
+
+def is_google_news_item(cand):
+    return netloc_of(cand.get("url", "")) == GOOGLE_NEWS_HOST
+
+
+def _carry_over(survivor, donor):
+    """Copy the donor's published time, snippet, image or video into a gap only."""
+    if not survivor.get("published") and donor.get("published"):
+        survivor["published"] = donor["published"]
+    if survivor.get("_dt") is None and donor.get("_dt") is not None:
+        survivor["_dt"] = donor["_dt"]
+    for key in ("snippet", "image", "video"):
+        if not survivor.get(key) and donor.get(key):
+            survivor[key] = donor[key]
+
+
+def prefer_direct_feeds(candidates):
+    """Drop a Google News item that duplicates a direct feed item.
+
+    Same story (one rule): equal normalized headline, or one normalized headline
+    inside the other with at least STORY_OVERLAP_CHARS characters -- never across
+    languages, and never between two direct feeds, so a fabricated match cannot
+    remove a real one. Returns (kept_in_order, stats).
+    """
+    direct = [c for c in candidates if not is_google_news_item(c)]
+    kept = []
+    replaced = google_kept = 0
+    for cand in candidates:
+        if not is_google_news_item(cand):
+            kept.append(cand)
+            continue
+        headline = normalise_headline(cand.get("title", ""))
+        match = None
+        for other in direct:
+            if other.get("language") != cand.get("language"):
+                continue
+            if same_story(headline, normalise_headline(other.get("title", ""))):
+                match = other
+                break
+        if match is None:
+            google_kept += 1
+            kept.append(cand)
+            continue
+        _carry_over(match, cand)
+        replaced += 1
+    return kept, {"google_replaced": replaced, "google_kept": google_kept}
+
+
+def google_preference_line(stats):
+    return ("google-news: %d replaced by a direct feed item, %d kept"
+            % (stats.get("google_replaced", 0), stats.get("google_kept", 0)))
+
+
 def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=FRESHNESS_HOURS)
@@ -2994,6 +3075,12 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
             prepared.append((1, dt or UNKNOWN_DATE_RANK, plan, kind, cand))
         else:
             prepared.append((0, dt or EPOCH, plan, kind, cand))
+
+    # Sourcing preference runs BEFORE the caps, so a Google duplicate is never
+    # the row that occupies a domain slot while the direct item is dropped.
+    survivors, google_stats = prefer_direct_feeds([item[4] for item in prepared])
+    survivor_ids = {id(cand) for cand in survivors}
+    prepared = [item for item in prepared if id(item[4]) in survivor_ids]
 
     # Two stable sorts. First freshest-first INSIDE each kind; then the
     # non-notice band before the notice band, so a burst of undated notices can
@@ -3078,6 +3165,10 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
         "dropped_dup_title": drops["dup_title"],
         "dropped_domain_cap": drops["domain_cap"],
         "dropped_total_cap": drops["total_cap"],
+        # Sourcing: a Google duplicate replaced by a direct feed item, and the
+        # Google items that had no direct duplicate (headline-only, acceptable).
+        "google_replaced": google_stats["google_replaced"],
+        "google_kept": google_stats["google_kept"],
         # Per SOURCE survival: the post-cap truth the health record reads.
         "kept_by_source": kept_by_source,
     }
@@ -3245,6 +3336,7 @@ def main(argv=None):
           % (stats["dropped_stale"], stats["dropped_keyword"],
              stats["dropped_dup_url"], stats["dropped_dup_title"],
              stats["dropped_domain_cap"]))
+    print("  %s" % google_preference_line(stats))
     print("  out: %s | timings: %s" % (args.out_path, args.timings_path))
     return 0
 

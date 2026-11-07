@@ -1007,20 +1007,42 @@ def fetch_missing_text(items, snippets=None, log=print, clock=None, fetch=None,
     -- and is injected so a test never opens a socket. A story that already has
     publisher text is never fetched: its own description is better evidence than
     a page scrape, and this phase exists only for the ones the skip line names.
+
+    A Google News link is resolved to the publisher url before anything is
+    requested, and robots.txt is then applied to THAT host. An id that carries no
+    url is counted `undecodable` and no request is made, because Google's own
+    robots.txt disallows everything and guessing a publisher is not an option.
     """
     clock = clock or time.monotonic
     fetch = fetch or article_text.fetch_with_reason
     texts = {}
-    stats = {"fetched": 0, "with_text": 0, "robots": 0, "failed": 0,
+    stats = {"google": 0, "resolved": 0, "undecodable": 0,
+             "fetched": 0, "with_text": 0, "robots": 0, "failed": 0,
              "stopped": ""}
     started = clock()
     stop = started + float(seconds)
     if deadline is not None:
         stop = min(stop, float(deadline))
     seen = set()
+    targets = set()
     for item in items:
         url = story_url(item)
         if not url or url in seen:
+            continue
+        seen.add(url)
+        # Google News is never fetched: the publisher decides, so the link is
+        # resolved first and a link that cannot be decoded is not fetched at all.
+        target = article_text.resolve_publisher_url(url)
+        if article_text.is_google_news(url):
+            stats["google"] += 1
+            if not target:
+                stats["undecodable"] += 1
+                continue
+            stats["resolved"] += 1
+        if not target:
+            stats["failed"] += 1
+            continue
+        if target in targets:
             continue
         if stats["fetched"] >= max_fetches:
             stats["stopped"] = "the %d-fetch cap" % max_fetches
@@ -1029,10 +1051,10 @@ def fetch_missing_text(items, snippets=None, log=print, clock=None, fetch=None,
         if left <= 0:
             stats["stopped"] = "the %ds budget" % int(seconds)
             break
-        seen.add(url)
+        targets.add(target)
         try:
-            text, reason = fetch(url, timeout=min(article_text.TIMEOUT_SECONDS,
-                                                  max(1, int(left))))
+            text, reason = fetch(target, timeout=min(article_text.TIMEOUT_SECONDS,
+                                                     max(1, int(left))))
         except Exception:      # a fetch must never cost the edition
             text, reason = None, "error"
         if reason == "robots":
@@ -1049,10 +1071,12 @@ def fetch_missing_text(items, snippets=None, log=print, clock=None, fetch=None,
             item["evidence_chars"] = len(text)
         else:
             stats["failed"] += 1
-    if stats["fetched"] or stats["robots"]:
-        log("  article text: %d fetched, %d with text, %d refused by robots, "
-            "%d failed" % (stats["fetched"], stats["with_text"],
-                           stats["robots"], stats["failed"]))
+    if stats["fetched"] or stats["robots"] or stats["google"]:
+        log("  article text: %d google link(s), %d resolved, %d undecodable, "
+            "%d fetched, %d with text, %d refused by robots, %d failed"
+            % (stats["google"], stats["resolved"], stats["undecodable"],
+               stats["fetched"], stats["with_text"], stats["robots"],
+               stats["failed"]))
     if stats["stopped"]:
         log("  article fetch stopped at %s; the rest keep the publisher's text"
             % stats["stopped"])

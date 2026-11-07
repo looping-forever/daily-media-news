@@ -14,6 +14,7 @@ The rules pinned here are the ones that keep that fetch safe and honest:
     FETCHED TEXT IS EVIDENCE, NOT THE PUBLISHER'S DESCRIPTION.
 """
 
+import base64
 import json
 import os
 import sys
@@ -301,6 +302,122 @@ class TheEvidenceWindow(unittest.TestCase):
         self.assertIn(self.LONG[:400], prompts[0])
         self.assertNotIn(self.LONG[:401], prompts[0],
                          "a publisher snippet keeps the proven 400 characters")
+
+
+def google_news_id(target):
+    """The id shape Google's feed uses: a protobuf carrying the target url."""
+    raw = target.encode("utf-8")
+    return base64.urlsafe_b64encode(
+        b"\x08\x13\x12" + bytes([len(raw)]) + raw).decode("ascii").rstrip("=")
+
+
+def google_link(target):
+    return ("https://news.google.com/rss/articles/%s?oc=5"
+            % google_news_id(target))
+
+
+def encrypted_link():
+    """A modern id: an opaque `AU_yqL...` payload with no url in it."""
+    raw = b"\x08\x13\x12\x20AU_yqLmAu7qLmAu7qLmAu7qLmAu7qLmAu7qLmAu7qL"
+    ident = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    return "https://news.google.com/rss/articles/%s?oc=5" % ident
+
+
+def story(url, title="Story"):
+    return {"title": title, "summary": "", "source_url": url}
+
+
+class GoogleNewsLinksResolve(unittest.TestCase):
+    """Google is a redirector: the publisher decides, so resolve first."""
+
+    def test_a_decodable_id_resolves_to_the_publisher(self):
+        target = "https://www.bbc.co.uk/news/world-1"
+        self.assertEqual(target, at.resolve_publisher_url(google_link(target)))
+
+    def test_a_direct_link_is_returned_unchanged(self):
+        self.assertEqual("https://www.bbc.co.uk/news/x",
+                         at.resolve_publisher_url("https://www.bbc.co.uk/news/x"))
+
+    def test_an_encrypted_id_resolves_to_nothing(self):
+        self.assertEqual("", at.resolve_publisher_url(encrypted_link()),
+                         "an id with no url in it must not be guessed")
+
+    def test_google_is_never_the_resolved_host(self):
+        for target in ("https://news.google.com/rss/articles/abc",
+                       "https://www.google.com/amp/s/bbc.co.uk/x"):
+            self.assertEqual("", at.resolve_publisher_url(google_link(target)))
+
+    def test_a_resolved_link_is_fetched_at_the_publisher(self):
+        target = "https://www.bbc.co.uk/news/world-1"
+        calls = []
+
+        def fetch(url, timeout=None):
+            calls.append(url)
+            return PROSE, "ok"
+
+        lines = []
+        texts, stats = ss.fetch_missing_text(
+            [story(google_link(target))], fetch=fetch, log=lines.append)
+        self.assertEqual([target], calls)
+        self.assertEqual((1, 1, 0), (stats["google"], stats["resolved"],
+                                    stats["undecodable"]))
+        self.assertEqual(PROSE, texts.get(google_link(target)),
+                         "the text is keyed by the story's own url")
+        self.assertTrue(any("1 google link(s), 1 resolved, 0 undecodable" in line
+                            for line in lines), lines)
+
+    def test_an_undecodable_id_makes_no_request(self):
+        calls = []
+
+        def fetch(url, timeout=None):
+            calls.append(url)
+            return PROSE, "ok"
+
+        texts, stats = ss.fetch_missing_text(
+            [story(encrypted_link())], fetch=fetch, log=lambda *_a: None)
+        self.assertEqual([], calls, "an undecodable link must not be fetched")
+        self.assertEqual(1, stats["undecodable"])
+        self.assertEqual(0, stats["fetched"])
+        self.assertEqual({}, texts)
+
+    def test_robots_is_asked_of_the_publisher_not_google(self):
+        target = "https://www.bbc.co.uk/news/x"
+        page = FakePage({"https://www.bbc.co.uk/robots.txt": allowed_robots(),
+                         "https://www.bbc.co.uk/news/x": page_with(PROSE)})
+        texts, stats = ss.fetch_missing_text(
+            [story(google_link(target))],
+            fetch=lambda url, timeout=None: at.fetch_with_reason(
+                url, timeout=timeout, open_page=page))
+        self.assertEqual(["https://www.bbc.co.uk/robots.txt", target],
+                         page.requested)
+        self.assertEqual(1, stats["with_text"])
+
+    def test_a_disallowing_publisher_still_yields_no_text(self):
+        target = "https://www.bbc.co.uk/news/x"
+        page = FakePage({"https://www.bbc.co.uk/robots.txt":
+                         (200, "text/plain", b"User-agent: *\nDisallow: /\n")})
+        texts, stats = ss.fetch_missing_text(
+            [story(google_link(target))],
+            fetch=lambda url, timeout=None: at.fetch_with_reason(
+                url, timeout=timeout, open_page=page))
+        self.assertEqual({}, texts)
+        self.assertEqual(1, stats["robots"])
+        self.assertEqual(["https://www.bbc.co.uk/robots.txt"], page.requested)
+
+    def test_the_cap_still_holds_for_resolved_links(self):
+        links = [google_link("https://www.bbc.co.uk/n%d" % n) for n in range(25)]
+        calls = []
+
+        def fetch(url, timeout=None):
+            calls.append(url)
+            return PROSE, "ok"
+
+        lines = []
+        _texts, stats = ss.fetch_missing_text(
+            [story(url) for url in links], fetch=fetch, log=lines.append)
+        self.assertEqual(20, len(calls))
+        self.assertEqual(20, stats["fetched"])
+        self.assertTrue(any("20-fetch cap" in line for line in lines), lines)
 
 
 if __name__ == "__main__":
