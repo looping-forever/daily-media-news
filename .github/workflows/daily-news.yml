@@ -128,10 +128,6 @@ permissions:
   # digest-prebuild.yml, whose own gates are unchanged -- and it is the same
   # capability that workflow's seal job already holds for the supersede.
   actions: write
-  # GITHUB MODELS, FOR THE SUMMARISER AND THE REPAIR ONLY. Both call
-  # `summarise_stories.ladder_models`, which asks for the family explicitly; the
-  # tool-using digest walk seeds from config/opencode.json and never gets it.
-  models: read
 
 concurrency:
   # Fixed group: a worker-dispatched run and its 30-min-later fallback twin
@@ -1874,10 +1870,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          # THE JOB'S OWN TOKEN, scoped by `models: read`. This is the one call
-          # site that asks for the GitHub Models family; unset contributes no
-          # rung and one log line, exactly like the three keyed providers.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The same committed demotion ledger the repair step reads, so a rung
           # that fails in EITHER summariser call site is skipped by the order.
           MODEL_COOLDOWN_PATH: state/model_cooldown.json
@@ -2103,11 +2095,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          # THE SAME FOURTH FAMILY THE DERIVER WALKS. `summarise_stubs.py` owns
-          # no model list of its own: it calls `summarise_stories.summarise`,
-          # which builds the ladder here, so the token has to reach this step
-          # too or the repair never sees the rung at all.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # RUN 42061741326: gemini-3.5-flash-lite answered nothing twice (rc=1,
           # kind `other`) and cost ~99s before gemini-3.1-flash-lite wrote the
           # batch. The summariser records that here, and this is the committed

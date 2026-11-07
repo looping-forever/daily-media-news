@@ -608,13 +608,6 @@ def ladder_models(transport=None, environ=None, log=None):
     EACH HTTP RUNG'S ID IS PROVEN, NOT ASSUMED (probe, 2026-11-05): the account
     serves a different set of ids than the seed guessed, so the catalogue decides
     which is sent and a provider that serves none of them contributes no rung.
-
-    GITHUB MODELS IS THIS LADDER'S FOURTH FAMILY AND NOBODY ELSE'S. It is
-    authenticated by the workflow's own `GITHUB_TOKEN` (permission `models:
-    read`), so it is asked for explicitly with `providers=HTTP_PROVIDERS`; the
-    breaking classifier and the CLI digest walk call the same function without
-    that argument and therefore never see it. An absent token contributes one
-    log line and no rung.
     """
     import model_selector
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -624,8 +617,7 @@ def ladder_models(transport=None, environ=None, log=None):
         ladder = []
     return list(llm_providers.ordered_ladder(ladder, environ=environ,
                                              transport=transport, resolve=True,
-                                             log=log,
-                                             providers=llm_providers.HTTP_PROVIDERS))
+                                             log=log))
 
 
 #: Where a demoted rung is remembered. The workflow sets this to

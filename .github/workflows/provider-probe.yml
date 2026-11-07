@@ -33,9 +33,6 @@ on:
 # uploaded, no commit is made -- this job's only output is its log and summary.
 permissions:
   contents: read
-  # One catalogue read and one one-word answer for GitHub Models, exactly like
-  # every other row. The token is used for nothing else in this job.
-  models: read
 
 jobs:
   probe:
@@ -67,9 +64,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          # The job's own token, scoped by `models: read` above. Absent or
-          # unscoped, its row says `verdict=not_configured` instead of guessing.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           python3 - <<'PY'

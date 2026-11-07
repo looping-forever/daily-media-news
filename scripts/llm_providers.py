@@ -105,7 +105,6 @@ class Provider:
     models: tuple          # candidate ids, best first; corrected by the probe
     timeout: int           # the socket ceiling for ONE call, in seconds
     free_only: bool = False
-    models_alt: str = ""   # a SECOND catalogue URL, asked only when the first lists nothing
 
 
 #: THE LADDER ORDER, AND THE ONLY PLACE IT IS WRITTEN. Gemini is absent on
@@ -114,14 +113,7 @@ class Provider:
 #: being flattened into one hardcoded list that can rot (the 2026-10-13 lesson).
 LADDER_PROVIDERS = ("groq", "openrouter", "mistral")
 
-#: THE FAMILY ONLY THE SUMMARISER AND THE REPAIR MAY WALK. GitHub Models is
-#: billed against the workflow's own `GITHUB_TOKEN`, not a key the owner minted,
-#: and the summariser is the only stage whose cost is a handful of small batches.
-#: The breaking classifier sizes its pool with `breaking_monitor.AI_POOL_SIZE`,
-#: and the CLI digest walk is the TOOL-USING stage -- neither may spend this
-#: credential, so `ladder_rungs()`/`ordered_ladder()` default to
-#: LADDER_PROVIDERS and only `summarise_stories.ladder_models` asks for this set.
-HTTP_PROVIDERS = LADDER_PROVIDERS + ("github",)
+#: The set `provider_of()` recognises: the ladder providers and nothing else.
 
 #: The second Google project. Same endpoint and models as `gemini`, different
 #: account and free allowance. Named with a dash so `provider_of()` keeps
@@ -205,23 +197,10 @@ PROVIDERS = {
         ("mistral-small-latest",),
         60,
     ),
-    # GitHub Models, authenticated by the job's own token rather than a secret.
-    # The ids are NAMESPACED (`openai/…`, `meta/…`) and the rung prefix keeps
-    # them apart from the provider name, so `github/openai/gpt-4o-mini` splits
-    # into provider `github` and model `openai/gpt-4o-mini` exactly once.
-    "github": Provider(
-        "github",
-        "https://models.github.ai/inference/chat/completions",
-        # THE CATALOGUE IS NOT ON THE /inference PATH. Probe 42363318770 asked
-        # /inference/models and got HTTP 200 with no ids at all. /catalog/models
-        # is the published catalogue; the inference path stays as a second ask
-        # for the day GitHub moves it again.
-        "https://models.github.ai/catalog/models",
-        "GITHUB_TOKEN",
-        ("openai/gpt-4o-mini", "meta/llama-3.3-70b-instruct"),
-        60,
-        models_alt="https://models.github.ai/inference/models",
-    ),
+    # GITHUB MODELS WAS REGISTERED HERE AND IS GONE: retired 2026-07-30. The
+    # host still resolves and answers HTTP 200 with the plain-text body `OK` for
+    # EVERY path, valid token or not, so a status-code check would falsely pass.
+    # Do not add it back.
 }
 
 #: Status -> the ONE reason word the rest of the repository already speaks.
@@ -388,11 +367,11 @@ class ModelList:
 def provider_of(model_id):
     """The HTTP provider a rung belongs to, or None for a CLI rung.
 
-    Only `HTTP_PROVIDERS` route here. `gemini/*` deliberately returns None so
+    Only `LADDER_PROVIDERS` route here. `gemini/*` deliberately returns None so
     it keeps walking the existing keyed CLI path.
     """
     name = str(model_id or "").split("/", 1)[0]
-    return name if name in HTTP_PROVIDERS else None
+    return name if name in LADDER_PROVIDERS else None
 
 
 def provider(name):
@@ -885,14 +864,7 @@ def list_models(name, transport=None, environ=None):
     key = key_for(name, environ)
     if not key:
         return ModelList([], 0, 0.0, "not_configured")
-    got = _read_models(record, key, record.models_url, transport, started)
-    if not got.ids and record.models_alt:
-        # SECOND ASK, in the stated order: the documented catalogue first, this
-        # path only when the documented one listed nothing.
-        alt = _read_models(record, key, record.models_alt, transport, started)
-        if alt.ids:
-            got = alt
-    return got
+    return _read_models(record, key, record.models_url, transport, started)
 
 
 def _read_models(record, key, url, transport, started):
@@ -1311,7 +1283,7 @@ def probe_rows(transport=None, environ=None, sleep=None):
     so the pinned row shape never changes.
     """
     rows = []
-    for name in ("gemini", GEMINI_KEY2_PROVIDER) + HTTP_PROVIDERS:
+    for name in ("gemini", GEMINI_KEY2_PROVIDER) + LADDER_PROVIDERS:
         got = probe(name, transport=transport, environ=environ, sleep=sleep)
         row = ("%s | key=%s | models=%d | chosen=%s | tried=%d | status=%s | "
                "ms=%d | verdict=%s"
@@ -1412,13 +1384,8 @@ def free_probe_rows(name="openrouter", **kwargs):
 
 
 def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
-                 refresh=False, providers=None):
+                 refresh=False):
     """The configured provider rungs, in ladder order, as full rung ids.
-
-    `providers` is WHICH families this caller may walk, defaulting to
-    LADDER_PROVIDERS. `summarise_stories.ladder_models` passes HTTP_PROVIDERS so
-    the summariser and the repair reach GitHub Models; every other caller keeps
-    the default and the family cannot leak into the breaking classifier.
 
     A provider with no key is SKIPPED SILENTLY -- its absence is a repository
     setting, not a model failure, and a rung that cannot be called would cost
@@ -1432,7 +1399,7 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
     because a caller that builds a ladder at IMPORT time must not open a socket.
     """
     rungs = []
-    for name in (providers or LADDER_PROVIDERS):
+    for name in LADDER_PROVIDERS:
         if not configured(name, environ):
             # STILL NOT A RUNGS, BUT NO LONGER SILENT. Run 42144852087 ended
             # with "3 of 6 free models tried" and no fourth provider; the run
@@ -1468,7 +1435,7 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
 
 
 def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
-                   resolve=False, log=None, providers=None):
+                   resolve=False, log=None):
     """`seeds` re-ordered as: both Gemini keys, then Groq/OpenRouter/Mistral, then the rest.
 
     Gemini rungs stay first because they are the owner's stated preference,
@@ -1486,9 +1453,6 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
     only seeds this process can resolve (the breaking walk, whose seeds are CLI
     rungs). The HTTP rungs are added regardless: they do not use the CLI, which
     is the point of having them.
-
-    `providers` is passed through to `ladder_rungs()`: the default walks
-    LADDER_PROVIDERS, and only the summariser asks for the wider HTTP_PROVIDERS.
     """
     seeds = [m for m in (seeds or ()) if isinstance(m, str) and m]
     if not configured(GEMINI_KEY2_PROVIDER, environ):
@@ -1504,5 +1468,4 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
     gemini = [m for m in seeds if m.startswith(GEMINI_PREFIXES)]
     rest = [m for m in seeds if not m.startswith(GEMINI_PREFIXES)]
     return tuple(gemini) + ladder_rungs(environ, transport=transport,
-                                        resolve=resolve, log=log,
-                                        providers=providers) + tuple(rest)
+                                        resolve=resolve, log=log) + tuple(rest)
