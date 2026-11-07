@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""tests/digest/test_llm_providers.py -- the three keyed HTTP fallback rungs.
+"""tests/digest/test_llm_providers.py -- the keyed HTTP fallback rungs.
 
 WHY THIS EXISTS. Measured 2026-11-05 (run 41944898717): the digest walk spent
 Gemini's free tier in 13.4 seconds, both keyed rungs refused, the shared OpenCode
 pool answered `payment_required`, and the edition shipped with publisher text.
 ONE account's allowance was the whole pipeline's single point of failure.
 
-`scripts/llm_providers.py` is the adapter for the three providers the owner added
-as real fallbacks (Groq, OpenRouter, Mistral). This file pins the contract every
+`scripts/llm_providers.py` is the adapter for the providers the owner added
+as real fallbacks (Groq, OpenRouter, Mistral). The fourth family -- GitHub
+Models, authenticated by the workflow's own token -- has its scope rules pinned
+in tests/digest/test_github_models_family.py; here it only appears in the probe
+table, where a missing credential is one `not_configured` row. This file pins the contract every
 caller depends on, and nothing about the prompts:
 
     THE REQUEST IS RIGHT      -- url, one Authorization header, one JSON body.
@@ -570,9 +573,10 @@ class SecondGeminiKeyTests(unittest.TestCase):
 
         rows = lp.probe_rows(transport=send, environ=KEYS_BOTH)
         keyed = [r for r in rows if "| key=" in r]
-        self.assertEqual(5, len(keyed),
-                         "one row per provider: two Gemini keys and the three "
-                         "HTTP providers -- got %r" % (rows,))
+        self.assertEqual(6, len(keyed),
+                         "one row per provider: two Gemini keys, the three "
+                         "keyed HTTP providers and GitHub Models -- got %r"
+                         % (rows,))
         self.assertTrue([r for r in rows if r.startswith("gemini-key2 | ")],
                         rows)
 
@@ -658,8 +662,11 @@ class ProbeTests(unittest.TestCase):
                 "groq | key=present | models=1 | chosen=llama-3.3-70b-versatile "
                 "| tried=1 | status=200 | ms=")])
         self.assertRegex(groq_row, r"ms=\d+ \| verdict=ok$")
-        # FIVE: gemini, the second Google project, and the three HTTP providers.
-        self.assertEqual(5, len([r for r in rows if "| key=" in r]))
+        # SIX: gemini, the second Google project, the three keyed providers, and
+        # GitHub Models, whose credential is the job's own token. The family is
+        # opt-in for the ladder but always present in the probe table, so its
+        # absence is visible as `not_configured` instead of as a missing row.
+        self.assertEqual(6, len([r for r in rows if "| key=" in r]))
 
     def test_an_absent_key_reports_not_configured_and_makes_no_request(self):
         send, calls = self._router()

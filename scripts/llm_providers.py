@@ -113,6 +113,15 @@ class Provider:
 #: being flattened into one hardcoded list that can rot (the 2026-10-13 lesson).
 LADDER_PROVIDERS = ("groq", "openrouter", "mistral")
 
+#: THE FAMILY ONLY THE SUMMARISER AND THE REPAIR MAY WALK. GitHub Models is
+#: billed against the workflow's own `GITHUB_TOKEN`, not a key the owner minted,
+#: and the summariser is the only stage whose cost is a handful of small batches.
+#: The breaking classifier sizes its pool with `breaking_monitor.AI_POOL_SIZE`,
+#: and the CLI digest walk is the TOOL-USING stage -- neither may spend this
+#: credential, so `ladder_rungs()`/`ordered_ladder()` default to
+#: LADDER_PROVIDERS and only `summarise_stories.ladder_models` asks for this set.
+HTTP_PROVIDERS = LADDER_PROVIDERS + ("github",)
+
 #: The second Google project. Same endpoint and models as `gemini`, different
 #: account and free allowance. Named with a dash so `provider_of()` keeps
 #: returning None and the rungs stay on the CLI path.
@@ -193,6 +202,18 @@ PROVIDERS = {
         "https://api.mistral.ai/v1/models",
         "MISTRAL_API_KEY",
         ("mistral-small-latest",),
+        60,
+    ),
+    # GitHub Models, authenticated by the job's own token rather than a secret.
+    # The ids are NAMESPACED (`openai/…`, `meta/…`) and the rung prefix keeps
+    # them apart from the provider name, so `github/openai/gpt-4o-mini` splits
+    # into provider `github` and model `openai/gpt-4o-mini` exactly once.
+    "github": Provider(
+        "github",
+        "https://models.github.ai/inference/chat/completions",
+        "https://models.github.ai/inference/models",
+        "GITHUB_TOKEN",
+        ("openai/gpt-4o-mini", "meta/llama-3.3-70b-instruct"),
         60,
     ),
 }
@@ -356,11 +377,11 @@ class ModelList:
 def provider_of(model_id):
     """The HTTP provider a rung belongs to, or None for a CLI rung.
 
-    Only `LADDER_PROVIDERS` route here. `gemini/*` deliberately returns None so
+    Only `HTTP_PROVIDERS` route here. `gemini/*` deliberately returns None so
     it keeps walking the existing keyed CLI path.
     """
     name = str(model_id or "").split("/", 1)[0]
-    return name if name in LADDER_PROVIDERS else None
+    return name if name in HTTP_PROVIDERS else None
 
 
 def provider(name):
@@ -548,6 +569,10 @@ _AUTH_BODY_MARKERS = (
     "incorrect api key",
     "authentication",
     "unauthorized",
+    # GitHub's two sentences. A token without `models: read` is a SCOPE fault
+    # that only a credential change fixes, and it is not an IP/egress decision.
+    "bad credentials",
+    "not accessible by integration",
 )
 
 
@@ -585,7 +610,11 @@ def classify_403(body):
         message = str(err.get("message") or "").lower()
     else:
         code = ""
-        message = str(err or "").lower()
+        # GitHub puts the sentence at the TOP LEVEL (`{"message": "…"}`) rather
+        # than under `error`, so the message that names the scope problem is
+        # read from either place before the classifier gives up on it.
+        top = doc.get("message") if isinstance(doc, dict) else ""
+        message = str(err or top or "").lower()
     if code in _AUTH_ERROR_CODES or any(m in message for m in _AUTH_BODY_MARKERS):
         return "auth", ""
     return "blocked", "provider"
@@ -1233,7 +1262,7 @@ def probe_rows(transport=None, environ=None, sleep=None):
     so the pinned row shape never changes.
     """
     rows = []
-    for name in ("gemini", GEMINI_KEY2_PROVIDER) + LADDER_PROVIDERS:
+    for name in ("gemini", GEMINI_KEY2_PROVIDER) + HTTP_PROVIDERS:
         got = probe(name, transport=transport, environ=environ, sleep=sleep)
         row = ("%s | key=%s | models=%d | chosen=%s | tried=%d | status=%s | "
                "ms=%d | verdict=%s"
@@ -1331,8 +1360,13 @@ def free_probe_rows(name="openrouter", **kwargs):
 
 
 def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
-                 refresh=False):
+                 refresh=False, providers=None):
     """The configured provider rungs, in ladder order, as full rung ids.
+
+    `providers` is WHICH families this caller may walk, defaulting to
+    LADDER_PROVIDERS. `summarise_stories.ladder_models` passes HTTP_PROVIDERS so
+    the summariser and the repair reach GitHub Models; every other caller keeps
+    the default and the family cannot leak into the breaking classifier.
 
     A provider with no key is SKIPPED SILENTLY -- its absence is a repository
     setting, not a model failure, and a rung that cannot be called would cost
@@ -1346,7 +1380,7 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
     because a caller that builds a ladder at IMPORT time must not open a socket.
     """
     rungs = []
-    for name in LADDER_PROVIDERS:
+    for name in (providers or LADDER_PROVIDERS):
         if not configured(name, environ):
             # STILL NOT A RUNGS, BUT NO LONGER SILENT. Run 42144852087 ended
             # with "3 of 6 free models tried" and no fourth provider; the run
@@ -1382,7 +1416,7 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
 
 
 def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
-                   resolve=False, log=None):
+                   resolve=False, log=None, providers=None):
     """`seeds` re-ordered as: both Gemini keys, then Groq/OpenRouter/Mistral, then the rest.
 
     Gemini rungs stay first because they are the owner's stated preference,
@@ -1400,6 +1434,9 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
     only seeds this process can resolve (the breaking walk, whose seeds are CLI
     rungs). The HTTP rungs are added regardless: they do not use the CLI, which
     is the point of having them.
+
+    `providers` is passed through to `ladder_rungs()`: the default walks
+    LADDER_PROVIDERS, and only the summariser asks for the wider HTTP_PROVIDERS.
     """
     seeds = [m for m in (seeds or ()) if isinstance(m, str) and m]
     if not configured(GEMINI_KEY2_PROVIDER, environ):
@@ -1415,4 +1452,5 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
     gemini = [m for m in seeds if m.startswith(GEMINI_PREFIXES)]
     rest = [m for m in seeds if not m.startswith(GEMINI_PREFIXES)]
     return tuple(gemini) + ladder_rungs(environ, transport=transport,
-                                        resolve=resolve, log=log) + tuple(rest)
+                                        resolve=resolve, log=log,
+                                        providers=providers) + tuple(rest)

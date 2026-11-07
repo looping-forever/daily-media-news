@@ -106,6 +106,10 @@ concurrency:
 
 permissions:
   contents: write   # bot state commit-back
+  # GITHUB MODELS. The summariser/repair ladder asks for this family explicitly
+  # (`llm_providers.HTTP_PROVIDERS`); the classifier's pool is built from the
+  # default set and never carries it, so the tool-using walk cannot spend it.
+  models: read
 
 jobs:
   breaking-monitor:
