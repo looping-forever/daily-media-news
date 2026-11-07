@@ -1,0 +1,45 @@
+name: provider-canary
+
+# THE ALARM, NOT THE DIAGNOSTIC. `provider-probe.yml` prints every row on demand;
+# this one fails the run when a family that is expected to work has gone dark,
+# and says in one line what to do about it. Nothing here touches docs/, state/
+# or any deploy path -- it reads the repository and makes five API calls.
+on:
+  schedule:
+    # MONDAY 05:20 UTC = 11:05 in Nepal. Weekly is enough: a retired model does
+    # not come back on its own, and the point is to know before a weekend of
+    # degraded editions has shipped. The time sits clear of both digest slots
+    # (01:35 and 13:35 UTC) and of the breaking sweep.
+    - cron: '20 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Every provider family still authenticates, lists and answers
+    runs-on: ubuntu-24.04
+    # Five probes, one retried at most, each bounded by the adapter's own cap.
+    timeout-minutes: 6
+    steps:
+      - name: Check out the adapter the canary reuses
+        uses: actions/checkout@v6
+        with:
+          # No commit is made and no other repository is read.
+          persist-credentials: false
+
+      - name: Fail loudly when a family has gone dark
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          set -eo pipefail
+          python3 scripts/provider_canary.py

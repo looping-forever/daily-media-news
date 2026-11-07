@@ -120,7 +120,15 @@
   },
   "repo_soft_cap_minutes": 1400,
   "days_per_month": 30,
-  "current_projected_minutes": 2244,
+  "current_projected_minutes": 2274,
+  "_projection_change_2026_11_07": [
+    "provider-canary.yml added: 1 job, p95 1.0 min, 1 run/day ceiling, weekly",
+    "cron -> +30 min/month (2,244 -> 2,274). The cron is '20 5 * * 1', so a",
+    "real month costs about 4 minutes; the 30 is the ceiling a daily-ish max",
+    "produces, recorded as such rather than nudged. The projection was 444 over",
+    "the hard ceiling before this line and is 474 over now, still REPORTED",
+    "(enforcement.enabled is false while the repository is public)."
+  ],
   "_projection_change_2026_11_05": [
     "provider-probe.yml added: 1 job, p95 0.5 min, max 1 run/day, no cron",
     "-> +15 min/month (2,229 -> 2,244). MANUAL DISPATCH ONLY, so this is a",
@@ -244,6 +252,13 @@
       "p95_minutes": 0.5,
       "crons": [],
       "why": "MANUAL DISPATCH ONLY -- no schedule, no repository_dispatch, so it costs nothing until a human asks. What it asks is the one question the test suites cannot: is this provider's id still served, is the key still live, does the plan still allow the call. ONE job: checkout, setup-python, then four catalogues and four one-word completions whose own sockets are capped at 40-75s each in scripts/llm_providers.py, plus the OpenRouter free-id sweep -- one more catalogue and up to twelve 8s completions, self-limited at 120s -- inside a job capped at 5 minutes. 0.5 minute is the shape of a normal run (all of it answers in well under a minute), not the cap. `max_runs_per_day: 1` is a ceiling on human asking, not a forecast."
+    },
+    "provider-canary.yml": {
+      "max_runs_per_day": 1,
+      "jobs_per_run": 1,
+      "p95_minutes": 1.0,
+      "crons": ["20 5 * * 1"],
+      "why": "THE ALARM, ONCE A WEEK. One cron, one job: checkout, then five `llm_providers.probe()` calls whose own sockets are capped at 40-75s each, inside a 6-minute job cap. A normal run is a checkout plus five answers in well under a minute, so 1.0 minute is the shape of the work, not the cap. `max_runs_per_day: 1` is the convention here for a ceiling on asking; because the cron fires weekly the projection bills it as 30 (the ceiling), which OVERSTATES it by about 26 minutes -- stated rather than hidden, and it is why the total moves 2,244 -> 2,274 rather than by the ~4 a real month costs."
     },
     "digest-watchdog.yml": {
       "max_runs_per_day": 2,

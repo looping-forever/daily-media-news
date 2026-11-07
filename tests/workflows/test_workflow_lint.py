@@ -394,6 +394,13 @@ CRON_NPT_TABLE = {
     # that no longer exists is exactly the drift this table exists to catch.
     # 30 0 * * *  ->  06:15 NPT, ~95 min before the morning slot
     ("drift-canary.yml", "30 0 * * *"): [(6, 15)],
+    # 20 5 * * 1  ->  11:05 NPT on a MONDAY (05:20 UTC, +5h45). The provider
+    # canary: one firing a week, deliberately clear of the 07:50 / 19:50 digest
+    # slots and the breaking sweep, so a red alarm never shares a minute with a
+    # delivery. Monday because the point is to learn about a dark family before
+    # a week of editions goes out degraded, and late morning so a human is awake
+    # to read it.
+    ("provider-canary.yml", "20 5 * * 1"): [(11, 5)],
 }
 
 

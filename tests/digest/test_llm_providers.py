@@ -7,10 +7,9 @@ pool answered `payment_required`, and the edition shipped with publisher text.
 ONE account's allowance was the whole pipeline's single point of failure.
 
 `scripts/llm_providers.py` is the adapter for the providers the owner added
-as real fallbacks (Groq, OpenRouter, Mistral). The fourth family -- GitHub
-Models, authenticated by the workflow's own token -- has its scope rules pinned
-in tests/digest/test_github_models_family.py; here it only appears in the probe
-table, where a missing credential is one `not_configured` row. This file pins the contract every
+as real fallbacks (Groq, OpenRouter, Mistral). GitHub Models was removed: it was
+retired on 2026-07-30 and its host now answers 200 with plain text `OK` to every
+path. This file pins the contract every
 caller depends on, and nothing about the prompts:
 
     THE REQUEST IS RIGHT      -- url, one Authorization header, one JSON body.
@@ -573,10 +572,9 @@ class SecondGeminiKeyTests(unittest.TestCase):
 
         rows = lp.probe_rows(transport=send, environ=KEYS_BOTH)
         keyed = [r for r in rows if "| key=" in r]
-        self.assertEqual(6, len(keyed),
-                         "one row per provider: two Gemini keys, the three "
-                         "keyed HTTP providers and GitHub Models -- got %r"
-                         % (rows,))
+        self.assertEqual(5, len(keyed),
+                         "one row per provider: two Gemini keys and the three "
+                         "keyed HTTP providers -- got %r" % (rows,))
         self.assertTrue([r for r in rows if r.startswith("gemini-key2 | ")],
                         rows)
 
@@ -662,11 +660,11 @@ class ProbeTests(unittest.TestCase):
                 "groq | key=present | models=1 | chosen=llama-3.3-70b-versatile "
                 "| tried=1 | status=200 | ms=")])
         self.assertRegex(groq_row, r"ms=\d+ \| verdict=ok$")
-        # SIX: gemini, the second Google project, the three keyed providers, and
-        # GitHub Models, whose credential is the job's own token. The family is
-        # opt-in for the ladder but always present in the probe table, so its
-        # absence is visible as `not_configured` instead of as a missing row.
-        self.assertEqual(6, len([r for r in rows if "| key=" in r]))
+        # FIVE: gemini, the second Google project, and the three keyed
+        # providers. GitHub Models is gone -- retired 2026-07-30, and its host
+        # answers 200 with plain-text `OK` to every path, so a row for it would
+        # prove nothing at all.
+        self.assertEqual(5, len([r for r in rows if "| key=" in r]))
 
     def test_an_absent_key_reports_not_configured_and_makes_no_request(self):
         send, calls = self._router()
@@ -1304,6 +1302,46 @@ class NoKeyShapedStringsTests(unittest.TestCase):
                     continue
                 offenders.append("%s: %s" % (path.name, match.group(0)[:8] + "..."))
         self.assertEqual([], offenders)
+
+
+class ProbesThatSayNothingTests(unittest.TestCase):
+    """A row that lists nothing must name the endpoint and the body it got.
+
+    Probe 42363318770 printed `models=0 | status=200 | verdict=network` with no
+    note at all, and the one fixable fact was the one not on the page. These
+    pins outlived the family that found them: they are about the PROBE.
+    """
+
+    def test_a_catalogue_that_lists_nothing_names_its_endpoint_and_status(self):
+        def send(spec):
+            if spec["url"].endswith("/models"):
+                return 200, json.dumps({"data": []})
+            return 200, OK_BODY
+
+        rows = lp.probe_rows(transport=send, environ=KEYS, sleep=lambda s: 0)
+        for name in ("groq", "openrouter"):
+            notes = [r for r in rows if r.strip().startswith(name + " note:")]
+            self.assertTrue(notes, "%s printed no note for an empty catalogue "
+                                   "-- rows: %r" % (name, rows))
+            self.assertIn(lp.PROVIDERS[name].models_url, notes[0])
+            self.assertIn("HTTP 200", notes[0])
+            self.assertIn('"data"', notes[0], "the body snippet is the evidence")
+
+    def test_a_two_hundred_with_no_usable_answer_has_its_own_verdict(self):
+        self.assertEqual("no_answer", lp.PROBE_VERDICT["garbage"])
+        self.assertEqual("network", lp.PROBE_VERDICT["transport"],
+                         "`network` means a transport failure and nothing else")
+
+        def send(spec):
+            if spec["url"].endswith("/models"):
+                return 200, json.dumps(
+                    {"data": [{"id": "llama-3.3-70b-versatile"}]})
+            return 200, "<html>not a reply</html>"
+
+        rows = lp.probe_rows(transport=send, environ=KEYS, sleep=lambda s: 0)
+        row = [r for r in rows if r.startswith("groq | ")][0]
+        self.assertIn("status=200", row)
+        self.assertIn("verdict=no_answer", row)
 
 
 if __name__ == "__main__":

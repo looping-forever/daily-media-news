@@ -98,6 +98,12 @@ WORKFLOW_NAMES = (
     # because it does run a job. Registered for the reason this tuple exists: an
     # unregistered workflow is one every check below silently skips.
     "provider-probe.yml",
+    # Added 2026-11-07 with the file itself. ONE weekly cron, so the alarm is
+    # the cheap half of the pair: provider-probe.yml answers questions on
+    # demand, this one answers "is a family dark" every Monday and fails when
+    # it is. Registered for the reason this tuple exists: an unregistered
+    # workflow is one every check below silently skips.
+    "provider-canary.yml",
 )
 
 try:  # pragma: no cover - environment dependent, both branches are exercised
