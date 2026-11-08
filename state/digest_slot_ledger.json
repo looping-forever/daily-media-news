@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-11-08T01:03:32Z",
+  "as_of": "2026-11-08T12:57:00Z",
   "days": {
     "2026-11-02": {
       "evening": {
@@ -213,10 +213,26 @@
       }
     },
     "2026-11-08": {
-      "morning": {
-        "built_at": "2026-11-08T01:03:29Z",
+      "evening": {
+        "built_at": "2026-11-08T12:56:56Z",
         "source_health_state": "ok",
-        "story_count": 7
+        "story_count": 3
+      },
+      "morning": {
+        "attempts": 1,
+        "build": "723ebbf",
+        "edition": "partial",
+        "edition_kind": "full",
+        "first_ntfy_sent_at": "2026-11-08T01:35:26Z",
+        "http_status": 200,
+        "is_partial": true,
+        "kind": "partial",
+        "ntfy_failed": false,
+        "ntfy_sent_at": "2026-11-08T01:35:26Z",
+        "pending_at": "2026-11-08T01:35:26Z",
+        "scheduled_instant": "2026-11-08T01:35:00Z",
+        "sequence_id": "dmn-2026-11-08-morning",
+        "state": "sent"
       }
     }
   },
