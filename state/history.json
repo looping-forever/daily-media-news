@@ -1,76 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "onlinekhabar.com/2026/10/2047680/bp-highway-blocked-after-rain",
-      "title_hash": "61c310bc6dd1435a2cf12d0c9633a624d012086d",
-      "title": "BP Highway blocked by landslides following continuous rainfall",
-      "category": "local_city",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/10/2047682/the-federation-of-nepali-journalists-will-hold-a-silent-sit-in-at-maitighar-to-protect-freedom-of-the-press-and-expression",
-      "title_hash": "529ba12632f1325f89ecf910a555c124de2b3882",
-      "title": "Journalists Federation plans silent sit-in at Maitighar over press freedom concerns",
-      "category": "nepal",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c3vgxznlx7jzo",
-      "title_hash": "77f5fd305447c05e172eafbd36e8db41620bc422",
-      "title": "US approves sale of 500 Patriot interceptor missiles to Ukraine",
-      "category": "world_major",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/10/2047679/jeep-accident-in-salyan-three-dead-seven-injured",
-      "title_hash": "1a4e00193b2a6e5d89322d16cadbdc5e61435dab",
-      "title": "Jeep accident in Salyan leaves three dead and seven injured",
-      "category": "nepal",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/crz9824d5e88o",
-      "title_hash": "154a188375e43883e7b9778f122244939549ca68",
-      "title": "Police deployed during stand-off over control of top Poland court",
-      "category": "world_major",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/10/2048018/rsp-directs-parliamentary-parties-to-advance-the-process-of-resolving-disputes-in-the-justice-sector-through-parliament",
-      "title_hash": "a1cea94a07b4574ee6d4c8ac26efb597c193809f",
-      "title": "UPDATE: Disputes in the justice sector to be resolved through Parliament",
-      "category": "nepal",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "dev.to/stackmasteraliza/your-photos-are-telling-on-you-i-built-a-metadata-remover-that-never-uploads-your-files-33kf",
-      "title_hash": "9fd83f13ea9ce297a195dc812d1953e488d11b47",
-      "title": "Your Photos Are Telling On You: A local tool to remove metadata",
-      "category": "tech_career",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/10/2048061/tourists-stranded-in-manang-after-snowfall",
-      "title_hash": "9e380e6feeb88d2e289f5413763fbb63ba928785",
-      "title": "Tourists Stranded in Manang Due to Heavy Snowfall",
-      "category": "local_city",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "polygon.com/final-fantasy-xiv-evercold-release-date-delayed",
-      "title_hash": "f638468ce513d1f0a69a19725f9d3060108da51c",
-      "title": "Final Fantasy XIV: Evercold Expansion Delayed",
-      "category": "gaming",
-      "date_sent": "2026-10-31"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/politics/nc-cwc-meeting-set-for-sunday",
-      "title_hash": "58c2d941377940db7fe75317d56455888bc37b0c",
-      "title": "NC Central Working Committee Meeting Scheduled for Sunday",
-      "category": "nepal",
-      "date_sent": "2026-10-31"
-    },
-    {
       "url_normalized": "api.open-meteo.com/v1/forecast",
       "title_hash": "88f9583ddc0bc9604be0092a2d34d7832c34ff16",
       "title": "Weather Forecast: Moderate Drizzle Expected",
@@ -1329,6 +1259,55 @@
       "title": "Xbox Testing New Cloud Gaming Features Including Phone Controls on Smart TVs",
       "category": "gaming",
       "date_sent": "2026-11-07"
+    },
+    {
+      "url_normalized": "dev.to/jedidiahrhodes8293/browser-direct-uploads-to-private-object-storage-nodejs-express-and-react-5gab",
+      "title_hash": "95ae40edc8e5b2a6d46714221b976e459220a300",
+      "title": "Browser Direct Uploads to Private Object Storage — Node.js, Express, and React",
+      "category": "tech_career",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "pcgamer.com/games/puzzle/chess-is-immediately-more-fun-if-you-jettison-most-of-the-rules-and-replace-them-with-weapons-grade-game-boy-advance",
+      "title_hash": "003dddd215322a2f5ad8fd2e0704f58dc754f655",
+      "title": "Chess is immediately more fun if you jettison most of the rules and replace them with weapons-grade Game Boy Advance",
+      "category": "gaming",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "polygon.com/probably-stolen-cyberpunk-shopkeeping-simulator-steam-hit",
+      "title_hash": "16d25dd96f89a7d9be14d640be0d620890b6d83f",
+      "title": "Cyberpunk 2077 Meets Papers, Please in Steam’s Latest Surprise Viral Hit",
+      "category": "gaming",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "polygon.com/fornite-treasure-hours-chapter-7-mini-season-c7ms",
+      "title_hash": "a687b599a2c32613355ffee4f3d8345fbe64bcab",
+      "title": "Fortune treasure hours schedule in the Fortnite Chapter 7 mini season",
+      "category": "gaming",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cmy8367lj5xlo",
+      "title_hash": "0525a400d6d830c2fa718d88815f2761f68e2a2a",
+      "title": "Israel's president tasks opposition leader Eisenkot with forming government",
+      "category": "world_major",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c68jzzvjgdy9o",
+      "title_hash": "5e5bf3766f30d8c673c59aebaebf8d08789bbd6a",
+      "title": "Paraguay's former president charged after bank collapse",
+      "category": "world_major",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "dev.to/yannicksterling6563/tenant-isolated-ai-image-storage-cheap-signed-downloads-no-open-bucket-4lp2",
+      "title_hash": "a9ea34d6e3c6d65979b55a3c39d7dfd6f92f5734",
+      "title": "Tenant-Isolated AI Image Storage: Cheap Signed Downloads, No Open Bucket",
+      "category": "tech_career",
+      "date_sent": "2026-11-08"
     }
   ]
 }
