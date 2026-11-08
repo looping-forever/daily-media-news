@@ -1329,6 +1329,20 @@
       "title": "New Frog Species Discovered in Hainan Tropical Rainforest",
       "category": "nepal",
       "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2053791/nepal-receives-twice-as-much-climate-finance-in-loans-as-grants",
+      "title_hash": "2b0c830eba10ab278dd7ab9bef6ce3a27dccd47b",
+      "title": "Climate finance for Nepal shows high loan-to-grant ratio",
+      "category": "nepal",
+      "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/society/two-people-killed-due-to-truck-hit-in-itahari",
+      "title_hash": "c607b8d6f23ade6cbfb0183f6e16339dfca3d420",
+      "title": "Two people killed in motorcycle accident in Itahari",
+      "category": "local_city",
+      "date_sent": "2026-11-08"
     }
   ]
 }

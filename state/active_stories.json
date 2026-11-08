@@ -14906,6 +14906,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-08T18:41:33+05:45"
+    },
+    {
+      "event_id": "evt-28f008df3121",
+      "event_key": "itahari-motorcycle-accident-nov8",
+      "canonical_title": "Two people killed in motorcycle accident in Itahari",
+      "category": "local_city",
+      "first_seen": "2026-11-08",
+      "last_seen": "2026-11-08",
+      "first_reported": "2026-11-08",
+      "last_reported": "2026-11-08",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.nepalnews.com/s/society/two-people-killed-due-to-truck-hit-in-itahari"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Two individuals, aged 27 and 28, died after a truck collided with their motorcycle near Ganesh Petrol Pump in Itahari-13, Sunsari. Local police confirmed the victims were Sparsh Aryal and Saswat P.",
+      "latest_development": "Reported: Two individuals, aged 27 and 28, died after a truck collided with their motorcycle near Ganesh Petrol Pump in Itahari-13, Sunsari. Local police confirmed the victims were Sparsh Aryal and Saswat P.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-08",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-08T19:22:15+05:45"
+    },
+    {
+      "event_id": "evt-875b4cdf9191",
+      "event_key": "nepal-climate-finance-loans",
+      "canonical_title": "Climate finance for Nepal shows high loan-to-grant ratio",
+      "category": "nepal",
+      "first_seen": "2026-11-08",
+      "last_seen": "2026-11-08",
+      "first_reported": "2026-11-08",
+      "last_reported": "2026-11-08",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2053791/nepal-receives-twice-as-much-climate-finance-in-loans-as-grants"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Recent analysis indicates that over the past eight years, Nepal has received approximately $3.19 billion in climate finance, with 63% being concessional loans and only 30% in direct grants.",
+      "latest_development": "Reported: Recent analysis indicates that over the past eight years, Nepal has received approximately $3.19 billion in climate finance, with 63% being concessional loans and only 30% in direct grants.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-08",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-08T19:22:15+05:45"
     }
   ],
   "archived": []
