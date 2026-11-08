@@ -1,22 +1,10 @@
 {
   "models": {
-    "gemini-key2/gemini-3.5-flash-lite": {
-      "hits": 1,
-      "last_hit": "2026-11-08T00:57:14.476554+00:00",
-      "reason": "quota_exhausted",
-      "until": "2026-11-08T06:57:14.476554+00:00"
-    },
     "gemini/gemini-3.5-flash-lite": {
       "hits": 1,
-      "last_hit": "2026-11-08T00:56:37.772003+00:00",
+      "last_hit": "2026-11-08T12:56:23.182793+00:00",
       "reason": "quota_exhausted",
-      "until": "2026-11-08T06:56:37.772003+00:00"
-    },
-    "mistral/mistral-small-latest": {
-      "hits": 1,
-      "last_hit": "2026-11-08T00:58:38.706107+00:00",
-      "reason": "quota_exhausted",
-      "until": "2026-11-08T06:58:38.706107+00:00"
+      "until": "2026-11-08T18:56:23.182793+00:00"
     },
     "opencode/beam-free": {
       "hits": 1,
