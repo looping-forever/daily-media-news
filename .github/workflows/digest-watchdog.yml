@@ -1908,6 +1908,10 @@ jobs:
         # so it cannot change the digest verdict.
         id: academic_alert
         continue-on-error: true
+        # RUN ONLY WHEN THE HEALTH STEP ABOVE ACTUALLY FOUND SOMETHING. Run
+        # 42645832031 paged "is not healthy (0 problem(s))" three times on a
+        # healthy run: the step had no gate, and `problems=0` is non-empty.
+        if: steps.academic.outputs.problems != '' && steps.academic.outputs.problems != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
@@ -1919,17 +1923,22 @@ jobs:
           # ONE joined string, written once by the health step. Read as a whole
           # or not at all -- a per-problem key would keep only the last reason.
           DETAIL_RAW="${{ steps.academic.outputs.detail }}"
+          # A HEALTHY STEP WRITES problems=0, WHICH IS NOT EMPTY. The old
+          # `[ -z "$PROBLEMS" ]` read that as "missing" and fell through to the
+          # paging path on every healthy run. 0 and empty both mean silence.
+          if [ -z "$PROBLEMS" ] || [ "$PROBLEMS" = "0" ]; then
+            echo "Academic monitor health: OK -- nothing to page"
+            exit 0
+          fi
           # LEAD FIRST, then the diagnosis. The old message opened with
           # "Academic result monitor is NOT healthy (2 problem(s))" -- the
           # component name and a count -- and put the sentence that actually
           # matters last, so it was the part a phone notification truncated.
           # One verdict sentence, then one Detail line; the files and fields an
           # operator opens moved to the log below, where a developer looks.
-          if [ -z "$PROBLEMS" ]; then
-            LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy."
-          else
-            LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy (${PROBLEMS} problem(s))."
-          fi
+          # No branch on PROBLEMS here: the guard above already exited for
+          # empty and for 0, so this line only ever runs with a real count.
+          LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy (${PROBLEMS} problem(s))."
           # NEVER "Detail:" AND NOTHING AFTER IT. That is exactly what the three
           # alerts above sent. An empty detail means the health step failed
           # without recording a reason, and the message says so instead.
@@ -2159,6 +2168,9 @@ jobs:
         # Separate step, own id, and no read of its own outputs -- check 23.
         id: worker_alert
         continue-on-error: true
+        # Run 42645832031 paged on a healthy run because this step had no gate
+        # and `problems=0` is non-empty -- see the academic arm above.
+        if: steps.worker.outputs.problems != '' && steps.worker.outputs.problems != '0'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
@@ -2167,6 +2179,11 @@ jobs:
           set -e
           PROBLEMS="${{ steps.worker.outputs.problems }}"
           DETAIL_RAW="${{ steps.worker.outputs.detail }}"
+          # 0 and empty both mean silence; only a real count may page.
+          if [ -z "$PROBLEMS" ] || [ "$PROBLEMS" = "0" ]; then
+            echo "Worker heartbeat: OK -- nothing to page"
+            exit 0
+          fi
           # LEAD FIRST, then the diagnosis. The old message opened with
           # "breaking-monitor worker heartbeat FAILED (2 problem(s))" and put
           # the consequence -- no breaking alert can fire -- inside the
@@ -2529,6 +2546,9 @@ jobs:
         # Separate step, own id, and no read of its own outputs -- check 23.
         id: chain_alert
         continue-on-error: true
+        # Run 42645832031 paged on a healthy run because this step had no gate
+        # and `problems=0` is non-empty -- see the academic arm above.
+        if: steps.chain.outputs.problems != '' && steps.chain.outputs.problems != '0'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
@@ -2537,6 +2557,11 @@ jobs:
           set -e
           PROBLEMS="${{ steps.chain.outputs.problems }}"
           DETAIL_RAW="${{ steps.chain.outputs.detail }}"
+          # 0 and empty both mean silence; only a real count may page.
+          if [ -z "$PROBLEMS" ] || [ "$PROBLEMS" = "0" ]; then
+            echo "Breaking dispatch chain: OK -- nothing to page"
+            exit 0
+          fi
           LEAD="A breaking alert is not confirmed delivered, or the last send was refused — a flood, an avalanche or a major outage can pass without you seeing it."
           # Never "Detail:" and nothing after it -- say why it is blank.
           if [ -z "$DETAIL_RAW" ]; then

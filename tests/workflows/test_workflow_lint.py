@@ -8499,6 +8499,167 @@ class MonitorAlertArmTests(WorkflowLintBase):
         print("check 23: %d alert arm(s) read a previous step, none its own"
               % len(MONITOR_ARMS))
 
+    # -- the gate -----------------------------------------------------------
+    def test_every_alert_step_is_gated_on_its_own_health_step(self):
+        """Run 42645832031 paged three times on a fully healthy run.
+
+        The alert steps had no `if:` at all, so they ran whether the health
+        step above found anything or not.
+        """
+        for health, alert in MONITOR_ARMS:
+            health_id = str(self._step(health).get("id") or "")
+            gate = str(self._step(alert).get("if") or "").strip()
+            self.assertTrue(
+                gate,
+                "%r has no `if:` gate, so it runs (and pages) even when %r "
+                "exits 0 with problems=0 -- that is exactly run 42645832031"
+                % (alert, health))
+            self.assertIn(
+                "steps.%s.outputs.problems" % health_id, gate,
+                "%r is gated, but not on steps.%s.outputs.problems: %r"
+                % (alert, health_id, gate))
+            self.assertIn(
+                "!= ''", gate,
+                "%r's gate does not require the health step to have run and "
+                "written an output: %r" % (alert, gate))
+            self.assertIn(
+                "!= '0'", gate,
+                "%r's gate does not treat `problems=0` as healthy: %r"
+                % (alert, gate))
+        print("check 23: %d alert step(s) gated on their own health step's "
+              "problems output" % len(MONITOR_ARMS))
+
+    def test_the_ungated_alert_regression_is_pinned(self):
+        """A text assertion, so a dropped `if:` reads as this defect."""
+        text = W.raw_workflow_text(WATCHDOG_YML)
+        for health, _alert in MONITOR_ARMS:
+            health_id = str(self._step(health).get("id") or "")
+            line = ("if: steps.%s.outputs.problems != '' && "
+                    "steps.%s.outputs.problems != '0'" % (health_id, health_id))
+            self.assertIn(
+                line, text,
+                "%s no longer carries its gate verbatim:\n  %s"
+                % (WATCHDOG_YML, line))
+        # The defect shape: a `-z` test alone, which is TRUE for the string
+        # "0" only when the variable is empty -- never for a healthy count.
+        self.assertNotIn(
+            'if [ -z "$PROBLEMS" ]; then', text,
+            "an alert body is back to `[ -z \"$PROBLEMS\" ]` as its only "
+            "health test: `problems=0` is non-empty, so that pages on a "
+            "healthy run (run 42645832031)")
+        print("check 23: the ungated-alert regression is pinned in the text")
+
+    def _exec_alert_body(self, alert, problems, detail=(
+            "host example.edu.np has been failing for 7h")):
+        """Run an alert step's body with GitHub expressions substituted.
+
+        The two `${{ steps.<id>.outputs.* }}` reads are replaced with literal
+        values; `bash`, `curl` and `gh` are shell functions that record the
+        call instead of making it. Returns (process, recorded calls).
+        """
+        import shutil
+        import tempfile
+        health_id = None
+        for _health, name in MONITOR_ARMS:
+            if name == alert:
+                health_id = str(self._step(_health).get("id") or "")
+        self.assertTrue(health_id, "%r is not one of the monitor arms" % (alert,))
+        body = self._run(alert)
+        for key, value in (("problems", problems), ("detail", detail)):
+            needle = '${{ steps.%s.outputs.%s }}' % (health_id, key)
+            self.assertIn(needle, body,
+                          "%r no longer reads %s from steps.%s"
+                          % (alert, key, health_id))
+            body = body.replace(needle, value)
+        self.assertNotIn("${{", body,
+                         "%r carries an expression this harness does not "
+                         "substitute, so the run below would not be a real "
+                         "test of the body" % (alert,))
+        tmp = tempfile.mkdtemp(prefix="alert-body-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        calls = os.path.join(tmp, "calls.txt").replace("\\", "/")
+        harness = (
+            "CALLS='%s'\n"
+            ': > "$CALLS"\n'
+            'bash() { echo "bash $*" >> "$CALLS"; return 0; }\n'
+            'curl() { echo "curl $*" >> "$CALLS"; return 0; }\n'
+            'gh() { echo "gh $*" >> "$CALLS"; return 0; }\n'
+        ) % calls
+        proc = W.run_bash_script(
+            harness + body,
+            env_overrides={"NTFY_TOPIC": "stub-topic",
+                           "NTFY_SERVER": "https://ntfy.example",
+                           "GH_TOKEN": "stub-token"},
+            cwd=W.REPO_ROOT,
+        )
+        recorded = ""
+        if os.path.exists(calls):
+            with open(calls, encoding="utf-8") as fh:
+                recorded = fh.read()
+        return proc, recorded
+
+    def test_problems_zero_pages_nobody(self):
+        """problems=0 is HEALTHY. No ntfy, no issue, no ::error::, exit 0."""
+        for _health, alert in MONITOR_ARMS:
+            proc, calls = self._exec_alert_body(alert, "0")
+            self.assertEqual(
+                0, proc.returncode,
+                "%r exits %d on a healthy run. stdout=%r stderr=%r"
+                % (alert, proc.returncode, proc.stdout, proc.stderr))
+            self.assertNotIn(
+                "curl", calls,
+                "%r still sends an ntfy ping when problems=0, which is what "
+                "paged three times on run 42645832031. calls=%r"
+                % (alert, calls))
+            self.assertNotIn(
+                "bash scripts/may-notify.sh", calls,
+                "%r still asks the quiet-hours helper about a healthy run. "
+                "calls=%r" % (alert, calls))
+            self.assertNotIn(
+                "gh", calls,
+                "%r still touches the issue tracker on a healthy run. calls=%r"
+                % (alert, calls))
+        print("check 23: problems=0 sends no ping, files no issue, %d arm(s)"
+              % len(MONITOR_ARMS))
+
+    def test_problems_zero_prints_no_error_annotation(self):
+        for _health, alert in MONITOR_ARMS:
+            proc, _calls = self._exec_alert_body(alert, "0")
+            self.assertNotIn(
+                "::error::", proc.stdout,
+                "%r still annotates a healthy run as an error, which is the "
+                "red step run 42645832031 showed. stdout=%r"
+                % (alert, proc.stdout))
+            self.assertIn(
+                "OK -- nothing to page", proc.stdout,
+                "%r does not say plainly that the arm is healthy: %r"
+                % (alert, proc.stdout))
+        print("check 23: problems=0 prints no ::error:: on %d arm(s)"
+              % len(MONITOR_ARMS))
+
+    def test_a_real_problem_still_pages(self):
+        """The healthy-case guard must not silence a genuine alarm."""
+        for _health, alert in MONITOR_ARMS:
+            proc, calls = self._exec_alert_body(alert, "2")
+            self.assertEqual(
+                0, proc.returncode,
+                "%r exits %d with two real problems. stdout=%r stderr=%r"
+                % (alert, proc.returncode, proc.stdout, proc.stderr))
+            self.assertIn(
+                "bash scripts/may-notify.sh", calls,
+                "%r no longer asks the shared quiet-hours helper. calls=%r"
+                % (alert, calls))
+            self.assertIn(
+                "curl", calls,
+                "%r no longer pages for a real problem. calls=%r"
+                % (alert, calls))
+            self.assertIn(
+                "::error::", proc.stdout,
+                "%r no longer annotates a real problem. stdout=%r"
+                % (alert, proc.stdout))
+        print("check 23: a real problem still pages on %d arm(s), so the "
+              "healthy-case guard is not a silencer" % len(MONITOR_ARMS))
+
     # -- the detail string --------------------------------------------------
     def test_the_health_steps_write_one_joined_detail(self):
         for health, _alert in MONITOR_ARMS:
