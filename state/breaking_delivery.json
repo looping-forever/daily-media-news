@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-11-05T09:48:56Z",
+    "at": "2026-11-09T07:30:54Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: 14 killed, 147 injured in road accidents across Nepal in 24 hours - Nepalnews.com — check this now",
+    "title": "🚨 CRITICAL: Fire incidents during Diwali leave 22 dead across India - Nepalnews.com — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-11-05T09:48:56Z",
+    "at": "2026-11-09T07:30:54Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: 14 killed, 147 injured in road accidents across Nepal in 24 hours - Nepalnews.com — check this now",
+    "title": "🚨 CRITICAL: Fire incidents during Diwali leave 22 dead across India - Nepalnews.com — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-11-09T07:30:54Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: Fire incidents during Diwali leave 22 dead across India - Nepalnews.com — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-11-05T09:48:56Z",
       "ok": true,

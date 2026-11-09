@@ -15130,6 +15130,36 @@
       "deadline": null,
       "effective_date": "2026-11-09",
       "updated_at": "2026-11-09T07:21:58+05:45"
+    },
+    {
+      "event_id": "evt-14a88613282e",
+      "event_key": null,
+      "canonical_title": "Fire incidents during Diwali leave 22 dead across India - Nepalnews.com",
+      "category": "local_city",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmioafbvv95cuxnsjdfuklqcfrgdkfpa1pzulrhau9tylfzcvp2dlfgeejjbxo3z3dztwz4uewtyzfwdl9odfrksvnjrlzov2vhqxnjd0vlzk9iq2jfc0znzenwwfj5r2lammgtnhe1weluz0rdbmr0lvlcs0djetfunkfycdjoumrywxjradiwzmnsnu5zcvzyx3lks0vgvkdmd0w0enhpngvy"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-09T13:15:54+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-09T13:15:54+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []
