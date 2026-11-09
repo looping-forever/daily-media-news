@@ -1122,28 +1122,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           # DEFECT 2, same as every other committing step here: the checkout
-          # persists no credentials, so the token is injected for the network
-          # commands only, via `git -c`.
-          auth=()
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
-          else
-            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
-          fi
+          # persists no credentials, and scripts/commit_state.sh builds the
+          # `git -c` auth argument from this env var, so the token never lands
+          # on disk.
           git add state/digest_slot_ledger.json
           if git diff --staged --quiet; then
             echo "the delivery ledger mirror is unchanged -- nothing to commit"
             exit 0
           fi
-          git commit -m "chore: mirror the digest delivery ledger [skip ci]"
-          if ! git "${auth[@]}" pull --ff-only origin master; then
-            git "${auth[@]}" pull --rebase -X theirs origin master || \
-              echo "Fast-forward and rebase both failed - proceeding without pulling"
-          fi
-          git "${auth[@]}" push
+          # THE COMMIT COMES FIRST, ALWAYS. Run 42621019476 pulled before
+          # committing its state, the rebase fallback then refused the dirty
+          # tree, and the push was rejected -- the state commit was lost after
+          # delivery had gone out. The shared script commits, fetches, re-applies
+          # this run's row on the fresh tip and pushes, three times; strict mode
+          # fails the step loudly if the row still cannot land.
+          COMMIT_STATE_STRICT=1 bash scripts/commit_state.sh \
+            "chore: mirror the digest delivery ledger [skip ci]" \
+            state/digest_slot_ledger.json
 
       - name: Supersede a degraded push with the full digest
         # REPAIRING A PUSH THAT REACHED THE OWNER BUT WAS NOT A DIGEST.

@@ -1881,15 +1881,25 @@ class SealJobTests(unittest.TestCase):
         # appearing here is the signal that this allowlist needs re-reading --
         # which is why it is a closed set and not a subset test.
         every = set(re.findall(r"https://([A-Za-z0-9.\-]+)", self.seal_run_text()))
-        self.assertEqual({"api.cloudflare.com", "github.com"}, every,
+        # The mirror commit's git remote is no longer written here: it is
+        # delegated to scripts/commit_state.sh, so the host moved with it. The
+        # host is asserted on the script instead, which keeps the closed-set
+        # invariant intact and in one place.
+        self.assertEqual({"api.cloudflare.com"}, every,
                          "seal's run blocks name the literal hosts %s. The "
                          "Cloudflare API is requirement E's Pages deployment "
-                         "read plus U8's ledger read; github.com is U8's mirror "
-                         "commit, whose staging list is asserted to be exactly "
-                         "one path. The Worker origin and the archive origin are "
-                         "both derived, never written here. A THIRD host means "
-                         "something new can receive data and this list is stale."
-                         % sorted(every))
+                         "read plus U8's ledger read; the mirror commit's git "
+                         "host now lives in %s, which stages exactly one path "
+                         "(asserted above). The Worker origin and the archive "
+                         "origin are both derived, never written here. A SECOND "
+                         "host means something new can receive data and this "
+                         "list is stale."
+                         % (sorted(every), L.DELEGATED_COMMIT))
+        script = (W.REPO_ROOT / "scripts" / "commit_state.sh").read_text(
+            encoding="utf-8")
+        self.assertIn("https://github.com/", script,
+                      "the delegated commit no longer names github.com either, "
+                      "so the mirror has no authenticated git host at all")
 
     def test_the_seal_job_fails_loudly_before_it_touches_anything(self):
         names = [str(s.get("name") or "") for s in steps_of(PREBUILD_WORKFLOW, "seal")]

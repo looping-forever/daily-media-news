@@ -5759,21 +5759,10 @@ jobs:
           TODAY: ${{ env.TODAY }}
         run: |
           set -eo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # DEFECT 2. The checkout sets persist-credentials: false, so
-          # GITHUB_TOKEN is NOT in .git/config and the `--auto` agent step
-          # cannot find it. It is injected here instead, for the network
-          # commands only, via `git -c`: it reaches the process argv, never the
-          # filesystem, and is gone when the step ends. `auth` stays empty if
-          # the token is unset, degrading to a plain unauthenticated push
-          # instead of a syntax error.
-          auth=()
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)")
-          else
-            echo "::warning::GITHUB_TOKEN is empty -- pull/push will run unauthenticated"
-          fi
+          # The commit, the fetch and the push are delegated below to
+          # scripts/commit_state.sh, which sets the bot identity and builds the
+          # `git -c` auth argument itself -- the token never reaches the
+          # filesystem here, exactly as with the inline block this replaced.
           # U8. THE GIT MIRROR OF THE DELIVERY LEDGER, refreshed by this run.
           #
           # DIRECTION OF TRUTH, which is the rule this whole block exists to
@@ -5920,22 +5909,21 @@ jobs:
           if git diff --staged --quiet; then
             echo "No state changes to commit"
           else
-            git commit -m "chore: update digest state and archive [skip ci]"
-            # An interleaved breaking-monitor commit can land between our
-            # checkout and this push; ff-only pull re-syncs or fails loudly
-            # instead of a non-fast-forward rejection (mirrors
-            # breaking-monitor.yml's commit step).
-            # Attempt fast-forward pull; if it fails, rebase with -X theirs so
-            # conflicts in the deterministic generated files (docs/digests/*.html,
-            # docs/index.html, state/*.json) auto-resolve in favor of the remote
-            # (theirs wins) instead of stalling the rebase on conflict markers.
-            if ! git "${auth[@]}" pull --ff-only origin master; then
-              echo "Fast-forward pull failed, attempting rebase (theirs wins on generated files)..."
-              if ! git "${auth[@]}" pull --rebase -X theirs origin master; then
-                echo "Rebase pull also failed — proceeding without pulling (may cause conflicts)"
-              fi
-            fi
-            git "${auth[@]}" push
+            # THE COMMIT COMES FIRST, ALWAYS. Run 42621019476 pulled BEFORE
+            # committing this state, the rebase fallback then refused the dirty
+            # tree ("cannot pull with rebase: You have unstaged changes"), and
+            # the push was rejected -- delivery had gone out and only the state
+            # commit was lost, silently. `state/model_health.json` is tracked and
+            # rewritten every run, so a rebase can never be legal here.
+            # scripts/commit_state.sh commits, fetches, re-applies this run's
+            # rows on the fresh tip and pushes, three times, and
+            # COMMIT_STATE_STRICT makes an exhausted retry fail the step loudly.
+            COMMIT_STATE_STRICT=1 bash scripts/commit_state.sh \
+              "chore: update digest state and archive [skip ci]" \
+              state/history.json state/digest-archive/ \
+              state/last_digest_sent.json docs/digests/ docs/index.html \
+              state/digest_retry.json state/digest_slot_ledger.json \
+              state/active_stories.json
           fi
 
       - name: Persist model cooldowns

@@ -25,6 +25,18 @@
 # Exit 0 when the state is pushed, already present, or unchanged. Exit 0 even
 # after the retries are exhausted -- losing telemetry must not fail the job --
 # but the warning names it.
+#
+# ORDER IS LOAD-BEARING: the commit is made BEFORE the first network command.
+# Run 42621019476 did it the other way round in the digest's own state step --
+# it pulled, the rebase fallback then refused a dirty tree ("cannot pull with
+# rebase: You have unstaged changes"), and the push was rejected. Delivery had
+# already gone out, so the only thing lost was this run's state commit.
+#
+# COMMIT_STATE_STRICT=true makes an exhausted retry FAIL the step with one
+# `::error::` line naming the paths still uncommitted, for state whose loss is
+# not acceptable (the digest state, the academic state, the ledger mirror). The
+# default stays exit 0 because the telemetry writers must not turn a finished
+# run red over a row the next sweep rewrites anyway.
 set -uo pipefail
 
 if [ "$#" -lt 2 ]; then
@@ -101,7 +113,7 @@ fi
 # `git add state/` would sweep in every preview file the workspace holds.
 staged=()
 for f in "${files[@]}"; do
-  if [ -f "$f" ] || git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+  if [ -e "$f" ] || git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
     git add -- "$f"
     staged+=("$f")
   fi
@@ -167,5 +179,9 @@ for attempt in 1 2 3; do
   sleep $((attempt * 2))
 done
 
+if [ "${COMMIT_STATE_STRICT:-false}" = "true" ]; then
+  echo "::error::commit_state: NOT pushed after 3 attempts on $branch -- still uncommitted: ${staged[*]}"
+  exit 1
+fi
 echo "::warning::commit_state: gave up after 3 attempts -- this run's state was not pushed; the next sweep rewrites its own rows"
 exit 0

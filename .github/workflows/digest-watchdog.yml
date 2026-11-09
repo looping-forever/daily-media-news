@@ -1614,8 +1614,8 @@ jobs:
         #      touches.
         #
         # Asserts: the last academic run recorded exit 0 (or there is no record
-        # yet, which is soft) and completed within 24h; schema_version == 2,
-        # last_poll_time within 24h and no host in hosts_down for more than 6h
+        # yet, which is soft) and completed within 26h; schema_version == 2,
+        # last_poll_time within 26h and no host in hosts_down for more than 6h
         # WHEN the state file is present -- and its ABSENCE is a note, never a
         # problem, because that file is gitignored and restored from KV inside
         # academic-result.yml (D2); and a successful exam-source self-check
@@ -1708,7 +1708,13 @@ jobs:
               except ValueError:
                   problems.append('last_poll_time %r is not a YYYY-MM-DD date'
                                   % last_poll)
-              if age_h is not None and age_h > 24:
+              # 26h, not 24h. The daily sweep drifts 11-22 minutes late, so a
+              # 24h threshold fired minutes BEFORE the run that satisfied it:
+              # all three false alerts (41441820627, 42474279212, 42618567399)
+              # preceded that day's successful academic run by 11-21 minutes.
+              # Two hours of slack cannot hide a dead monitor, which is still
+              # caught the next day and is named with its real gap.
+              if age_h is not None and age_h > 26:
                   problems.append(
                       'result monitor has not completed a run for ~%dh '
                       '(last_poll_time %s NPT) - a result can be published with '
@@ -1786,7 +1792,10 @@ jobs:
               except ValueError:
                   problems.append('state/academic_last_run.json has an '
                                   'unreadable checked_at %r' % checked)
-              if age_h is not None and age_h > 24:
+              # Same 26h slack as the state-file check above, and for the same
+              # reason: a scheduler that runs 11-22 minutes late must not be
+              # judged dead at the moment it is about to run.
+              if age_h is not None and age_h > 26:
                   problems.append('the result monitor has not completed a run '
                                   'for ~%.0fh (last checked_at %s) - a result '
                                   'can be published with nobody watching'
@@ -1849,15 +1858,18 @@ jobs:
                           fh.write('- ❌ %s\n' % problem)
                   else:
                       fh.write('- ✅ result monitor is healthy '
-                               '(polled within 24h, no stuck host, no stale '
+                               '(polled within 26h, no stuck host, no stale '
                                'self-check)\n')
                   for note in notes:
                       fh.write('- ℹ️ %s\n' % note)
 
+          # ONE joined key. A repeated `problem=` is not a list: GitHub keeps
+          # only the last value, so every reason but the last was lost even
+          # once the alerting step read the key correctly.
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
               fh.write('problems=%d\n' % len(problems))
-              for problem in problems:
-                  fh.write('problem=%s\n' % problem.replace('\n', ' '))
+              fh.write('detail=%s\n' % '; '.join(
+                  problem.replace('\n', ' ') for problem in problems))
 
           if not problems:
               for note in notes:
@@ -1877,16 +1889,55 @@ jobs:
             echo "Academic monitor health: OK"
             exit 0
           fi
+          # ALERTING LIVES IN THE STEP BELOW, NOT HERE. It used to read
+          # its own outputs from INSIDE the step that writes them; GitHub
+          # expands step expressions before the step runs, so they were always
+          # empty. Runs 41441820627, 42474279212 and 42618567399 each paged
+          # "is not healthy ( problem(s)). Detail:" with nothing after it, while
+          # the ::error:: above carried the real reason.
+          exit 0
+
+      - name: Alert on academic monitor health
+        # A SEPARATE STEP WITH ITS OWN id, because a step cannot read the
+        # outputs it is about to write: `steps.<id>.outputs` in a run block is
+        # resolved before that step starts. Check 23 fails any run block that
+        # names its own outputs, so this cannot silently regress.
+        #
+        # Same three guarantees as the health step above: continue-on-error, its
+        # own outputs (`academic_alert`), and no read of steps.watch.outputs --
+        # so it cannot change the digest verdict.
+        id: academic_alert
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          set -e
           PROBLEMS="${{ steps.academic.outputs.problems }}"
-          PROBLEM="${{ steps.academic.outputs.problem }}"
+          # ONE joined string, written once by the health step. Read as a whole
+          # or not at all -- a per-problem key would keep only the last reason.
+          DETAIL_RAW="${{ steps.academic.outputs.detail }}"
           # LEAD FIRST, then the diagnosis. The old message opened with
           # "Academic result monitor is NOT healthy (2 problem(s))" -- the
           # component name and a count -- and put the sentence that actually
           # matters last, so it was the part a phone notification truncated.
           # One verdict sentence, then one Detail line; the files and fields an
           # operator opens moved to the log below, where a developer looks.
-          LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy (${PROBLEMS} problem(s))."
-          DETAIL="Detail: ${PROBLEM}"
+          if [ -z "$PROBLEMS" ]; then
+            LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy."
+          else
+            LEAD="A TU result notice could go out with nobody watching — the academic result monitor is not healthy (${PROBLEMS} problem(s))."
+          fi
+          # NEVER "Detail:" AND NOTHING AFTER IT. That is exactly what the three
+          # alerts above sent. An empty detail means the health step failed
+          # without recording a reason, and the message says so instead.
+          if [ -z "$DETAIL_RAW" ]; then
+            DETAIL="Detail: the health check reported a failure without a stated reason — read the ::error:: lines in the 'Check academic monitor health' step log."
+          else
+            DETAIL="Detail: ${DETAIL_RAW}"
+          fi
           MSG="${LEAD} ${DETAIL}"
           BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
           echo "::error::$MSG"
@@ -2076,10 +2127,12 @@ jobs:
                   for note in notes:
                       fh.write('- ℹ️ %s\n' % note)
 
+          # ONE joined key -- see the same note on the academic arm above: a
+          # repeated `problem=` keeps only the last value.
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
               fh.write('problems=%d\n' % len(problems))
-              for problem in problems:
-                  fh.write('problem=%s\n' % problem.replace('\n', ' '))
+              fh.write('detail=%s\n' % '; '.join(
+                  problem.replace('\n', ' ') for problem in problems))
               fh.write('notes=%d\n' % len(notes))
 
           for note in notes:
@@ -2097,8 +2150,23 @@ jobs:
             echo "Worker heartbeat: OK — both sweep crons are firing"
             exit 0
           fi
+          # ALERTING LIVES IN THE STEP BELOW for the reason given on the
+          # academic arm: this block used to read its OWN outputs from inside
+          # the step that writes them, so both were always empty.
+          exit 0
+
+      - name: Alert on worker heartbeat
+        # Separate step, own id, and no read of its own outputs -- check 23.
+        id: worker_alert
+        continue-on-error: true
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          set -e
           PROBLEMS="${{ steps.worker.outputs.problems }}"
-          PROBLEM="${{ steps.worker.outputs.problem }}"
+          DETAIL_RAW="${{ steps.worker.outputs.detail }}"
           # LEAD FIRST, then the diagnosis. The old message opened with
           # "breaking-monitor worker heartbeat FAILED (2 problem(s))" and put
           # the consequence -- no breaking alert can fire -- inside the
@@ -2106,7 +2174,12 @@ jobs:
           # one Detail line reach the phone; the surfaces and the wrangler
           # command an operator runs moved to the log below.
           LEAD="Breaking-news detection is not running, so NO BREAKING ALERT CAN FIRE right now -- a flood, an outage or a landslide will pass silently."
-          DETAIL="Detail: ${PROBLEM}"
+          # Never "Detail:" and nothing after it -- say why it is blank.
+          if [ -z "$DETAIL_RAW" ]; then
+            DETAIL="Detail: the heartbeat check reported a failure without a stated reason — read the ::error:: lines in the 'Check worker heartbeat (dead-man's switch, external arm)' step log."
+          else
+            DETAIL="Detail: ${DETAIL_RAW}"
+          fi
           MSG="${LEAD} ${DETAIL}"
           BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
           echo "::error::$MSG"
@@ -2414,10 +2487,11 @@ jobs:
                   for item in unknown + notes:
                       fh.write('- ℹ️ %s\n' % item)
 
+          # ONE joined key -- see the same note on the academic arm above.
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
               fh.write('problems=%d\n' % len(problems))
-              for problem in problems:
-                  fh.write('problem=%s\n' % problem.replace('\n', ' '))
+              fh.write('detail=%s\n' % '; '.join(
+                  problem.replace('\n', ' ') for problem in problems))
               # Parenthesised on purpose. `'notes=%d\n' % len(notes) + len(unknown)`
               # is a TypeError -- the % binds tighter than +, so that raised
               # BEFORE the ::error:: annotations below were printed and made the
@@ -2446,10 +2520,30 @@ jobs:
             echo "Breaking dispatch chain: OK — a breaking alert is confirmed delivered to ntfy"
             exit 0
           fi
+          # ALERTING LIVES IN THE STEP BELOW for the reason given on the
+          # academic arm: this block used to read its OWN outputs from inside
+          # the step that writes them, so both were always empty.
+          exit 0
+
+      - name: Alert on breaking dispatch chain
+        # Separate step, own id, and no read of its own outputs -- check 23.
+        id: chain_alert
+        continue-on-error: true
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          set -o pipefail
+          set -e
           PROBLEMS="${{ steps.chain.outputs.problems }}"
-          PROBLEM="${{ steps.chain.outputs.problem }}"
+          DETAIL_RAW="${{ steps.chain.outputs.detail }}"
           LEAD="A breaking alert is not confirmed delivered, or the last send was refused — a flood, an avalanche or a major outage can pass without you seeing it."
-          DETAIL="Detail: ${PROBLEM} (${PROBLEMS} problem(s))."
+          # Never "Detail:" and nothing after it -- say why it is blank.
+          if [ -z "$DETAIL_RAW" ]; then
+            DETAIL="Detail: the delivery check reported a failure without a stated reason — read the ::error:: lines in the 'Check breaking dispatch chain (delivery arm, external)' step log."
+          else
+            DETAIL="Detail: ${DETAIL_RAW} (${PROBLEMS} problem(s))."
+          fi
           BODY="$(printf '%s\n\n%s' "$LEAD" "$DETAIL")"
           echo "::error::${BODY}"
           # The operator's half: which file is judged, what a blank means, and

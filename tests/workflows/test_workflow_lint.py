@@ -76,6 +76,18 @@ except ImportError:  # pragma: no cover - direct execution of this file
 #: even though the `git commit` text lives in the script instead of the `run:`.
 DELEGATED_COMMIT = "scripts/commit_state.sh"
 
+#: What a state commit must look like, matched on a LINE so prose (`push_log=`,
+#: "a push that loses master") can never be mistaken for a command.
+GIT_COMMIT_RE = re.compile(
+    r'^\s*(?:(?:if|elif|then|while)\s+!?\s*)?'
+    r'git\b(?:\s+"[^"]*")*\s+commit\b')
+GIT_NETWORK_RE = re.compile(
+    r'^\s*(?:(?:if|elif|then|while)\s+!?\s*)?'
+    r'git\b(?:\s+"[^"]*")*\s+(?:push|pull|fetch|clone)\b')
+#: Either `for attempt in 1 2 3` or `while [ "$attempt" -le 3 ]`.
+RETRY_LOOP_RE = re.compile(
+    r"for attempt in 1 2 3|attempt\"?\s*-le\s*3")
+
 
 # ==========================================================================
 # Check 2 helpers (shared with the regression test that proves they fail)
@@ -3775,6 +3787,162 @@ def reconstruct_pre_fix_render_shape(text):
         "the fallback was not dedented to module level, so the mutation is not "
         "the pre-fix fall-through shape")
     return rebuilt
+
+
+class StateCommitOrderingTests(WorkflowLintBase):
+    """A state commit is made BEFORE the step talks to the network.
+
+    RUN 42621019476, the exact text: "fatal: Not possible to fast-forward,
+    aborting." then "error: cannot pull with rebase: You have unstaged changes."
+    then "! [rejected] master -> master (non-fast-forward)". The step committed
+    its state, then pulled, and the rebase fallback could not run because
+    `state/model_health.json` is tracked and rewritten by every run. Delivery had
+    already gone out, so the only thing lost was the state commit -- silently.
+
+    The rule, wherever the pattern appears: commit first, then fetch, re-apply on
+    the fresh tip and push, three attempts, and a step whose state actually
+    matters must FAIL when the three are exhausted instead of warning.
+    """
+
+    #: Run blocks whose lost commit is not acceptable. Telemetry writers stay
+    #: non-fatal on purpose (a lost row must not redden a finished run).
+    LOAD_BEARING = (
+        ("daily-news.yml", "Commit state changes"),
+        ("digest-prebuild.yml", "Commit the delivery ledger mirror"),
+        ("academic-result.yml", "Commit academic state"),
+    )
+
+    def _script(self):
+        return (W.REPO_ROOT / "scripts" / "commit_state.sh").read_text(
+            encoding="utf-8")
+
+    def _commit_blocks(self):
+        blocks = []
+        for wf in W.WORKFLOW_NAMES:
+            for job, step, run, st in W.iter_run_blocks(wf):
+                if "git commit" in run or DELEGATED_COMMIT in run:
+                    blocks.append((wf, job, step, run, st))
+        return blocks
+
+    @staticmethod
+    def _problems(run):
+        """Problems with ONE run block's commit/network ordering; [] is fine."""
+        problems = []
+        # COMMENT LINES ARE HISTORY, NOT CODE. Several steps quote the old
+        # `pull --rebase -X theirs` shape in their own rationale, and a check
+        # that cannot tell that from an executed command is a check that fires
+        # on documentation.
+        lines = [line for line in run.split("\n")
+                 if not line.strip().startswith("#")]
+        delegated = any(DELEGATED_COMMIT in line for line in lines)
+        commit_at = next((i for i, line in enumerate(lines)
+                          if GIT_COMMIT_RE.match(line)), None)
+        network_at = next((i for i, line in enumerate(lines)
+                           if GIT_NETWORK_RE.match(line)), None)
+        if any("pull" in line and "--rebase" in line for line in lines):
+            problems.append("still pulls with `--rebase`, which refuses a dirty "
+                            "tree -- the exact failure run 42621019476 hit")
+        if delegated:
+            # The ordering and the retry live in the script, checked by
+            # test_the_shared_script_commits_before_it_fetches_and_retries.
+            return problems
+        if commit_at is None and network_at is None:
+            return problems
+        if commit_at is None:
+            problems.append("talks to the network but never commits")
+        elif network_at is None:
+            problems.append("commits but never pushes")
+        elif commit_at > network_at:
+            problems.append("talks to the network BEFORE committing its state")
+        if not RETRY_LOOP_RE.search("\n".join(lines)):
+            problems.append("has no bounded three-attempt retry loop")
+        return problems
+
+    def test_every_state_commit_block_commits_before_the_network(self):
+        blocks = self._commit_blocks()
+        self.assertGreaterEqual(
+            len(blocks), 4,
+            "expected at least the four `[skip ci]` state commits, found %d. "
+            "The floor exists so this check cannot pass by finding nothing: "
+            "lower it only when a commit site genuinely went away." % len(blocks))
+        offenders = []
+        for wf, job, step, run, st in blocks:
+            for problem in self._problems(run):
+                offenders.append("%s / %s / %r: %s" % (wf, job, step, problem))
+        self.assertEqual(
+            [], offenders,
+            "state commits that still race the remote:\n  " + "\n  ".join(offenders))
+        print("check 22: %d state commit block(s), all commit before the network"
+              % len(blocks))
+
+    def test_the_shared_script_commits_before_it_fetches_and_retries(self):
+        script = self._script()
+        commit_at = script.index("git commit -m")
+        fetch_at = script.index("fetch --quiet origin")
+        self.assertLess(
+            commit_at, fetch_at,
+            "scripts/commit_state.sh fetches before it commits, which is the "
+            "defect it exists to remove")
+        self.assertIn("for attempt in 1 2 3; do", script,
+                      "the three-attempt retry loop is gone")
+        self.assertIn("COMMIT_STATE_STRICT", script,
+                      "an exhausted retry can only warn again, so a lost state "
+                      "commit stays silent")
+        for banned in ("--autostash", "--force-with-lease",
+                       "push --force", "push -f", "git add -A",
+                       "reset --hard", "rebase"):
+            # Comments quote the shape this script replaced; only executed
+            # lines are forbidden.
+            code = "\n".join(line for line in script.split("\n")
+                             if not line.strip().startswith("#"))
+            self.assertNotIn(
+                banned, code,
+                "scripts/commit_state.sh must never use %r: a race is retried "
+                "and re-applied through the index, never forced or discarded"
+                % banned)
+        print("check 22: %s commits before it fetches, retries three times"
+              % DELEGATED_COMMIT)
+
+    def test_the_load_bearing_state_commits_fail_loudly(self):
+        found = set()
+        for wf in W.WORKFLOW_NAMES:
+            for job, step, run, st in W.iter_run_blocks(wf):
+                for want_wf, want_step in self.LOAD_BEARING:
+                    if wf == want_wf and step == want_step:
+                        found.add((wf, step))
+                        self.assertIn(
+                            DELEGATED_COMMIT, run,
+                            "%s / %r: must hand the commit+push to %s -- an "
+                            "inline copy is how the two orderings drifted apart"
+                            % (wf, step, DELEGATED_COMMIT))
+                        self.assertIn(
+                            "COMMIT_STATE_STRICT=1", run,
+                            "%s / %r: its state is load-bearing, so an exhausted "
+                            "retry must fail the step, not warn" % (wf, step))
+        self.assertEqual(
+            set(self.LOAD_BEARING), found,
+            "a load-bearing state commit disappeared (found %r)" % (found,))
+
+    def test_every_state_commit_is_authenticated_for_its_push(self):
+        # The delegated block no longer carries its own `git -c` argument, so the
+        # token it passes must reach the script's own fetch and push.
+        script = self._script()
+        self.assertIn("auth=(", script)
+        self.assertIn('git "${auth[@]}" push', script)
+
+    def test_the_pre_fix_shape_is_rejected(self):
+        """The quoted run-42621019476 shape must not pass the same predicate."""
+        pre_fix = (
+            'git commit -m "chore: update digest state [skip ci]"\n'
+            'if ! git "${auth[@]}" pull --ff-only origin master; then\n'
+            '  if ! git "${auth[@]}" pull --rebase -X theirs origin master; then\n'
+            '    echo "Rebase pull also failed — proceeding without pulling"\n'
+            "  fi\n"
+            "fi\n"
+            'git "${auth[@]}" push\n')
+        self.assertTrue(
+            self._problems(pre_fix),
+            "the pre-fix shape passes the check, so the check proves nothing")
 
 
 class AcademicRenderFallbackTests(WorkflowLintBase):
@@ -8176,6 +8344,281 @@ class ManualPrebuildPublishGateTests(WorkflowLintBase):
             "false", str(publish.get("default")).lower(),
             "`publish` must default to false: a default of true restores the "
             "2026-11-01 early publish with no edit to any step")
+
+
+# ---------------------------------------------------------------------------
+# Check 23 -- AN ALERT STEP MUST READ ANOTHER STEP'S OUTPUTS, NEVER ITS OWN
+# ---------------------------------------------------------------------------
+# THE DEFECT (three alerts: runs 41441820627, 42474279212, 42618567399). The
+# health step wrote `problems`/`problem` to GITHUB_OUTPUT and then read
+# `${{ steps.<its own id>.outputs.* }}` in the same step. GitHub expands step
+# expressions BEFORE the step runs, so both were always empty and every page
+# said "is not healthy ( problem(s)). Detail:" while the same step's
+# ::error:: line carried the real reason.
+#
+# These tests assert the SHAPE, not one string, because the same file carried
+# the same defect in three separate arms. A check that only pinned the academic
+# arm would have let the other two keep paging an empty body.
+WATCHDOG_YML = "digest-watchdog.yml"
+ACADEMIC_HEALTH_STEP = "Check academic monitor health"
+ACADEMIC_ALERT_STEP = "Alert on academic monitor health"
+WORKER_HEALTH_STEP = "Check worker heartbeat (dead-man's switch, external arm)"
+WORKER_ALERT_STEP = "Alert on worker heartbeat"
+CHAIN_HEALTH_STEP = "Check breaking dispatch chain (delivery arm, external)"
+CHAIN_ALERT_STEP = "Alert on breaking dispatch chain"
+
+#: (health step, alert step) -- the alerting half of each arm.
+MONITOR_ARMS = (
+    (ACADEMIC_HEALTH_STEP, ACADEMIC_ALERT_STEP),
+    (WORKER_HEALTH_STEP, WORKER_ALERT_STEP),
+    (CHAIN_HEALTH_STEP, CHAIN_ALERT_STEP),
+)
+
+#: 24h fired minutes before the run that satisfied it; 26h is the slack.
+STALENESS_LIMIT_H = 26
+
+
+class MonitorAlertArmTests(WorkflowLintBase):
+    """The alerting step must be a different step from the one it reads."""
+
+    # -- helpers ------------------------------------------------------------
+    def _step(self, name):
+        step = step_named(W.load_workflow(WATCHDOG_YML), name)
+        self.assertIsNotNone(step, "step %r is gone from %s"
+                             % (name, WATCHDOG_YML))
+        return step
+
+    def _run(self, name):
+        return str(self._step(name).get("run") or "")
+
+    def _step_order(self):
+        return [step_name for _job, step_name, _step in
+                W.iter_all_steps(WATCHDOG_YML)]
+
+    def _health_body(self, name=ACADEMIC_HEALTH_STEP):
+        bodies = [body for _tag, body in heredoc_bodies(self._run(name))]
+        self.assertEqual(1, len(bodies),
+                         "step %r should carry exactly one python heredoc, "
+                         "found %d" % (name, len(bodies)))
+        return bodies[0]
+
+    @staticmethod
+    def _exec_body(body, env, cwd):
+        """Run a heredoc body with `env` applied. Returns (exit_code, text)."""
+        import contextlib
+        import io
+        saved = dict(os.environ)
+        os.environ.update({k: str(v) for k, v in env.items()})
+        buf = io.StringIO()
+        code = 0
+        cwd_before = os.getcwd()
+        try:
+            os.chdir(str(cwd))
+            with contextlib.redirect_stdout(buf):
+                try:
+                    exec(compile(body, "<heredoc>", "exec"),
+                         {"__name__": "heredoc"})
+                except SystemExit as exc:
+                    code = exc.code if isinstance(exc.code, int) else 1
+        finally:
+            os.chdir(cwd_before)
+            os.environ.clear()
+            os.environ.update(saved)
+        return code, buf.getvalue()
+
+    def _run_academic_health(self, age_hours, state=None):
+        """Execute the real health heredoc against a fabricated last run."""
+        import datetime
+        import json as _json
+        import shutil
+        tmp = tempfile.mkdtemp(prefix="academic-health-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        os.makedirs(os.path.join(tmp, "state"), exist_ok=True)
+        checked = (datetime.datetime.now(datetime.timezone.utc)
+                   - datetime.timedelta(hours=age_hours))
+        with open(os.path.join(tmp, "state", "academic_last_run.json"), "w",
+                  encoding="utf-8") as fh:
+            _json.dump({"exit_code": 0, "checked_at": checked.isoformat()}, fh)
+        if state is not None:
+            with open(os.path.join(tmp, "state", "academic_state.json"), "w",
+                      encoding="utf-8") as fh:
+                _json.dump(state, fh)
+        out_path = os.path.join(tmp, "gh_output.txt")
+        with open(out_path, "w", encoding="utf-8") as fh:
+            fh.write("")
+        code, text = self._exec_body(
+            self._health_body(), {"GITHUB_OUTPUT": out_path}, tmp)
+        with open(out_path, encoding="utf-8") as fh:
+            return code, text, fh.read()
+
+    # -- the defect ---------------------------------------------------------
+    def test_no_step_reads_its_own_outputs(self):
+        """The class, not the instance: any arm, any workflow step."""
+        offenders = []
+        for job, step, run, st in W.iter_run_blocks(WATCHDOG_YML):
+            sid = str(st.get("id") or "")
+            # Full-line comments are prose about the defect, not a read of it.
+            code = "\n".join(line for line in run.split("\n")
+                             if not line.strip().startswith("#"))
+            if sid and ("steps.%s.outputs" % sid) in code:
+                offenders.append(
+                    "%s / job %r step %r reads its OWN outputs (steps.%s)"
+                    % (WATCHDOG_YML, job, step, sid))
+        self.assertEqual(
+            [], offenders,
+            "a step cannot read outputs GitHub has not written yet -- the "
+            "expression is expanded before the step runs:\n  "
+            + "\n  ".join(offenders))
+
+    def test_each_alert_step_reads_the_health_step_that_runs_before_it(self):
+        order = self._step_order()
+        for health, alert in MONITOR_ARMS:
+            health_id = str(self._step(health).get("id") or "")
+            alert_id = str(self._step(alert).get("id") or "")
+            run = self._run(alert)
+            self.assertTrue(health_id, "step %r has no id to read" % (health,))
+            self.assertTrue(alert_id, "step %r has no id" % (alert,))
+            self.assertNotEqual(
+                health_id, alert_id,
+                "%r and %r share id %r, so the alert can only read its own "
+                "outputs" % (health, alert, health_id))
+            self.assertIn(
+                "steps.%s.outputs.problems" % health_id, run,
+                "%r does not read steps.%s.outputs.problems"
+                % (alert, health_id))
+            self.assertIn(
+                "steps.%s.outputs.detail" % health_id, run,
+                "%r does not read the JOINED detail from steps.%s"
+                % (alert, health_id))
+            self.assertIn(health, order, "%r is gone" % (health,))
+            self.assertIn(alert, order, "%r is gone" % (alert,))
+            self.assertLess(
+                order.index(health), order.index(alert),
+                "%r runs before %r, so there is nothing to read yet"
+                % (alert, health))
+        print("check 23: %d alert arm(s) read a previous step, none its own"
+              % len(MONITOR_ARMS))
+
+    # -- the detail string --------------------------------------------------
+    def test_the_health_steps_write_one_joined_detail(self):
+        for health, _alert in MONITOR_ARMS:
+            body = self._health_body(health)
+            self.assertIn(
+                "'detail=%s\\n' % '; '.join(", body,
+                "%r no longer joins its problems into one `detail` output. A "
+                "repeated `problem=` key is not a list: GitHub keeps only the "
+                "last value, so every reason but the last is lost." % (health,))
+            self.assertNotIn(
+                "'problem=%s\\n'", body,
+                "%r still writes a `problem=` key per problem" % (health,))
+            self.assertNotIn(
+                "fh.write('problem=", body,
+                "%r writes a per-problem output key" % (health,))
+
+    def test_an_empty_detail_can_never_be_an_empty_sentence(self):
+        for _health, alert in MONITOR_ARMS:
+            run = self._run(alert)
+            self.assertIn(
+                '-z "$DETAIL_RAW"', run,
+                "%r has no empty-detail branch, so it can still send "
+                "\"Detail:\" with nothing after it" % (alert,))
+            self.assertIn(
+                "without a stated reason", run,
+                "%r does not say WHY the detail is blank" % (alert,))
+            self.assertIn(
+                "step log", run,
+                "%r does not point at the log that carries the reason"
+                % (alert,))
+        text = W.raw_workflow_text(WATCHDOG_YML)
+        self.assertNotIn(
+            'DETAIL="Detail: ${PROBLEM}"', text,
+            "the pre-fix one-key detail read is back")
+        self.assertNotIn(
+            'DETAIL="Detail: ${PROBLEM} (', text,
+            "the pre-fix one-key detail read is back")
+
+    def test_the_issue_body_uses_the_same_joined_detail(self):
+        run = self._run(ACADEMIC_ALERT_STEP)
+        issue = run[run.index("gh issue create"):]
+        self.assertIn('--body "${LEAD}', issue)
+        self.assertIn("${DETAIL}", issue,
+                      "the issue body does not carry the joined detail")
+        self.assertNotIn("$PROBLEM", issue,
+                         "the issue body still carries the single-key read")
+
+    def test_the_quiet_hours_priority_tags_and_dedupe_are_untouched(self):
+        run = self._run(ACADEMIC_ALERT_STEP)
+        for kept in ("bash scripts/may-notify.sh digest_watchdog",
+                     "digest_watchdog.academic_health 5",
+                     '-H "Priority: 5"',
+                     '-H "Tags: warning,rotating_light"',
+                     "already exists — not duplicating",
+                     'echo "::error::$MSG"'):
+            self.assertIn(kept, run,
+                          "%r no longer carries %r" % (ACADEMIC_ALERT_STEP, kept))
+
+    # -- the threshold ------------------------------------------------------
+    def test_a_lagging_scheduler_does_not_alarm(self):
+        """A 24h gap used to alarm minutes before the run that satisfied it."""
+        code, text, out = self._run_academic_health(24)
+        self.assertEqual(
+            0, code,
+            "a 24h gap still alarms; the daily sweep drifts 11-22 minutes "
+            "late, which is what fired all three false alerts. output=%r "
+            "stdout=%r" % (out, text))
+        self.assertIn("problems=0", out, "expected no problems, got %r" % (out,))
+        self.assertNotIn("has not completed a run", out)
+
+    def test_a_genuinely_dead_monitor_still_alarms_with_its_real_gap(self):
+        code, text, out = self._run_academic_health(27)
+        self.assertEqual(
+            1, code,
+            "a 27h gap no longer alarms, so a dead monitor is silenced. "
+            "output=%r stdout=%r" % (out, text))
+        self.assertIn("problems=1", out)
+        self.assertIn("27h", out, "the message no longer names the real gap")
+        self.assertEqual(
+            1, sum(1 for line in out.split("\n") if line.startswith("detail=")),
+            "the detail must be ONE joined output key, got %r" % (out,))
+
+    def test_the_detail_joins_every_problem_with_a_separator(self):
+        """Two problems must both survive: a repeated key kept only the last."""
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        npt = now + datetime.timedelta(hours=5, minutes=45)
+        state = {
+            "schema_version": 2,
+            "last_poll_time": npt.date().isoformat(),
+            "hosts_down": {
+                "example.edu.np": (now - datetime.timedelta(hours=7)).isoformat(),
+                "tu.edu.np": (now - datetime.timedelta(hours=8)).isoformat(),
+            },
+        }
+        code, text, out = self._run_academic_health(1, state=state)
+        self.assertEqual(
+            1, code,
+            "two long-down hosts did not alarm. output=%r stdout=%r"
+            % (out, text))
+        self.assertIn("problems=2", out, "expected two problems: %r" % (out,))
+        detail = [line for line in out.split("\n")
+                  if line.startswith("detail=")]
+        self.assertEqual(1, len(detail), "not one joined key: %r" % (out,))
+        for host in ("example.edu.np", "tu.edu.np"):
+            self.assertIn(
+                host, detail[0],
+                "the joined detail dropped %r, which is exactly what a "
+                "repeated `problem=` key did" % (host,))
+        self.assertEqual(
+            1, detail[0].count("; "),
+            "the two problems are not separated: %r" % (detail[0],))
+
+    def test_the_threshold_is_26h_and_is_not_a_silenced_monitor(self):
+        script = W.raw_workflow_text(WATCHDOG_YML)
+        self.assertIn("age_h > %d" % STALENESS_LIMIT_H, script,
+                      "the staleness threshold is not %dh" % STALENESS_LIMIT_H)
+        self.assertNotIn("age_h > 24", script,
+                         "a 24h threshold is back: it fires before the run "
+                         "that would satisfy it")
 
 
 if __name__ == "__main__":
