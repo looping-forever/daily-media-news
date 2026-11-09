@@ -15074,6 +15074,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-09T06:42:10+05:45"
+    },
+    {
+      "event_id": "evt-c37659afd0cb",
+      "event_key": "prithvi-highway-landslide-ghopte-bhir-nov9",
+      "canonical_title": "Prithvi Highway Blocked by Dry Landslide at Ghopte Bhir",
+      "category": "action",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": "2026-11-09",
+      "last_reported": "2026-11-09",
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054218/another-dry-landslide-hits-ghopte-bhir-blocking-prithvi-highway-in-both-directions"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: A dry landslide occurred at Ghopte Bhir in Ichchhakamana Rural Municipality-4 at 5:00 AM today, completely blocking the Prithvi Highway in both directions.",
+      "latest_development": "Confirmed: A dry landslide occurred at Ghopte Bhir in Ichchhakamana Rural Municipality-4 at 5:00 AM today, completely blocking the Prithvi Highway in both directions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-09",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-09",
+      "updated_at": "2026-11-09T07:21:58+05:45"
+    },
+    {
+      "event_id": "evt-e28ded51d051",
+      "event_key": "nepal-weather-forecast-nov9",
+      "canonical_title": "Weather Forecast: Partial Clouds and Mild Temperatures",
+      "category": "local_city",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": "2026-11-09",
+      "last_reported": "2026-11-09",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.nepalnews.com/s/weather/light-rain-and-snowfall-expected-in-some-areas"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Department of Hydrology and Meteorology reports partial cloud cover in hilly and mountainous regions today, with a slight possibility of light rain or snowfall in some areas.",
+      "latest_development": "Confirmed: The Department of Hydrology and Meteorology reports partial cloud cover in hilly and mountainous regions today, with a slight possibility of light rain or snowfall in some areas.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-09",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-09",
+      "updated_at": "2026-11-09T07:21:58+05:45"
     }
   ],
   "archived": []

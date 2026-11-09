@@ -1287,6 +1287,20 @@
       "title": "Warhammer Blood Bowl Game Delayed to 2027",
       "category": "gaming",
       "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054218/another-dry-landslide-hits-ghopte-bhir-blocking-prithvi-highway-in-both-directions",
+      "title_hash": "1e4242264973a315a205671b82841cf9cf3ee9c3",
+      "title": "Prithvi Highway Blocked by Dry Landslide at Ghopte Bhir",
+      "category": "action",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/weather/light-rain-and-snowfall-expected-in-some-areas",
+      "title_hash": "2d8bfb62b1ff52b63752b34aa42a0ddddb0ae170",
+      "title": "Weather Forecast: Partial Clouds and Mild Temperatures",
+      "category": "local_city",
+      "date_sent": "2026-11-09"
     }
   ]
 }
