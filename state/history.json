@@ -1301,6 +1301,69 @@
       "title": "Weather Forecast: Partial Clouds and Mild Temperatures",
       "category": "local_city",
       "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/there-is-no-excuse-for-what-i-did-nvidia-ceo-says-as-affair-with-an-alleged-chinese-spy-makes-the-us-china-ai-race-look-even-more-ridiculous",
+      "title_hash": "ea8dee2462a45b259a803fb70ed09fd144acf4a3",
+      "title": "\"There is no excuse for what I did,\" Nvidia CEO says, as affair with an alleged Chinese spy makes the US-China AI race look even more ridiculous",
+      "category": "gaming",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "dev.to/senthil_kr/blameless-postmortems-a-leaders-guide-to-learning-from-incidents-10c0",
+      "title_hash": "33cc74de9b04393e15496ad6898f089142057be6",
+      "title": "Blameless Postmortems: A Leader’s Guide to Learning From Incidents",
+      "category": "tech_career",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "dev.to/jaibalaji41/dockerize-like-a-pro-5-best-practices-for-lean-and-secure-container-images-3ddc",
+      "title_hash": "77f0f355dac74687ff10b250bdf36cbcb59ba78d",
+      "title": "Dockerize Like a Pro: 5 Best Practices for Lean and Secure Container Images",
+      "category": "tech_career",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "english.onlinekhabar.com/swarnim-wagle-cop31-turkey.html",
+      "title_hash": "404ce4ac0ee6f6e1e0105d14bff893043883c03d",
+      "title": "Finance Minister Swarnim Wagle leaves for COP31 in Turkey",
+      "category": "nepal",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/politics/gai-puja-fosters-awareness-of-coexistence-between-humans-and-animals-oli",
+      "title_hash": "17d80659e5ee53d2250b5beb59d6d10ed80799d3",
+      "title": "Gai Puja fosters awareness of coexistence between humans and animals: Oli",
+      "category": "nepal",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/sports/kathmandu-set-181-run-target-for-chitwan-in-npl",
+      "title_hash": "3b23a6b97f136b2fcf3baa4a1dfc9cb64b07bea7",
+      "title": "Kathmandu set 181-run target for Chitwan in NPL",
+      "category": "nepal",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c6y434dw8319o",
+      "title_hash": "32a9d1ea47f73d81879d2ae9cd8ecfe2b5219e8d",
+      "title": "Krakow shooting suspect has died in hospital, police say",
+      "category": "world_major",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "gamespot.com/articles/mortal-kombat-2-is-winning-the-race-to-become-mortal-kombat-2",
+      "title_hash": "ff0259b2114d10fcdf6fd0d61b95746e2ff94eb8",
+      "title": "Mortal Kombat 2 Is Winning The Race To Become Mortal Kombat 2",
+      "category": "gaming",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cm93z3lp5lnpo",
+      "title_hash": "552ce5e31dfe87238f288de7f20a1f8abc4f176d",
+      "title": "Nine foreigners caught allegedly trying to leave South Africa to fight in Ukraine",
+      "category": "world_major",
+      "date_sent": "2026-11-09"
     }
   ]
 }
