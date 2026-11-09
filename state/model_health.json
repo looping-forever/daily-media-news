@@ -122,13 +122,13 @@
       "cooldown_until": 1793777426.3737597
     },
     "gemini/gemini-3.5-flash-lite": {
-      "success": 87,
+      "success": 88,
       "timeout": 0,
       "transport": 0,
       "garbage": 0,
       "quota_notice": 0,
       "consecutive_failures": 0,
-      "last_ok_at": 1794225132.2580664
+      "last_ok_at": 1794226568.968186
     },
     "gemini/gemini-3.1-flash-lite": {
       "success": 0,
