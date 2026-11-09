@@ -10,18 +10,20 @@ weather AQI, breaking ladder, ladder probe, honesty gate, `commit_state.sh`).
 honesty and for the model ladder as it actually stands. **2026-11-07:** §1's
 HEAD was re-checked and §44 was amended for the GitHub Models retirement, the
 self-healing ladder, the repair prompt/clock changes and the provider canary.
+**2026-11-09:** §1's HEAD and test baselines, §42.6 and §25's 24h figure were
+re-checked, and §45 was added for the summariser/article, publisher-URL,
+state-push and alerting changes.
 Do not edit product source code from this file; record decisions here instead.
 
-## 1. Repo state (re-verified 2026-11-01; tip re-checked 2026-11-07)
+## 1. Repo state (re-verified 2026-11-01; tip and test baselines re-checked 2026-11-09)
 
 - Repo: this repository (git, branch `master`). This section said `main` until
   2026-11-01; no ref of that name exists.
-- HEAD = `6c806d6` ("fix: remove the retired GitHub Models family") at the
-  2026-11-07 check. Treat the tip as moving: read `git log --oneline`.
-  **Superseded 2026-11-07:** this line recorded `7c37a78` at the 2026-11-06
-  check. Among the commits since: `71cf488` added the GitHub Models family,
-  `11cd7bd` moved its catalogue to `/catalog/models`, `d58b657` added the
-  provider canary, and `6c806d6` removed the family again (see §44).
+- HEAD = `eb65460` ("fix: an alert that fires on a healthy run is worse than no
+  alert") at the 2026-11-09 check. Treat the tip as moving: read `git log
+  --oneline`. **Superseded 2026-11-09:** this line recorded `6c806d6` at the
+  2026-11-07 check, itself superseding `7c37a78` at the 2026-11-06 check. The
+  `71cf488`/`11cd7bd`/`d58b657`/`6c806d6` family history remains in §44.
 - Working tree MOVES DURING A SESSION, so a count here is not durable. Measured
   2026-11-03: `git status --porcelain` printed only `?? CON` at 15:31, then
   showed `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
@@ -30,12 +32,15 @@ Do not edit product source code from this file; record decisions here instead.
   this line recorded 10 modified files and no untracked files at the 2026-11-01
   check. Re-run `git status`; do not trust a stored count. Nothing was committed
   or pushed in either session.
-- Measured suite counts, 2026-11-01, `unittest discover` from the repo root:
-  workflows **482**, render **488**, digest **392**, collection **254**, weather
-  **135** -- all green. Two earlier readings in this session were stale, not
-  different measurements: 476 was the count BEFORE the four manual-prebuild
-  publish-gate tests landed, and 480/252 was before the tree-problems negative
-  control (2 tests) and the wet-verdict/outlook-row invariant class (2 tests).
+- Test baselines recorded by the commits, 2026-11-09: workflows **536**
+  (`eb65460`), digest **617** (3 skipped), validate **241**, collection **270**
+  (`3dd22b7`). **Superseded 2026-11-09:** this bullet recorded the 2026-11-01
+  run — workflows 482, render 488, digest 392, collection 254, weather 135, all
+  green. Render and weather were not re-measured, so do not read their old
+  counts as current. The stale-reading explanation below belongs to that older
+  reading: 476 was the count BEFORE the four manual-prebuild publish-gate tests
+  landed, and 480/252 was before the tree-problems negative control (2 tests)
+  and the wet-verdict/outlook-row invariant class (2 tests).
   One digest run in between failed
   `test_the_same_input_yields_the_same_payload_bytes` because the payload title
   carries the wall clock and the two builds straddled a minute boundary; the
@@ -883,13 +888,16 @@ programme and carries no CSIT marker. It is a terminal `irrelevant` dismissal
   04:00/16:00 UTC slots. It cannot cause a false digest alarm by construction:
   it writes only its own outputs (never `steps.watch.outputs`), it is
   `continue-on-error`, and it reads state files the digest marker never touches.
-  Asserts: `schema_version == 2`, `last_poll_time` within 24h, no host in
-  `hosts_down` for more than 6h, a successful exam-source self-check within 7
-  days. **Deferred notices are reported as a SOFT note, never alarmed** — a
+  Asserts: `schema_version == 2`, `last_poll_time` within 26h (was 24h;
+  superseded 2026-11-09 — see §45), no host in `hosts_down` for more than 6h, a
+  successful exam-source self-check within 7 days. **Deferred notices are
+  reported as a SOFT note, never alarmed** — a
   deferred notice is the no-burn invariant *working*, and while the board is
   unreachable there is always at least one, so alarming it would train the owner
   to ignore the arm. Schema 1 and a missing self-check log are also SOFT, so the
-  arm cannot false-alarm on its own introduction day.
+  arm cannot false-alarm on its own introduction day. **Superseded 2026-11-09:**
+  the alert is now its own step, gated on the health step's `problems`; `0` or
+  empty is silence before any annotation, ping or issue. See §45.
 
 ## 26. Unit 3 — surfaces
 
@@ -2324,15 +2332,19 @@ run — it describes the code and its stated contracts.
 
 ### 42.6 State durability — `scripts/commit_state.sh`
 
-`commit_state.sh` replaces the `git pull --ff-only || git pull --rebase -X
-theirs` ending that took the REMOTE side of a conflict. On 2026-11-01 two
-breaking sweeps raced and the slower run's `state/model_health.json` increments
-were silently dropped; the same shape existed on the cooldown file and the alert
-ledger (`commit_state.sh:4-18`). The new rule: a race is **retried and
-re-applied from the index**, never resolved by deletion, and never with
-`reset --hard` (`:20-22`, `:122-168`). It exits 0 even after its retries are
-exhausted — losing telemetry must not fail the job — but warns by name (`:24-27`,
-`:170-171`).
+`commit_state.sh` now commits the named state files **before its first network
+command** (`commit_state.sh:29`), then fetches and pushes in one shape shared by
+13 state-commit blocks across six workflows. On a moved remote it retries three
+times, re-applying this run's copy of the staged files over the fresh tip through
+the index; it never deletes a row and never uses `reset --hard` (`:130-180`).
+`COMMIT_STATE_STRICT=true` turns an exhausted retry into a failing step with one
+`::error::` naming the paths still uncommitted; the default still exits 0 because
+telemetry must not fail a finished run (`:25-39`, `:182-187`).
+**Superseded 2026-11-09:** the previous text here described the pull-then-push
+rule that lost run `42621019476`'s state — the pull happened first, the rebase
+fallback refused a dirty tree ("cannot pull with rebase: You have unstaged
+changes"), and the push was rejected. Delivery had already gone out; only the
+state commit was lost (`:29-33`).
 
 ### 42.7 Two honest limits
 
@@ -2456,17 +2468,86 @@ summary, 5 dropped; edition_kind=full (10 of 10)`.
 
 **Provider canary (2026-11-07).** `scripts/provider_canary.py` and
 `.github/workflows/provider-canary.yml` run Monday 05:20 UTC (11:05 NPT),
-read-only, with a six-minute cap. A family that should work and has stopped fails
+read-only, with a six-minute cap. Live run `42371450573` is green. A family that
+should work and has stopped fails
 the run with a line naming the action to take; `quota` and `not_configured` are
 excused by name. **Its limitation, stated plainly:** the weekly cadence allows up
 to seven days of degraded editions before the alarm.
 
+## 45. 2026-11-09 — summariser partial answers, article evidence, publisher URLs, state push and alerting
+
+Everything here was read from the named commits and code; the live run claims
+were re-read from GitHub, not inferred.
+
+**Summariser partial answers (`b1fc724`).** `BATCH_SIZE = 2`, and a model that
+answers every story it was asked for grows to `MAX_BATCH_SIZE = 4`; a partial
+answer keeps the **same model** for the remainder of that group
+(`scripts/summarise_stories.py:47-52`, `:1107-1113`, `:1513-1517`). Only a
+request that returns **nothing usable** advances the ladder (`:1502-1505`). The
+fixed request count is gone: `TOTAL_BUDGET_SECONDS = 300` is the clock, and the
+loop stops when the next call cannot be paid for (`:101`, `:1430-1465`).
+
+**Retirement and the no-text gate (`9f0dc3c`).** `RETIRE_AFTER_RUNGS = 2`
+(`:66`): a story two rungs answered emptily is retired from the **walk**, not
+from the edition — it still reaches repair and the publisher fallback
+(`:1495-1532`), so no card goes blank by this route. A story with no publisher
+text, or whose snippet is the headline itself, is never asked for; the bounded
+article fetch below is tried first (`:1269-1288`).
+
+**Article text (`f3adf54`).** `scripts/article_text.py` fetches only those
+no-text stories, under a 5 s per-request timeout, a 512 KB page cap, and
+robots.txt per RFC 9309 (4xx allows, 5xx or unreachable refuses) (`:41-44`,
+`:225-260`). Scripts, styles, navs, headers and footers are stripped; only the
+longest contiguous prose run is kept, and under 200 characters is `None`
+(`:20-23`, `:50-53`). The run may fetch at most 20 articles / 120 s
+(`scripts/summarise_stories.py:68-74`); fetched evidence gets a 1200-character
+prompt window instead of the 400 used for publisher snippets (`:371-374`).
+
+**Publisher URLs and direct-feed preference (`3dd22b7`).**
+`resolve_publisher_url` decodes a Google News link **offline** and never fetches
+`news.google.com`; a link whose id carries no URL returns `""` and is counted
+`undecodable` (`scripts/article_text.py:11-13`, `:198-205`;
+`scripts/summarise_stories.py:1035-1039`). `prefer_direct_feeds` drops a Google
+candidate that duplicates a direct-feed candidate: equal normalised headline, or
+one contained in the other with at least 25 characters, same language only, and
+it runs before the source caps (`scripts/collect_news.py:2975-3046`,
+`:3079-3083`). It carries the Google row's published time, snippet, image or
+video into a gap on the direct row (`:3006-3014`). **Live limitation, stated
+plainly:** Google News link ids are encrypted, so in practice they do not
+resolve, and Google's robots.txt disallows crawling; Google candidates still
+enter and are then skipped, never fetched (`scripts/article_text.py:11-13`;
+`3dd22b7`). The commit's own measurement is 0 of 17 ids resolved.
+
+**State push (`7e41ce2`).** See §42.6, rewritten 2026-11-09: the commit comes
+before the first network call, three retries re-apply this run's copy over a
+moved tip, and `COMMIT_STATE_STRICT=true` makes the strict call sites fail
+loudly.
+
+**Alerting (`7e41ce2`, `eb65460`).** The academic-monitor alert had an empty
+`Detail:` since October, including issue #1, because the alert read its own
+step's outputs inside that same step, before GitHub expanded them; the
+worker-heartbeat and breaking-chain arms had the identical bug. Alerting is now
+its own step, the detail is one joined string, and an empty detail says so
+(`.github/workflows/digest-watchdog.yml:1866-1872`, `:1896-1948`). The academic
+staleness threshold moved 24h → 26h because the daily run drifts 11-22 minutes
+late and 24h fired minutes before the run that satisfied it; all three alerts
+preceded that day's successful run by 11-21 minutes (`:1706-1722`). The split
+alert steps then had no `if:` gate and paged on a healthy run with
+`(0 problem(s))`; `-z "$PROBLEMS"` also read `0` as failure. Each arm is now
+gated on its own health step's `problems`, `0`/empty is silence before any
+annotation, ping or issue, and tests execute the real step body with a
+`problems=2` control (`:1911-1948`, `:2173-2198`, `:2551-2570`;
+`tests/workflows/test_workflow_lint.py:8504-8763`). Run `42648802118` has all
+three alert steps `skipped`, and its log contains no alert ntfy send.
+
 ---
 
-Newest section: §44 (2026-11-06, amended 2026-11-07: the model ladder as it
-actually stands, the retired GitHub Models family, the self-healing ladder,
-repair and the provider canary), preceded by §43 (the same day: the single summary
-predicate and the counts every surface reads), then §42 (2026-11-03, the digest story floor, weather AQI, the
+Newest section: §45 (2026-11-09, the summariser partial-answer/retirement
+changes, bounded article text, publisher-URL and direct-feed preference, the
+state push and the alerting fixes), preceded by §44 (2026-11-06, amended
+2026-11-07: the model ladder as it actually stands, the retired GitHub Models
+family, the self-healing ladder, repair and the provider canary), then §43 (the
+single summary predicate and the counts every surface reads), then §42 (2026-11-03, the digest story floor, weather AQI, the
 breaking ladder and probe, honesty-gate recovery and `commit_state.sh`),
 followed by §41 (2026-10-10, the at-least-once delivery contract, the
 single-cron dispatcher, and the health check that hid a half-applied deploy),
@@ -2476,7 +2557,7 @@ cron arithmetic are corrected/superseded by §41**) and §38 (2026-10-03,
 digest archive origin access control). §§38-40 are the security control, the
 worker liveness contract and the open redesigns; §§31-37 are the
 personal-relevance, weather-engine, guardrail, operations and risk record;
-§§23-30 are the phase-1 reliability rebuild. Read §§23-44 first for current
+§§23-30 are the phase-1 reliability rebuild. Read §§23-45 first for current
 reality, and read **§38 before making any claim about the digest archive's
 privacy**.
 
