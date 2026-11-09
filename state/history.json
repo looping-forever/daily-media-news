@@ -1,90 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "api.open-meteo.com/v1/forecast",
-      "title_hash": "88f9583ddc0bc9604be0092a2d34d7832c34ff16",
-      "title": "Weather Forecast: Moderate Drizzle Expected",
-      "category": "local_city",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2048176/this-is-the-foreign-currency-exchange-rate-for-today-32",
-      "title_hash": "555f37f3800ae8df9de923a365c844e873b1031b",
-      "title": "Foreign Currency Exchange Rates for November 1",
-      "category": "bank_local",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/weather/influence-of-cyclone-arnab-diminishing-weather-improving",
-      "title_hash": "6f1bd8221cb97c141bf4bb80135df1f24918249b",
-      "title": "Influence of Cyclone Arnab diminishing, weather improving across Nepal",
-      "category": "nepal",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c893z699q401o",
-      "title_hash": "8e15bc83593401b1d3220c1fcc335b12f9332da8",
-      "title": "Serbia election outcome mirrors recent Hungarian political shifts",
-      "category": "world_major",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "pcgamer.com/games/horror/after-almost-a-decade-of-work-alien-isolation-mod-tools-hit-1-0-with-support-for-full-custom-maps-missions-modes-characters-weapons-animations-sounds-models-textures-and-more",
-      "title_hash": "22682d76ff6ac6c99ab3c3fbbf27cc969b08b672",
-      "title": "Alien: Isolation mod tools hit version 1.0 with comprehensive custom asset support",
-      "category": "gaming",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/gandaki-deploys-46-medical-officers-to-strengthen-provincial-healthcare-services.html",
-      "title_hash": "014b9af1eb3c7c587e4902cd100a21731725bbe9",
-      "title": "Gandaki Province Deploys 46 Medical Officers",
-      "category": "nepal",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2048599/new-restrictions-imposed-in-delhi-to-control-air-pollution",
-      "title_hash": "6a60133600f3772a4f0aa3b5fb8ce2ec5ba07006",
-      "title": "New Air Pollution Restrictions in New Delhi",
-      "category": "nepal",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/politics/nepali-congress-calls-parliamentary-party-meeting-for-tomorrow",
-      "title_hash": "b1bfae9e3ffc7e3f82c657875d6bcfe321ea69e4",
-      "title": "Nepali Congress calls parliamentary party meeting for Monday morning",
-      "category": "nepal",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-01/jun-kirarazaka-blobtopia-manga-ends-in-3-chapters/.243401",
-      "title_hash": "51608fd342794ec9a7e068ebf8d7d1191185880f",
-      "title": "Jun Kirarazaka's Blobtopia manga series scheduled to conclude in three chapters",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "portal.tu.edu.np/downloads/_2026_08_27_16_53_53.pdf",
-      "title_hash": "776d353159edb98c8510a359590d1481112abd0a",
-      "title": "Tribhuvan University releases new human resource development regulation",
-      "category": "education_tu",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "dev.to/ai_maya_063fc568e157562fd/kimi-k2-closes-in-december-what-moving-to-k31-pro-changes-and-what-the-default-reasoning-effort-fld",
-      "title_hash": "09540cff0584d52f8a08c6c92b6a6f05374567c9",
-      "title": "Kimi K2 model access limited, plans to retire by December 2026",
-      "category": "tech_career",
-      "date_sent": "2026-11-01"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2048777/nepal-international-trade-fair-from-7th-mangsir",
-      "title_hash": "e80c3f46ea4e06a68f5a6919dac787de7350ac8c",
-      "title": "Nepal International Trade Fair to be held from November 23",
-      "category": "nepal",
-      "date_sent": "2026-11-01"
-    },
-    {
       "url_normalized": "myanimelist.net/news/74894062",
       "title_hash": "98da8bc00ab7085f00eac8c3bec3b25f21993f53",
       "title": "'Charisma' Unveils Additional Cast, Teaser Promo",
@@ -1343,6 +1259,34 @@
       "title": "Two people killed in motorcycle accident in Itahari",
       "category": "local_city",
       "date_sent": "2026-11-08"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054209/this-is-the-foreign-currency-exchange-rate-for-today-33",
+      "title_hash": "e322cc9fa4b0bba3d7706068fdd096418ec5843a",
+      "title": "US Dollar Exchange Rate for November 9, 2026",
+      "category": "bank_local",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054206/cop-31-begins-nepal-will-seek-climate-justice-by-showing-reality",
+      "title_hash": "da67f4f96c313ee461f0f12317eb726512224f42",
+      "title": "Nepal Urges Climate Justice at COP-31",
+      "category": "nepal",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054204/today-is-the-fourth-day-of-tihar-cow-worship-is-being-performed",
+      "title_hash": "5afc4f4fb0f0c7bfeffc6b6c3800fd9ce1a9a997",
+      "title": "Tihar Festival Celebrated with Cow Worship Today",
+      "category": "nepal",
+      "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "pcgamer.com/games/sports/warhammer-blood-bowl-has-been-delayed-into-2027",
+      "title_hash": "4c92c17d21762acda602b3101bc436ace76a5d29",
+      "title": "Warhammer Blood Bowl Game Delayed to 2027",
+      "category": "gaming",
+      "date_sent": "2026-11-09"
     }
   ]
 }

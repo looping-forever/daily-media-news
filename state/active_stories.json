@@ -7583,7 +7583,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The weather forecast for Kathmandu for November 1–2 indicates moderate drizzle with maximum temperatures ranging from 24°C to 25°C and precipitation of 1.6 mm to 2.0 mm.",
       "latest_development": "Confirmed: The weather forecast for Kathmandu for November 1–2 indicates moderate drizzle with maximum temperatures ranging from 24°C to 25°C and precipitation of 1.6 mm to 2.0 mm.",
       "alerted": false,
@@ -7593,7 +7593,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T06:41:41+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-12f2f7fe422c",
@@ -7611,7 +7611,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Nepal Rastra Bank has set the foreign currency exchange rates for today. The US Dollar buying rate is Rs 151.63 and the selling rate is Rs 152.23. The Euro buying rate is Rs 169.86 and selling rate is Rs 170.54.",
       "latest_development": "Confirmed: Nepal Rastra Bank has set the foreign currency exchange rates for today. The US Dollar buying rate is Rs 151.63 and the selling rate is Rs 152.23. The Euro buying rate is Rs 169.86 and selling rate is Rs 170.54.",
       "alerted": false,
@@ -7621,7 +7621,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T06:41:41+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-c0ab40e6f8b8",
@@ -7639,7 +7639,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: According to the Weather Forecasting Division, the low pressure area near western Nepal acting as a remnant of Cyclone Arnab is subsiding, and weather conditions are progressively improving across the country's mountainous regions.",
       "latest_development": "Confirmed: According to the Weather Forecasting Division, the low pressure area near western Nepal acting as a remnant of Cyclone Arnab is subsiding, and weather conditions are progressively improving across the country's mountainous regions.",
       "alerted": false,
@@ -7649,7 +7649,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T07:21:07+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-435943bf522f",
@@ -7667,7 +7667,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: After nearly a decade of development, the modding community has released version 1.0 of the Alien: Isolation mod tools, adding full support for custom maps, missions, modes, characters, weapons, animations, and textures.",
       "latest_development": "Confirmed: After nearly a decade of development, the modding community has released version 1.0 of the Alien: Isolation mod tools, adding full support for custom maps, missions, modes, characters, weapons, animations, and textures.",
       "alerted": false,
@@ -7677,7 +7677,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T07:21:07+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-a43f20eb5019",
@@ -7695,7 +7695,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Defeat for Serbia's Aleksandar Vučić in the recent weekend vote closely mirrors the prior political transition seen with Viktor Orbán in Hungary.",
       "latest_development": "Reported: Defeat for Serbia's Aleksandar Vučić in the recent weekend vote closely mirrors the prior political transition seen with Viktor Orbán in Hungary.",
       "alerted": false,
@@ -7705,7 +7705,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T07:21:07+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-e34e580bd8b5",
@@ -7723,7 +7723,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Authorities in New Delhi have implemented stricter restrictions starting today to control rising air pollution levels.",
       "latest_development": "Reported: Authorities in New Delhi have implemented stricter restrictions starting today to control rising air pollution levels.",
       "alerted": false,
@@ -7733,7 +7733,7 @@
       "in_evening": "2026-11-01",
       "deadline": null,
       "effective_date": "2026-11-01",
-      "updated_at": "2026-11-01T17:02:37+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-4b9861b00436",
@@ -7751,7 +7751,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Gandaki Province has deployed 46 medical officers to district hospitals to address healthcare staffing shortages in remote and mountainous areas, including Mustang and Manang.",
       "latest_development": "Confirmed: Gandaki Province has deployed 46 medical officers to district hospitals to address healthcare staffing shortages in remote and mountainous areas, including Mustang and Manang.",
       "alerted": false,
@@ -7761,7 +7761,7 @@
       "in_evening": "2026-11-01",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T17:02:37+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-f1b43bcb94ba",
@@ -7779,7 +7779,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepali Congress has called a meeting of its parliamentary party for 8:30 AM on Monday at the party's parliamentary office in Singha Durbar to discuss contemporary political issues.",
       "latest_development": "Reported: The Nepali Congress has called a meeting of its parliamentary party for 8:30 AM on Monday at the party's parliamentary office in Singha Durbar to discuss contemporary political issues.",
       "alerted": false,
@@ -7789,7 +7789,7 @@
       "in_evening": "2026-11-01",
       "deadline": null,
       "effective_date": "2026-11-02 08:30 AM",
-      "updated_at": "2026-11-01T18:41:16+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-e52387b60516",
@@ -7807,7 +7807,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Weekly manga announcements indicate that Jun Kirarazaka's Blobtopia manga series is ending in its next three chapters.",
       "latest_development": "Confirmed: Weekly manga announcements indicate that Jun Kirarazaka's Blobtopia manga series is ending in its next three chapters.",
       "alerted": false,
@@ -7817,7 +7817,7 @@
       "in_evening": "2026-11-01",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T18:41:16+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-a313340d8883",
@@ -7835,7 +7835,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University has officially released the 'Human Resource Development Regulation-2080' for its staff.",
       "latest_development": "Confirmed: Tribhuvan University has officially released the 'Human Resource Development Regulation-2080' for its staff.",
       "alerted": false,
@@ -7845,7 +7845,7 @@
       "in_evening": "2026-11-01",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-01T19:21:38+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-fb95663881b6",
@@ -7863,7 +7863,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "latest_development": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "alerted": false,
@@ -7873,7 +7873,7 @@
       "in_evening": "2026-11-01",
       "deadline": "2026-11-23",
       "effective_date": "2026-11-23",
-      "updated_at": "2026-11-01T19:21:38+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-15d07f280a39",
@@ -7891,7 +7891,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Moonshot AI has restricted newly registered accounts from accessing the Kimi K2 model series since October 31, 2026, with plans to retire all K2 models by the end of December 2026.",
       "latest_development": "Confirmed: Moonshot AI has restricted newly registered accounts from accessing the Kimi K2 model series since October 31, 2026, with plans to retire all K2 models by the end of December 2026.",
       "alerted": false,
@@ -7901,7 +7901,7 @@
       "in_evening": "2026-11-01",
       "deadline": null,
       "effective_date": "2026-12-31",
-      "updated_at": "2026-11-01T19:21:38+05:45"
+      "updated_at": "2026-11-09T06:42:10+05:45"
     },
     {
       "event_id": "evt-51236db629c9",
@@ -14962,6 +14962,118 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-08T19:22:15+05:45"
+    },
+    {
+      "event_id": "evt-0b4c82f8c775",
+      "event_key": "nepal-cop31-climate-justice",
+      "canonical_title": "Nepal Urges Climate Justice at COP-31",
+      "category": "nepal",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": "2026-11-09",
+      "last_reported": "2026-11-09",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054206/cop-31-begins-nepal-will-seek-climate-justice-by-showing-reality"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Following devastating floods in the Bhote Koshi river in August 2026 that resulted in over 1,450 deaths and widespread destruction, Nepal is highlighting the reality of climate-induced disasters at the COP-31 climate conference to seek international climate justice.",
+      "latest_development": "Reported: Following devastating floods in the Bhote Koshi river in August 2026 that resulted in over 1,450 deaths and widespread destruction, Nepal is highlighting the reality of climate-induced disasters at the COP-31 climate conference to seek international climate justice.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-09",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-09T06:42:10+05:45"
+    },
+    {
+      "event_id": "evt-0eae322f78c7",
+      "event_key": "tihar-cow-worship-2026",
+      "canonical_title": "Tihar Festival Celebrated with Cow Worship Today",
+      "category": "nepal",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": "2026-11-09",
+      "last_reported": "2026-11-09",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054204/today-is-the-fourth-day-of-tihar-cow-worship-is-being-performed"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Today, on the fourth day of the Tihar festival, the cow is being honored and worshipped across Nepal, a traditional practice held to bring prosperity and express gratitude to livestock.",
+      "latest_development": "Reported: Today, on the fourth day of the Tihar festival, the cow is being honored and worshipped across Nepal, a traditional practice held to bring prosperity and express gratitude to livestock.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-09",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-09T06:42:10+05:45"
+    },
+    {
+      "event_id": "evt-c6ad696ff998",
+      "event_key": "nepal-forex-nov9",
+      "canonical_title": "US Dollar Exchange Rate for November 9, 2026",
+      "category": "bank_local",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": "2026-11-09",
+      "last_reported": "2026-11-09",
+      "importance": 0,
+      "personal_relevance": 9,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054209/this-is-the-foreign-currency-exchange-rate-for-today-33"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Nepal Rastra Bank has set the buying rate for one US dollar at NPR 149.96 and the selling rate at NPR 150.56 for today, November 9, 2026.",
+      "latest_development": "Confirmed: The Nepal Rastra Bank has set the buying rate for one US dollar at NPR 149.96 and the selling rate at NPR 150.56 for today, November 9, 2026.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-09",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-09",
+      "updated_at": "2026-11-09T06:42:10+05:45"
+    },
+    {
+      "event_id": "evt-c3442ae9ba45",
+      "event_key": "warhammer-blood-bowl-delay-2027",
+      "canonical_title": "Warhammer Blood Bowl Game Delayed to 2027",
+      "category": "gaming",
+      "first_seen": "2026-11-09",
+      "last_seen": "2026-11-09",
+      "first_reported": "2026-11-09",
+      "last_reported": "2026-11-09",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "pcgamer.com/games/sports/warhammer-blood-bowl-has-been-delayed-into-2027"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The video game title 'Warhammer Blood Bowl' has been officially delayed, with the new release window scheduled for early 2027.",
+      "latest_development": "Reported: The video game title 'Warhammer Blood Bowl' has been officially delayed, with the new release window scheduled for early 2027.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-09",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-09T06:42:10+05:45"
     }
   ],
   "archived": []
