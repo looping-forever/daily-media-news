@@ -7919,7 +7919,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "En breve: Respuesta corta: Tailscale es WireGuard con el trabajo de coordinación hecho por otro. Resumen Respuesta corta: Tailscale es WireGuard con el trabajo de coordinación hecho por otro. La pregunta real no es qué cifra mejor, sino…",
       "latest_development": "En breve: Respuesta corta: Tailscale es WireGuard con el trabajo de coordinación hecho por otro. Resumen Respuesta corta: Tailscale es WireGuard con el trabajo de coordinación hecho por otro. La pregunta real no es qué cifra mejor, sino…",
       "alerted": false,
@@ -7929,7 +7929,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-eace68664401",
@@ -7947,7 +7947,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The usage and internals of Java virtual threads and Kotlin coroutines are already widely covered. Rather than explaining each technology separately, this post compares how their different ways of implementing suspension change how code is…",
       "latest_development": "The usage and internals of Java virtual threads and Kotlin coroutines are already widely covered. Rather than explaining each technology separately, this post compares how their different ways of implementing suspension change how code is…",
       "alerted": false,
@@ -7957,7 +7957,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-766851a612e6",
@@ -7975,7 +7975,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "If you added a checkout field with woocommerce_checkout_fields or printed one on woocommerce_after_order_notes , and it's simply not there on a newer store, the store is probably using the Checkout block. Since WooCommerce 8.3 (November…",
       "latest_development": "If you added a checkout field with woocommerce_checkout_fields or printed one on woocommerce_after_order_notes , and it's simply not there on a newer store, the store is probably using the Checkout block. Since WooCommerce 8.3 (November…",
       "alerted": false,
@@ -7985,7 +7985,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-76f8d20114a2",
@@ -8003,7 +8003,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: The Department of Hydrology and Meteorology has forecast partial cloud cover across the country today. According to the department, there is a possibility of light rain and snowfall in a few places within the hilly and…",
       "latest_development": "KATHMANDU: The Department of Hydrology and Meteorology has forecast partial cloud cover across the country today. According to the department, there is a possibility of light rain and snowfall in a few places within the hilly and…",
       "alerted": false,
@@ -8013,7 +8013,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-076d8fa0fa56",
@@ -8031,7 +8031,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: The Nepal Rastra Bank has published the foreign currency exchange rates for Monday. According to the central bank, the buying rate for one US dollar is set at Rs 151.63, while the selling rate is Rs 152.23. The buying rate for…",
       "latest_development": "KATHMANDU: The Nepal Rastra Bank has published the foreign currency exchange rates for Monday. According to the central bank, the buying rate for one US dollar is set at Rs 151.63, while the selling rate is Rs 152.23. The buying rate for…",
       "alerted": false,
@@ -8041,7 +8041,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-b8ba01a5359c",
@@ -8059,7 +8059,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "१६ कात्तिक, गुल्मी । नेपालीहरूको दोस्रो ठूलो पर्व तिहार नजिकिँदै गर्दा गुल्मीमा व्यावसायिक रूपमा फूल खेती गर्दै आएका किसान वर्षातका कारण समस्यामा परेका छन् । तिहार तथा विभिन्न मेला महोत्सवलाई लक्षित गरी लगाइएको सयपत्री, मखमली लगायतका फूल…",
       "latest_development": "१६ कात्तिक, गुल्मी । नेपालीहरूको दोस्रो ठूलो पर्व तिहार नजिकिँदै गर्दा गुल्मीमा व्यावसायिक रूपमा फूल खेती गर्दै आएका किसान वर्षातका कारण समस्यामा परेका छन् । तिहार तथा विभिन्न मेला महोत्सवलाई लक्षित गरी लगाइएको सयपत्री, मखमली लगायतका फूल…",
       "alerted": false,
@@ -8069,7 +8069,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-7cbf35510096",
@@ -8087,7 +8087,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Disneyland Pandora charms add Doctor Doom, Loki and Mulan IMDb",
       "latest_development": "Disneyland Pandora charms add Doctor Doom, Loki and Mulan IMDb",
       "alerted": false,
@@ -8097,7 +8097,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-d0f818b1855b",
@@ -8115,7 +8115,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Polls have been predicting a Democratic surge, but last-minute deciders and sampling issues mean there's no guarantee.",
       "latest_development": "Polls have been predicting a Democratic surge, but last-minute deciders and sampling issues mean there's no guarantee.",
       "alerted": false,
@@ -8125,7 +8125,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-fde36769b6a1",
@@ -8143,7 +8143,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "5 Naruto characters who were disappointing in Boruto. Vietnam.vn",
       "latest_development": "5 Naruto characters who were disappointing in Boruto. Vietnam.vn",
       "alerted": false,
@@ -8153,7 +8153,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-12fc44fda7f6",
@@ -8171,7 +8171,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Fortnite Treasure Hunters | One Piece Hybrid Trailer gamesxtreme.com",
       "latest_development": "Fortnite Treasure Hunters | One Piece Hybrid Trailer gamesxtreme.com",
       "alerted": false,
@@ -8181,7 +8181,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-2b18adbc2175",
@@ -8199,7 +8199,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "MF DOOM's Estate Teams With Sanford Greene for Capsule Collection Yahoo",
       "latest_development": "MF DOOM's Estate Teams With Sanford Greene for Capsule Collection Yahoo",
       "alerted": false,
@@ -8209,7 +8209,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-a2541cb6e556",
@@ -8227,7 +8227,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Arizona flooding triggers evacuations, highway closures azcentral.com and The Arizona Republic",
       "latest_development": "Arizona flooding triggers evacuations, highway closures azcentral.com and The Arizona Republic",
       "alerted": false,
@@ -8237,7 +8237,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-e051050668a5",
@@ -8255,7 +8255,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "アニメ『BLEACH』最終決戦は“アニオリ”ではない？ 原作者も関与した「もうひとつの」公式展開（マグミクス） Yahoo!ニュース",
       "latest_development": "アニメ『BLEACH』最終決戦は“アニオリ”ではない？ 原作者も関与した「もうひとつの」公式展開（マグミクス） Yahoo!ニュース",
       "alerted": false,
@@ -8265,7 +8265,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-1772e17cb715",
@@ -8283,7 +8283,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The move by Haley Stevens, who lost out on the Democratic Senate nomination to Abdul El-Sayed, was called a \"despicable betrayal\" by one top Democrat.",
       "latest_development": "The move by Haley Stevens, who lost out on the Democratic Senate nomination to Abdul El-Sayed, was called a \"despicable betrayal\" by one top Democrat.",
       "alerted": false,
@@ -8293,7 +8293,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-43ebe1ff6fc1",
@@ -8311,7 +8311,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KuCoin Announces Russia and Belarus Exit With Individual Account Deadlines TradingView",
       "latest_development": "KuCoin Announces Russia and Belarus Exit With Individual Account Deadlines TradingView",
       "alerted": false,
@@ -8321,7 +8321,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-4628e13a8fa9",
@@ -8339,7 +8339,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "What makes Carrion interesting obviously lies in playing as the monster in a horror game rather than being the one chased down by it. The game's nasty tentacle monster still gives me the heebie jeebies, so I really would hate to be hunted…",
       "latest_development": "What makes Carrion interesting obviously lies in playing as the monster in a horror game rather than being the one chased down by it. The game's nasty tentacle monster still gives me the heebie jeebies, so I really would hate to be hunted…",
       "alerted": false,
@@ -8349,7 +8349,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-2add7b2cad42",
@@ -8367,7 +8367,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Major collision closes Sherwood Park Freeway in both directions Edmonton Journal",
       "latest_development": "Major collision closes Sherwood Park Freeway in both directions Edmonton Journal",
       "alerted": false,
@@ -8377,7 +8377,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-de897fc21eb7",
@@ -8395,7 +8395,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sedona flooding triggers evacuations and closes multiple Arizona highways FOX 10 Phoenix",
       "latest_development": "Sedona flooding triggers evacuations and closes multiple Arizona highways FOX 10 Phoenix",
       "alerted": false,
@@ -8405,7 +8405,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-2b967fccb058",
@@ -8423,7 +8423,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Salzburg bank mistakenly gives student €120,000 instead of €12,900 Around Prague",
       "latest_development": "Salzburg bank mistakenly gives student €120,000 instead of €12,900 Around Prague",
       "alerted": false,
@@ -8433,7 +8433,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-19ad9090de82",
@@ -8451,7 +8451,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "IDBI Bank Strike 2026: Will Branches Remain Closed on November 2 & 3? Employees Protest Fairfax Privatisation Deal; Check Customer Advisory, ATM, UPI & Online Banking Services The Sunday Guardian",
       "latest_development": "IDBI Bank Strike 2026: Will Branches Remain Closed on November 2 & 3? Employees Protest Fairfax Privatisation Deal; Check Customer Advisory, ATM, UPI & Online Banking Services The Sunday Guardian",
       "alerted": false,
@@ -8461,7 +8461,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-e6e6f1f2a66c",
@@ -8535,7 +8535,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Norihiro Yagi, the creator of Claymore, began serializing a new manga titled Bartlet Fairy Basslet on the Shounen Jump+ platform on Monday. Yagi serialized Claymore in Monthly Shounen Jump from June 2001 to June 2007. Following the…",
       "latest_development": "Norihiro Yagi, the creator of Claymore, began serializing a new manga titled Bartlet Fairy Basslet on the Shounen Jump+ platform on Monday. Yagi serialized Claymore in Monthly Shounen Jump from June 2001 to June 2007. Following the…",
       "alerted": false,
@@ -8545,7 +8545,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-26e8204d5a88",
@@ -8563,7 +8563,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The official website for the television anime adaptation of the Charisma House mixed-media project unveiled a pair of additional cast and teaser promotional video on Sunday. The anime series will premiere on TBS affiliate networks at 11:56…",
       "latest_development": "The official website for the television anime adaptation of the Charisma House mixed-media project unveiled a pair of additional cast and teaser promotional video on Sunday. The anime series will premiere on TBS affiliate networks at 11:56…",
       "alerted": false,
@@ -8573,7 +8573,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-8cf970442d18",
@@ -8619,7 +8619,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sunshine clears rain-hit TU ground, Biratnagar Kings set five-over T20 record in delayed NPL match Nepalnews.com",
       "latest_development": "Sunshine clears rain-hit TU ground, Biratnagar Kings set five-over T20 record in delayed NPL match Nepalnews.com",
       "alerted": false,
@@ -8629,7 +8629,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T06:41:15+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-6e9340a4fe1e",
@@ -8647,7 +8647,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The National Disaster Risk Reduction and Management Authority has documented 7,688 disaster incidents across Nepal between mid-April and November 1, resulting in 402 deaths.",
       "latest_development": "Reported: The National Disaster Risk Reduction and Management Authority has documented 7,688 disaster incidents across Nepal between mid-April and November 1, resulting in 402 deaths.",
       "alerted": false,
@@ -8657,7 +8657,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T07:21:30+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-a043c8c0dbbb",
@@ -8675,7 +8675,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Ukrainian authorities reported that their air raid alert application was hacked, with false radiation warnings sent to users. Russian authorities subsequently claimed a similar hack on their own system.",
       "latest_development": "Reported: Ukrainian authorities reported that their air raid alert application was hacked, with false radiation warnings sent to users. Russian authorities subsequently claimed a similar hack on their own system.",
       "alerted": false,
@@ -8685,7 +8685,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T07:21:30+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-25afb40fd513",
@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-04T06:44:00+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -8731,7 +8731,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -8741,7 +8741,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T17:33:54+05:45",
+      "updated_at": "2026-11-10T06:41:43+05:45",
       "last_confidence": "HIGH",
       "detection_source": "google-news"
     },
@@ -8761,7 +8761,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Nepal Oil Corporation (NOC) has begun a formal merger process for various gas industries to curb market irregularities and provide relief to consumers.",
       "latest_development": "Confirmed: The Nepal Oil Corporation (NOC) has begun a formal merger process for various gas industries to curb market irregularities and provide relief to consumers.",
       "alerted": false,
@@ -8771,7 +8771,7 @@
       "in_evening": "2026-11-02",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T19:21:29+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-205032664814",
@@ -8789,7 +8789,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Rastriya Swatantra Party (RSP) is facing scrutiny regarding its internal handling of allegations against party member Khagendra Sunar.",
       "latest_development": "Reported: The Rastriya Swatantra Party (RSP) is facing scrutiny regarding its internal handling of allegations against party member Khagendra Sunar.",
       "alerted": false,
@@ -8799,7 +8799,7 @@
       "in_evening": "2026-11-02",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T19:21:29+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-a1dac836ee17",
@@ -8817,7 +8817,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: During the Nepal Premier League (NPL) match at the Tribhuvan University International Cricket Ground, the Chitwan Rhinos set a target of 130 runs for the Sudurpaschim Royals.",
       "latest_development": "Reported: During the Nepal Premier League (NPL) match at the Tribhuvan University International Cricket Ground, the Chitwan Rhinos set a target of 130 runs for the Sudurpaschim Royals.",
       "alerted": false,
@@ -8827,7 +8827,7 @@
       "in_evening": "2026-11-02",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T19:21:29+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-b70d8e91d568",
@@ -8845,7 +8845,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A suspected cyber-attack has affected shop freezers across six European countries, causing temperatures to reportedly rise as high as 50°C.",
       "latest_development": "Reported: A suspected cyber-attack has affected shop freezers across six European countries, causing temperatures to reportedly rise as high as 50°C.",
       "alerted": false,
@@ -8855,7 +8855,7 @@
       "in_evening": "2026-11-02",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-02T19:21:29+05:45"
+      "updated_at": "2026-11-10T06:41:43+05:45"
     },
     {
       "event_id": "evt-4115557820cf",
@@ -15888,6 +15888,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-09T19:25:03+05:45"
+    },
+    {
+      "event_id": "evt-138b7a17c413",
+      "event_key": "nepal-rastra-bank-fx-rate-nov10",
+      "canonical_title": "Nepal Rastra Bank Determines Foreign Exchange Rates for Today",
+      "category": "bank_local",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054935/this-is-the-foreign-exchange-rate-for-today-30"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has fixed the foreign exchange rates for Tuesday, November 10, 2026. The US Dollar is set at a buy rate of 149.99 NPR and a sell rate of 150.59 NPR, while the Euro buy rate is 167.89 NPR.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has fixed the foreign exchange rates for Tuesday, November 10, 2026. The US Dollar is set at a buy rate of 149.99 NPR and a sell rate of 150.59 NPR, while the Euro buy rate is 167.89 NPR.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-10",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-10",
+      "updated_at": "2026-11-10T06:41:43+05:45"
+    },
+    {
+      "event_id": "evt-0d50be029a48",
+      "event_key": "nepal-sambat-1147-tihar-day5",
+      "canonical_title": "Nepal Celebrates Nepal Sambat 1147 and Tihar",
+      "category": "local_city",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054933/today-is-the-fifth-day-of-yama-panchaka-worship-of-govardhan-bali-bull-and-hali"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Today marks the start of Nepal Sambat 1147 and the fifth day of the Tihar festival (Yama Panchaka), which includes the worship of Govardhan, Bali, cows, and farmers. The President issued a message encouraging progress toward social equality.",
+      "latest_development": "Confirmed: Today marks the start of Nepal Sambat 1147 and the fifth day of the Tihar festival (Yama Panchaka), which includes the worship of Govardhan, Bali, cows, and farmers. The President issued a message encouraging progress toward social equality.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-10",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-10",
+      "updated_at": "2026-11-10T06:41:43+05:45"
     }
   ],
   "archived": []

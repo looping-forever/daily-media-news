@@ -1,258 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "myanimelist.net/news/74894062",
-      "title_hash": "98da8bc00ab7085f00eac8c3bec3b25f21993f53",
-      "title": "'Charisma' Unveils Additional Cast, Teaser Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74894409",
-      "title_hash": "011b1d07d046b5037edee77159ce5ff20d5fbf79",
-      "title": "'Claymore' Creator Norihiro Yagi Begins New Manga",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "vietnam.vn/en/5-nhan-vat-naruto-gay-that-vong-trong-boruto",
-      "title_hash": "2f7570368e079b0400116ec507aaa491e1578c85",
-      "title": "5 Naruto characters who were disappointing in Boruto. - Vietnam.vn",
-      "category": "anime",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "azcentral.com/story/weather/severe/2026/11/01/flash-floods-trigger-evacuations-across-arizona/92551548007",
-      "title_hash": "cb058d6143150b785043d479ae2837e73c87b613",
-      "title": "Arizona flooding triggers evacuations, highway closures - azcentral.com and The Arizona Republic",
-      "category": "local_city",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "dev.to/bealinawaz/custom-fields-on-the-woocommerce-checkout-block-why-your-old-snippet-does-nothing-19e5",
-      "title_hash": "8bbb8005b0d085f46b3b05c4517303b50d4852d0",
-      "title": "Custom fields on the WooCommerce Checkout block: why your old snippet does nothing",
-      "category": "tech_career",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c95ynzv88n68o",
-      "title_hash": "066855cca7f0977e03c3b342aa3291902f1ac195",
-      "title": "Democrat endorses Republican candidate in key Michigan Senate race as party spat erupts",
-      "category": "world_major",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cmg47p3edv4do",
-      "title_hash": "a4916c848c04c5bfe9c704ff16515a85b50bac40",
-      "title": "Democrats have high hopes for midterms, but polls have let them down before",
-      "category": "world_major",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "imdb.com/news/ni66090828",
-      "title_hash": "2a3ff73f9569bfb5f734af635609b899bc891e75",
-      "title": "Disneyland Pandora charms add Doctor Doom, Loki and Mulan - IMDb",
-      "category": "gaming",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "gamesxtreme.com/video/47732/fortnite-treasure-hunters-one-piece-hybrid-trailer",
-      "title_hash": "9bf8475886c85bdad031441d3ed601e608e98bbf",
-      "title": "Fortnite Treasure Hunters | One Piece Hybrid Trailer - gamesxtreme.com",
-      "category": "anime",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/gag-order-is-a-co-op-scp-ish-horror-shooter-about-surviving-as-best-you-can-against-some-nasty-tentacle-covered-cephalopod-creatures",
-      "title_hash": "6c95dabb2f6db2468bb91fba282ca663ea8434f2",
-      "title": "Gag Order is a co-op, SCP-ish horror shooter about surviving as best you can against some nasty, tentacle covered cephalopod creatures",
-      "category": "gaming",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "sundayguardianlive.com/world/idbi-bank-strike-2026-will-branches-remain-closed-on-november-2-3-employees-protest-fairfax-privatisation-deal-check-customer-advisory-atm-upi-online-banking-services-315517",
-      "title_hash": "18771a3e8535171ab21566e72ac2f4715185bb84",
-      "title": "IDBI Bank Strike 2026: Will Branches Remain Closed on November 2 & 3? Employees Protest Fairfax Privatisation Deal; Check Customer Advisory, ATM, UPI & Online Banking Services - The Sunday Guardian",
-      "category": "bank_local",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "dev.to/jogakdal/java-virtual-threads-vs-kotlin-coroutines-suspension-models-and-the-shifting-bottleneck-3ghb",
-      "title_hash": "008008bab83c5b41e3b7b5885be5b7a8b7daa517",
-      "title": "Java Virtual Threads vs Kotlin Coroutines: Suspension Models and the Shifting Bottleneck",
-      "category": "tech_career",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "tradingview.com/news/newsbtc:78f8686ed094b:0-kucoin-announces-russia-and-belarus-exit-with-individual-account-deadlines",
-      "title_hash": "3e7ce3eec1cb73fd993a5d594e2f0eeb9ba512c5",
-      "title": "KuCoin Announces Russia and Belarus Exit With Individual Account Deadlines - TradingView",
-      "category": "bank_local",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/weather/light-rain-and-snowfall-likely-in-hilly-and-mountainous-regions",
-      "title_hash": "c28af8d492400e20e953e5deedb1901fc4f565b5",
-      "title": "Light rain and snowfall likely in hilly and mountainous regions",
-      "category": "nepal",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "yahoo.com/entertainment/music/articles/mf-dooms-estate-teams-sanford-001659237.html",
-      "title_hash": "f6c57dc6a518e6587084256436c5533aeacc1f1b",
-      "title": "MF DOOM's Estate Teams With Sanford Greene for Capsule Collection - Yahoo",
-      "category": "gaming",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c51kdy1ew7zvo",
-      "title_hash": "f1f2221c0f40f8190a21b23a62735b52ad2aa728",
-      "title": "Ukraine Air Raid App Hacked; False Radiation Warnings Reported",
-      "category": "world_major",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/nation/mid-april-to-1st-november-17688-disaster-incidents-across-nation",
-      "title_hash": "6e60ff147c46c7180f12e3e4b4396e102dff2d09",
-      "title": "7,688 Disaster Incidents Reported Nationwide Since Mid-April",
-      "category": "nepal",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "iost.tu.edu.np/notices/16029",
-      "title_hash": "412dc1983d48c3610e9d8eee5105e1063cdfaade",
-      "title": "Re-Totaling Result of M.Sc. Mathematics III Semester-2081",
-      "category": "education_tu",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "portal.tu.edu.np/downloads/apidownloadfile_2026_07_22_15_42_39.pdf",
-      "title_hash": "4ec57c160dd7dbabedfa7c16a71612556f08e89e",
-      "title": "शिक्षक/कर्मचारीले अन्य संस्थामा आंशिक रुपमा काम गर्ने अनुमति माग गर्ने फाराम",
-      "category": "education_tu",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "eurogamer.net/id-software-doing-great-losing-half-the-studio",
-      "title_hash": "ffb625d4b2161fd725e9e7638518403120e32eca",
-      "title": "\"We're doing great,\" says id Software boss, despite losing \"about half of our studio\" amid devastating Xbox cuts",
-      "category": "gaming",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "polygon.com/lord-of-the-ring-gandalf-greatest-quote",
-      "title_hash": "8c5637cb8a2b1ec07e6dd1c5fa32414e34253fbc",
-      "title": "23 Years Later, Gandalf’s Greatest Lord of the Rings Line Is Still the Wisest Quote in Fantasy History",
-      "category": "gaming",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "dev.to/ashish_624379625242c5d263/cartographers-of-north-korea-2019-ke5",
-      "title_hash": "e4f7ff64580f39096f9f183604bd4437ffb82655",
-      "title": "Cartographers of North Korea (2019)",
-      "category": "tech_career",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "kfoxtv.com/news/local/deadly-crash-closes-section-of-socorro-road-in-el-paso-county",
-      "title_hash": "93c044ab0872927bc06397b1f81d2796e6c2d071",
-      "title": "Deadly crash closes section of Socorro Road in El Paso County - KFOX",
-      "category": "local_city",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/delve-into-a-deep-underground-facility-full-of-secrets-and-horrors-in-the-latest-fallout-4-quest-mod-from-the-commonwealth-story-expansion-project",
-      "title_hash": "4375c9e7e479f5cbe1eec3bdb896a0410a9e731a",
-      "title": "Delve into \"a deep underground facility full of secrets and horrors\" in the latest Fallout 4 quest mod from the Commonwealth Story Expansion Project",
-      "category": "gaming",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "dev.to/eugine_noel_fe6aa47191efa/democratizing-cyber-defense-building-jed-autonomous-security-system-with-just-kali-and-python-hgg",
-      "title_hash": "f6c9d3053886cfdcfdc4c12d4bc8b9b1edb11fc1",
-      "title": "Democratizing Cyber Defense : Building JED AUTONOMOUS SECURITY SYSTEM; with Just Kali and Python",
-      "category": "tech_career",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/diplomacy/hor-speaker-aryal-swiss-national-council-president-page-discuss-stronger-parliamentary-ties",
-      "title_hash": "01c57e0840f1049a27a10a8401167217babd4444",
-      "title": "HoR Speaker Aryal, Swiss National Council President Page discuss stronger parliamentary ties",
-      "category": "nepal",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-02/my-lovesick-life-as-a-90s-otaku-nico-nicholson-launches-new-manga/.243426",
-      "title_hash": "4627e9660e66a9de48cdc6cdaa7bf96249731c9a",
-      "title": "My Lovesick Life as a '90s Otaku's Nico Nicholson Launches New Manga",
-      "category": "anime",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/nepal-news-evening-economic-brief-november-02-2026",
-      "title_hash": "224588282286dda4abfa17becff06b7735e5a99e",
-      "title": "Nepal News Evening Economic Brief – November 02, 2026 - Nepalnews.com",
-      "category": "world_major",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-02/new-resident-evil-reboot-film-earns-usd400-million-globally/.243442",
-      "title_hash": "e2d604fe1c8966dec3fa20bb856f2bb5cc3a3f6b",
-      "title": "New Resident Evil Reboot Film Earns US$400 Million Globally",
-      "category": "anime",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "thepakistanconnect.com/peshawar-administration-private-schools",
-      "title_hash": "18e32328fb52f77bba723d7dbbfd1c910ed17e6f",
-      "title": "Peshawar administration takes action against 13 private schools over unsafe buildings - Pakistan Connect",
-      "category": "local_city",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "ad-hoc-news.de/boerse/news/corporate-news/royal-bank-of-canada-stock-ai-access-limits-keep-security-in-focus/70445108",
-      "title_hash": "cac7596c73d27db4c2ee2965a6c968a85812ebb6",
-      "title": "Royal Bank of Canada stock: AI access limits keep security in focus - ad-hoc-news.de",
-      "category": "bank_local",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cr0qkve1x224o",
-      "title_hash": "4083ca0de64bf69fd8c34147f70d164ab094ff1b",
-      "title": "Ryanair says it may freeze workers' pay and raise airfares",
-      "category": "world_major",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2049621/what-are-the-industrialists-demands-from-the-government-regarding-the-gas-industry-merger",
-      "title_hash": "875294d3f1d532312ad84981ce12ff5a37d86e48",
-      "title": "NOC Initiates Merger Process for Gas Industries to Control Market Irregularities",
-      "category": "nepal",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cq1kd1nee80eo",
-      "title_hash": "bc998d3de5145e5210d265e7df1a4da6f981d6e4",
-      "title": "Shop Freezers in Six European Countries Hit by Suspected Cyber-Attack",
-      "category": "world_major",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/sports/chitwan-rhinos-set-130-run-target-for-sudurpaschim-royals",
-      "title_hash": "3662ee7e0177035c4a624de471848ad4d1fabaed",
-      "title": "Chitwan Rhinos Set 130-Run Target for Sudurpaschim Royals in NPL",
-      "category": "nepal",
-      "date_sent": "2026-11-02"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/rsp-questions-khagendra-sunar.html",
-      "title_hash": "eed89263e85c4d6b0f0cab52c129466cd41a5134",
-      "title": "RSP Questions Handling of Allegations Against MP Khagendra Sunar",
-      "category": "nepal",
-      "date_sent": "2026-11-02"
-    },
-    {
       "url_normalized": "dev.to/erasmuspierce7981/accurate-audio-transcription-api-in-python-and-nodejs-game-saas-reliability-25j9",
       "title_hash": "204f0669b3a53e97bf73168b6d2c4fb723277231",
       "title": "Accurate Audio Transcription API in Python and Node.js Game SaaS — Reliability",
@@ -1364,6 +1112,20 @@
       "title": "Nine foreigners caught allegedly trying to leave South Africa to fight in Ukraine",
       "category": "world_major",
       "date_sent": "2026-11-09"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054935/this-is-the-foreign-exchange-rate-for-today-30",
+      "title_hash": "a48d413ae6bf7febcb7bf10ec2a9352ffb4c1c65",
+      "title": "Nepal Rastra Bank Determines Foreign Exchange Rates for Today",
+      "category": "bank_local",
+      "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054933/today-is-the-fifth-day-of-yama-panchaka-worship-of-govardhan-bali-bull-and-hali",
+      "title_hash": "a44a7645254d4190bbca0e8240bdab3459e477e1",
+      "title": "Nepal Celebrates Nepal Sambat 1147 and Tihar",
+      "category": "local_city",
+      "date_sent": "2026-11-10"
     }
   ]
 }
