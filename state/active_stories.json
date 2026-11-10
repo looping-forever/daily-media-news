@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-10T18:41:48+05:45"
+      "updated_at": "2026-11-10T19:22:13+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -16112,6 +16112,62 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-10T18:41:48+05:45"
+    },
+    {
+      "event_id": "evt-e0eae879b17e",
+      "event_key": "nepal-climate-finance-call-cop31",
+      "canonical_title": "Foreign Minister Khanal calls for climate finance support",
+      "category": "nepal",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.nepalnews.com/s/climate/foreign-minister-khanal-calls-for-increased-climate-finance-for-vulnerable-countries"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Foreign Minister Shisir Khanal, speaking on behalf of Least Developed Countries at COP31 in Antalya, has called for stronger international climate finance and support for vulnerable nations.",
+      "latest_development": "Reported: Foreign Minister Shisir Khanal, speaking on behalf of Least Developed Countries at COP31 in Antalya, has called for stronger international climate finance and support for vulnerable nations.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-10",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T19:22:13+05:45"
+    },
+    {
+      "event_id": "evt-a2c886410019",
+      "event_key": "nepal-sambat-celebration-basantapur",
+      "canonical_title": "Newar community celebrates Nepal Sambat at Basantapur",
+      "category": "local_city",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2055032/new-year-of-the-newar-community-in-basantapur-photos"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Newar community gathered at Basantapur, Kathmandu, to celebrate the New Year, Nepal Sambat, with traditional music and festivities.",
+      "latest_development": "Reported: The Newar community gathered at Basantapur, Kathmandu, to celebrate the New Year, Nepal Sambat, with traditional music and festivities.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-10",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T19:22:13+05:45"
     }
   ],
   "archived": []
