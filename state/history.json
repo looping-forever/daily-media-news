@@ -1147,6 +1147,27 @@
       "title": "48 Kilometers of Embankment Constructed on Rapti River",
       "category": "nepal",
       "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/crpdgd723x2zo",
+      "title_hash": "49d290c4d7d90d4cf08748e7ba4655e6808a3a76",
+      "title": "Anthropic to Raise $64bn in Major Stock Market Listing",
+      "category": "world_major",
+      "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "eurogamer.net/arc-raiders-17-million-sales-nexon-decline",
+      "title_hash": "e93bae311d80279f3b43b266de098c8261abca99",
+      "title": "Arc Raiders Exceeds 17 Million Sales in First Year",
+      "category": "gaming",
+      "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/steams-new-steam-deck-framerate-graphs-are-good-news-for-handheld-players-though-i-wouldnt-fully-trust-the-numbers-yet",
+      "title_hash": "bd36dd687e045005e03a53227f1fbe527f938aae",
+      "title": "Steam Introduces Framerate Estimation Graphs on Store Pages",
+      "category": "gaming",
+      "date_sent": "2026-11-10"
     }
   ]
 }

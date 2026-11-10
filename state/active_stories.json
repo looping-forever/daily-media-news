@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-10T07:21:47+05:45"
+      "updated_at": "2026-11-10T18:41:48+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -16028,6 +16028,90 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-10T07:21:47+05:45"
+    },
+    {
+      "event_id": "evt-ff5199c49417",
+      "event_key": "anthropic-64bn-stock-market-listing",
+      "canonical_title": "Anthropic to Raise $64bn in Major Stock Market Listing",
+      "category": "world_major",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "bbc.co.uk/news/articles/crpdgd723x2zo"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: AI company Anthropic plans to raise $64bn through an initial public offering, offering shares priced between $70 and $78. The significant stock market debut highlights major capital influx into foundational AI development.",
+      "latest_development": "Reported: AI company Anthropic plans to raise $64bn through an initial public offering, offering shares priced between $70 and $78. The significant stock market debut highlights major capital influx into foundational AI development.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-10",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T18:41:48+05:45"
+    },
+    {
+      "event_id": "evt-ab8cceb823f6",
+      "event_key": "steam-framerate-estimation-graphs-update",
+      "canonical_title": "Steam Introduces Framerate Estimation Graphs on Store Pages",
+      "category": "gaming",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "rockpapershotgun.com/steams-new-steam-deck-framerate-graphs-are-good-news-for-handheld-players-though-i-wouldnt-fully-trust-the-numbers-yet"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Valve has updated Steam store pages to display framerate estimation graphs derived from aggregated performance data collected from hardware users. The feature provides hardware performance insights directly on game listings.",
+      "latest_development": "Reported: Valve has updated Steam store pages to display framerate estimation graphs derived from aggregated performance data collected from hardware users. The feature provides hardware performance insights directly on game listings.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-10",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T18:41:48+05:45"
+    },
+    {
+      "event_id": "evt-e00e87707eb3",
+      "event_key": "arc-raiders-17-million-sales-milestone",
+      "canonical_title": "Arc Raiders Exceeds 17 Million Sales in First Year",
+      "category": "gaming",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "eurogamer.net/arc-raiders-17-million-sales-nexon-decline"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Publisher Nexon announced that Embark Studios' extraction shooter Arc Raiders has surpassed 17 million copies sold during its first anniversary, though future revenue is projected to decline. The milestone underscores the title's commercial adoption.",
+      "latest_development": "Reported: Publisher Nexon announced that Embark Studios' extraction shooter Arc Raiders has surpassed 17 million copies sold during its first anniversary, though future revenue is projected to decline. The milestone underscores the title's commercial adoption.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-10",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T18:41:48+05:45"
     }
   ],
   "archived": []
