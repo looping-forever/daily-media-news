@@ -1126,6 +1126,27 @@
       "title": "Nepal Celebrates Nepal Sambat 1147 and Tihar",
       "category": "local_city",
       "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cqg7x7dpvym8o",
+      "title_hash": "41f8335ff8c752d9a1aad137bbfd5c5d8731e965",
+      "title": "FBI Investigating Nvidia CEO Following Allegations",
+      "category": "world_major",
+      "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054955/sudurpaschim-and-janakpur-clash-today-in-npl",
+      "title_hash": "ea70eba4ca00e2284f093bd71f32b174fcc4d67d",
+      "title": "Sudurpaschim Royals and Janakpur Bolts Clash Today in NPL",
+      "category": "nepal",
+      "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2054953/construction-of-48-km-embankment-on-rapti-river",
+      "title_hash": "ebbb146f56b4bd8beca81ff7f711a60d405f7819",
+      "title": "48 Kilometers of Embankment Constructed on Rapti River",
+      "category": "nepal",
+      "date_sent": "2026-11-10"
     }
   ]
 }

@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-10T06:41:43+05:45"
+      "updated_at": "2026-11-10T07:21:47+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -15944,6 +15944,90 @@
       "deadline": null,
       "effective_date": "2026-11-10",
       "updated_at": "2026-11-10T06:41:43+05:45"
+    },
+    {
+      "event_id": "evt-84f159847a44",
+      "event_key": "npl-royals-bolts-nov10",
+      "canonical_title": "Sudurpaschim Royals and Janakpur Bolts Clash Today in NPL",
+      "category": "nepal",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054955/sudurpaschim-and-janakpur-clash-today-in-npl"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Nepal Premier League (NPL) fixture today features a match between Sudurpaschim Royals and Janakpur Bolts at the TU Cricket Ground. The game is scheduled to commence at 5:00 PM.",
+      "latest_development": "Reported: The Nepal Premier League (NPL) fixture today features a match between Sudurpaschim Royals and Janakpur Bolts at the TU Cricket Ground. The game is scheduled to commence at 5:00 PM.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-10",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "17:00",
+      "updated_at": "2026-11-10T07:21:47+05:45"
+    },
+    {
+      "event_id": "evt-8d63b197a597",
+      "event_key": "nvidia-ceo-fbi-investigation",
+      "canonical_title": "FBI Investigating Nvidia CEO Following Allegations",
+      "category": "world_major",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "bbc.co.uk/news/articles/cqg7x7dpvym8o"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: US President Trump stated that the FBI is investigating Nvidia CEO Jensen Huang regarding an alleged affair with a person described as a Chinese spy. The President confirmed he spoke with Huang about the matter on Monday.",
+      "latest_development": "Reported: US President Trump stated that the FBI is investigating Nvidia CEO Jensen Huang regarding an alleged affair with a person described as a Chinese spy. The President confirmed he spoke with Huang about the matter on Monday.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-10",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T07:21:47+05:45"
+    },
+    {
+      "event_id": "evt-63191bd2a03b",
+      "event_key": "rapti-river-embankment-completion",
+      "canonical_title": "48 Kilometers of Embankment Constructed on Rapti River",
+      "category": "nepal",
+      "first_seen": "2026-11-10",
+      "last_seen": "2026-11-10",
+      "first_reported": "2026-11-10",
+      "last_reported": "2026-11-10",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "onlinekhabar.com/2026/11/2054953/construction-of-48-km-embankment-on-rapti-river"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Irrigation and Water Resources Management Project in Dang has completed the construction of 48 kilometers of embankment along the Rapti River. This initiative has reportedly protected and reclaimed 1,440 hectares of cultivable land from the confluence of Dang-Pyuthan to the Indian border in Banke.",
+      "latest_development": "Confirmed: The Irrigation and Water Resources Management Project in Dang has completed the construction of 48 kilometers of embankment along the Rapti River. This initiative has reportedly protected and reclaimed 1,440 hectares of cultivable land from the confluence of Dang-Pyuthan to the Indian border in Banke.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-10",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-10T07:21:47+05:45"
     }
   ],
   "archived": []
