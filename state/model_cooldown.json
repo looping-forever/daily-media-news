@@ -1,5 +1,11 @@
 {
   "models": {
+    "gemini/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-10T13:37:01.166254+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-10T19:37:01.166254+00:00"
+    },
     "opencode/beam-free": {
       "hits": 1,
       "last_hit": "2026-11-09T13:42:41.289469+00:00",
