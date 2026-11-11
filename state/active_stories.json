@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-11T18:43:17+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -17148,6 +17148,34 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-7e8a7029ac8b",
+      "event_key": "ps5-100m-sales-milestone",
+      "canonical_title": "PlayStation 5 Surpasses 100 Million Units Sold",
+      "category": "gaming",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "eurogamer.net/playstation-5-100-million-sales-november-2026"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Confirmed: Sony's latest sales data reveals that the PlayStation 5 has officially crossed the 100 million consoles sold milestone as of November 10. This achievement comes nearly six years after the console's initial global release.",
+      "latest_development": "Confirmed: Sony's latest sales data reveals that the PlayStation 5 has officially crossed the 100 million consoles sold milestone as of November 10. This achievement comes nearly six years after the console's initial global release.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-11",
+      "deadline": null,
+      "effective_date": "2026-11-10",
+      "updated_at": "2026-11-11T18:43:17+05:45"
     }
   ],
   "archived": []
