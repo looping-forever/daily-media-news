@@ -64,42 +64,46 @@
     "opencode/muse-spark-1.3-contributor-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 1,
+      "transport": 2,
       "garbage": 3,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "transport",
-      "last_fail_at": 1793631383.2278621,
-      "cooldown_until": 1793717783.2278621
+      "last_fail_at": 1794362818.6912894,
+      "cooldown_until": 1794449218.6912894,
+      "quota_notice": 0
     },
     "opencode/ling-3.0-flash-fin-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 1,
+      "transport": 2,
       "garbage": 3,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "transport",
-      "last_fail_at": 1793631385.340091,
-      "cooldown_until": 1793717785.340091
+      "last_fail_at": 1794362820.3016045,
+      "cooldown_until": 1794449220.3016045,
+      "quota_notice": 0
     },
     "opencode/muse-spark-1.2-contributor-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 1,
+      "transport": 2,
       "garbage": 3,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "transport",
-      "last_fail_at": 1793631387.5049891,
-      "cooldown_until": 1793717787.5049891
+      "last_fail_at": 1794362821.9111834,
+      "cooldown_until": 1794449221.9111834,
+      "quota_notice": 0
     },
     "opencode/nemotron-3-ultra-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 1,
+      "transport": 2,
       "garbage": 3,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "transport",
-      "last_fail_at": 1793631389.7179255,
-      "cooldown_until": 1793717789.7179255
+      "last_fail_at": 1794362823.621395,
+      "cooldown_until": 1794449223.621395,
+      "quota_notice": 0
     },
     "opencode/mimo-v2.5-free": {
       "success": 0,
