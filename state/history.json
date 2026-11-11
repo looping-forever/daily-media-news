@@ -1,412 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "dev.to/erasmuspierce7981/accurate-audio-transcription-api-in-python-and-nodejs-game-saas-reliability-25j9",
-      "title_hash": "204f0669b3a53e97bf73168b6d2c4fb723277231",
-      "title": "Accurate Audio Transcription API in Python and Node.js Game SaaS — Reliability",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "cricketnmore.com/cricket-livescore/scorecard/13072010797/nepal-premier-league-t20-1",
-      "title_hash": "bf1207877ceeb9ab5df4f010cdc9f9b1b5b1a694",
-      "title": "Chitwan Rhinos Vs Sudur Paschim Royals - T20 Cricket Scorecard - Cricketnmore",
-      "category": "education_tu",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-02/drama-queen-manga-ends-in-4-chapters/.243455",
-      "title_hash": "e37aa5d1519962fa631f98ed12812b2cc57bc32b",
-      "title": "Drama Queen Manga Ends in 4 Chapters",
-      "category": "anime",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "gamespot.com/articles/epic-just-saved-fortnite-for-now-anyway",
-      "title_hash": "75a55169682483525e0ca438c305366b5423c346",
-      "title": "Epic Just Saved Fortnite–For Now, Anyway",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "wmbfnews.com/2026/11/02/highway-closure-after-head-on-crash-florence-county",
-      "title_hash": "51adc094f7cddf647a6b672dcd8216e11d3633a8",
-      "title": "Highway closure after head-on crash in Florence County - WMBF",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/zisamglitch/how-we-eliminated-cache-stampedes-in-nodejs-bun-with-single-flight-coalescing-2h0i",
-      "title_hash": "2653b568e2b6e8d353df2b5f11f3e43f3ab331fc",
-      "title": "How We Eliminated Cache Stampedes in Node.js & Bun with Single-Flight Coalescing",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/videos/cmvg9w5w2p1no",
-      "title_hash": "023dce49f513c12151b553c3e5ee29fb794d4ea6",
-      "title": "Indian film star Ranbir Kapoor on AI, movies and fatherhood",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "durangoherald.com/articles/news/la-plata-county-sheriff-lifts-road-closure",
-      "title_hash": "3406e2fd97984965fe3a15b481d19481ce0bab8c",
-      "title": "La Plata County sheriff lifts road closure - Durango Herald",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "ktar.com/arizona-traffic/highways-closed-flooding-storms",
-      "title_hash": "334650cc8c28d3d152b8200a7d9675ee622fe3e6",
-      "title": "Multiple highways across Arizona remain closed after potent weekend storms - KTAR News 92.3 FM",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "polygon.com/exclusive-look-the-art-of-the-mandalorian-and-grogu",
-      "title_hash": "eafa0c65c6fcf3a2bec3fb5bfc80d8b09fe89a1b",
-      "title": "New Star Wars Book Reveals the Surprising '90s Inspiration for an Iconic New Character",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cm369yy7lw73o",
-      "title_hash": "4f6f51be7606e7bb953f528ddb04270e5ff5856a",
-      "title": "Plane may have broken apart ahead of deadly Florida jet crash, say investigators",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cm3wv085ne6po",
-      "title_hash": "1d8fec17b6124a4634c05ee8d9e2ffacb3908774",
-      "title": "Thousands of European troops to rehearse Ukraine deployment in event of peace",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "sportskeeda.com/wwe/news-top-star-sends-daunting-message-the-bloodline-ahead-return-match-after-91-days-wwe-raw",
-      "title_hash": "1e2027d1620ff372d8688156c9e69ad3297acc6c",
-      "title": "Top Star Sends Daunting Message to The Bloodline Ahead of Return Match After 91 Days on WWE RAW - Sportskeeda",
-      "category": "anime",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-02/urban-myth-dissolution-center-manga-ends/.243452",
-      "title_hash": "b38735d5aa5ecbcacf9ab79317a6993ed48ab6b2",
-      "title": "Urban Myth Dissolution Center Manga Ends",
-      "category": "anime",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/dafili/why-your-cloud-monitoring-is-blind-to-ipv6-blackholes-and-how-to-fix-it-m8i",
-      "title_hash": "9f48d7dd54870522a31d99d65c11e563dcc90941",
-      "title": "Why your cloud monitoring is blind to IPv6 blackholes (and how to fix it)",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/zisamglitch/building-a-zero-dependency-key-value-engine-in-5-languages-rust-go-typescript-swift-kotlin-3gp4",
-      "title_hash": "a84df77e0effc0cb2eab244584f745fa560fa357",
-      "title": "Building a Zero-Dependency Key-Value Engine in 5 Languages (Rust, Go, TypeScript, Swift, Kotlin)",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "laughingplace.com/disney-entertainment/marvel-contest-of-champions-empire-of-doom-november-update",
-      "title_hash": "c463d73e813edd36745e93ad395feea15e6a4ce2",
-      "title": "Doctor Doom Takes Over Marvel Contest of Champions in New Empire of Doom Saga - LaughingPlace.com",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "cbs12.com/news/local/flooding-prompts-st-lucie-county-closures-could-affect-election-day-voting-st-lucie-county-flooding-flooded-roads-road-closures-flood-safety-heavy-rain-state-of-emergency-gov-ron-desantis-executive-order-26-227-st-lucie-county",
-      "title_hash": "a287d4f9dccf076963de5c25c8148dc6d054d629",
-      "title": "Flooding prompts St. Lucie County closures, could affect Election Day voting - WPEC",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c6rey4v53exgo",
-      "title_hash": "ecd881509add2e6c3311aa43b358901d7a7b5de4",
-      "title": "North Korea denies being behind record $6.3bn Binance hack",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/publicrecords/the-mcp-servers-an-etsy-seller-can-actually-use-21l3",
-      "title_hash": "dcbb2ed5a4903e73465d933408166709eac60bb0",
-      "title": "The MCP servers an Etsy seller can actually use",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/publicrecords/the-sports-odds-mcp-servers-worth-connecting-one-per-sportsbook-36oi",
-      "title_hash": "084a42767269b21ba006d5a469b58b4205cda598",
-      "title": "The sports odds MCP servers worth connecting, one per sportsbook",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2049786/tourism-minister-poudel-in-london-33-stalls-from-nepal-at-world-travel-market",
-      "title_hash": "b1097cc665137f26a82dc91c1038e73a453b2edb",
-      "title": "पर्यटनमन्त्री पौडेल लण्डनमा, वर्ल्ड ट्राभल मार्केटमा नेपालबाट ३३ स्टल",
-      "category": "nepal",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2049788/extensive-changes-to-uk-pr-rules-thousands-of-nepalis-will-be-affected",
-      "title_hash": "ac5f2c248b7517e7fcb98784e797941477f357c4",
-      "title": "बेलायतको पीआर नियममा व्यापक परिवर्तन, हजारौं नेपाली समेत प्रभावित हुने",
-      "category": "nepal",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2049793/one-person-dies-after-two-motorcycles-collide-in-sundarijal",
-      "title_hash": "0705f7f84d20967339ab77f2e52dbf29b6ba0931",
-      "title": "सुन्दरीजलमा दुईवटा मोटरसाइकल ठोक्किँदा एक जनाको मृत्यु",
-      "category": "nepal",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "imdb.com/it/news/ni66065218",
-      "title_hash": "ca56dcb369164a2398bd4b076e3fb709a4df01cf",
-      "title": "A Returner's Magic Should Be Special Season 2 Anime Shares Opening, Ending Song Music Videos - IMDb",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "fohss.tu.edu.np/notices/16032",
-      "title_hash": "4864a5928e6871c29cfbcd346ac37beec91730c5",
-      "title": "Faculty of Humanities and Social Sciences - Tribhuvan University",
-      "category": "education_tu",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "sports.yahoo.com/articles/mark-bowman-put-college-football-170421539.html",
-      "title_hash": "40a04f871bb06021ea8d88eb9b216bd13f4fb23d",
-      "title": "Mark Bowman put the college football world on notice vs Ohio State - Yahoo Sports",
-      "category": "college_local",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74894552",
-      "title_hash": "48480863586c38aefe00d4e847a808ec7d3918ec",
-      "title": "North American Anime & Manga Releases for November",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74900432",
-      "title_hash": "3e973f7afafeab28baa3d363e89d05763b609ff6",
-      "title": "'Hyouken no Majutsushi ga Sekai wo Suberu II' Announces Additional Cast",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "citinewsroom.com/2026/11/20-mobile-loan-apps-operating-illegally-bog-warns-customers",
-      "title_hash": "040eab775165f81a40347ff227b97c56cd50bf82",
-      "title": "20 mobile loan apps operating illegally – BoG warns customers - CitiNewsroom.com",
-      "category": "bank_local",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "pakobserver.net/allied-bank-app-outage-sparks-frustration-as-myabl-app-users-struggle-to-log-in-transfer-funds",
-      "title_hash": "82a0a65f34a914a01dd814a471d6e781b071b21c",
-      "title": "Allied Bank App Outage sparks Frustration as myABL App Users struggle to Log In, Transfer Funds - Pakistan Observer",
-      "category": "bank_local",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/arc-raiders-devs-embark-insist-that-using-genai-for-voice-lines-was-necessary-as-actors-would-just-go-crazy-if-they-had-to-read-all-of-that",
-      "title_hash": "efeddce4970b5008c41f2db03d2597e23499135d",
-      "title": "Arc Raiders devs Embark insist that using genAI for voice lines was necessary, as \"actors would just go crazy if they had to read all of that\"",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/review/black-clover-season-2/episode-175/.243429",
-      "title_hash": "79ec74d468de592ebd9081db43ddc8f3c0c9961f",
-      "title": "Black Clover Season 2 ‒ Episode 175",
-      "category": "anime",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "973thedawg.com/east-gloria-switch-road-closure-lafayette",
-      "title_hash": "1408d1bb4aeee67be198e923357bb25b196d09c3",
-      "title": "East Gloria Switch Road Closures Run Through December 2 — Here Are the Detours - 97.3 The Dawg",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c8r4y91x4x42o",
-      "title_hash": "dc6780d5ac47ba5be6fc273f6782c30876eab883",
-      "title": "Escaped horse on A3 prompt road closure in Wisley - BBC",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/society/five-injured-after-tractor-trolley-overturns-in-gorkha",
-      "title_hash": "02cfeea154791f1a927d8bb9c60f060b0d34a999",
-      "title": "Five injured after tractor trolley overturns in Gorkha",
-      "category": "nepal",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-03/im-not-even-an-npc-in-this-otome-game-manga-ends/.243461",
-      "title_hash": "df5cad0e59751ee918dc50a9a7d1db2228541ca4",
-      "title": "I'm Not Even an NPC In This Otome Game! Manga Ends",
-      "category": "anime",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "indiatoday.in/world/story/nepal-helicopter-collision-kills-indian-global-political-security-developments-ptag-3031473-2026-11-03",
-      "title_hash": "d94b2928f3d27d42942addc3efddcde1f9b50312",
-      "title": "Indian killed in Nepal helicopter collision amid global developments - India Today",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cmqlnx7z1549o",
-      "title_hash": "acd6fa05cba44ef3a208e086ee63f0d35069223c",
-      "title": "Indian tourist killed after two helicopters collide near Everest base camp",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "lawchakra.in/supreme-court/mumbai-municipal-commissioner",
-      "title_hash": "1e87b83f152643033fa837f29120e02adfd680cb",
-      "title": "Mumbai Municipal Commissioner In Contempt: Supreme Court Halts Salaries Over Encroachments - LawChakra",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "binance.com/en-jp/support/announcement/detail/0233836e13694b8c8fc13fb15c6ba81d",
-      "title_hash": "226afbca22fc114f866449f7e50d1d1740597bf1",
-      "title": "Notice of Service Resumption Following the Security Incident at Binance Global (4th follow-up notice) - Binance",
-      "category": "education_tu",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "tradingview.com/news/modular_finance:3d540b278626a:0-notice-of-an-extraordinary-general-meeting-of-noba-bank-group-ab-publ",
-      "title_hash": "13303b30935574bf67f1079cbcca7c7fbf966b93",
-      "title": "Notice of an extraordinary general meeting of NOBA Bank Group AB (publ) - TradingView",
-      "category": "bank_local",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/forlazindebug/our-llm-filter-looked-broken-under-load-it-was-a-billing-short-circuit-returning-in-00-seconds-36o5",
-      "title_hash": "58a83b89c5ff2edfd28045391cff857ccade14d2",
-      "title": "Our LLM filter looked broken under load. It was a billing short-circuit returning {} in 0.0 seconds",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "polygon.com/zero-parades-directors-cut-switch-2-ps5-xbox-release",
-      "title_hash": "ec9170bd91e7d20cbb132e409df3681d6e40e9cb",
-      "title": "2026’s Best RPG Is Finally on Consoles Just in Time for GOTY Season",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "yen.com.gh/ghana/314980-bank-ghana-names-20-unlicensed-mobile-loan-apps-warns-public-avoid-them",
-      "title_hash": "2f8fa39d757b0b3d90148b2eaffa08e93d79eef3",
-      "title": "Bank of Ghana releases new list of 20 shady loan apps Ghanaians should avoid - Yen News",
-      "category": "bank_local",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/xusteve/building-a-wordpress-newsletter-plugin-benchmark-from-the-wordpressorg-api-3ei7",
-      "title_hash": "549ce40743a055075d7cca88c49e61d2bfff5824",
-      "title": "Building a WordPress Newsletter Plugin Benchmark from the WordPress.org API",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/batuweb/does-perplexity-mention-your-brand-check-ai-answers-for-mentions-position-and-citations-cdh",
-      "title_hash": "fe02b7af362905909bd7eefb389ab98636d54eb7",
-      "title": "Does Perplexity Mention Your Brand? Check AI Answers for Mentions, Position and Citations",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cwy8lm1m59mvo",
-      "title_hash": "c1622bd88fa9b03624d98c9c000e4161710de5ba",
-      "title": "Europe on alert after supermarket freezers hit by cyber-attacks in nine countries",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "videogameschronicle.com/news/former-xbox-coo-denies-claims-she-was-fired-for-a-policy-violation-says-reports-are-not-the-whole-story",
-      "title_hash": "25eeb724275295fec258cebff7432ad44ca86ba1",
-      "title": "Former Xbox COO denies claims she was ‘fired for a policy violation’, says reports are ‘not the whole story’",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "weisradio.com/2026/11/03/fort-payne-railroad-crossing-highway-35-closure",
-      "title_hash": "6a3721fc402092723c567df236be42e21e422d15",
-      "title": "Highway 35 Railroad Crossing Closure Planned Tuesday in Fort Payne - WEIS | Local & Area News, Sports, & Weather - weisradio.com",
-      "category": "local_city",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/politics/karnali-cabinet-makes-five-decisions-approves-two-bills-for-provincial-assembly",
-      "title_hash": "19f75a18703abc1d47bf693352886609216b5401",
-      "title": "Karnali Cabinet makes five decisions, approves two bills for provincial assembly",
-      "category": "nepal",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "dev.to/atabek_murtazaev_18e1ac50/listing-an-api-on-rapidapi-five-things-the-docs-dont-cover-1bjc",
-      "title_hash": "81da7d09e1c950f9c7d6ef3f10f204d51617685a",
-      "title": "Listing an API on RapidAPI: five things the docs don't cover",
-      "category": "tech_career",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/main-left/nepal-news-evening-briefing-tuesday-november-03-2026",
-      "title_hash": "e0c323b6627ed866e7c0cb36ce84fce3b06b8975",
-      "title": "Nepal News Evening Briefing | Tuesday, November 03, 2026",
-      "category": "nepal",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "igorslab.de/en/notebooksbilliger-de-reports-cyberattack-customer-data-may-have-been-leaked",
-      "title_hash": "07b959dbabcda62cefdf309bf0ddb1218f462a6b",
-      "title": "Notebooksbilliger.de reports cyberattack: customer data may have been leaked - igor´sLAB",
-      "category": "bank_local",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "me.ign.com/en/avengers-the-kang-dynasty/249449/pedro-pascal-is-hiding-an-avengers-doomsday-easter-egg-on-his-doctor-doom-halloween-costume-fans-say",
-      "title_hash": "8e639d726085d478981fd05912bf954cf87b1f60",
-      "title": "Pedro Pascal Is Hiding an Avengers: Doomsday Easter Egg on His Doctor Doom Halloween Costume, Fans Say - IGN",
-      "category": "gaming",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cjy56dndlyz0o",
-      "title_hash": "0a3eab8648151855efa69d52b00b3aa3bddc1475",
-      "title": "Russian bombing kills 31 people at Ukraine aid centre, Kyiv says",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c9j346xg0mkvo",
-      "title_hash": "030dff87c5c058116fa1b5330040c968e78b602d",
-      "title": "Trump to remove Rwanda and South Africa from US trade deal",
-      "category": "world_major",
-      "date_sent": "2026-11-03"
-    },
-    {
-      "url_normalized": "heavy.com/sports/mens-college-basketball/ucf-dior-johnson-puts-college-basketball-on-notice",
-      "title_hash": "a625917014e86d3d5831e93fac17682c535c5570",
-      "title": "UCF’s Dior Johnson Puts College Basketball On Notice - Heavy.com",
-      "category": "college_local",
-      "date_sent": "2026-11-03"
-    },
-    {
       "url_normalized": "onlinekhabar.com/2026/11/2050621/urge-to-exercise-caution-in-the-tourism-industry",
       "title_hash": "64cdb6e5e1e469ead71ad93829958b7d91e1b191",
       "title": "Caution Urged for Pokhara Water Tourism Activities",
@@ -1182,6 +776,62 @@
       "title": "Foreign Minister Khanal calls for climate finance support",
       "category": "nepal",
       "date_sent": "2026-11-10"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c687z7g4xr97o",
+      "title_hash": "42f496143baf8ff8f3e39b5d2c91227967baf82c",
+      "title": "'They will kill you too': Sonia Gandhi's turbulent journey in Indian politics",
+      "category": "world_major",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "polygon.com/the-odyssey-christopher-nolan-home-release-date",
+      "title_hash": "ee44d7cd4db2009537cc51002aa1a4aa79f03657",
+      "title": "Christopher Nolan's The Odyssey Officially Sets Home Release Date",
+      "category": "gaming",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "dev.to/paullovelace/claude-is-now-an-office-suite-sheets-whiteboards-data-5d51",
+      "title_hash": "9ff7ab7eb03a38e9733a14f8d94dd05c3e1f662c",
+      "title": "Claude Is Now an Office Suite: Sheets, Whiteboards, Data",
+      "category": "tech_career",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "dev.to/thalynrift3485/incremental-indexing-for-financial-research-dashboards-4-stages-that-preserve-freshness-1eed",
+      "title_hash": "ce27ddae84f1ec017f8eaeb527ff3b64aa5a230b",
+      "title": "Incremental Indexing for Financial Research Dashboards — 4 Stages That Preserve Freshness",
+      "category": "tech_career",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "dev.to/jslab/prettier-on-demand-on-run-on-save-m57",
+      "title_hash": "abb8e569bd4852be99d0b785a7a31446b0d3605a",
+      "title": "Prettier on demand, on run, on save",
+      "category": "tech_career",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cqm26mmpp2p1o",
+      "title_hash": "401da7e5c612bb467541550bd0fb6bcdebc38218",
+      "title": "Real Madrid's Vinícius Jr sends surprise message to boy who lost his legs in Sudan's war",
+      "category": "world_major",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "pcgamer.com/gaming-industry/sony-cancels-another-live-service-game-ahead-of-release-but-at-least-there-wont-be-any-layoffs-this-time",
+      "title_hash": "96e291dc9304dc8445d095edc59f4c494c3a222e",
+      "title": "Sony cancels another live service game ahead of release, but at least there won't be any layoffs this time",
+      "category": "gaming",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-10/tekken-8-game-streams-roger-jr-starter-guide/.243701",
+      "title_hash": "00ee9a194284fba6695779f41525f08c71744db4",
+      "title": "Tekken 8 Game Streams Roger Jr. Starter Guide",
+      "category": "anime",
+      "date_sent": "2026-11-11"
     }
   ]
 }
