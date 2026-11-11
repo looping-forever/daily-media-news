@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -16269,9 +16269,9 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
-      "known_facts": "The US House rejects an impeachment attempt against Defence Secretary Pete Hegseth for now, while Trump praises Hegseth and Democrats can try again next year.",
-      "latest_development": "The US House rejects an impeachment attempt against Defence Secretary Pete Hegseth for now, while Trump praises Hegseth and Democrats can try again next year.",
+      "status": "DEVELOPING",
+      "known_facts": "President Trump welcomed a congressional halt to Pete Hegseths impeachment while Democrats may retry next year.",
+      "latest_development": "President Trump welcomed a congressional halt to Pete Hegseths impeachment while Democrats may retry next year.",
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
@@ -16279,7 +16279,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-317d8b99efe0",
@@ -16531,7 +16531,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-ec480d3f6b24",
@@ -16559,7 +16559,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-d97a64b16ae0",
@@ -16615,7 +16615,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-bc3d2461397b",
@@ -16643,7 +16643,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-1e278840c6ad",
@@ -16671,7 +16671,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-621d0eeba869",
@@ -16689,9 +16689,9 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
-      "known_facts": "The light novel 'Hyouken no Majutsushi ga Sekai wo Suberu' concludes with the release of its 10th volume.",
-      "latest_development": "The light novel 'Hyouken no Majutsushi ga Sekai wo Suberu' concludes with the release of its 10th volume.",
+      "status": "DEVELOPING",
+      "known_facts": "The official X account for author Nana Mikoshiba announced on Tuesday that the Hyouken no Majutsushi ga Sekai wo Suberu: Sekai Saikyou no Majutsushi de Aru Shounen wa, Majutsu Gakuin ni Nyuugaku suru (The Iceblade Sorcerer Shall Rule the…",
+      "latest_development": "The official X account for author Nana Mikoshiba announced on Tuesday that the Hyouken no Majutsushi ga Sekai wo Suberu: Sekai Saikyou no Majutsushi de Aru Shounen wa, Majutsu Gakuin ni Nyuugaku suru (The Iceblade Sorcerer Shall Rule the…",
       "alerted": false,
       "alert_count": 0,
       "last_alerted": null,
@@ -16699,7 +16699,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-d79bf013ae68",
@@ -16727,7 +16727,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-246036e6ae48",
@@ -16755,7 +16755,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-05c74e078fc9",
@@ -16783,7 +16783,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-98f08807e3e3",
@@ -16811,7 +16811,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
     },
     {
       "event_id": "evt-fa280e0340f2",
@@ -16839,7 +16839,315 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-ab8e57a4cf6c",
+      "event_key": null,
+      "canonical_title": "Trump hails “exoneration” of Hegseth as House blocks impeachment; calls Rep. Massie “major loser”",
+      "category": "nepal",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.nepalnews.com/s/international/trump-hails-exoneration-of-hegseth-as-house-blocks-impeachment-calls-rep-massie-major-loser"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "President Trump praises the failure of impeachment efforts against Secretary of War Pete Hegseth, while Rep. Massie is labeled a 'major loser' after the House blocks impeachment calls.",
+      "latest_development": "President Trump praises the failure of impeachment efforts against Secretary of War Pete Hegseth, while Rep. Massie is labeled a 'major loser' after the House blocks impeachment calls.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-5aa11757e550",
+      "event_key": null,
+      "canonical_title": "Steam's age verification in Australia now takes your account's age into consideration",
+      "category": "gaming",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "pcgamer.com/software/platforms/steams-age-verification-in-australia-now-takes-your-accounts-age-into-consideration"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Steam's age verification process in Australia now takes your account's age into account.",
+      "latest_development": "Steam's age verification process in Australia now takes your account's age into account.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-11",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-b9faef3a7650",
+      "event_key": null,
+      "canonical_title": "Automate the Impossible: Building a Closed-Loop Medical Appointment Agent with Browser-use & GPT-4V 🚀",
+      "category": "tech_career",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/wellallytech/automate-the-impossible-building-a-closed-loop-medical-appointment-agent-with-browser-use-gpt-4v-17mo"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Have you ever tried navigating a clunky hospital portal? Between the cryptic department names and the endless clicking, it’s a UI nightmare. But what if your computer could \"see\" the screen, reason like a human, and handle the entire…",
+      "latest_development": "Have you ever tried navigating a clunky hospital portal? Between the cryptic department names and the endless clicking, it’s a UI nightmare. But what if your computer could \"see\" the screen, reason like a human, and handle the entire…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-11",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-c5e23231cf5b",
+      "event_key": null,
+      "canonical_title": "Partition invoice exports by document count, not order rows",
+      "category": "tech_career",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/browser_act_e2505dbdf454a/partition-invoice-exports-by-document-count-not-order-rows-8oe"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "An order export makes a tempting work queue: take the first 2,000 rows, click download, and repeat. That works only if the limit counts orders and each row has the same relationship to a document. Neither assumption belongs in a billing…",
+      "latest_development": "An order export makes a tempting work queue: take the first 2,000 rows, click download, and repeat. That works only if the limit counts orders and each row has the same relationship to a document. Neither assumption belongs in a billing…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-11",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-f6e18804c24a",
+      "event_key": null,
+      "canonical_title": "How to turn a PDF or Word file into Markdown for AI and notes",
+      "category": "tech_career",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "dev.to/tidybytetools/how-to-turn-a-pdf-or-word-file-into-markdown-for-ai-and-notes-5fp1"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "You want the text out of a PDF, a Word file, or a web page — with the headings and tables still looking like headings and tables. Then you can paste it into a notes app, or cut it into chunks for AI search (RAG). Copy and paste from a PDF…",
+      "latest_development": "You want the text out of a PDF, a Word file, or a web page — with the headings and tables still looking like headings and tables. Then you can paste it into a notes app, or cut it into chunks for AI search (RAG). Copy and paste from a PDF…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-11",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-ca4338bf323d",
+      "event_key": null,
+      "canonical_title": "Netflix Confirms New One Piece Anime Season on November 15 - Comic Book Resources",
+      "category": "anime",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmicefvx3lxte1fug8xa0xvdevcz1fiwc1jywfnslfor1dnqxbkrmhcaxbkt1ywymzjexrhswzvazbjzvpuumjhcl9nd1zwvhh1vlrfy011wnhowgwtowpmdxzdvm55bkrpm0pva1qxq19cu3l3axllchg"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-03af90bdd3a6",
+      "event_key": null,
+      "canonical_title": "Minister Timilsina calls for global support to rebuild disaster-hit communication infrastructure",
+      "category": "nepal",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.nepalnews.com/s/diplomacy/minister-timilsina-calls-for-global-support-to-rebuild-disaster-hit-communication-infrastructure"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "KATHMANDU: Minister for Information and Communications Dr Bikram Timilsina has called for stronger international cooperation and investment in resilient communication infrastructure to ensure uninterrupted services during disasters.…",
+      "latest_development": "KATHMANDU: Minister for Information and Communications Dr Bikram Timilsina has called for stronger international cooperation and investment in resilient communication infrastructure to ensure uninterrupted services during disasters.…",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-11",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-87902325ef34",
+      "event_key": null,
+      "canonical_title": "Three Iran-backed suspects plotted attacks including RAF Fairford incident, US says",
+      "category": "world_major",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": "2026-11-11",
+      "last_reported": "2026-11-11",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "bbc.co.uk/news/articles/c3rryrryk59zo"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "American justice officials linked three suspects with Iranian ties to multiple plotted attacks including an incident near a US-linked UK airbase.",
+      "latest_development": "American justice officials linked three suspects with Iranian ties to multiple plotted attacks including an incident near a US-linked UK airbase.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-11",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-6ecd8a0d75aa",
+      "event_key": null,
+      "canonical_title": "Doctor Doom's New 'Avengers: Doomsday' Popcorn Bucket Has Glowing Eyes, Because Of Course It Does - Foodbeast",
+      "category": "gaming",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiwgfbvv95cuxqbvvinmxpbk44cmjtbjvfqurmwlk5terqshvbty0wzerlmvzmdvjongn0rddqdjkxudljqmdmtzu4etlpzzvtyklxemjlrlb6dhv4mtf0neu1ufjisuzwbmd6du1jb0uztgdmzedvuhfzcddtnuhpcf94luxkt2rkc0dhxzrjaffxamlgqxeybuq5n0u5uf8ycthoszkxbxdprgrrv093avp6btvpuvdzbzbad0horuzkzmu1nnfzuunlqq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-6bad9c3ce818",
+      "event_key": null,
+      "canonical_title": "Robert Downey Jr. returns to MCU as Doctor Doom, sparking global fan frenzy - Chosunbiz",
+      "category": "gaming",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiiafbvv95cuxpdnjayws0zzdis09zvllwcnbhu0xcvza4vjrpsjlgwujmm0tzm1vumkxvsethr3vgzxbzd1vbu3o5mvuwaelwunjfmhvnb1fxx3yxsuewn2ffbfvfa1bpq2rawdnusllxdvzlu093vgzrvdhhvv9lmvrls3bvctnhoeddu3vtqvlt0ggcaufvx3lxte5tm3ozzwlvwha4egnzwldeexlhsuvmcgpyzfhzznzxrk1grwtgx24wuutlsuthempmu0y1dny0egfvow5jrhdnvwoteg9stwz1nhdbazd2nujtwwxbcnzjmljirnvxm2nxcjb6mkngakd2s2jpzxdzaw1en0jsbf9nmlfftuv4qmt5swlxrhdoowyzetjycwdocy1ida"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
+    },
+    {
+      "event_id": "evt-6bf302e9f486",
+      "event_key": null,
+      "canonical_title": "Traffic update: Arnold Drive in Sonoma reopened after 12-hour closure - Sonoma Index-Tribune",
+      "category": "local_city",
+      "first_seen": "2026-11-11",
+      "last_seen": "2026-11-11",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiwwfbvv95cuxnr1l3unr3zgn6r1r1dzhzdxhxnw00qmlxdxnduzdtr1nysgvvvwi0z2lzzkqxcuk2mjhpzlhmckhqvhloderxvenksel0qzg0vkxuc2d5emtjt2z3sglpsvzrnjh1ovlzytbqdji3dllhrvnjcei3umlrwnzuzkdrznbnde82m3rbsljavddmzgpcwu9enhdla3k5b0ronudioewwtljldhlpbnhtcgfywmvebutoyjfiy3lfd21lvdrkm3m"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-11T07:23:52+05:45"
     }
   ],
   "archived": []
