@@ -4,7 +4,7 @@
       "alerted_at": "2026-11-11T02:07:07Z",
       "cause": "ai_fail_safe: models=opencode/nemotron-3.5-lightning-free,opencode/big-pickle source=live; opencode/nemotron-3.5-lightning-free: timed out after 150s -- e models work in OpenCode (https://opencode.ai); subscribe to",
       "first_seen": "2026-11-11T02:07:07Z",
-      "healthy_streak": 0,
+      "healthy_streak": 1,
       "last_seen": "2026-11-11T06:42:05Z",
       "runs": 5,
       "window_first": "2026-11-11T04:39:07Z",
