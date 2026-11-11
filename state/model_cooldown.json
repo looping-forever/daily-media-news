@@ -36,6 +36,12 @@
       "reason": "model_not_found",
       "until": "2026-11-12T02:07:00.301080+00:00"
     },
+    "opencode/mimo-v2.5-free": {
+      "hits": 1,
+      "last_hit": "2026-11-11T04:34:02.587473+00:00",
+      "reason": "model_not_found",
+      "until": "2026-11-12T04:34:02.587473+00:00"
+    },
     "opencode/muse-spark-1.2-contributor-free": {
       "hits": 1,
       "last_hit": "2026-11-11T02:07:01.910646+00:00",
