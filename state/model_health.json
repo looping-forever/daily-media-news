@@ -33,13 +33,13 @@
     },
     "opencode/nemotron-3.5-lightning-free": {
       "success": 0,
-      "timeout": 12,
+      "timeout": 13,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 12,
+      "consecutive_failures": 13,
       "last_failure": "timeout",
-      "last_fail_at": 1794371792.6690192,
-      "cooldown_until": 1794458192.6690192,
+      "last_fail_at": 1794372150.5195181,
+      "cooldown_until": 1794458550.5195181,
       "quota_notice": 0
     },
     "opencode/glm-5.3-flash-free": {
@@ -119,13 +119,13 @@
     },
     "opencode/big-pickle": {
       "success": 0,
-      "timeout": 12,
+      "timeout": 13,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 12,
+      "consecutive_failures": 13,
       "last_failure": "timeout",
-      "last_fail_at": 1794371942.774526,
-      "cooldown_until": 1794458342.774526,
+      "last_fail_at": 1794372300.6271129,
+      "cooldown_until": 1794458700.6271129,
       "quota_notice": 0
     },
     "gemini/gemini-3.5-flash-lite": {
