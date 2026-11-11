@@ -33,13 +33,14 @@
     },
     "opencode/nemotron-3.5-lightning-free": {
       "success": 0,
-      "timeout": 11,
+      "timeout": 12,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 11,
+      "consecutive_failures": 12,
       "last_failure": "timeout",
-      "last_fail_at": 1793689325.1189184,
-      "cooldown_until": 1793775725.1189184
+      "last_fail_at": 1794371792.6690192,
+      "cooldown_until": 1794458192.6690192,
+      "quota_notice": 0
     },
     "opencode/glm-5.3-flash-free": {
       "success": 0,
@@ -108,22 +109,24 @@
     "opencode/mimo-v2.5-free": {
       "success": 0,
       "timeout": 0,
-      "transport": 1,
+      "transport": 2,
       "garbage": 3,
-      "consecutive_failures": 4,
+      "consecutive_failures": 5,
       "last_failure": "transport",
-      "last_fail_at": 1793633459.8367124,
-      "cooldown_until": 1793719859.8367124
+      "last_fail_at": 1794371642.5879464,
+      "cooldown_until": 1794458042.5879464,
+      "quota_notice": 0
     },
     "opencode/big-pickle": {
       "success": 0,
-      "timeout": 11,
+      "timeout": 12,
       "transport": 0,
       "garbage": 0,
-      "consecutive_failures": 11,
+      "consecutive_failures": 12,
       "last_failure": "timeout",
-      "last_fail_at": 1793691026.3737597,
-      "cooldown_until": 1793777426.3737597
+      "last_fail_at": 1794371942.774526,
+      "cooldown_until": 1794458342.774526,
+      "quota_notice": 0
     },
     "gemini/gemini-3.5-flash-lite": {
       "success": 91,
