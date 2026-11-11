@@ -881,6 +881,62 @@
       "title": "PlayStation 5 Surpasses 100 Million Units Sold",
       "category": "gaming",
       "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "polygon.com/zelda-ocarina-of-time-dungeons-ranked",
+      "title_hash": "7b64339f0e0cfd62e26ed59131c6a3d3cb98e7a3",
+      "title": "All Zelda: Ocarina of Time Dungeons, Ranked From Worst to Best",
+      "category": "gaming",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "dev.to/oleksii_sorokin_411f31dd9/announcing-the-alphagrowth-mcp-server-27-web3-tools-for-claude-chatgpt-and-cursor-3m5n",
+      "title_hash": "520093d5a64364f8e368a6355d691eacc31e3e5e",
+      "title": "Announcing the AlphaGrowth MCP Server: 27 Web3 Tools for Claude, ChatGPT, and Cursor",
+      "category": "tech_career",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "pcgamer.com/hardware/graphics-cards/apparently-now-we-wont-see-a-24-gb-rtx-5080-which-is-probably-actually-good-for-our-wallets",
+      "title_hash": "b3786c3862f16c487ce9d66cc6e62a15a24cf452",
+      "title": "Apparently now we *won’t* see a 24 GB RTX 5080, which is probably actually good for our wallets",
+      "category": "gaming",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cmkg5jr59835o",
+      "title_hash": "bff1ebaa27ba5973b3484b4d3ef7a7e3a0154eec",
+      "title": "Egyptian journalist's retrial adjourned as UN warns of 'assaults on press freedom'",
+      "category": "world_major",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cwg5r8zrm11mo",
+      "title_hash": "5a361625953fcee48f299159a3f83744577acc8c",
+      "title": "Four grizzly bears killed in Canada after fatal attack on mother and daughter",
+      "category": "world_major",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "dev.to/t1m4lc/how-i-built-a-multi-country-price-comparator-as-a-solo-dev-static-first-workers-d1-and-a-lot-of-1ff8",
+      "title_hash": "402ab69fb73a3bc4fcf55bbd447db27c2a76dbb5",
+      "title": "How I built a multi-country price comparator as a solo dev: static-first, Workers, D1 and a lot of feed matching",
+      "category": "tech_career",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "dev.to/shamsxnahid/is-cursors-composer-25-worth-it-for-everyday-basic-usage-4lka",
+      "title_hash": "55173ad92bb8b60c04bf6399149325237c974a17",
+      "title": "Is Cursor's Composer 2.5 worth it for everyday basic usage?",
+      "category": "tech_career",
+      "date_sent": "2026-11-11"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cwe9kzv0g0v7o",
+      "title_hash": "a6de594e7e1774ec01643a105e10ddab17406cba",
+      "title": "Kenya discharges last Ebola patient in major milestone towards virus-free status",
+      "category": "world_major",
+      "date_sent": "2026-11-11"
     }
   ]
 }

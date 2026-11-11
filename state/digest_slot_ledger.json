@@ -222,7 +222,7 @@
       "evening": {
         "built_at": "2026-11-11T12:58:39Z",
         "source_health_state": "ok",
-        "story_count": 1
+        "story_count": 8
       },
       "morning": {
         "actions_dispatch_at": "2026-11-11T01:35:50Z",
