@@ -1,35 +1,28 @@
 {
   "models": {
+    "gemini-key2/gemini-3.1-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-11T00:57:12.365035+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-11T06:57:12.365035+00:00"
+    },
+    "gemini-key2/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-11T00:57:46.919219+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-11T06:57:46.919219+00:00"
+    },
     "gemini/gemini-3.5-flash-lite": {
       "hits": 1,
-      "last_hit": "2026-11-10T13:37:01.166254+00:00",
+      "last_hit": "2026-11-11T00:56:54.351290+00:00",
       "reason": "quota_exhausted",
-      "until": "2026-11-10T19:37:01.166254+00:00"
+      "until": "2026-11-11T06:56:54.351290+00:00"
     },
-    "opencode/beam-free": {
+    "mistral/mistral-small-latest": {
       "hits": 1,
-      "last_hit": "2026-11-09T13:42:41.289469+00:00",
-      "reason": "rung_broken"
-    },
-    "opencode/deepseek-v4.1-flash-free": {
-      "hits": 1,
-      "last_hit": "2026-11-09T13:41:56.196550+00:00",
-      "reason": "rung_broken"
-    },
-    "opencode/glm-5.3-flash-free": {
-      "hits": 1,
-      "last_hit": "2026-11-09T13:44:56.538499+00:00",
-      "reason": "rung_broken"
-    },
-    "opencode/mimo-v2.6-flash-free": {
-      "hits": 1,
-      "last_hit": "2026-11-09T13:43:26.376534+00:00",
-      "reason": "rung_broken"
-    },
-    "opencode/nemotron-3.5-lightning-free": {
-      "hits": 1,
-      "last_hit": "2026-11-09T13:44:11.445498+00:00",
-      "reason": "rung_broken"
+      "last_hit": "2026-11-11T00:59:21.468611+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-11T06:59:21.468611+00:00"
     }
   },
   "pool": {},
