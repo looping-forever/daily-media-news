@@ -1880,57 +1880,59 @@ jobs:
           # 2026-10-31 the model wrote three stories, the schema dropped all
           # three, and this step still saw a non-empty state/stories.json and
           # skipped the fallback -- so the owner got an empty edition and the
-          # seal was skipped. The decision is the number of stories that
-          # SURVIVE schema validation, counted with the same validator the
-          # "Validate stories" step runs.
-          python3 - <<'PY' > state/digest_survivors.txt || echo "0 0" > state/digest_survivors.txt
-          import json
-          import os
-          import sys
-          sys.path.insert(0, 'scripts')
-          raw = survivors = 0
-          try:
-              import validate_stories as vs
-          except Exception as exc:
-              print('::warning::the validator could not be imported (%s); treating the model-written digest as unusable' % exc, file=sys.stderr)
-              vs = None
-          if vs is not None and os.path.isfile('state/stories.json'):
-              try:
-                  with open('state/stories.json', encoding='utf-8') as fh:
-                      payload = json.load(fh)
-                  stories = payload.get('stories') if isinstance(payload, dict) else payload
-                  if isinstance(stories, list):
-                      raw = len(stories)
-                      survivors = sum(1 for i, s in enumerate(stories)
-                                      if vs.validate_story(s, i)[0])
-              except Exception as exc:
-                  print('::warning::state/stories.json could not be read (%s); treating the model-written digest as unusable' % exc, file=sys.stderr)
-          print('%d %d' % (raw, survivors))
-          PY
-          read RAW SURVIVORS < state/digest_survivors.txt
+          # seal was skipped.
+          # AND SURVIVORS MEANS WHAT THE VALIDATOR WOULD SHIP, NOT WHAT THE SCHEMA
+          # ACCEPTED. Run 43235310367 passed this gate with 4 schema survivors and
+          # shipped 2 cards, because history dedup runs inside the validator, after
+          # the schema. `--count-only` runs that same pipeline -- schema, keywords,
+          # spoiler, crime, history dedup, event dedup, rank cap -- read-only and
+          # prints COUNT=<n> last, so the number this gate reads is the number the
+          # edition would carry. It writes no payload and no state.
+          COUNT_LOG=/tmp/validate-count.log
+          RAW=0; SURVIVORS=0; DEDUPED=0; CANDIDATES=0
+          if [ -s state/stories.json ]; then
+            if python3 scripts/validate_stories.py --count-only \
+                 --in state/stories.json \
+                 --history state/history.json \
+                 --state state/active_stories.json \
+                 --candidates state/candidates.json \
+                 --config-dir config \
+                 --today "$TODAY" > "$COUNT_LOG" 2>&1; then
+              sed -n '1,5p' "$COUNT_LOG"
+              RAW=$(sed -n 's/.*raw=\([0-9][0-9]*\).*/\1/p' "$COUNT_LOG" | tail -n 1)
+              DEDUPED=$(sed -n 's/.*after-history-dedup=\([0-9][0-9]*\).*/\1/p' "$COUNT_LOG" | tail -n 1)
+              SURVIVORS=$(sed -n 's/^COUNT=\([0-9][0-9]*\)$/\1/p' "$COUNT_LOG" | tail -n 1)
+            else
+              echo "::warning::the validator could not count the edition; treating the model-written digest as unusable"
+            fi
+          fi
+
+          RAW=${RAW:-0}; SURVIVORS=${SURVIVORS:-0}; DEDUPED=${DEDUPED:-0}
           CANDIDATES=0
           if [ -s state/candidates.json ]; then
             CANDIDATES=$(python3 -c "import json;d=json.load(open('state/candidates.json'));print(len(d.get('candidates') or []))" 2>/dev/null || echo 0)
           fi
-          # ONE LINE, THREE COUNTS: `candidates` is the collector's pool, `raw`
-          # is the MODEL's own story count, and `schema-survivors` is what got
-          # past validation. Naming all three is what stops raw=3 being read as
-          # a collection failure, which is how both empty editions were misread.
-          echo "Digest provenance: candidates=${CANDIDATES} raw=${RAW} (model-written stories) schema-survivors=${SURVIVORS}"
+          # ONE LINE, FOUR COUNTS: `candidates` is the collector's pool, `raw` is
+          # the MODEL's own story count, `after-history-dedup` is what survived the
+          # already-sent check, and `would-ship` is what the edition would actually
+          # carry. Naming all four is what stops raw=3 being read as a collection
+          # failure, and what makes a 4-to-2 dedup visible instead of a surprise.
+          echo "Digest provenance: candidates=${CANDIDATES} raw=${RAW} (model-written stories) after-history-dedup=${DEDUPED} would-ship=${SURVIVORS}"
           if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]; then
-            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation, floor ${STORIES_FLOOR}); the unsummarised fallback is not used."
+            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation and history dedup, floor ${STORIES_FLOOR}); the unsummarised fallback is not used."
             exit 0
           fi
           if [ "$SURVIVORS" != "0" ]; then
-            echo "::warning::Only ${SURVIVORS} of ${RAW} model-written stories survive validation, below the ${STORIES_FLOOR}-story floor -- deriving the unsummarised edition instead."
+            echo "::warning::Only ${SURVIVORS} of ${RAW} model-written stories would ship, below the ${STORIES_FLOOR}-story floor -- deriving the unsummarised edition instead."
           fi
+
           # The deriver writes state/stories.json only ABOVE ITS OWN floor, so a
           # file still here is the too-thin model payload. Removing it first
           # means a floor miss leaves NO payload and the empty-outcome path owns
           # it, instead of a thin digest being sealed as an ordinary edition.
           rm -f state/stories.json
           if [ "$RAW" != "0" ]; then
-            echo "::warning::All ${RAW} model-written stories were rejected by schema validation -- the empty edition is not shipped; deriving the unsummarised edition instead."
+            echo "::warning::All ${RAW} model-written stories were rejected by validation -- the empty edition is not shipped; deriving the unsummarised edition instead."
           fi
           if [ ! -s state/candidates.json ]; then
             echo "::warning::No collected candidates to derive from -- the empty-outcome path owns this run."
@@ -2021,7 +2023,8 @@ jobs:
             --out state/stories.validated.json \
             --history state/history.json \
             --today "$TODAY" \
-            --config-dir config 2>&1 | tee /tmp/validate.log || rc=$?
+            --config-dir config \
+            --floor "$STORIES_FLOOR" 2>&1 | tee /tmp/validate.log || rc=$?
           END=$(date +%s)
           STAGE_KEY=validate STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
           tail -n 40 /tmp/validate.log || true

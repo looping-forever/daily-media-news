@@ -101,7 +101,7 @@ translate, spoiler-tag, and write up THOSE candidates into stories. Do NOT
 redo the broad searches the collector already ran.
 
 - `candidates.json` is a TRUNCATED set: the collector keeps at most the
-  freshest 4 candidates per `domain_category` (dedup and the 36h freshness
+  freshest 8 candidates per `domain_category` (dedup and the 36h freshness
   window run BEFORE that cap). So a domain showing only a few rows is capped,
   not quiet — never claim coverage beyond what you were given, and never widen
   the supplemental budget to compensate.

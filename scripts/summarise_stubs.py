@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import derive_unsummarised  # noqa: E402
 import edition_kind  # noqa: E402
+import english_text  # noqa: E402
 import validate_stories  # noqa: E402
 
 
@@ -310,6 +311,17 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
         payload["notes"] = (sentence + " " + existing).strip()
     elif existing != str(payload.get("notes") or "").strip():
         payload["notes"] = existing
+    # THE FLOOR FOLLOWS THE CARDS THIS PASS KEPT. A story can leave here (no
+    # model, no extract, nothing to quote) while the edition still clears the
+    # floor, so the count written before repair can be one or two too high.
+    floor_record = payload.get("floor")
+    if isinstance(floor_record, dict) and floor_record.get("required"):
+        floor_required = int(floor_record.get("required") or 0)
+        floor_kept = len(payload.get("stories") or [])
+        payload["floor"] = {"required": floor_required, "kept": floor_kept,
+                            "met": floor_kept >= floor_required}
+        payload["notes"] = english_text.replace_floor(
+            payload.get("notes"), floor_kept, floor_required)
     if result.get("budget_spent") or written == 0:
         # ONE VERDICT LINE. Run 42144852087 overran its allowance by 4.5
         # minutes, was killed by the step's own cap, and said nothing at all;

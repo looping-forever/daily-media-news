@@ -141,11 +141,14 @@ MAX_TOTAL = 140
 #: How many candidates ONE domain may contribute. This is the agent's INPUT
 #: size, not a display setting: measured 2026-10-27, the collector's 20-per-domain
 #: output was 140 rows / 139,207 bytes, and the model has to read all of it before
-#: it can classify anything. 4 per domain keeps every domain represented, keeps
-#: the freshest of each (the ordering below is freshest-first), and is still far
-#: more than the 5-15 stories the digest targets. The prompt states the cap, so
-#: an absent candidate is never read as a quiet day.
-MAX_PER_DOMAIN = 4
+#: it can classify anything. It was 4 until 2026-11-12, when run 43235310367 kept
+#: exactly 4 per section and lost 472 rows to this cap -- and the edition still
+#: came out at 2 cards because history dedup then removed half of what survived.
+#: 8 per section is the pool that leaves ~4 after a repeat-heavy dedup, and with
+#: 6-7 sections it is ~56 rows, still far below the 140-row ceiling that was
+#: measured too large to read. The prompt states the cap, so an absent candidate
+#: is never read as a quiet day.
+MAX_PER_DOMAIN = 8
 
 TITLE_JACCARD_THRESHOLD = 0.7
 SNIPPET_MAX_CHARS = 300
@@ -3198,6 +3201,14 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
     final = []
     kept_by_source = {}
     drops = {"dup_url": 0, "dup_title": 0, "domain_cap": 0, "total_cap": 0}
+    # SUPPLY, COUNTED BEFORE ANY CAP. A cap that silently binds looks identical to
+    # a quiet day, and 43235310367 lost 472 rows to it while the report showed only
+    # "4 each". kept/available per domain is the number that says which it was.
+    available_by_domain = {}
+    domain_cap_drops = {}
+    for item in prepared:
+        _dom = item[4].get("domain_category", "")
+        available_by_domain[_dom] = available_by_domain.get(_dom, 0) + 1
 
     def admit(cand, plan):
         """Try to place one candidate. Returns (ok, reason)."""
@@ -3258,6 +3269,9 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
             continue
         if reason in drops:
             drops[reason] += 1
+        if reason == "domain_cap":
+            _dom = cand.get("domain_category", "")
+            domain_cap_drops[_dom] = domain_cap_drops.get(_dom, 0) + 1
         if reason == "total_cap":
             break
 
@@ -3270,6 +3284,12 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
         "dropped_dup_title": drops["dup_title"],
         "dropped_domain_cap": drops["domain_cap"],
         "dropped_total_cap": drops["total_cap"],
+        # The caps THEMSELVES, and the supply they were applied to, so a report can
+        # name the cap that bound instead of implying the news was thin.
+        "cap_per_domain": max_per_domain,
+        "cap_total": MAX_TOTAL,
+        "available_by_domain": available_by_domain,
+        "dropped_domain_cap_by_domain": domain_cap_drops,
         # Sourcing: a Google duplicate replaced by a direct feed item, and the
         # Google items that had no direct duplicate (headline-only, acceptable).
         "google_replaced": google_stats["google_replaced"],
@@ -3321,6 +3341,23 @@ def main(argv=None):
 
     excluded_keywords, sections = load_interests(args.interests_path)
     excluded_lower = [k.lower() for k in excluded_keywords]
+
+    # THE QUERY CAP, COUNTED THE WAY THE SWEEP COUNTS IT. One interest title is one
+    # outbound Google News request, so a cap here narrows what was SEARCHED -- the
+    # one loss a candidate count can never show. It is reported, not raised: the
+    # 2026-11-12 run already lost 472 rows to the per-domain cap, so the edition was
+    # short on slots, not on queries, and extra requests would spend the budget
+    # without adding a card.
+    interest_cap = args.max_interest_titles or DEFAULT_INTEREST_TITLE_CAP
+    interest_total = interest_used = 0
+    interest_losses = {}
+    for _key in ("games", "anime", "manga", "manhwa", "manhua"):
+        _titles = cleaned_interest_list(sections, _key)
+        interest_total += len(_titles)
+        _kept = min(len(_titles), interest_cap)
+        interest_used += _kept
+        if len(_titles) > _kept:
+            interest_losses[_key] = len(_titles) - _kept
 
     cfg = load_collection_config(args.collection_config)
     default_timeout = args.timeout or cfg["timeout_sec"].get("default")
@@ -3418,6 +3455,22 @@ def main(argv=None):
           % (len(final_candidates), len(raw_candidates), total_sec))
     print("  per-domain: %s" % ", ".join(
         "%s=%d" % (k, v) for k, v in sorted(per_domain.items())))
+    # EVERY CAP, ITS VALUE, AND WHAT IT COST. Without this the only number a
+    # reader saw was the kept count, which cannot distinguish a cap from a quiet
+    # day -- exactly how 4-per-section looked like "that is all there was".
+    print("  caps: per_domain=%d; total=%d"
+          % (stats["cap_per_domain"], stats["cap_total"]))
+    print("  per-domain supply (kept/available, cap-dropped): %s" % ", ".join(
+        "%s=%d/%d,%d" % (k, per_domain.get(k, 0), avail,
+                         stats["dropped_domain_cap_by_domain"].get(k, 0))
+        for k, avail in sorted(stats["available_by_domain"].items())))
+    print("  cap losses: domain_cap=%d, total_cap=%d"
+          % (stats["dropped_domain_cap"], stats["dropped_total_cap"]))
+    print("  interest cap: per list=%d; titles used %d of %d%s"
+          % (interest_cap, interest_used, interest_total,
+             ("  (not searched: %s)" % ", ".join(
+                 "%s=%d" % (k, v) for k, v in sorted(interest_losses.items())))
+             if interest_losses else ""))
     print("  sources ok: %d, failed: %d" % (len(sources_ok), len(sources_failed)))
     for entry in sources_failed:
         print("    FAILED: %s" % entry)

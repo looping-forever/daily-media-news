@@ -116,3 +116,25 @@ def replace_held_back(notes, count):
     if not count:
         return text
     return (text + " " + held_back_note(count)).strip()
+
+
+def floor_note(kept, required):
+    """The sentence a short edition carries: how many cards, against what floor."""
+    return ("Short edition: %d stories, below the %d-story floor."
+            % (int(kept), int(required)))
+
+
+#: Statement, or its absence, as one pattern -- `replace_floor` rewrites it so the
+#: repair pass cannot leave two different counts in one field.
+_FLOOR_RE = re.compile(
+    r"Short edition: \d+ stories, below the \d+-story floor\.")
+
+
+def replace_floor(notes, kept, required):
+    """The notes with exactly ONE short-edition sentence, or none when the floor is met."""
+    text = _FLOOR_RE.sub("", str(notes or ""))
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    if not required or int(kept) >= int(required):
+        return text
+    sentence = floor_note(kept, required)
+    return (sentence + " " + text).strip() if text else sentence

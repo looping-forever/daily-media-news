@@ -2545,6 +2545,21 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
             edition_line = join_sentences(
                 edition_line, english_text.held_back_note(held_back))
 
+    # A SHORT EDITION SAYS SO, whatever its coverage line said. This block sits
+    # OUTSIDE the fallback branch on purpose: run 43235310367 shipped 2 cards, all
+    # of them written, so `edition_kind` was "full" and the banner was the ordinary
+    # one. The floor is a separate claim from coverage and is stated separately.
+    floor_record = (meta or {}).get("floor")
+    if isinstance(floor_record, dict) and floor_record.get("met") is False:
+        try:
+            floor_kept = int(floor_record.get("kept") or 0)
+            floor_required = int(floor_record.get("required") or 0)
+        except (TypeError, ValueError):
+            floor_kept = floor_required = 0
+        if floor_required > floor_kept:
+            edition_line = join_sentences(
+                edition_line, english_text.floor_note(floor_kept, floor_required))
+
     grouped = {}
     for s in stories:
         grouped.setdefault(s.get("category", ""), []).append(s)

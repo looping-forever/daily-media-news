@@ -1877,7 +1877,16 @@ def main(argv=None):
     ap.add_argument("--config-dir", dest="config_dir", default="config")
     ap.add_argument("--state", dest="state_path", default="state/active_stories.json")
     ap.add_argument("--candidates", dest="candidates_path", default="state/candidates.json")
+    # RUN THE PIPELINE, WRITE NOTHING. The workflow's pre-derive gate used to count
+    # schema survivors and call that the edition; run 43235310367 passed that gate
+    # with 4 and shipped 2, because history dedup runs HERE and not there.
+    ap.add_argument("--count-only", dest="count_only", action="store_true",
+                    help="run the whole pipeline read-only, print COUNT=<n> and exit")
+    # The floor this edition must reach. Written to the payload as data (never
+    # merely checked) so a short edition cannot present itself as a full one.
+    ap.add_argument("--floor", dest="floor", type=int, default=0)
     args = ap.parse_args(argv)
+    count_only = bool(args.count_only)
 
     # ASCII-safe stdout for Windows consoles.
     try:
@@ -2168,9 +2177,12 @@ def main(argv=None):
                 drop(story, "duplicate_of_active_event: event %s already reported in today's %s edition"
                      % (eid, digest_time))
                 continue
-        event_id, label = story_state.upsert_sighting(state, story, today)
-        story["event_id"] = event_id
-        story["label"] = label
+        # A count-only run must not record sightings: it answers "how many would
+        # ship", and the state file it read is the downloaded one.
+        if not count_only:
+            event_id, label = story_state.upsert_sighting(state, story, today)
+            story["event_id"] = event_id
+            story["label"] = label
         survivors.append(story)
 
     # -- Stage 7: sort + cap ---------------------------------------------------
@@ -2186,6 +2198,19 @@ def main(argv=None):
     for story in capped:
         drop(story, "below_priority_cap: ranked below top %d" % MAX_STORIES)
     final_stories = survivors[:MAX_STORIES]
+
+    # -- COUNT ONLY: the same pipeline, no writes, one machine-readable line ----
+    # The workflow's gate needs the number THIS stage would ship. Counting the
+    # schema survivors instead is what let a 4-survivor edition that dedup cut to
+    # 2 report itself as full on 2026-11-12.
+    if count_only:
+        print("validate_stories --count-only: %s" % args.in_path)
+        print("  provenance:  raw=%d (model-written) schema-survivors=%d "
+              "after-history-dedup=%d after-event-dedup=%d final=%d"
+              % (len(raw_stories), stage2_counts["kept"], len(after_dedup),
+                 len(survivors), len(final_stories)))
+        print("COUNT=%d" % len(final_stories))
+        return 0
 
     # -- Stage 7b: `for_you` screening (display-only personal line) ----------
     # Runs AFTER the final ordering so the rank cap matches what the reader
@@ -2268,6 +2293,19 @@ def main(argv=None):
     # drops) so the page line and the note sentence cannot disagree.
     if held_total or isinstance(data.get("held_back"), dict):
         payload["held_back"] = {"count": held_total, "reason": "not_english"}
+    # THE FLOOR IS DATA, CHECKED HERE AND WRITTEN HERE. `edition_kind` describes
+    # coverage only, so an edition of 2 cards whose 2 summaries are written is
+    # "full" -- true about coverage, false about the floor, and that "full" is
+    # what the page showed. The numbers go on the payload and the sentence into
+    # the notes, both from the count this stage just produced.
+    floor_required = max(0, int(getattr(args, "floor", 0) or 0))
+    if floor_required:
+        floor_kept = len(final_stories)
+        payload["floor"] = {"required": floor_required,
+                            "kept": floor_kept,
+                            "met": floor_kept >= floor_required}
+        payload["notes"] = english_text.replace_floor(
+            payload.get("notes"), floor_kept, floor_required)
     # The writer rung is the producer's claim about WHICH model (or the no-AI
     # deriver) wrote this edition. Passthrough only: the seal needs it to mark a
     # fallback edition degraded, and a model-written payload predating the field
@@ -2337,6 +2375,10 @@ def main(argv=None):
           (len(after_dedup) - len(survivors), len(active_events),
            expire_counts["resolved"], expire_counts["stale"], expire_counts["archived"]))
     print("  cap:         %d dropped (cap %d)" % (len(capped), MAX_STORIES))
+    if floor_required:
+        print("  floor:       %d of %d (%s)"
+              % (len(final_stories), floor_required,
+                 "met" if len(final_stories) >= floor_required else "SHORT"))
     print("  for_you:     %d kept, %d stripped (%d failed a screen, %d past the rank cap)"
           % (for_you_stats["kept"], for_you_stats["stripped"],
              for_you_stats["screened"], for_you_stats["capped"]))
