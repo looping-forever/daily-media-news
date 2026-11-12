@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-11T18:43:17+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -10805,7 +10805,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The District Administration Office in Kaski has issued a public notice urging operators and visitors to strictly follow regulations and safety protocols for water tourism activities, including boating, kayaking, and surfing on Phewa Lake and other local water bodies.",
       "latest_development": "Confirmed: The District Administration Office in Kaski has issued a public notice urging operators and visitors to strictly follow regulations and safety protocols for water tourism activities, including boating, kayaking, and surfing on Phewa Lake and other local water bodies.",
       "alerted": false,
@@ -10815,7 +10815,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T06:44:00+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-ddea1a87e9a3",
@@ -10833,7 +10833,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Warner Bros. Japan has announced a live-action film adaptation of Hajime Koumoto's manga series Mashle: Magic and Muscles, scheduled to premiere in Japanese theaters on March 19, 2027.",
       "latest_development": "Reported: Warner Bros. Japan has announced a live-action film adaptation of Hajime Koumoto's manga series Mashle: Magic and Muscles, scheduled to premiere in Japanese theaters on March 19, 2027.",
       "alerted": false,
@@ -10843,7 +10843,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2027-03-19",
-      "updated_at": "2026-11-04T06:44:00+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-46abca654de2",
@@ -10861,7 +10861,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The District Administration Office, Kaski has issued a public notice urging operators of water tourism activities, including boating, kayaking, and surfing in Phewa Lake and other area lakes, to ensure all activities are conducted safely and in compliance with legal regulations.",
       "latest_development": "Confirmed: The District Administration Office, Kaski has issued a public notice urging operators of water tourism activities, including boating, kayaking, and surfing in Phewa Lake and other area lakes, to ensure all activities are conducted safely and in compliance with legal regulations.",
       "alerted": false,
@@ -10871,7 +10871,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T06:44:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-e9d4bfae81d4",
@@ -10889,7 +10889,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: A live-action film adaptation of Hajime Koumoto's 'Mashle: Magic and Muscles' manga has been announced, scheduled to premiere in Japanese theaters on March 19, 2027.",
       "latest_development": "Confirmed: A live-action film adaptation of Hajime Koumoto's 'Mashle: Magic and Muscles' manga has been announced, scheduled to premiere in Japanese theaters on March 19, 2027.",
       "alerted": false,
@@ -10899,7 +10899,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T06:44:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-2832986d1173",
@@ -10917,7 +10917,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: A television anime adaptation of Julietta Suzuki's comedy-romance manga 'Oshi ni Amagami' (Otaku Vampire's Love Bite) has been announced.",
       "latest_development": "Confirmed: A television anime adaptation of Julietta Suzuki's comedy-romance manga 'Oshi ni Amagami' (Otaku Vampire's Love Bite) has been announced.",
       "alerted": false,
@@ -10927,7 +10927,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T06:44:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-ec9d252ee384",
@@ -10945,7 +10945,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepali Congress has rejected attempts to question the legitimacy of its special and 15th general conventions, labeling the claims a conspiracy and disinformation campaign, while demanding an independent investigation.",
       "latest_development": "Reported: The Nepali Congress has rejected attempts to question the legitimacy of its special and 15th general conventions, labeling the claims a conspiracy and disinformation campaign, while demanding an independent investigation.",
       "alerted": false,
@@ -10955,7 +10955,7 @@
       "in_evening": "2026-11-04",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T18:41:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-f3d88926592e",
@@ -10973,7 +10973,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Civil Aviation Authority and the Customs Department have signed an agreement regarding a National Single Window system to streamline business and service delivery procedures.",
       "latest_development": "Confirmed: The Civil Aviation Authority and the Customs Department have signed an agreement regarding a National Single Window system to streamline business and service delivery procedures.",
       "alerted": false,
@@ -10983,7 +10983,7 @@
       "in_evening": "2026-11-04",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T18:41:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-f1c6a42330ae",
@@ -11001,7 +11001,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Independent studio Raw Power Games has called on players for wishlist support after losing funding, posing an existential threat to the development of their historical strategy sandbox game, Chronicles: Medieval.",
       "latest_development": "Reported: Independent studio Raw Power Games has called on players for wishlist support after losing funding, posing an existential threat to the development of their historical strategy sandbox game, Chronicles: Medieval.",
       "alerted": false,
@@ -11011,7 +11011,7 @@
       "in_evening": "2026-11-04",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T18:41:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-d4154d15967e",
@@ -11029,7 +11029,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Authorities in Austria, Germany, and Hungary have received dozens of reports of sharp objects, including pins found inside chocolate, with a nine-year-old girl injured.",
       "latest_development": "Reported: Authorities in Austria, Germany, and Hungary have received dozens of reports of sharp objects, including pins found inside chocolate, with a nine-year-old girl injured.",
       "alerted": false,
@@ -11039,7 +11039,7 @@
       "in_evening": "2026-11-04",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-04T18:41:10+05:45"
+      "updated_at": "2026-11-12T06:41:57+05:45"
     },
     {
       "event_id": "evt-7bde4e4fc0ab",
@@ -17176,6 +17176,90 @@
       "deadline": null,
       "effective_date": "2026-11-10",
       "updated_at": "2026-11-11T18:43:17+05:45"
+    },
+    {
+      "event_id": "evt-d6f499e00704",
+      "event_key": "gosainkunda-tourist-recovery",
+      "canonical_title": "Gosainkunda Tourist Traffic Increases Following Flood Recovery",
+      "category": "nepal",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": "2026-11-12",
+      "last_reported": "2026-11-12",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2055829/tourist-traffic-increasing-in-gosainkunda-after-floods"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Tourist arrivals in Gosainkunda have begun to rise again as access routes recover from damage caused by the Bhote Koshi floods on August 26, 2026. The area remains a major site for religious and natural tourism in the Rasuwa district.",
+      "latest_development": "Reported: Tourist arrivals in Gosainkunda have begun to rise again as access routes recover from damage caused by the Bhote Koshi floods on August 26, 2026. The area remains a major site for religious and natural tourism in the Rasuwa district.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-12",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T06:41:57+05:45"
+    },
+    {
+      "event_id": "evt-24909ba13dee",
+      "event_key": "cop31-climate-warning",
+      "canonical_title": "UN Secretary-General Urges Accelerated Climate Action at COP-31",
+      "category": "nepal",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": "2026-11-12",
+      "last_reported": "2026-11-12",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "onlinekhabar.com/2026/11/2055819/climate-crisis-is-overwhelming-the-worlds-preparedness-and-response-capacity"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: During the COP-31 leadership summit in Antalya, Turkey, UN Secretary-General António Guterres warned that the climate crisis is escalating faster than the world's ability to prepare and respond. He has called on world leaders to aggressively intensify greenhouse gas emission reduction efforts.",
+      "latest_development": "Reported: During the COP-31 leadership summit in Antalya, Turkey, UN Secretary-General António Guterres warned that the climate crisis is escalating faster than the world's ability to prepare and respond. He has called on world leaders to aggressively intensify greenhouse gas emission reduction efforts.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-12",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T06:41:57+05:45"
+    },
+    {
+      "event_id": "evt-d9fca61aac9c",
+      "event_key": "us-senate-mississippi-colom",
+      "canonical_title": "Historic Senate Win for Scott Colom in Mississippi",
+      "category": "world_major",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": "2026-11-12",
+      "last_reported": "2026-11-12",
+      "importance": 0,
+      "personal_relevance": 3,
+      "sources": [
+        "bbc.co.uk/news/articles/cw7vppyr80eeo"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Democrat Scott Colom has been elected to the US Senate in Mississippi, marking the first time in over 140 years that a black person has been elected to the Senate from the state. The results were confirmed as part of the recent US elections.",
+      "latest_development": "Reported: Democrat Scott Colom has been elected to the US Senate in Mississippi, marking the first time in over 140 years that a black person has been elected to the Senate from the state. The results were confirmed as part of the recent US elections.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-12",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T06:41:57+05:45"
     }
   ],
   "archived": []
