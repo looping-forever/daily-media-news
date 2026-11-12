@@ -1,63 +1,15 @@
 {
   "models": {
-    "gemini-key2/gemini-3.1-flash-lite": {
-      "hits": 1,
-      "last_hit": "2026-11-12T00:56:37.922519+00:00",
-      "reason": "quota_exhausted",
-      "until": "2026-11-12T06:56:37.922519+00:00"
-    },
-    "gemini-key2/gemini-3.5-flash-lite": {
-      "hits": 1,
-      "last_hit": "2026-11-12T00:56:49.284229+00:00",
-      "reason": "quota_exhausted",
-      "until": "2026-11-12T06:56:49.284229+00:00"
-    },
     "gemini/gemini-3.5-flash-lite": {
       "hits": 1,
-      "last_hit": "2026-11-12T01:36:40.826804+00:00",
+      "last_hit": "2026-11-12T12:56:21.165815+00:00",
       "reason": "quota_exhausted",
-      "until": "2026-11-12T07:36:40.826804+00:00"
-    },
-    "mistral/mistral-small-latest": {
-      "hits": 1,
-      "last_hit": "2026-11-12T01:38:33.639721+00:00",
-      "reason": "quota_exhausted",
-      "until": "2026-11-12T07:38:33.639721+00:00"
-    },
-    "opencode/ling-3.0-flash-fin-free": {
-      "hits": 1,
-      "last_hit": "2026-11-11T02:07:00.301080+00:00",
-      "reason": "model_not_found",
-      "until": "2026-11-12T02:07:00.301080+00:00"
-    },
-    "opencode/mimo-v2.5-free": {
-      "hits": 1,
-      "last_hit": "2026-11-11T04:34:02.587473+00:00",
-      "reason": "model_not_found",
-      "until": "2026-11-12T04:34:02.587473+00:00"
+      "until": "2026-11-12T18:56:21.165815+00:00"
     },
     "opencode/mimo-v2.6-flash-free": {
       "hits": 1,
       "last_hit": "2026-11-12T01:39:30.984704+00:00",
       "reason": "rung_broken"
-    },
-    "opencode/muse-spark-1.2-contributor-free": {
-      "hits": 1,
-      "last_hit": "2026-11-11T02:07:01.910646+00:00",
-      "reason": "model_not_found",
-      "until": "2026-11-12T02:07:01.910646+00:00"
-    },
-    "opencode/muse-spark-1.3-contributor-free": {
-      "hits": 1,
-      "last_hit": "2026-11-11T02:06:58.690964+00:00",
-      "reason": "model_not_found",
-      "until": "2026-11-12T02:06:58.690964+00:00"
-    },
-    "opencode/nemotron-3-ultra-free": {
-      "hits": 1,
-      "last_hit": "2026-11-11T02:07:03.620807+00:00",
-      "reason": "model_not_found",
-      "until": "2026-11-12T02:07:03.620807+00:00"
     },
     "opencode/nemotron-3.5-lightning-free": {
       "hits": 1,
