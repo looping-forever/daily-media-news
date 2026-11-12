@@ -1,47 +1,6 @@
 {
-  "as_of": "2026-11-11T12:58:45Z",
+  "as_of": "2026-11-12T00:57:27Z",
   "days": {
-    "2026-11-05": {
-      "evening": {
-        "attempts": 1,
-        "build": "723ebbf",
-        "edition": "partial",
-        "edition_kind": "partial",
-        "first_ntfy_sent_at": "2026-11-05T13:35:27Z",
-        "http_status": 200,
-        "is_partial": true,
-        "kind": "partial",
-        "ntfy_failed": false,
-        "ntfy_sent_at": "2026-11-05T13:35:27Z",
-        "pending_at": "2026-11-05T13:35:26Z",
-        "scheduled_instant": "2026-11-05T13:35:00Z",
-        "sequence_id": "dmn-2026-11-05-evening",
-        "state": "sent"
-      },
-      "morning": {
-        "actions_dispatch_at": "2026-11-05T01:35:26Z",
-        "actions_dispatch_cause": null,
-        "actions_dispatch_http_status": null,
-        "actions_dispatch_reason": null,
-        "attempts": 1,
-        "build": "723ebbf",
-        "dispatch_failure_class": null,
-        "edition": "fallback",
-        "first_ntfy_sent_at": "2026-11-05T01:35:30Z",
-        "http_status": 200,
-        "kind": "fallback_last_good",
-        "last_good_shown": "2026-11-04",
-        "late_build_dispatched": true,
-        "ntfy_failed": false,
-        "ntfy_sent_at": "2026-11-05T01:35:30Z",
-        "pending_at": "2026-11-05T01:35:26Z",
-        "reject_plain": "no digest was built for morning 2026-11-05.",
-        "reject_reason": "absent | a late build was dispatched",
-        "scheduled_instant": "2026-11-05T01:35:00Z",
-        "sequence_id": "dmn-2026-11-05-morning-full",
-        "state": "sent"
-      }
-    },
     "2026-11-06": {
       "evening": {
         "attempts": 1,
@@ -220,9 +179,20 @@
     },
     "2026-11-11": {
       "evening": {
-        "built_at": "2026-11-11T12:58:39Z",
-        "source_health_state": "ok",
-        "story_count": 8
+        "actions_dispatch_at": "2026-11-11T13:35:36Z",
+        "actions_dispatch_reason": null,
+        "attempts": 2,
+        "build": "723ebbf",
+        "deduped_via": null,
+        "edition": "partial",
+        "first_ntfy_sent_at": "2026-11-11T13:42:49Z",
+        "kind": "partial",
+        "ntfy_sent_at": "2026-11-11T13:42:49Z",
+        "pending_at": "2026-11-11T13:35:26Z",
+        "scheduled_instant": "2026-11-11T13:35:00Z",
+        "sequence_id": "dmn-2026-11-11-evening",
+        "state": "sent",
+        "trigger_source": "worker"
       },
       "morning": {
         "actions_dispatch_at": "2026-11-11T01:35:50Z",
@@ -239,6 +209,13 @@
         "sequence_id": "dmn-2026-11-11-morning",
         "state": "sent",
         "trigger_source": "worker"
+      }
+    },
+    "2026-11-12": {
+      "morning": {
+        "built_at": "2026-11-12T00:57:23Z",
+        "source_health_state": "ok",
+        "story_count": 3
       }
     }
   },
