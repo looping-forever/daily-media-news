@@ -909,6 +909,41 @@
       "title": "Historic Senate Win for Scott Colom in Mississippi",
       "category": "world_major",
       "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74928431",
+      "title_hash": "08b43e0fa4f8748d4fab80aad17a5a236b07e001",
+      "title": "'Mashle: Sanma Taisou Shinkakusha Saishuu Shiken-hen' Reveals Additional Cast, Promo",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "dev.to/taocarts/building-a-real-time-parcel-tracking-feed-with-websockets-1k3a",
+      "title_hash": "ff8d08839fd66be5f3267a513f74d7f762de07b5",
+      "title": "Building a Real-Time Parcel Tracking Feed with WebSockets",
+      "category": "tech_career",
+      "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "dev.to/theophilushawkins9265/fifo-queue-vs-standard-queue-for-failed-jobs-idempotent-consumer-guide-c66",
+      "title_hash": "07ee4bbdda694a7e5749a717ef2843cefe2c9292",
+      "title": "FIFO Queue vs Standard Queue for Failed Jobs: Idempotent Consumer Guide",
+      "category": "tech_career",
+      "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/videos/c60rkwjj7x7go",
+      "title_hash": "faf3cf9d997ed6c87ea12d90a9a04e0c73b5163c",
+      "title": "New York building collapse kills one person and injures 12",
+      "category": "world_major",
+      "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/ck5ynyw527wdo",
+      "title_hash": "febab71025c32ce9f0422924d324ba785569c4af",
+      "title": "Nigeria's president launches re-election manifesto but can he regain voters' trust?",
+      "category": "world_major",
+      "date_sent": "2026-11-12"
     }
   ]
 }
