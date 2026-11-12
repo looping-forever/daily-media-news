@@ -36,8 +36,8 @@ from validate_stories import VALID_CATEGORIES  # noqa: E402
 # keeps its bare headline (the old behaviour) instead of being dropped as a
 # whole and shrinking an edition that already has no model behind it.
 from validate_stories import (crime_violation, is_real_summary,  # noqa: E402
-                              load_excluded_keywords, snippet_index,
-                              spoiler_violation, stub_reason)
+                              load_excluded_keywords, novel_details,
+                              snippet_index, spoiler_violation, stub_reason)
 # And the SAME English-only gate. A headline the page cannot draw must be
 # REFUSED here rather than shipped and dropped later, because this file is the
 # only one that knows how many stories the fallback held back.
@@ -325,6 +325,112 @@ def lead_text(snippet, title, category):
         # publisher's description would be a false claim about the source.
         return ""
     return text
+
+
+#: The deterministic extractive fallback: 1-2 sentences copied out of the
+#: publisher's own text. The floor is the validator's own "real summary" floor,
+#: so an extract can never be text that predicate calls too short; the cap is the
+#: summariser's prompt cap, so a card still reads like a summary.
+EXTRACT_MIN_CHARS = 40
+EXTRACT_MAX_CHARS = 300
+EXTRACT_MAX_SENTENCES = 2
+#: Shorter than this and a "sentence" is page furniture ("Read more", "Photo:"),
+#: not prose worth quoting.
+EXTRACT_MIN_SENTENCE = 20
+
+
+def _sentence_spans(text):
+    """(start, end) of every sentence in *text*, so every span is verbatim."""
+    spans = []
+    for match in re.finditer(r"[^.!?]+[.!?]*", text):
+        start, end = match.span()
+        while start < end and text[start].isspace():
+            start += 1
+        while end > start and text[end - 1].isspace():
+            end -= 1
+        if end - start >= EXTRACT_MIN_SENTENCE:
+            spans.append((start, end))
+    return spans
+
+
+def _trim_to_limit(text, limit):
+    """*text* cut at the last whole word inside *limit*; adds no word of its own."""
+    if len(text) <= limit:
+        return text
+    cut = text.rfind(" ", 0, limit)
+    return text[:cut if cut >= EXTRACT_MIN_CHARS else limit].rstrip(" ,;:-")
+
+
+def _extract_refusal(text, title, snippet, category):
+    """The first gate that refuses *text*, or "" when it may ship.
+
+    Every rule here is the SAME rule the validator runs on a written summary, so
+    text this accepts is never rejected as a stub at validation. Where the
+    validator has a reason string it is returned unchanged, which is what lets
+    the run log say which gate refused how many extracts.
+    """
+    if not english_text.looks_english(text):
+        return "not English"
+    low = text.lower()
+    if any(keyword in low for keyword in EXCLUDED_KEYWORDS):
+        return "excluded keyword"
+    if spoiler_violation(category, "none", text) or crime_violation(text):
+        return "spoiler or crime rule"
+    return stub_reason(text, title, snippet) or ""
+
+
+def extractive_summary(source, title="", snippet="", category=""):
+    """1-2 sentences of the publisher's own text, verbatim; ("", reason) if none.
+
+    DETERMINISTIC and extractive: no model is asked, no sentence is rewritten,
+    and nothing is stitched across a gap -- the result is ALWAYS a contiguous
+    substring of *source*, so a reader can find it on the publisher's page word
+    for word. The span naming the most detail the headline does not wins, then
+    the longer span, then the earlier one, so the same text always yields the
+    same extract.
+
+    It returns ("", reason) rather than a weaker string when every span is
+    refused, and the reason names the gate that refused the last candidate -- a
+    caller that ships nothing must still be able to say why.
+    """
+    text = re.sub(r"\s+", " ", str(source or "")).strip()
+    title_text = re.sub(r"\s+", " ", str(title or "")).strip()
+    if not text:
+        return "", "no publisher text"
+    if title_text and text.lower() == title_text.lower():
+        return "", "the text is the headline"
+    if len(text) < EXTRACT_MIN_CHARS:
+        return "", "text is %d chars, under %d" % (len(text), EXTRACT_MIN_CHARS)
+    if not english_text.looks_english(text):
+        return "", "text is not English"
+    spans = _sentence_spans(text)
+    if not spans:
+        return "", "no sentence long enough to quote"
+    best = None
+    why = "no span inside %d-%d chars" % (EXTRACT_MIN_CHARS, EXTRACT_MAX_CHARS)
+    for start_index in range(len(spans)):
+        for count in range(1, EXTRACT_MAX_SENTENCES + 1):
+            if start_index + count > len(spans):
+                break
+            start = spans[start_index][0]
+            end = spans[start_index + count - 1][1]
+            candidate = text[start:end]
+            if len(candidate) > EXTRACT_MAX_CHARS:
+                if count > 1:
+                    break
+                candidate = _trim_to_limit(candidate, EXTRACT_MAX_CHARS)
+            if len(candidate) < EXTRACT_MIN_CHARS:
+                continue
+            refused = _extract_refusal(candidate, title_text, snippet, category)
+            if refused:
+                why = refused
+                continue
+            score = (len(novel_details(candidate, title_text)), len(candidate))
+            if best is None or score > best[0]:
+                best = (score, candidate)
+    if best is not None:
+        return best[1], ""
+    return "", why
 
 
 def derive(candidates, now=None, held=None):

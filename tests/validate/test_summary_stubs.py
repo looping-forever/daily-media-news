@@ -97,8 +97,8 @@ class CountsOnEveryPathTests(unittest.TestCase):
         facts = vs.edition_facts({}, stories,
                                  snippets={"https://x/1": SNIPPET})
         self.assertEqual("full", facts["edition_kind"])
-        self.assertEqual({"summarised": 1, "publisher": 0, "none": 0,
-                          "total": 1}, facts["summary_counts"])
+        self.assertEqual({"summarised": 1, "publisher": 0, "extracted": 0,
+                          "none": 0, "total": 1}, facts["summary_counts"])
 
     def test_a_stub_is_not_counted_as_ai_written(self):
         stories = [story("https://x/1", PROSE),
@@ -107,8 +107,8 @@ class CountsOnEveryPathTests(unittest.TestCase):
                                  snippets={"https://x/1": SNIPPET,
                                            "https://x/2": SNIPPET})
         self.assertEqual("partial", facts["edition_kind"])
-        self.assertEqual({"summarised": 1, "publisher": 0, "none": 1,
-                          "total": 2}, facts["summary_counts"])
+        self.assertEqual({"summarised": 1, "publisher": 0, "extracted": 0,
+                          "none": 1, "total": 2}, facts["summary_counts"])
 
     def test_publisher_text_is_never_counted_even_when_it_is_prose(self):
         stories = [story("https://x/1", PROSE, source="publisher")]
@@ -140,8 +140,8 @@ class RepairTests(unittest.TestCase):
         self.assertEqual("ai", payload["stories"][0]["summary_source"])
         self.assertEqual(1, counts["written"])
         self.assertEqual("full", payload["edition_kind"])
-        self.assertEqual({"summarised": 2, "publisher": 0, "none": 0,
-                          "total": 2}, payload["summary_counts"])
+        self.assertEqual({"summarised": 2, "publisher": 0, "extracted": 0,
+                          "none": 0, "total": 2}, payload["summary_counts"])
 
     def test_real_prose_is_never_sent_and_never_rewritten(self):
         payload = self._payload([story("https://x/2", PROSE)])
@@ -163,8 +163,8 @@ class RepairTests(unittest.TestCase):
                          "the publisher's own description, quoted verbatim")
         self.assertEqual("publisher", payload["stories"][0]["summary_source"])
         self.assertEqual("unsummarised", payload["edition_kind"])
-        self.assertEqual({"summarised": 0, "publisher": 1, "none": 0,
-                          "total": 1}, payload["summary_counts"])
+        self.assertEqual({"summarised": 0, "publisher": 1, "extracted": 0,
+                          "none": 0, "total": 1}, payload["summary_counts"])
         self.assertIn("No AI summary", payload["notes"],
                       "the note has to say it, not stay silent")
 
@@ -268,8 +268,8 @@ class RepairTests(unittest.TestCase):
         self.assertEqual("ai", after["stories"][0]["summary_source"])
         self.assertEqual(PROSE, after["stories"][1]["summary"],
                          "a summary that already passed is never rewritten")
-        self.assertEqual({"summarised": 2, "publisher": 0, "none": 0,
-                          "total": 2}, after["summary_counts"])
+        self.assertEqual({"summarised": 2, "publisher": 0, "extracted": 0,
+                          "none": 0, "total": 2}, after["summary_counts"])
         self.assertEqual(1, after["notes"].count("an AI wrote the summary"),
                          "the deriver's stale count sentence is replaced, not "
                          "joined by a second one: %r" % after["notes"])
@@ -323,8 +323,8 @@ class RepairTests(unittest.TestCase):
                       "https://x/3": DESCRIPTION},
             summarise=lambda rows, **_kw: {"summaries": {"https://x/1": PROSE}},
             log=lambda *_a: None, derived=True)
-        self.assertEqual({"summarised": 1, "publisher": 2, "none": 0,
-                          "total": 3}, payload["summary_counts"],
+        self.assertEqual({"summarised": 1, "publisher": 2, "extracted": 0,
+                          "none": 0, "total": 3}, payload["summary_counts"],
                          "one of three was written; the other two are not")
         self.assertEqual("partial", payload["edition_kind"])
         self.assertIn("an AI wrote the summary for 1 of 3 stories",

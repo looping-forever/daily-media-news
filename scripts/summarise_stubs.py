@@ -161,6 +161,12 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
     source text as well as used to judge and to quote. It was never passed
     through before, so the ladder was asked to rewrite the very stub it was
     meant to replace.
+
+    WHEN NO MODEL ANSWERS, the extractive fallback runs first: 1-2 sentences of
+    the publisher's own text, picked by a fixed rule and copied verbatim, marked
+    `summary_source: "extractive"` and counted on its own. It costs no request,
+    it rewrites nothing, and it is only accepted when the SAME predicate the
+    validator runs would accept it -- otherwise the story keeps the old paths.
     """
     import summarise_stories
     snippets = snippets or {}
@@ -172,7 +178,7 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
     if not found:
         log("summarise_stubs: every story already has a written summary")
         return {"stubs": 0, "written": 0, "publisher": 0, "none": 0,
-                "dropped": 0, "budget_spent": False}
+                "dropped": 0, "extracted": 0, "budget_spent": False}
 
     log("summarise_stubs: %d of %d stories have no written summary; asking the "
         "ladder (allowance %ds)" % (len(found), len(stories), spend))
@@ -202,9 +208,11 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
         result = {"summaries": {}, "requests": 0, "budget_spent": True,
                   "attempts": 1, "reasons": {"ladder_error": 1}}
     summaries = result.get("summaries") or {}
+    fetched = result.get("fetched_text") or {}
     model = str(result.get("model") or "")
-    written = publisher = none = dropped = 0
+    written = publisher = none = dropped = extracted = 0
     rejected = []
+    refused = {}
     stub_ids = {id(story) for story in found}
     kept = []
     for index, story in enumerate(stories):
@@ -230,6 +238,23 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
                 "reason": validate_stories.stub_reason(
                     text, story.get("title"), snippet),
             })
+        # NO MODEL ANSWER -- OR AN ANSWER THE PREDICATE REFUSED. Before quoting
+        # the feed's description whole, 1-2 sentences of the publisher's own text
+        # are picked by a fixed rule: no request, no rewrite, and a source label
+        # of its own so the page can say how many cards were extracted.
+        extract, why = derive_unsummarised.extractive_summary(
+            fetched.get(_url(story), "") or snippet, story.get("title"),
+            snippet, story.get("category"))
+        if extract:
+            story["summary"] = extract
+            story["summary_source"] = "extractive"
+            extracted += 1
+            kept.append(story)
+            continue
+        if why:
+            # Counted by the gate that refused, so "0 extracted" is never a
+            # shrug: the run says which rule is doing the refusing.
+            refused[why] = refused.get(why, 0) + 1
         # NO MODEL, NO INVENTED SENTENCE. The publisher's own description is
         # quoted verbatim when the feed carried one.
         fallback = derive_unsummarised.lead_text(
@@ -277,7 +302,8 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
             facts["summary_counts"]["summarised"],
             facts["summary_counts"]["total"],
             facts["summary_counts"]["publisher"],
-            facts["summary_counts"]["none"])
+            facts["summary_counts"]["none"],
+            extracted=facts["summary_counts"].get("extracted", 0))
         if edition_kind.has_model_note(existing):
             sentence = ""
     if sentence:
@@ -305,13 +331,21 @@ def repair(payload, snippets=None, summarise=None, log=print, derived=False,
             # ladder (run 42321136172: 0 of 11, one log line, no reason).
             log("summarise_stubs: 0 repaired, %d left \u2014 %s"
                 % (max(0, len(found) - written), why))
-    log("summarise_stubs: replaced %d with written summaries, %d with publisher "
-        "text, %d left without a summary, %d dropped; edition_kind=%s (%d of %d)"
-        % (written, publisher, none, dropped, facts["edition_kind"],
+    log("summarise_stubs: replaced %d with written summaries, %d with extracted "
+        "sentences, %d with publisher text, %d left without a summary, %d "
+        "dropped; edition_kind=%s (%d of %d)"
+        % (written, extracted, publisher, none, dropped,
+           facts["edition_kind"],
            facts["summary_counts"]["summarised"],
            facts["summary_counts"]["total"]))
+    if refused:
+        detail = ", ".join(
+            "%s=%d" % (gate, count) for gate, count in
+            sorted(refused.items(), key=lambda kv: (-kv[1], kv[0])))
+        log("summarise_stubs: %d story(ies) had no usable extract (%s)"
+            % (sum(refused.values()), detail))
     return {"stubs": len(found), "written": written, "publisher": publisher,
-            "none": none, "dropped": dropped,
+            "extracted": extracted, "none": none, "dropped": dropped,
             "budget_spent": bool(result.get("budget_spent"))}
 
 
@@ -350,7 +384,7 @@ def main(argv=None):
     debug_path = os.path.join(os.path.dirname(os.path.abspath(args.in_path))
                               or ".", "summarise-debug.json")
     counts = {"stubs": 0, "written": 0, "publisher": 0, "none": 0,
-              "dropped": 0}
+              "dropped": 0, "extracted": 0}
     failed = False
     try:
         counts = repair(payload, validate_stories.snippet_index(args.candidates),

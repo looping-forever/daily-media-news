@@ -41,7 +41,24 @@ def _carry(n):
     return "carries no summary" if n == 1 else "carry no summary"
 
 
-def coverage_phrase(publisher, none, total=None):
+#: A card whose body is single sentences copied verbatim from the publisher's
+#: own text by the deterministic extractor. It is neither AI-written nor the
+#: feed's description quoted whole, so it gets its own count and its own
+#: half-sentence: the page must show how many cards were extracted, not written.
+NOTE_EXTRACTED = (" %d of them are single sentences picked out of the "
+                  "publisher's text.")
+
+
+def extracted_clause(extracted):
+    """`" 3 of them are single sentences picked ..."`, or "" when there are none."""
+    try:
+        count = int(extracted or 0)
+    except (TypeError, ValueError):
+        return ""
+    return NOTE_EXTRACTED % count if count > 0 else ""
+
+
+def coverage_phrase(publisher, none, total=None, extracted=0):
     """Who supplied the text for the stories no model wrote -- and how many have none.
 
     RUN 42074891307: the note said "the rest quote the publisher's own
@@ -49,24 +66,33 @@ def coverage_phrase(publisher, none, total=None):
     a written summary nor publisher text is stated as such, never folded into the
     publisher claim. All four combinations resolve here, so no caller has to
     guess which half is true.
+
+    `extracted` names the subset of the publisher-side cards whose text was
+    picked out sentence by sentence rather than quoted whole. It defaults to 0,
+    which keeps every sentence written before that count existed byte-identical.
     """
     if publisher <= 0:
         if total is not None and none >= total:
-            return "no story carries a summary of its own"
-        return "%d %s" % (none, _carry(none))
+            return "no story carries a summary of its own" \
+                + extracted_clause(extracted)
+        return "%d %s" % (none, _carry(none)) + extracted_clause(extracted)
     if none <= 0:
-        return "the rest quote the publisher's own description"
+        return "the rest quote the publisher's own description" \
+            + extracted_clause(extracted)
     return ("%d quote the publisher's own description and %d %s"
-            % (publisher, none, _carry(none)))
+            % (publisher, none, _carry(none))) + extracted_clause(extracted)
 
 
-def sourcing_note(kind, written, total, publisher, none, fallback=True):
+def sourcing_note(kind, written, total, publisher, none, fallback=True,
+                  extracted=0):
     """The count sentence for all four combinations of written/publisher text."""
     if written <= 0:
         if publisher <= 0:
-            return NOTE_NO_TEXT_FALLBACK if fallback else NOTE_NO_TEXT_MODEL
+            return (NOTE_NO_TEXT_FALLBACK if fallback else NOTE_NO_TEXT_MODEL) \
+                + extracted_clause(extracted)
         if none <= 0:
-            return NOTE_NONE_SURVIVED if fallback else NOTE_MODEL_NONE
+            return (NOTE_NONE_SURVIVED if fallback else NOTE_MODEL_NONE) \
+                + extracted_clause(extracted)
         pattern = NOTE_REST_FALLBACK if fallback else NOTE_REST_MODEL
         # BOTH sentences carry two counts AND the coverage phrase. This branch
         # passed only the phrase, so a model-written edition with 0 written,
@@ -75,16 +101,17 @@ def sourcing_note(kind, written, total, publisher, none, fallback=True):
         # own note -- the one path whose whole job is to say why it repaired
         # nothing.
         return pattern % (written, total,
-                          coverage_phrase(publisher, none, total))
+                          coverage_phrase(publisher, none, total, extracted))
     if kind == FULL:
         return NOTE_ALL % total
     if none <= 0:
-        return NOTE_SOME % (written, total)
+        return NOTE_SOME % (written, total) + extracted_clause(extracted)
     pattern = NOTE_REST_FALLBACK if fallback else NOTE_REST_MODEL
-    return pattern % (written, total, coverage_phrase(publisher, none, total))
+    return pattern % (written, total,
+                      coverage_phrase(publisher, none, total, extracted))
 
 
-def summary_note(kind, written, total, publisher=None, none=None):
+def summary_note(kind, written, total, publisher=None, none=None, extracted=0):
     """The one sentence a fallback edition prints about who wrote its summaries."""
     if written <= 0:
         # Zero is the deriver's ground: it knows WHY no model answered, and that
@@ -95,8 +122,9 @@ def summary_note(kind, written, total, publisher=None, none=None):
         # sentence that pair can prove: the rest is all it knows.
         if kind == FULL:
             return NOTE_ALL % total
-        return NOTE_SOME % (written, total)
-    return sourcing_note(kind, written, total, publisher, none, fallback=True)
+        return NOTE_SOME % (written, total) + extracted_clause(extracted)
+    return sourcing_note(kind, written, total, publisher, none, fallback=True,
+                         extracted=extracted)
 
 
 #: A MODEL-WRITTEN edition that still has unwritten summaries. "Fallback
@@ -120,15 +148,16 @@ NOTE_NO_TEXT_MODEL = ("No AI summary survived for this edition, and no story "
                       "carries a summary of its own.")
 
 
-def model_note(kind, written, total, publisher=None, none=None):
+def model_note(kind, written, total, publisher=None, none=None, extracted=0):
     """The sentence a model-written edition needs, or None when it needs none."""
     if kind == FULL:
         return None
     if publisher is None or none is None:
         if kind == UNSUMMARISED or written <= 0:
-            return NOTE_MODEL_NONE
-        return NOTE_MODEL_SOME % (written, total)
-    return sourcing_note(kind, written, total, publisher, none, fallback=False)
+            return NOTE_MODEL_NONE + extracted_clause(extracted)
+        return NOTE_MODEL_SOME % (written, total) + extracted_clause(extracted)
+    return sourcing_note(kind, written, total, publisher, none, fallback=False,
+                         extracted=extracted)
 
 
 def has_model_note(notes):

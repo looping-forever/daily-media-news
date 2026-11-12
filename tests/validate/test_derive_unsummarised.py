@@ -487,8 +487,8 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
     def test_a_dropped_written_story_lowers_both_numbers(self):
         data = self.payload(["ai", "ai", "ai", "publisher"])
         facts = vs.edition_facts(data, data["stories"][:3])
-        self.assertEqual({"summarised": 3, "publisher": 0, "none": 0,
-                          "total": 3}, facts["summary_counts"])
+        self.assertEqual({"summarised": 3, "publisher": 0, "extracted": 0,
+                          "none": 0, "total": 3}, facts["summary_counts"])
         self.assertEqual("full", facts["edition_kind"],
                          "the name must describe what survived, not what was sent")
 
@@ -501,8 +501,8 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
         data = self.payload(["ai", "ai", "publisher", "publisher"])
         facts = vs.edition_facts(data, data["stories"][:3])
         self.assertEqual("partial", facts["edition_kind"])
-        self.assertEqual({"summarised": 2, "publisher": 1, "none": 0,
-                          "total": 3}, facts["summary_counts"])
+        self.assertEqual({"summarised": 2, "publisher": 1, "extracted": 0,
+                          "none": 0, "total": 3}, facts["summary_counts"])
 
     def test_a_model_written_payload_gains_truthful_counts(self):
         """The round-4 contract: every path gets counts, not only the deriver's.
@@ -519,8 +519,8 @@ class TheValidatorRecountsTheKind(unittest.TestCase):
                 "Wednesday, and the district allocation rises by nine percent."}]}
         facts = vs.edition_facts(data, data["stories"])
         self.assertEqual("partial", facts["edition_kind"])
-        self.assertEqual({"summarised": 1, "publisher": 0, "none": 1,
-                          "total": 2}, facts["summary_counts"])
+        self.assertEqual({"summarised": 1, "publisher": 0, "extracted": 0,
+                          "none": 1, "total": 2}, facts["summary_counts"])
 
 
 class TheNoteFollowsTheSameCount(unittest.TestCase):

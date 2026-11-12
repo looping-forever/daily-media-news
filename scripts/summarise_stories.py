@@ -1093,7 +1093,8 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
     Returns {"summaries": {url: text}, "model": last model that answered,
              "requests": int, "waits": [s], "refusals": [str], "debug": [dict],
              "causes": {cause: stories lost}, "attempts": int,
-             "reasons": {reason: failed attempts}, "closest": dict|None}.
+             "reasons": {reason: failed attempts}, "closest": dict|None,
+             "fetched_text": {url: article text fetched in this run}}.
 
     Nothing here raises for a model problem: an edition with no summaries is a
     valid outcome that the caller labels, and a crash here would cost the
@@ -1169,7 +1170,7 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
            "refusals": [], "debug": [], "causes": {},
            "attempts": 0, "reasons": {}, "closest": None,
            "retired": 0, "skipped_no_text": 0, "article_fetch": {},
-           "budget_spent": False, "seconds": 0.0}
+           "budget_spent": False, "seconds": 0.0, "fetched_text": {}}
     #: Rungs demoted by a refusal IN THIS RUN. They are skipped for the rest of
     #: it (run 42070185644 paid the same broken rung in all three batches), but
     #: never removed outright: if every other rung refuses, the fallback is the
@@ -1542,6 +1543,9 @@ def summarise(stories, models=None, run=None, sleep=None, clock=None,
                 "for them" % len(pending))
 
     out["waits"].extend(pacer.waits)
+    # HANDED BACK, not thrown away at the end of the walk: the repair stage can
+    # extract sentences from the article this phase already fetched, for free.
+    out["fetched_text"] = dict(fetched_text or {})
     out["seconds"] = round(max(0.0, clock() - started), 1)
     save_memory()
     log("summarise_stories: %d of %d stories summarised in %d request(s), "

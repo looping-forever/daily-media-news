@@ -2489,9 +2489,11 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         counts = (meta or {}).get("summary_counts")
         written = total = None
         publisher = none = None
+        extracted = 0
         if isinstance(counts, dict):
             written, total = counts.get("summarised"), counts.get("total")
             publisher, none = counts.get("publisher"), counts.get("none")
+            extracted = counts.get("extracted") or 0
         # The publisher claim is only printable when publisher text exists. A
         # payload predating the two extra counts keeps the old wording, which its
         # stories really did carry; a payload that has them says exactly what it
@@ -2523,6 +2525,11 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         else:
             edition_line = UNSUMMARISED_LABEL if derived \
                 else UNSUMMARISED_MODEL_LABEL
+        # HOW MANY of the publisher-side cards are sentences picked out of that
+        # text rather than the feed's description quoted whole. Absent count (an
+        # older payload) appends nothing, so its sentence is unchanged.
+        if edition_line:
+            edition_line += edition_kind.extracted_clause(extracted)
         # A short edition must say what made it short. The count is DATA on the
         # payload (`held_back.count`), written once by the pipeline; only a payload
         # predating that field is read back off its notes text.

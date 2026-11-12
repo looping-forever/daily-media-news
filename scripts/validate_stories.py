@@ -1785,9 +1785,10 @@ def _is_ai_written(story, snippets):
     """One story's contribution to `summary_counts.summarised`."""
     if not isinstance(story, dict):
         return False
-    # The deriver and the repair record whose text this is; neither fallback is
-    # ever AI-written, however long the publisher's description happens to be.
-    if story.get("summary_source") in ("publisher", "none"):
+    # The deriver and the repair record whose text this is; none of the three
+    # fallbacks is ever AI-written, however long the publisher's description
+    # happens to be. `extractive` is sentences copied from that description.
+    if story.get("summary_source") in ("publisher", "none", "extractive"):
         return False
     url = story.get("source_url") or story.get("url")
     return is_real_summary(story.get("summary"), story.get("title"),
@@ -1807,17 +1808,22 @@ def edition_facts(data, final_stories, snippets=None):
     stub is not counted as AI-written merely because it is non-empty.
     """
     snippets = snippets or {}
-    written = publisher = none = 0
+    written = publisher = none = extracted = 0
     for story in final_stories:
         if _is_ai_written(story, snippets):
             written += 1
             continue
-        # Publisher text is only what a stage labelled publisher AND left a body
-        # for. Everything else carries no summary at all, and the note says so
-        # instead of calling an empty body the publisher's description.
-        if isinstance(story, dict) \
-                and story.get("summary_source") == "publisher" \
-                and str(story.get("summary") or "").strip():
+        # Publisher text is only what a stage labelled publisher OR extractive
+        # AND left a body for. Everything else carries no summary at all, and the
+        # note says so instead of calling an empty body the publisher's
+        # description. The two publisher-side shapes are counted apart because
+        # the page names them apart.
+        source = story.get("summary_source") if isinstance(story, dict) else None
+        body = str(story.get("summary") or "").strip() \
+            if isinstance(story, dict) else ""
+        if source == "extractive" and body:
+            extracted += 1
+        elif source == "publisher" and body:
             publisher += 1
         else:
             none += 1
@@ -1825,6 +1831,7 @@ def edition_facts(data, final_stories, snippets=None):
     return {"edition_kind": edition_kind.kind_for(written, total),
             "summary_counts": {"summarised": written,
                                "publisher": publisher,
+                               "extracted": extracted,
                                "none": none,
                                "total": total}}
 
@@ -1848,7 +1855,8 @@ def rewritten_note(facts, notes):
     note = edition_kind.sourcing_note(facts["edition_kind"],
                                       counts["summarised"], counts["total"],
                                       counts["publisher"], counts["none"],
-                                      fallback=True)
+                                      fallback=True,
+                                      extracted=counts.get("extracted", 0))
     if note:
         return note
     if edition_kind.NOTE_COUNT_MARKER in str(notes or ""):
