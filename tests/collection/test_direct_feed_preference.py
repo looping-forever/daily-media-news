@@ -62,7 +62,10 @@ class TestDirectFeedPreference(unittest.TestCase):
         final, _per_domain, stats = cn.postprocess([google, direct], [], 4)
         self.assertEqual([c["url"] for c in final], [direct["url"]])
         self.assertIn("ending three weeks of deadlock", final[0]["snippet"])
-        self.assertEqual(stats["google_replaced"], 1)
+        # The Google item no longer reaches this pass at all: collection drops
+        # it by host, so the counted reason is the drop, not a replacement.
+        self.assertEqual(stats["dropped_google_unresolvable"], 1)
+        self.assertEqual(stats["google_replaced"], 0)
         self.assertEqual(stats["google_kept"], 0)
 
     def test_an_outlet_suffix_still_matches(self):
@@ -134,7 +137,12 @@ class TestDirectFeedPreference(unittest.TestCase):
         _kept, stats = cn.prefer_direct_feeds([google_dup, google_only, direct])
         self.assertEqual(
             cn.google_preference_line(stats),
-            "google-news: 1 replaced by a direct feed item, 1 kept")
+            "google-news: 0 dropped as unresolvable (no publisher URL), "
+            "1 replaced by a direct feed item, 1 kept")
+        self.assertEqual(
+            cn.google_preference_line({"dropped_google_unresolvable": 222}),
+            "google-news: 222 dropped as unresolvable (no publisher URL), "
+            "0 replaced by a direct feed item, 0 kept")
 
 
 if __name__ == "__main__":

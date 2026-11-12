@@ -358,6 +358,19 @@ DIRECT_FEEDS = (
     # -- world -------------------------------------------------------------
     ("feed:world-bbc", "https://feeds.bbci.co.uk/news/world/rss.xml",
      "world_major", "en"),
+    # ADDED 2026-11-12, each fetched that day and accepted only on a real RSS
+    # 2.0 body with at least 5 <item> and 3 dated titles: guardian 45,
+    # nytimes 57, aljazeera 25, france24 24. Rejected on the same pass: The
+    # Verge (Atom <feed>, which rss_task refuses), Nature (RSS 1.0 <rdf>).
+    ("feed:world-guardian", "https://www.theguardian.com/world/rss",
+     "world_major", "en"),
+    ("feed:world-nytimes",
+     "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+     "world_major", "en"),
+    ("feed:world-aljazeera", "https://www.aljazeera.com/xml/rss/all.xml",
+     "world_major", "en"),
+    ("feed:world-france24", "https://www.france24.com/en/rss",
+     "world_major", "en"),
     # -- nepal -------------------------------------------------------------
     ("feed:nepal-onlinekhabar", "https://www.onlinekhabar.com/feed",
      "nepal", "ne"),
@@ -365,13 +378,38 @@ DIRECT_FEEDS = (
      "nepal", "en"),
     ("feed:nepal-nepalnews", "https://english.nepalnews.com/feed/",
      "nepal", "en"),
+    # ADDED 2026-11-12, verified the same day (items): nepalitimes 30,
+    # khabarhub-en 12, nepalpress-en 21. Rejected: Kathmandu Post and
+    # Spotlight Nepal (RSS with no dates at all), Ratopati (body is not XML),
+    # Himalayan Times and MyRepublica (404), Setopati (500).
+    ("feed:nepal-nepalitimes", "https://www.nepalitimes.com/feed/",
+     "nepal", "en"),
+    ("feed:nepal-khabarhub-en", "https://english.khabarhub.com/feed/",
+     "nepal", "en"),
+    ("feed:nepal-nepalpress-en", "https://english.nepalpress.com/feed/",
+     "nepal", "en"),
     # -- tech / career -----------------------------------------------------
     ("feed:tech-stackoverflow", "https://stackoverflow.blog/feed/",
      "tech_career", "en"),
     ("feed:tech-lobsters", "https://lobste.rs/rss", "tech_career", "en"),
     ("feed:tech-hnrss", "https://hnrss.org/frontpage", "tech_career", "en"),
     ("feed:tech-githubblog", "https://github.blog/feed/", "tech_career", "en"),
-    ("feed:tech-devto", "https://dev.to/feed", "tech_career", "en"),
+    # dev.to is GONE, not moved: 10 of 35 cards in 3 days came from it, and
+    # some were vendors writing about their own products. Reported publishers
+    # replace it below (ars 20, techcrunch 20, theregister 50 items on
+    # 2026-11-12), and the host stays blocked in SELF_PUBLISHED_HOSTS so a
+    # dev.to link cannot re-enter through any other lane.
+    ("feed:tech-arstechnica",
+     "https://feeds.arstechnica.com/arstechnica/index", "tech_career", "en"),
+    ("feed:tech-techcrunch", "https://techcrunch.com/feed/",
+     "tech_career", "en"),
+    ("feed:tech-theregister", "https://www.theregister.com/headlines.atom",
+     "tech_career", "en"),
+    # -- gaming, second pass (2026-11-12) ----------------------------------
+    # The gaming feeds above supplied 6 of 35 cards between them; this trade
+    # title is a reported publisher, not a self-published blog.
+    ("feed:gaming-gamedeveloper", "https://www.gamedeveloper.com/rss.xml",
+     "gaming", "en"),
 )
 
 #: How many titles from EACH configured interest list are actually turned into
@@ -2970,10 +3008,33 @@ def collect_parallel(plans, cfg=None):
 # Post-processing: filters, dedup, caps
 # ---------------------------------------------------------------------------
 
-#: A Google News link is a redirect: short snippet, no article text. When the
-#: same story also arrived from a publisher feed, the direct item must survive.
+#: A Google News link is a redirect whose target cannot be recovered: the URL id
+#: is encrypted and news.google.com serves `Disallow: /` to crawlers. MEASURED
+#: over 3 days / 7 editions / 35 cards: 222 of 541 candidates (41%) arrived this
+#: way, 0 of them resolved to publisher text, 0 of the 35 cards came from one,
+#: and they were 51 of the 57 textless skips. So they are dropped at collection.
 GOOGLE_NEWS_HOST = "news.google.com"
-#: Minimum characters one normalized headline must share to be "inside" another.
+GOOGLE_DROP_REASON = "google-unresolvable"
+
+#: Publishers whose content is written by whoever opens an account: no editor,
+#: no desk, no correction policy. MEASURED: dev.to alone supplied 10 of 35 cards
+#: in 3 days, some of them vendors writing about their own products, and the
+#: owner approved removing it. The rest are the same shape of platform (a free
+#: account publishes directly), which is the reason they are named here as hosts
+#: rather than guessed at by keywords.
+SELF_PUBLISHED_HOSTS = (
+    "dev.to",
+    "medium.com",
+    "hashnode.com",
+    "substack.com",
+    "wordpress.com",
+    "blogspot.com",
+)
+SELF_PUBLISHED_DROP_REASON = "self-published"
+
+#: A Google News item that duplicates a publisher feed still hands its date,
+#: snippet and image to the direct item before it is dropped -- never the other
+#: way round.
 STORY_OVERLAP_CHARS = 25
 _OUTLET_SUFFIX_RE = re.compile(
     r"\s+[\-\u2013\u2014|]\s+[^\-\u2013\u2014|]{1,60}$")
@@ -2999,8 +3060,30 @@ def same_story(a, b):
     return a in b or b in a
 
 
+def host_matches(url, hosts):
+    """True when the URL's host IS one of `hosts`, or a subdomain of one."""
+    host = netloc_of(url)
+    if not host:
+        return False
+    return any(host == h or host.endswith("." + h) for h in hosts)
+
+
 def is_google_news_item(cand):
-    return netloc_of(cand.get("url", "")) == GOOGLE_NEWS_HOST
+    return host_matches(cand.get("url", ""), (GOOGLE_NEWS_HOST,))
+
+
+def drop_reason_for(cand):
+    """The counted filter reason a candidate is refused at collection, or ''.
+
+    Host, never keyword: `dev.to` is refused because the platform publishes
+    anyone, not because a title looks promotional.
+    """
+    url = cand.get("url", "")
+    if host_matches(url, (GOOGLE_NEWS_HOST,)):
+        return GOOGLE_DROP_REASON
+    if host_matches(url, SELF_PUBLISHED_HOSTS):
+        return SELF_PUBLISHED_DROP_REASON
+    return ""
 
 
 def _carry_over(survivor, donor):
@@ -3047,8 +3130,17 @@ def prefer_direct_feeds(candidates):
 
 
 def google_preference_line(stats):
-    return ("google-news: %d replaced by a direct feed item, %d kept"
-            % (stats.get("google_replaced", 0), stats.get("google_kept", 0)))
+    return ("google-news: %d dropped as unresolvable (no publisher URL), "
+            "%d replaced by a direct feed item, %d kept"
+            % (stats.get("dropped_google_unresolvable", 0),
+               stats.get("google_replaced", 0),
+               stats.get("google_kept", 0)))
+
+
+def self_published_line(stats):
+    return ("self-published: %d dropped (%s)"
+            % (stats.get("dropped_self_published", 0),
+               ", ".join(SELF_PUBLISHED_HOSTS)))
 
 
 def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
@@ -3057,10 +3149,21 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
 
     prepared = []
     dropped_stale = dropped_keyword = 0
+    dropped_google = dropped_self_published = 0
     for cand in raw_candidates:
         dt = cand.pop("_dt", None)
         kind = cand.pop("_kind", "")
         plan = cand.pop("_plan", "")
+        # FIRST, before any other filter: a candidate whose host makes it
+        # unreadable or unedited is not news this page can print. Counted, so
+        # the loss is visible in telemetry instead of looking like thin news.
+        reason = drop_reason_for(cand)
+        if reason == GOOGLE_DROP_REASON:
+            dropped_google += 1
+            continue
+        if reason == SELF_PUBLISHED_DROP_REASON:
+            dropped_self_published += 1
+            continue
         text = ("%s %s" % (cand.get("title", ""), cand.get("snippet", ""))).lower()
         if any(kw in text for kw in excluded_keywords_lower):
             dropped_keyword += 1
@@ -3161,6 +3264,8 @@ def postprocess(raw_candidates, excluded_keywords_lower, max_per_domain):
     stats = {
         "dropped_stale": dropped_stale,
         "dropped_keyword": dropped_keyword,
+        "dropped_google_unresolvable": dropped_google,
+        "dropped_self_published": dropped_self_published,
         "dropped_dup_url": drops["dup_url"],
         "dropped_dup_title": drops["dup_title"],
         "dropped_domain_cap": drops["domain_cap"],
@@ -3337,6 +3442,7 @@ def main(argv=None):
              stats["dropped_dup_url"], stats["dropped_dup_title"],
              stats["dropped_domain_cap"]))
     print("  %s" % google_preference_line(stats))
+    print("  %s" % self_published_line(stats))
     print("  out: %s | timings: %s" % (args.out_path, args.timings_path))
     return 0
 

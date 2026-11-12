@@ -64,12 +64,12 @@ DERIVED_ONLY = ("action",)
 #: Direct RSS feeds configured in this change, by section key. Asserted
 #: individually so a single mis-tagged feed cannot hide behind eighteen others.
 EXPECTED_FEED_SECTIONS = {
-    "gaming": 6,
+    "gaming": 7,
     "anime": 2,
     "manga_manhwa_manhua": 1,
-    "world_major": 1,
-    "nepal": 3,
-    "tech_career": 5,
+    "world_major": 5,
+    "nepal": 6,
+    "tech_career": 7,
 }
 
 
