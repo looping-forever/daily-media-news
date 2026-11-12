@@ -39,6 +39,8 @@ import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 
+import check_public_sanitisation as _private_vocabulary
+
 STATE_VERSION = 1
 MERGE_TITLE_JACCARD = 0.6
 MATERIAL_CHANGE_JACCARD = 0.85
@@ -46,6 +48,24 @@ STALE_AFTER_DAYS = 7
 ARCHIVE_AFTER_DAYS = 30
 ARCHIVE_CAP = 200
 KATHMANDU_OFFSET = timedelta(hours=5, minutes=45)
+
+#: What a private-vocabulary run is replaced with when a story reaches the
+#: state file. A deleted run leaves a broken sentence; a placeholder keeps the
+#: fact readable and removes only the private part.
+PRIVATE_RUN_REPLACEMENT = _private_vocabulary.REDACTED
+
+
+def redact_private_runs(text):
+    """Replace every run whose SHA-256 is in the private vocabulary.
+
+    THIS IS THE GUARD AT THE WRITE, not a scrub afterwards. scripts/
+    check_public_sanitisation.py holds the vocabulary as fingerprints and no
+    plaintext, and redact() there is the same rule the gate refuses on, run in
+    reverse. So a story that quotes a real article naming a private value can
+    never reach state/active_stories.json -- the file that IS published -- even
+    if the article is fetched again or the event is rewritten by a later run.
+    """
+    return _private_vocabulary.redact(text)
 
 
 class StateCorruptionError(Exception):
@@ -245,9 +265,10 @@ def upsert_sighting(state, story, today):
     today_d = _coerce_today(today)
     today_iso = today_d.isoformat()
     now_iso = kathmandu_now_iso()
-    canonical_title = _story_title(story)
+    canonical_title = redact_private_runs(_story_title(story))
     urls = _story_urls(story)
-    known_facts = (story.get("known_facts") or story.get("summary") or "").strip()
+    known_facts = redact_private_runs(
+        (story.get("known_facts") or story.get("summary") or "").strip())
 
     eid = match_event(story, state.get("stories", []))
     ev = None
@@ -265,7 +286,8 @@ def upsert_sighting(state, story, today):
             if story.get(key) is not None:
                 ev[key] = story[key]
         ev["known_facts"] = known_facts
-        ev["latest_development"] = (story.get("latest_development") or known_facts).strip()
+        ev["latest_development"] = redact_private_runs(
+            (story.get("latest_development") or known_facts).strip())
         if story.get("deadline"):
             ev["deadline"] = story["deadline"]
         if story.get("effective_date"):
@@ -294,7 +316,8 @@ def upsert_sighting(state, story, today):
     revived = ev.get("status") in ("RESOLVED", "STALE")
     if material:
         ev["known_facts"] = known_facts
-        ev["latest_development"] = (story.get("latest_development") or known_facts).strip()
+        ev["latest_development"] = redact_private_runs(
+            (story.get("latest_development") or known_facts).strip())
     if material or revived:
         ev["status"] = "DEVELOPING"
 

@@ -164,6 +164,29 @@ def is_text(path):
     return True
 
 
+#: What a matched run becomes when a WRITER redacts instead of being refused.
+#: The gate itself never writes this: it reports and exits non-zero.
+REDACTED = "[redacted]"
+
+
+def redact(text, vocabulary=None):
+    """Return `text` with every known run replaced by REDACTED.
+
+    The same rule as scan_text, run in reverse, so a writer can guarantee the
+    gate passes instead of being refused after the words are already in a file.
+    """
+    if not text or not isinstance(text, str):
+        return text
+    vocabulary = VOCABULARY_SET if vocabulary is None else vocabulary
+
+    def swap(match):
+        if fingerprint(match.group(0)) in vocabulary:
+            return REDACTED
+        return match.group(0)
+
+    return TOKEN_RE.sub(swap, text)
+
+
 def scan_tree(root, vocabulary=None):
     """Yield (relative_path, line_number, digest) for the whole tree."""
     vocabulary = VOCABULARY_SET if vocabulary is None else vocabulary

@@ -167,7 +167,7 @@ def main(argv=None):
         entry = {
             "url_normalized": url_norm,
             "title_hash": thash,
-            "title": story.get("title", ""),
+            "title": story_state.redact_private_runs(story.get("title", "")),
             "category": story.get("category", ""),
             "date_sent": date_sent,
         }
