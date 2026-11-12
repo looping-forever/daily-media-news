@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-12T18:41:30+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -17962,6 +17962,90 @@
       "updated_at": "2026-11-12T17:57:58+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
+    },
+    {
+      "event_id": "evt-6bbd995d0ab3",
+      "event_key": "bhimphedi-accident-nov12",
+      "canonical_title": "Bhimphedi Road Accident: Three More Victims Identified",
+      "category": "nepal",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": "2026-11-12",
+      "last_reported": "2026-11-12",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2056412/three-more-victims-of-bhimphedi-accident-identified"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Authorities have identified three additional victims of the EV vehicle accident that occurred this morning in Chishapani Gadi, Bhimphedi rural municipality. The deceased have been identified as Rakesh Yadav (35), Chotu Ray (28), and Sudesh Yadav (approx. 17), all from Sarlahi.",
+      "latest_development": "Reported: Authorities have identified three additional victims of the EV vehicle accident that occurred this morning in Chishapani Gadi, Bhimphedi rural municipality. The deceased have been identified as Rakesh Yadav (35), Chotu Ray (28), and Sudesh Yadav (approx. 17), all from Sarlahi.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-12",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T18:41:30+05:45"
+    },
+    {
+      "event_id": "evt-829fe0d2a385",
+      "event_key": "nepal-gambling-arrests-nov12",
+      "canonical_title": "Police Arrest 44 Individuals for Gambling in Kathmandu and Tanahun",
+      "category": "nepal",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": "2026-11-12",
+      "last_reported": "2026-11-12",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "english.nepalnews.com/s/crime-news/police-arrest-44-people-for-gambling-in-kathmandu-and-tanahun"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Nepal Police have arrested 44 individuals for illegal gambling in separate operations. In Kathmandu, 37 people were taken into custody at a homestay in Kageshwori Manohara Municipality, while additional arrests occurred in Tanahun.",
+      "latest_development": "Reported: Nepal Police have arrested 44 individuals for illegal gambling in separate operations. In Kathmandu, 37 people were taken into custody at a homestay in Kageshwori Manohara Municipality, while additional arrests occurred in Tanahun.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-12",
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T18:41:30+05:45"
+    },
+    {
+      "event_id": "evt-2ba4d3733383",
+      "event_key": "humble-bundle-2fa-removed",
+      "canonical_title": "Humble Bundle Redesign Weakens Account Security",
+      "category": "tech_career",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": "2026-11-12",
+      "last_reported": "2026-11-12",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "pcgamer.com/software/platforms/humble-bundles-new-redesign-inexplicably-removes-2-factor-authentication-dramatically-weakening-account-security"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Humble Bundle's recent website redesign has removed the option for 2-factor authentication, significantly reducing account security for users. It is recommended that users remove saved payment information until security measures are restored.",
+      "latest_development": "Reported: Humble Bundle's recent website redesign has removed the option for 2-factor authentication, significantly reducing account security for users. It is recommended that users remove saved payment information until security measures are restored.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": "2026-11-12",
+      "deadline": null,
+      "effective_date": "2026-11-12",
+      "updated_at": "2026-11-12T18:41:30+05:45"
     }
   ],
   "archived": []

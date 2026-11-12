@@ -944,6 +944,27 @@
       "title": "Nigeria's president launches re-election manifesto but can he regain voters' trust?",
       "category": "world_major",
       "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "pcgamer.com/software/platforms/humble-bundles-new-redesign-inexplicably-removes-2-factor-authentication-dramatically-weakening-account-security",
+      "title_hash": "0f407941f06581d193e507476f771e62ae654a72",
+      "title": "Humble Bundle Redesign Weakens Account Security",
+      "category": "tech_career",
+      "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2056412/three-more-victims-of-bhimphedi-accident-identified",
+      "title_hash": "e27dd82d5d5fc3fbcdc7f18bfac71211d2885610",
+      "title": "Bhimphedi Road Accident: Three More Victims Identified",
+      "category": "nepal",
+      "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/crime-news/police-arrest-44-people-for-gambling-in-kathmandu-and-tanahun",
+      "title_hash": "b514a511148fbed1b409453fa14c26888b50d69c",
+      "title": "Police Arrest 44 Individuals for Gambling in Kathmandu and Tanahun",
+      "category": "nepal",
+      "date_sent": "2026-11-12"
     }
   ]
 }
