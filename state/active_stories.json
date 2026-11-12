@@ -18046,6 +18046,36 @@
       "deadline": null,
       "effective_date": "2026-11-12",
       "updated_at": "2026-11-12T18:41:30+05:45"
+    },
+    {
+      "event_id": "evt-95c919fbe362",
+      "event_key": null,
+      "canonical_title": "At least 14 dead in passenger EV accident in Central Nepal - ANI News",
+      "category": "local_city",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmisafbvv95cuxoa3r3skxhemhwvljlwjfwtzlnzuxmyvzitxrpn1pxt1vbrhfpegg0dkjuakvqz3fstmf5rmjvm3znnknleuljbdn0cfruquxoouf5nu93cdnvzhlmmzdutefqd3jnvwu2a3vwmw9fweu3snlste5nzglhmet2cw40q2xsv0xhazhxofc2aefdmwzfumf4owz4v29rns0xrnrvtjhlqtd1efvkevfzuuxqcq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-12T19:39:53+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T19:39:53+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "rss"
     }
   ],
   "archived": []

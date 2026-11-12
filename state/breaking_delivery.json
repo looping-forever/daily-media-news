@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-11-12T12:12:58Z",
+    "at": "2026-11-12T13:54:53Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Death toll rises to 14 in Makwanpur microbus crash; six from same family killed - Nepalnew — check this now",
+    "title": "🚨 CRITICAL: At least 14 dead in passenger EV accident in Central Nepal - ANI News — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-11-12T12:12:58Z",
+    "at": "2026-11-12T13:54:53Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Death toll rises to 14 in Makwanpur microbus crash; six from same family killed - Nepalnew — check this now",
+    "title": "🚨 CRITICAL: At least 14 dead in passenger EV accident in Central Nepal - ANI News — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-11-12T13:54:53Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: At least 14 dead in passenger EV accident in Central Nepal - ANI News — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-11-12T12:12:58Z",
       "ok": true,
