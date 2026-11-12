@@ -17932,6 +17932,36 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-12T07:22:51+05:45"
+    },
+    {
+      "event_id": "evt-b57401979cb5",
+      "event_key": null,
+      "canonical_title": "Death toll rises to 14 in Makwanpur microbus crash; six from same family killed - Nepalnews.com",
+      "category": "local_city",
+      "first_seen": "2026-11-12",
+      "last_seen": "2026-11-12",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiuwfbvv95cuxptzdodwpfc3rmsi1qqty0szu0cndxwniwbthzdy1lx3yzvkuzsdv3empvowd4wg1yzy1fn2tjlxnhrvuysfhlewdftxljvuzkruxueflyzee2mujpqnn4amzrbnowue1gr3lzr0zkazhvdzvhc3hpa0xkstj6dzlmlxf6vtjmdm43otvclwnltwewr1fqae5zves2nzmyznbgmzmtdtnqd2rry2vwmniya1dtruhus3k3ueuw"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-12T17:57:58+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-12T17:57:58+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "rss"
     }
   ],
   "archived": []
