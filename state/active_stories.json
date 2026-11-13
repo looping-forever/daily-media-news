@@ -18076,6 +18076,36 @@
       "updated_at": "2026-11-12T20:10:01+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
+    },
+    {
+      "event_id": "evt-567cc3aa8be1",
+      "event_key": null,
+      "canonical_title": "14 killed as microbus plunges off hilly road in central Nepal - Daily Excelsior",
+      "category": "local_city",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmimafbvv95cuxobvvksmlkdhf5wkjuru9ttkrnvkp3wvlhymzyd0xuu2w3tdzvvte5mu9foxp3c0n6agn0uvrstkh2cfduutjdz3yxzxvkn0hxcutqqmv0agf0twporddyzvdozexbuep2dwx1mfleqwthvvnuwmxoquttc3vdsnlfddb1q3psmgd5r1run0pdu0fpvmy2qy1yt9ibnafbvv95cuxnqjbzzhpcblhqeedsv1rpdvzirvdlew9zugr4ckiyajhcwfzxbhvcwdjlmgpanmfkb05paum2ek03mjlqq1fzcui0qwe0akdwmk8wmkwwedrlqmz0u3fgwhhmsm5dylhvmmloqzvcrmhiajg2um5uu3bzb3f6tji2bfhzt2rmn29zuudux3vnvunznzizalnzselzclg"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-13T06:07:11+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-13T06:07:11+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "rss"
     }
   ],
   "archived": []
