@@ -1432,6 +1432,35 @@ class TestSourceResults(unittest.TestCase):
         self.assertEqual(health["critical"]["hosts_down"], [])
 
 
+class TestSourceSummary(unittest.TestCase):
+    def test_summary_reconciles_empty_failed_and_budget(self):
+        results = [
+            {"name": "ok", "outcome": "ok"},
+            {"name": "empty", "outcome": "empty"},
+            {"name": "failed", "outcome": "failed"},
+            {"name": "skipped", "outcome": "skipped_budget"},
+        ]
+        sources_ok = ["ok", "empty"]
+        sources_failed = ["failed (boom)", "skipped (budget)"]
+        cfg = {"soft_budget_sec": 75, "max_workers": 8,
+               "retry": {"attempts": 2}}
+
+        counts = cn.source_result_counts(results)
+        self.assertEqual(len(sources_ok), counts["ok"] + counts["empty"])
+        self.assertEqual(len(sources_failed),
+                         counts["failed"] + counts["skipped_budget"])
+
+        lines = cn.source_summary_lines(sources_ok, sources_failed, results, cfg)
+        self.assertEqual(
+            lines[0],
+            "  sources ok: 2 reachable plans (incl. 1 empty), failed: 2 "
+            "(historical; includes skipped_budget)")
+        self.assertEqual(
+            lines[1],
+            "  source_results: 4 total = 1 ok + 1 empty + 1 failed + 1 "
+            "skipped_budget (budget 75s, workers 8, 2 attempt(s) max)")
+
+
 class TestDnsPreflight(unittest.TestCase):
     """P3: getaddrinfo is NOT bounded by urlopen(timeout=...)."""
 

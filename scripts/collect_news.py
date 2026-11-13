@@ -3006,6 +3006,31 @@ def collect_parallel(plans, cfg=None):
             return_dict["weather_summary"] or weather_summary, source_results)
 
 
+def source_result_counts(source_results):
+    """Count the four source_results outcomes plus a total."""
+    counts = {"ok": 0, "empty": 0, "failed": 0, "skipped_budget": 0}
+    for rec in source_results or ():
+        outcome = rec.get("outcome")
+        if outcome in counts:
+            counts[outcome] += 1
+    counts["total"] = len(source_results or ())
+    return counts
+
+
+def source_summary_lines(sources_ok, sources_failed, source_results, cfg):
+    """The two console lines, reconciled: reachable = ok + empty."""
+    counts = source_result_counts(source_results)
+    return [
+        "  sources ok: %d reachable plans (incl. %d empty), failed: %d "
+        "(historical; includes skipped_budget)"
+        % (len(sources_ok), counts["empty"], len(sources_failed)),
+        "  source_results: %d total = %d ok + %d empty + %d failed + %d "
+        "skipped_budget (budget %.0fs, workers %d, %s attempt(s) max)"
+        % (counts["total"], counts["ok"], counts["empty"], counts["failed"],
+           counts["skipped_budget"], cfg["soft_budget_sec"],
+           cfg["max_workers"], cfg["retry"]["attempts"]),
+    ]
+
 
 # ---------------------------------------------------------------------------
 # Post-processing: filters, dedup, caps
@@ -3471,18 +3496,11 @@ def main(argv=None):
              ("  (not searched: %s)" % ", ".join(
                  "%s=%d" % (k, v) for k, v in sorted(interest_losses.items())))
              if interest_losses else ""))
-    print("  sources ok: %d, failed: %d" % (len(sources_ok), len(sources_failed)))
+    for line in source_summary_lines(sources_ok, sources_failed,
+                                     source_results, cfg):
+        print(line)
     for entry in sources_failed:
         print("    FAILED: %s" % entry)
-    # Truth line: reachable vs failed vs UNKNOWN (budget-skipped) per source.
-    _by_outcome = {"ok": 0, "failed": 0, "skipped_budget": 0}
-    for rec in source_results:
-        _by_outcome[rec["outcome"]] = _by_outcome.get(rec["outcome"], 0) + 1
-    print("  source_results: %d ok, %d failed, %d skipped_budget (budget %.0fs, "
-          "workers %d, %s attempt(s) max)"
-          % (_by_outcome["ok"], _by_outcome["failed"],
-             _by_outcome["skipped_budget"], cfg["soft_budget_sec"],
-             cfg["max_workers"], cfg["retry"]["attempts"]))
     for rec in source_results:
         if rec["outcome"] != "ok":
             print("    %-13s %s (%s) after %d attempt(s): %s"
