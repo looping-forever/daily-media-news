@@ -1,216 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "sports.yahoo.com/articles/hope-smart-pat-mcafee-put-172610631.html",
-      "title_hash": "a259f7a37fe56ec62f4670b151bfe1f9e17a634f",
-      "title": "\"Hope He is Smart\": Pat McAfee Put on Notice as Ex-NBC Host Rings Alarm Bells Over Broadcasting Future - Yahoo Sports",
-      "category": "college_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74904410",
-      "title_hash": "23fa7acdf6b598e63425af22deba77651fb1e39f",
-      "title": "'Tensei shitara Ken deshita II' Reveals Supporting Cast, Third Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "risingnepaldaily.com/news/88392",
-      "title_hash": "c13fcae4aa186d99a283e19864ca27f38babb4a5",
-      "title": "705 Ropani of land belonging to TU returned - The Rising Nepal",
-      "category": "education_tu",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "yardbarker.com/college_basketball_w/articles/addi_mack_put_college_basketball_world_on_notice_in_paris_against_no_1_south_carolina/s1_16457_44516773",
-      "title_hash": "aa085c9f3fd8f6fbead21110b981453f0ba5d04f",
-      "title": "Addi Mack Put College Basketball World on Notice in Paris Against No. 1 South Carolina - Yardbarker",
-      "category": "college_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "dev.to/noahcontrolplane/how-to-keep-an-ai-product-online-when-your-model-provider-goes-down-llm-failover-gateways-and-5bo0",
-      "title_hash": "7f3cde1f453aecf911ef9098d652fdf35013e867",
-      "title": "How to Keep an AI Product Online When Your Model Provider Goes Down: LLM Failover, Gateways, and Fallback Models",
-      "category": "tech_career",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c6d934npl9y8o",
-      "title_hash": "1a6d60b8b6f73590b3166e1798dab9ed9da1caf4",
-      "title": "Iran's chief negotiator says Americans voted 'no to war'",
-      "category": "world_major",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "dev.to/zenmesh/kubernetes-secrets-are-distribution-not-custody-5000",
-      "title_hash": "15f50c1cb4b04ace4429fa2353cf7de4a980f81e",
-      "title": "Kubernetes Secrets Are Distribution, Not Custody",
-      "category": "tech_career",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-04/live-action-mashle-magic-and-muscles-film-reveals-cast-director/.243531",
-      "title_hash": "1bc99894f00acf8bc0beb26cf1f721f9491997c3",
-      "title": "Live-Action Mashle: Magic and Muscles Film Reveals Cast, Director",
-      "category": "anime",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "mtsunews.com/2026/11/04/mtsu-earns-notice-on-forbes-money-magazines-lists-of-top-u-s-colleges",
-      "title_hash": "e03e8a9b4a83f26cddcc61222b0bb86096810865",
-      "title": "MTSU earns notice on Forbes, Money magazines’ lists of top U.S. colleges - MTSU News",
-      "category": "college_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "natlawreview.com/article/major-banks-move-block-or-limit-customer-directed-ai-agents",
-      "title_hash": "236b7bf59f2ffef7542b152cae4331a0acdb5959",
-      "title": "Major Banks Move to Block or Limit Customer-Directed AI Agents - The National Law Review",
-      "category": "bank_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "samoaglobalnews.com/nbs-warns-public-of-increase-in-counterfeit-50-and-100-tala-banknotes",
-      "title_hash": "ef1a31ee625f6f2ed16d3c87b15426336c7d5f10",
-      "title": "NBS Warns Public of Increase in Counterfeit $50 and $100 Tala Banknotes - Samoa Global News",
-      "category": "bank_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/nepals-academic-research-ethics.html",
-      "title_hash": "e281a92549bc895a06217fd7aa4153b96ebba3a5",
-      "title": "Nepal’s academic research has an ethics problem",
-      "category": "nepal",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "mysanantonio.com/news/local/traffic/article/highway-90-loop-1604-closure-22512184.php",
-      "title_hash": "0d77485a8b3da5255a2fbca688941a50089d98ec",
-      "title": "Prepare for delay: TxDOT closing S.A. highway ramp in just hours - MySA",
-      "category": "local_city",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "exnews.net/vernon-news/remembrance-day-road-closure-in-coldstream",
-      "title_hash": "0e72805bc7fa35f51019cb5dbe640411c6516100",
-      "title": "Remembrance Day Road Closure in Coldstream - ExNews.net",
-      "category": "local_city",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "wfmz.com/news/area/poconos-coal/carbon-county/route-209-rockslide-disrupts-jim-thorpe-tourism-scenic-railway-and-daily-commutes/article_c7d4ff47-b1ff-49ff-96f9-ac91fbdabae7.html",
-      "title_hash": "5b7610d9340e3b9e5fad4708daa1c42c4a323f8e",
-      "title": "Route 209 rockslide disrupts Jim Thorpe tourism, scenic railway, and daily commutes - WFMZ.com",
-      "category": "local_city",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "iost.tu.edu.np/notices/16063",
-      "title_hash": "7abec9367964b6ea82087830456d26796e5240ed",
-      "title": "M.Sc. Math IV semester makeup result 2080",
-      "category": "education_tu",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "redlandcitybulletin.com.au/story/9386492/a-mans-man-jones-scaled-formula-one-heights",
-      "title_hash": "8d1b4ef51a70a1c2e143b502902ee5f5a3785689",
-      "title": "'A man's man': Jones scaled Formula One heights - Redland City Bulletin",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74906712",
-      "title_hash": "63f6df8353ee412c817ccf434577c74db5ad6b06",
-      "title": "'Fool Night' Unveils Additional Cast, Theme Songs, First Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "theverge.com/news/1027379/discord-ditching-electron-web-app",
-      "title_hash": "54c17603af93af733afe7c5ab6d176c8de22506c",
-      "title": "Discord is ditching Electron and its new app uses less RAM",
-      "category": "tech_career",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "dev.to/alifar/eu-issues-alert-on-refrigeration-cyber-incidents-as-cross-border-response-intensifies-41a9",
-      "title_hash": "1b86056046987d55fcc60c94e7db8aae68c52c5f",
-      "title": "EU Issues Alert on Refrigeration Cyber Incidents as Cross-Border Response Intensifies",
-      "category": "tech_career",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "thetelegraphandargus.co.uk/news/26700088.garden-centre-owners-call-clearer-road-closure-signs",
-      "title_hash": "c9b2e8853152ce6cd1699d266ed0f8b12236625a",
-      "title": "Garden centre says unclear 'road closed' signs are costing it business - Telegraph and Argus",
-      "category": "local_city",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "dev.to/sascha-ms/giving-feedback-to-your-manager-a-guide-for-developers-i1o",
-      "title_hash": "5bc35f779aad1647802303d3f9f7f0289915de16",
-      "title": "Giving feedback to your manager: a guide for developers",
-      "category": "tech_career",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "tribuneindia.com/news/chandigarh/hdfc-bank-faces-consumer-commission-action-over-double-debit-of-rs-4150-in-chandigarh",
-      "title_hash": "691ee53a721004befb41a014a07a33aef815ace4",
-      "title": "HDFC bank faces Consumer Commission action over double debit of Rs 4,150 in Chandigarh - The Tribune",
-      "category": "bank_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "kqed.org/news/12108378/101-closure-san-francisco-bay-bridge-november-6-9-detour-traffic",
-      "title_hash": "158cf6308127a0d1f3881b081683005088cd5569",
-      "title": "Highway 101 Through SF Is Closed Again This Weekend — for the Last Time - KQED",
-      "category": "local_city",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cm4g1j0n92qdo",
-      "title_hash": "959a4d23d1ac139efb4f99cf936de0bde1affb41",
-      "title": "How America voted in maps and charts",
-      "category": "world_major",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74906596",
-      "title_hash": "8dad149a9c293b6619c39bd2f5de1f1108ea2dfa",
-      "title": "Manga 'Spirit Circle' Gets TV Anime in December 2026",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "eurogamer.net/bioware-canada-house-of-commons-petition-save-mass-effect",
-      "title_hash": "b1434a9077237bf46d11ad3eb74f9dbc4e18c08c",
-      "title": "Mass Effect petition has enough signatures for the Canadian Government to potentially save BioWare",
-      "category": "gaming",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "samoaglobalnews.com/nbs-important-notice-to-all-customers-warning-counterfeit-samoan-tala-banknotes",
-      "title_hash": "bc02b26b3cdc6ff386ef481cf4502c981d4b7ecd",
-      "title": "NBS IMPORTANT NOTICE TO ALL CUSTOMERS WARNING – COUNTERFEIT SAMOAN TALA BANKNOTES - Samoa Global News",
-      "category": "bank_local",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/nepal-news-evening-economic-brief-november-05-2026",
-      "title_hash": "e1b316775d5c7747b3a81451afd2fc3f2e028f62",
-      "title": "Nepal News Evening Economic Brief – November 05, 2026",
-      "category": "nepal",
-      "date_sent": "2026-11-05"
-    },
-    {
-      "url_normalized": "lnt.ma/one-pieces-zero-is-now-playing-mash-in-the-live-action-mashle-movie",
-      "title_hash": "6bda70003d90cff08172090c25c3c0e93be11a63",
-      "title": "One Piece’s Zero is now playing Mash in the live-action Mashle movie - lnt.ma",
-      "category": "anime",
-      "date_sent": "2026-11-05"
-    },
-    {
       "url_normalized": "linedrivemedia.com/news/club-news-the-final-pitch-nov-5-2026-spotlighting-turnin2-prospect-makenna-bareman-news-commits-beauty-and-the-beat-dr-doom-appointment",
       "title_hash": "d13cfa6c639f648bd01c149837969fbdc06d2e23",
       "title": "Club News: The Final Pitch (Nov. 5, 2026): Spotlighting Turnin2-Prospect Makenna Bareman, News, Commits, 'Beauty and the Beat' & Dr. Doom Appointment - Line Drive Media",
@@ -965,6 +755,41 @@
       "title": "Police Arrest 44 Individuals for Gambling in Kathmandu and Tanahun",
       "category": "nepal",
       "date_sent": "2026-11-12"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16061",
+      "title_hash": "5fcb941786b2ee01784ec55ff5ac2ec9c6bb973c",
+      "title": "Tribhuvan University IOST Publishes BIT V Semester Exam Results",
+      "category": "education_tu",
+      "date_sent": "2026-11-13"
+    },
+    {
+      "url_normalized": "tu.edu.np/notices/16055",
+      "title_hash": "b178900ea5171b209a7d306a467be6e57af64871",
+      "title": "Tribhuvan University Invites Proposals for Mini Research Grants",
+      "category": "education_tu",
+      "date_sent": "2026-11-13"
+    },
+    {
+      "url_normalized": "theregister.com/saas/2026/11/12/microsoft-struggling-to-fix-massive-cloud-outage-thats-taken-down-email-and-intune/5309531",
+      "title_hash": "c8a02a72c146e5d9e10d7d8d20d828249ec4a02e",
+      "title": "Microsoft Fails to Resolve Massive Cloud Outage Affecting Email and Intune",
+      "category": "tech_career",
+      "date_sent": "2026-11-13"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/slay-the-spire-2s-biggest-beta-patch-yet-adds-its-first-new-early-access-and-foolish-character-two-game-modes-and-more-tweaks-than-you-can-shake-a-stick-at",
+      "title_hash": "4e754dfefb46c72a92dbbfea1959af1c2ccda6d2",
+      "title": "Slay the Spire 2 Releases Largest Beta Patch Adding New Character and Game Modes",
+      "category": "gaming",
+      "date_sent": "2026-11-13"
+    },
+    {
+      "url_normalized": "theregister.com/cyber-crime/2026/11/12/doj-takes-aim-at-12b-in-binance-loot-as-fbi-disrupts-north-korean-scam/5309523",
+      "title_hash": "9d8757503c857c39a227478d58814d1471e99956",
+      "title": "DOJ Targets $1.2B in Binance Loot as FBI Disrupts North Korean Scam Network",
+      "category": "tech_career",
+      "date_sent": "2026-11-13"
     }
   ]
 }

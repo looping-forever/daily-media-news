@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-12T18:41:30+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -11057,7 +11057,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Walk-forward analysis is called the gold standard of strategy validation — but two different things share the name. Know which one you are actually getting. Ask a quant how they validate a strategy and sooner or later you will hear…",
       "latest_development": "Walk-forward analysis is called the gold standard of strategy validation — but two different things share the name. Know which one you are actually getting. Ask a quant how they validate a strategy and sooner or later you will hear…",
       "alerted": false,
@@ -11067,7 +11067,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-217a47f80137",
@@ -11085,7 +11085,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Keep an AI product online by putting an OpenAI-compatible gateway in front of every model call, configuring fallback chains across providers, regions, and a self-hosted open-weight model, and handling timeouts, rate limits, and partial…",
       "latest_development": "Keep an AI product online by putting an OpenAI-compatible gateway in front of every model call, configuring fallback chains across providers, regions, and a self-hosted open-weight model, and handling timeouts, rate limits, and partial…",
       "alerted": false,
@@ -11095,7 +11095,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-2197f42c7e61",
@@ -11113,7 +11113,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This is article 4 of 10 in Beyond Kubernetes Defaults . Read article 3: A Kubernetes Lease Is Not a Fencing Token first, or start with article 1: When Kubernetes Primitives Aren’t Enough . Later articles cover workload admission and more.…",
       "latest_development": "This is article 4 of 10 in Beyond Kubernetes Defaults . Read article 3: A Kubernetes Lease Is Not a Fencing Token first, or start with article 1: When Kubernetes Primitives Aren’t Enough . Later articles cover workload admission and more.…",
       "alerted": false,
@@ -11123,7 +11123,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-0484629a7cc6",
@@ -11141,7 +11141,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "World of Warcraft: Forever's launch hit some minor hiccups immediately upon release, but overall is going surprisingly well, much to the surprise of players who anticipated the worst. As soon as the countdown timer clicked to zero at 3 PM…",
       "latest_development": "World of Warcraft: Forever's launch hit some minor hiccups immediately upon release, but overall is going surprisingly well, much to the surprise of players who anticipated the worst. As soon as the countdown timer clicked to zero at 3 PM…",
       "alerted": false,
@@ -11151,7 +11151,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-c3b9ea4b03a4",
@@ -11169,7 +11169,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Thousands of research papers and theses are written every year across universities in Nepal, but many of these research’s depicts a troubling pattern i.e. many of these work’s proceeds and gets published without formal ethical review.…",
       "latest_development": "Thousands of research papers and theses are written every year across universities in Nepal, but many of these research’s depicts a troubling pattern i.e. many of these work’s proceeds and gets published without formal ethical review.…",
       "alerted": false,
@@ -11179,7 +11179,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-041687d9d8d4",
@@ -11197,7 +11197,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Theories that Bethesda is hinting at an earlier launch are already surfacing, and a few of them are pretty good.",
       "latest_development": "Theories that Bethesda is hinting at an earlier launch are already surfacing, and a few of them are pretty good.",
       "alerted": false,
@@ -11207,7 +11207,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-184cd3be66ae",
@@ -11225,7 +11225,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "MTSU earns notice on Forbes, Money magazines’ lists of top U.S. colleges MTSU News",
       "latest_development": "MTSU earns notice on Forbes, Money magazines’ lists of top U.S. colleges MTSU News",
       "alerted": false,
@@ -11235,7 +11235,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-f9a9ae1d1497",
@@ -11253,7 +11253,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Ubisoft Puts in a Bid for Dishonored Studio Arkane Lyon TechPowerUp",
       "latest_development": "Ubisoft Puts in a Bid for Dishonored Studio Arkane Lyon TechPowerUp",
       "alerted": false,
@@ -11263,7 +11263,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-238b80cc6e6d",
@@ -11281,7 +11281,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "NBS Warns Public of Increase in Counterfeit $50 and $100 Tala Banknotes Samoa Global News",
       "latest_development": "NBS Warns Public of Increase in Counterfeit $50 and $100 Tala Banknotes Samoa Global News",
       "alerted": false,
@@ -11291,7 +11291,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-90e8506fa992",
@@ -11309,7 +11309,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Remembrance Day Road Closure in Coldstream ExNews.net",
       "latest_development": "Remembrance Day Road Closure in Coldstream ExNews.net",
       "alerted": false,
@@ -11319,7 +11319,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-5a5a50fba5fa",
@@ -11337,7 +11337,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Route 209 rockslide disrupts Jim Thorpe tourism, scenic railway, and daily commutes WFMZ.com",
       "latest_development": "Route 209 rockslide disrupts Jim Thorpe tourism, scenic railway, and daily commutes WFMZ.com",
       "alerted": false,
@@ -11347,7 +11347,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-ed45a5776a0a",
@@ -11365,7 +11365,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Mackenyu Maeda stars as Mash Burnedead with Gintama's Yūichi Fukuda directing",
       "latest_development": "Mackenyu Maeda stars as Mash Burnedead with Gintama's Yūichi Fukuda directing",
       "alerted": false,
@@ -11375,7 +11375,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-4c24ff3b5417",
@@ -11393,7 +11393,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "At least 40 people were killed and another 30 may still be under the rubble after Monday's attack on a Ukrainian village, Kyiv says.",
       "latest_development": "At least 40 people were killed and another 30 may still be under the rubble after Monday's attack on a Ukrainian village, Kyiv says.",
       "alerted": false,
@@ -11403,7 +11403,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-9b107e0bdebc",
@@ -11421,7 +11421,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Yamamoto BLEACH Vol. 3 Deck List and Guide Joseph Writer Anderson",
       "latest_development": "Yamamoto BLEACH Vol. 3 Deck List and Guide Joseph Writer Anderson",
       "alerted": false,
@@ -11431,7 +11431,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-0a747e84bb29",
@@ -11449,7 +11449,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Prepare for delay: TxDOT closing S.A. highway ramp in just hours MySA",
       "latest_development": "Prepare for delay: TxDOT closing S.A. highway ramp in just hours MySA",
       "alerted": false,
@@ -11459,7 +11459,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-a051ed657a83",
@@ -11477,7 +11477,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Addi Mack Put College Basketball World on Notice in Paris Against No. 1 South Carolina Yardbarker",
       "latest_development": "Addi Mack Put College Basketball World on Notice in Paris Against No. 1 South Carolina Yardbarker",
       "alerted": false,
@@ -11487,7 +11487,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-17bb463903c8",
@@ -11505,7 +11505,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "With Canada-US trade talks back on, Tuesday’s midterm Democratic wave puts pressure on the White House to come to a deal.",
       "latest_development": "With Canada-US trade talks back on, Tuesday’s midterm Democratic wave puts pressure on the White House to come to a deal.",
       "alerted": false,
@@ -11515,7 +11515,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-1610ca270819",
@@ -11533,7 +11533,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "\"Hope He is Smart\": Pat McAfee Put on Notice as Ex-NBC Host Rings Alarm Bells Over Broadcasting Future Yahoo Sports",
       "latest_development": "\"Hope He is Smart\": Pat McAfee Put on Notice as Ex-NBC Host Rings Alarm Bells Over Broadcasting Future Yahoo Sports",
       "alerted": false,
@@ -11543,7 +11543,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:00+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-a6e4755291a7",
@@ -11561,7 +11561,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "\"We endorse this message,\" Mohammed Bagher Ghalibaf says, as Donald Trump acknowledges the conflict's role in the Republican Party's defeat.",
       "latest_development": "\"We endorse this message,\" Mohammed Bagher Ghalibaf says, as Donald Trump acknowledges the conflict's role in the Republican Party's defeat.",
       "alerted": false,
@@ -11571,7 +11571,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-e61bc922ef5a",
@@ -11589,7 +11589,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The official website of the television anime adaptation of Yuu Tanaka's Tensei shitara Ken deshita (Reincarnated as a Sword) light novel revealed supporting cast, second key visual (pictured), and third promotional video for the \"Seedrun…",
       "latest_development": "The official website of the television anime adaptation of Yuu Tanaka's Tensei shitara Ken deshita (Reincarnated as a Sword) light novel revealed supporting cast, second key visual (pictured), and third promotional video for the \"Seedrun…",
       "alerted": false,
@@ -11599,7 +11599,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-a65e94a11cc8",
@@ -11617,7 +11617,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Major Banks Move to Block or Limit Customer-Directed AI Agents The National Law Review",
       "latest_development": "Major Banks Move to Block or Limit Customer-Directed AI Agents The National Law Review",
       "alerted": false,
@@ -11627,7 +11627,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-78c4ce4cf4cb",
@@ -11645,7 +11645,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Tribhuvan University reclaims 705 ropanis of land in Kathmandu Valley Khabarhub",
       "latest_development": "Tribhuvan University reclaims 705 ropanis of land in Kathmandu Valley Khabarhub",
       "alerted": false,
@@ -11655,7 +11655,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-71e9ac446d1b",
@@ -11673,7 +11673,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "705 Ropani of land belonging to TU returned The Rising Nepal",
       "latest_development": "705 Ropani of land belonging to TU returned The Rising Nepal",
       "alerted": false,
@@ -11683,7 +11683,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-5f730446f41c",
@@ -11701,7 +11701,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "SBI has told the stock exchanges about its data breach, but not the customers whose data was leaked Internet Freedom Foundation",
       "latest_development": "SBI has told the stock exchanges about its data breach, but not the customers whose data was leaked Internet Freedom Foundation",
       "alerted": false,
@@ -11711,7 +11711,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-14347ed8b42f",
@@ -11729,7 +11729,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The official website for the television anime adaptation of Angyaman's Ramen Akaneko (Red Cat Ramen) revealed new staff and key visual (pictured) for the upcoming second season. The anime is scheduled to premiere in January 2027 on Tokyo…",
       "latest_development": "The official website for the television anime adaptation of Angyaman's Ramen Akaneko (Red Cat Ramen) revealed new staff and key visual (pictured) for the upcoming second season. The anime is scheduled to premiere in January 2027 on Tokyo…",
       "alerted": false,
@@ -11739,7 +11739,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T06:42:01+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-2d2e64cba7c5",
@@ -11757,7 +11757,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -11767,7 +11767,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T16:33:56+05:45",
+      "updated_at": "2026-11-13T06:41:19+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
     },
@@ -11787,7 +11787,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -11797,7 +11797,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-f3630b32eb9e",
@@ -11815,7 +11815,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -11825,7 +11825,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-f716d99b8361",
@@ -11843,7 +11843,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Canadian fans have petitioned the Canadian Government to save the RPG studio BioWare following EA's decision to shut it down.",
       "latest_development": "Canadian fans have petitioned the Canadian Government to save the RPG studio BioWare following EA's decision to shut it down.",
       "alerted": false,
@@ -11853,7 +11853,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-15232c670a41",
@@ -11899,7 +11899,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The European Commission has warned that commercial refrigeration systems across several EU member states have been affected by cybersecurity incidents.",
       "latest_development": "The European Commission has warned that commercial refrigeration systems across several EU member states have been affected by cybersecurity incidents.",
       "alerted": false,
@@ -11909,7 +11909,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-519cd2aee94d",
@@ -11927,7 +11927,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This article serves as a guide for developers on how to provide upward feedback to their managers.",
       "latest_development": "This article serves as a guide for developers on how to provide upward feedback to their managers.",
       "alerted": false,
@@ -11937,7 +11937,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-bac8811f6401",
@@ -11955,7 +11955,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Rob Gronkowski has revealed the one piece of advice he would now give to Drake Maye.",
       "latest_development": "Rob Gronkowski has revealed the one piece of advice he would now give to Drake Maye.",
       "alerted": false,
@@ -11965,7 +11965,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-626f1907db8a",
@@ -11983,7 +11983,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "While World of Warcraft: Forever had a smooth launch overall, Blizzard's new server structure made it difficult for some players to create characters.",
       "latest_development": "While World of Warcraft: Forever had a smooth launch overall, Blizzard's new server structure made it difficult for some players to create characters.",
       "alerted": false,
@@ -11993,7 +11993,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-307690b5f7af",
@@ -12011,7 +12011,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Maps and charts are available to show how America voted in the US midterm elections.",
       "latest_development": "Maps and charts are available to show how America voted in the US midterm elections.",
       "alerted": false,
@@ -12021,7 +12021,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-aa38437be90c",
@@ -12039,7 +12039,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Nepal News provides a snapshot of the nation's economic activities, covering market movements, policy shifts, and financial developments for November 05, 2026.",
       "latest_development": "Nepal News provides a snapshot of the nation's economic activities, covering market movements, policy shifts, and financial developments for November 05, 2026.",
       "alerted": false,
@@ -12049,7 +12049,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-756d41e0ba75",
@@ -12067,7 +12067,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Details are being provided about the Doctor Doom character played by Robert Downey Jr. in the upcoming film Avengers: Doomsday.",
       "latest_development": "Details are being provided about the Doctor Doom character played by Robert Downey Jr. in the upcoming film Avengers: Doomsday.",
       "alerted": false,
@@ -12077,7 +12077,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-9bba5a4500fc",
@@ -12123,7 +12123,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Portugal legend Cristiano Ronaldo has announced his retirement from international duty, stating that the time has come to hand back his number seven shirt.",
       "latest_development": "Portugal legend Cristiano Ronaldo has announced his retirement from international duty, stating that the time has come to hand back his number seven shirt.",
       "alerted": false,
@@ -12133,7 +12133,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-4bc1f3785568",
@@ -12151,7 +12151,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Highway 101 through San Francisco is scheduled to be closed again this weekend for the final time.",
       "latest_development": "Highway 101 through San Francisco is scheduled to be closed again this weekend for the final time.",
       "alerted": false,
@@ -12161,7 +12161,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-cb4181af3d05",
@@ -12207,7 +12207,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A garden centre reports that unclear road closed signs are negatively impacting its business.",
       "latest_development": "A garden centre reports that unclear road closed signs are negatively impacting its business.",
       "alerted": false,
@@ -12217,7 +12217,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-e3110416a612",
@@ -12235,7 +12235,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Redland City Bulletin highlights Jones's career as he achieved significant heights in Formula One.",
       "latest_development": "The Redland City Bulletin highlights Jones's career as he achieved significant heights in Formula One.",
       "alerted": false,
@@ -12245,7 +12245,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-891e1eab94ae",
@@ -12263,7 +12263,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The official website for the Fool Night anime revealed additional cast members, theme songs, and a promotional video for the upcoming adaptation of Kasumi Yasuda's manga.",
       "latest_development": "The official website for the Fool Night anime revealed additional cast members, theme songs, and a promotional video for the upcoming adaptation of Kasumi Yasuda's manga.",
       "alerted": false,
@@ -12273,7 +12273,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-460b6c51c8ad",
@@ -12291,7 +12291,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Pune Municipal Corporation tenders are facing challenges related to the Marathi language.",
       "latest_development": "Pune Municipal Corporation tenders are facing challenges related to the Marathi language.",
       "alerted": false,
@@ -12301,7 +12301,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-5064ddbf9489",
@@ -12319,7 +12319,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The actor who played Zero in One Piece is now cast as Mash in the live-action Mashle movie.",
       "latest_development": "The actor who played Zero in One Piece is now cast as Mash in the live-action Mashle movie.",
       "alerted": false,
@@ -12329,7 +12329,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-32665472c9b5",
@@ -12347,7 +12347,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "An Italian chef reportedly claimed that putting pineapple on pizza was offensive to his culture after refusing to serve it.",
       "latest_development": "An Italian chef reportedly claimed that putting pineapple on pizza was offensive to his culture after refusing to serve it.",
       "alerted": false,
@@ -12357,7 +12357,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-ed1b6df6f31d",
@@ -12375,7 +12375,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "HDFC bank is facing action from the Consumer Commission following a double debit of Rs 4,150 in Chandigarh.",
       "latest_development": "HDFC bank is facing action from the Consumer Commission following a double debit of Rs 4,150 in Chandigarh.",
       "alerted": false,
@@ -12385,7 +12385,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-33076bcf0b1c",
@@ -12403,7 +12403,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A woman discovered her bank locker was surrendered and Rs 47 lakh in jewellery was missing, leading her to seek Rs 48 lakh in compensation.",
       "latest_development": "A woman discovered her bank locker was surrendered and Rs 47 lakh in jewellery was missing, leading her to seek Rs 48 lakh in compensation.",
       "alerted": false,
@@ -12413,7 +12413,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-c3b51ae6aa67",
@@ -12431,7 +12431,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "NBS has issued a warning to customers regarding counterfeit Samoan Tala banknotes.",
       "latest_development": "NBS has issued a warning to customers regarding counterfeit Samoan Tala banknotes.",
       "alerted": false,
@@ -12441,7 +12441,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-73ca7b3715b9",
@@ -12459,7 +12459,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Production company Twin Engine opened an official website for a television anime adaptation of Satoshi Mizukami's Spirit Circle manga on Thursday, revealing the main cast, staff, a teaser visual (pictured), the ending theme, and first…",
       "latest_development": "Production company Twin Engine opened an official website for a television anime adaptation of Satoshi Mizukami's Spirit Circle manga on Thursday, revealing the main cast, staff, a teaser visual (pictured), the ending theme, and first…",
       "alerted": false,
@@ -12469,7 +12469,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-b079bc9be51f",
@@ -12487,7 +12487,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "TU to deliver academic certificates to students' homes through postal service myRepublica",
       "latest_development": "TU to deliver academic certificates to students' homes through postal service myRepublica",
       "alerted": false,
@@ -12497,7 +12497,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-05T18:44:19+05:45"
+      "updated_at": "2026-11-13T06:41:19+05:45"
     },
     {
       "event_id": "evt-69ad694c0874",
@@ -18106,6 +18106,146 @@
       "updated_at": "2026-11-13T06:07:11+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
+    },
+    {
+      "event_id": "evt-b05e4a6b3386",
+      "event_key": "tu-iost-bit-v-semester-results-2080",
+      "canonical_title": "Tribhuvan University IOST Publishes BIT V Semester Exam Results",
+      "category": "education_tu",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": "2026-11-13",
+      "last_reported": "2026-11-13",
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "iost.tu.edu.np/notices/16061"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology (IOST) has published the exam results for BIT V Semester-2080 under notice ID 16061 on iost.tu.edu.np.",
+      "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology (IOST) has published the exam results for BIT V Semester-2080 under notice ID 16061 on iost.tu.edu.np.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-13",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-13T06:41:19+05:45"
+    },
+    {
+      "event_id": "evt-a91a3d170b1c",
+      "event_key": "tu-mini-research-proposal-call-16055",
+      "canonical_title": "Tribhuvan University Invites Proposals for Mini Research Grants",
+      "category": "education_tu",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": "2026-11-13",
+      "last_reported": "2026-11-13",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "tu.edu.np/notices/16055"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University has officially invited grant-based research proposals under notice ID 16055 published on tu.edu.np for faculty and researchers.",
+      "latest_development": "Confirmed: Tribhuvan University has officially invited grant-based research proposals under notice ID 16055 published on tu.edu.np for faculty and researchers.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-13",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-13T06:41:19+05:45"
+    },
+    {
+      "event_id": "evt-967677ad0fe0",
+      "event_key": "microsoft-cloud-outage-email-intune",
+      "canonical_title": "Microsoft Fails to Resolve Massive Cloud Outage Affecting Email and Intune",
+      "category": "tech_career",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": "2026-11-13",
+      "last_reported": "2026-11-13",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "theregister.com/saas/2026/11/12/microsoft-struggling-to-fix-massive-cloud-outage-thats-taken-down-email-and-intune/5309531"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Microsoft is struggling to fix a massive cloud outage that has taken down corporate email and Intune services, admitting that actions taken thus far have not provided the anticipated relief.",
+      "latest_development": "Reported: Microsoft is struggling to fix a massive cloud outage that has taken down corporate email and Intune services, admitting that actions taken thus far have not provided the anticipated relief.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-13",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-12",
+      "updated_at": "2026-11-13T06:41:19+05:45"
+    },
+    {
+      "event_id": "evt-f44e0afddb0f",
+      "event_key": "doj-fbi-binance-north-korean-scam-disruption",
+      "canonical_title": "DOJ Targets $1.2B in Binance Loot as FBI Disrupts North Korean Scam Network",
+      "category": "tech_career",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": "2026-11-13",
+      "last_reported": "2026-11-13",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "theregister.com/cyber-crime/2026/11/12/doj-takes-aim-at-12b-in-binance-loot-as-fbi-disrupts-north-korean-scam/5309523"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The United States Department of Justice is targeting $1.2 billion in cryptocurrency loot associated with Binance while the FBI successfully disrupts a North Korean FaceStealer scam tied to over $400 million in thefts and 900 webcam recordings.",
+      "latest_development": "Reported: The United States Department of Justice is targeting $1.2 billion in cryptocurrency loot associated with Binance while the FBI successfully disrupts a North Korean FaceStealer scam tied to over $400 million in thefts and 900 webcam recordings.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-13",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-13T06:41:19+05:45"
+    },
+    {
+      "event_id": "evt-9fdbf372bfdb",
+      "event_key": "slay-the-spire-2-beta-patch-new-character",
+      "canonical_title": "Slay the Spire 2 Releases Largest Beta Patch Adding New Character and Game Modes",
+      "category": "gaming",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": "2026-11-13",
+      "last_reported": "2026-11-13",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "rockpapershotgun.com/slay-the-spire-2s-biggest-beta-patch-yet-adds-its-first-new-early-access-and-foolish-character-two-game-modes-and-more-tweaks-than-you-can-shake-a-stick-at"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: Mega Crit has released its biggest beta patch for Slay the Spire 2 yet, introducing its first new early access character alongside two distinct game modes and numerous balance tweaks.",
+      "latest_development": "Reported: Mega Crit has released its biggest beta patch for Slay the Spire 2 yet, introducing its first new early access character alongside two distinct game modes and numerous balance tweaks.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-13",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-13T06:41:19+05:45"
     }
   ],
   "archived": []
