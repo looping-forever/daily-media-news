@@ -18694,6 +18694,36 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-13T07:23:40+05:45"
+    },
+    {
+      "event_id": "evt-aaa6e405b958",
+      "event_key": "nepal-minibus-accident",
+      "canonical_title": "Minibus accident in Nepal results in 14 fatalities",
+      "category": "nepal",
+      "first_seen": "2026-11-13",
+      "last_seen": "2026-11-13",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmitafbvv95cuxptgv1rzdfbxdktmzst0xjr2p6q3dqu0hoc0ddow4xuwrtcnzsr0vjx0l0a3jya1zaymxjvi1sbzfgdmvinxvxykzvdfetytnsvddeqjlut1ryvmpzejviry1qt3b3yxviz2sxykxzu0riyjnfzvc3bjbwd0zvefhyc3npzepqlxi5rhpku3g0rufwwxncnwn3u0tkcfpsv3vuv0c3ewj2nhvruhzqsxg4dnvqc0w"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: A minibus carrying 20 people plunged down a slope in Nepal, resulting in 14 deaths. The incident was reported by Kathmandu Post via UA.NEWS.",
+      "latest_development": "Reported: A minibus carrying 20 people plunged down a slope in Nepal, resulting in 14 deaths. The incident was reported by Kathmandu Post via UA.NEWS.",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-13T08:16:18+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-13T08:16:18+05:45",
+      "last_confidence": "HIGH",
+      "detection_source": "rss"
     }
   ],
   "archived": []
