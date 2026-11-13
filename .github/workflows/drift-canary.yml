@@ -105,16 +105,19 @@ jobs:
         # between config/opencode.json, the workflows and the scripts.
         run: python3 tests/breaking/test_ladder_sync.py
 
-      - name: Typo sweep (prose/config surfaces)
-        # Code paths (.github/scripts/prompts/tests) are covered by the
-        # ladder-sync test above. This sweep covers the remaining
-        # prose/config surfaces for reintroduced stale IDs, the v2-only
-        # flag, and the classic `nfty` typo. docs/PKB.md is excluded: it
-        # keeps dated history by design (see its freshness check below).
+      - name: Typo sweep (behaviour surfaces)
+        # Scope only files that can change a run. state/model_health.json:98 is
+        # telemetry about a model that died, and
+        # tests/fixtures/walk_auth_abort_2026_10_27.txt records the 2026-10-27
+        # provider outage; neither can influence a run. docs/ is prose, not
+        # behaviour.
         run: |
           set -eo pipefail
-          if grep -rnE --exclude=PKB.md 'hy3-free|nemotron-3-ultra|--standalone|nfty' \
-            docs README.md templates deploy config state; then
+          CANARY_SCOPE="scripts prompts config .github deploy"
+          # drift-canary.yml contains this grep's own pattern; the gate
+          # workflows and breaking_monitor.py carry the allowlisted v2-only
+          # phrases already pinned in tests/breaking/test_ladder_sync.py.
+          if grep -rnE --exclude=PKB.md --exclude=drift-canary.yml --exclude-dir=__pycache__ 'hy3-free|nemotron-3-ultra|--standalone|nfty' $CANARY_SCOPE | grep -vE 'v2/opencode2-only|grep -q -- --standalone|exposes --standalone|--standalone absent'; then
             echo "FATAL: stale CLI/ladder/flag identifiers or ntfy typos found above"
             exit 1
           fi

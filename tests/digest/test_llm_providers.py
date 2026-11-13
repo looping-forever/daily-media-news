@@ -899,15 +899,14 @@ class ChatCapableSelectionTests(unittest.TestCase):
     def test_the_measured_catalogues_keep_their_working_choices(self):
         gemini = ["gemini-3.5-flash", "gemini-3.5-flash-lite",
                   "gemini-2.5-flash", "gemini-embedding-001"]
-        openrouter = ["nvidia/nemotron-3-ultra-550b-a55b:free",
-                      "nvidia/nemotron-3.5-lightning:free",
-                      "recursive/flint-v1.0:free"]
+        openrouter = ["nvidia/nemotron-3.5-lightning:free",
+                       "recursive/flint-v1.0:free"]
         send, _ = router({"gemini": gemini, "openrouter": openrouter})
         self.assertEqual(
             "gemini-3.5-flash-lite",
             lp.probe("gemini", transport=send, environ=KEYS)["chosen"])
         self.assertEqual(
-            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "nvidia/nemotron-3.5-lightning:free",
             lp.probe("openrouter", transport=send, environ=KEYS)["chosen"])
 
     #: A 400 that names the id we sent: `_model_caused_400` turns it into
@@ -1123,7 +1122,8 @@ class FreeSweepTests(unittest.TestCase):
 
 
 class OpenRouterRungTests(unittest.TestCase):
-    """Probe 42049082917: seven usable free ids, so ONE id is not a rung.
+    """Probe 42049082917 measured seven usable free ids; the ultra id was
+    retired on 2026-11-13, leaving six, so ONE id is still not a rung.
 
     The sweep measured these answering with text; the two 429s and the 404 are
     today's weather, not a licence to hardcode anything -- the catalogue check
@@ -1131,7 +1131,6 @@ class OpenRouterRungTests(unittest.TestCase):
     """
 
     MEASURED = (
-        "nvidia/nemotron-3-ultra-550b-a55b:free",
         "nvidia/nemotron-3.5-lightning:free",
         "recursive/flint-v1.0:free",
         "nvidia/nemotron-3.5-super-vl:free",
@@ -1153,11 +1152,11 @@ class OpenRouterRungTests(unittest.TestCase):
 
     def test_the_first_rung_is_a_prose_model_from_the_measured_list(self):
         rungs = self._rungs()
-        self.assertEqual("openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+        self.assertEqual("openrouter/nvidia/nemotron-3.5-lightning:free",
                          rungs[0],
                          "a specialist or a silent id must not lead")
         self.assertEqual(lp.PROVIDERS["openrouter"].models[0],
-                         "nvidia/nemotron-3-ultra-550b-a55b:free")
+                         "nvidia/nemotron-3.5-lightning:free")
 
     def test_specialists_are_last_in_the_seed_order(self):
         # Requirement, not a guess: a model that exists but writes the wrong

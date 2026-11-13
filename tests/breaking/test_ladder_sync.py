@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
@@ -210,6 +211,34 @@ def _scan_files():
                     continue
 
 
+def _typo_sweep_hits(root, scope):
+    """Apply the drift-canary typo grep to `root` and return `rel:line` hits."""
+    pattern = re.compile(r"hy3-free|nemotron-3-ultra|--standalone|nfty")
+    allow = re.compile(
+        r"v2/opencode2-only|grep -q -- --standalone|"
+        r"exposes --standalone|--standalone absent")
+    hits = []
+    for rel_dir in scope:
+        base = os.path.join(root, rel_dir)
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            for name in sorted(filenames):
+                if name == "PKB.md" or name == "drift-canary.yml":
+                    continue
+                path = os.path.join(dirpath, name)
+                try:
+                    with open(path, encoding="utf-8",
+                              errors="replace") as fh:
+                        for lineno, line in enumerate(fh, 1):
+                            if pattern.search(line) and not allow.search(line):
+                                rel = os.path.relpath(path, root).replace(
+                                    os.sep, "/")
+                                hits.append("%s:%d" % (rel, lineno))
+                except OSError:
+                    continue
+    return hits
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -249,6 +278,46 @@ def test_no_stale_references():
     assert not violations, \
         "stale CLI/ladder/flag references:\n" + "\n".join(violations)
     print("  PASS: test_no_stale_references")
+
+
+def test_typo_sweep_scope_is_behaviour_only():
+    """The workflow sweep must ignore telemetry, fixtures and docs.
+
+    The old whole-tree grep matched state/model_health.json:98 (a dead
+    model's telemetry) and tests/fixtures/walk_auth_abort_2026_10_27.txt
+    (the 2026-10-27 outage record). Neither can influence a run, so neither
+    may turn the canary red.
+    """
+    workflow_path = os.path.join(REPO_ROOT, ".github", "workflows",
+                                 "drift-canary.yml")
+    with open(workflow_path, encoding="utf-8") as fh:
+        workflow = fh.read()
+    match = re.search(r'CANARY_SCOPE="([^"]+)"', workflow)
+    assert match, "drift-canary.yml must keep the sweep scope in CANARY_SCOPE"
+    scope = match.group(1).split()
+    assert set(scope) == {"scripts", "prompts", "config", ".github", "deploy"}, \
+        "the typo sweep must scan exactly the behaviour surfaces: %r" % (scope,)
+    assert not ({"state", "tests/fixtures", "docs"} & set(scope)), \
+        "telemetry, fixtures and docs must stay out of the sweep: %r" % (scope,)
+    assert "state/model_health.json:98" in workflow
+    assert "tests/fixtures/walk_auth_abort_2026_10_27.txt" in workflow
+
+    with tempfile.TemporaryDirectory(prefix="ladder_scope_") as root:
+        def write(rel, text):
+            path = os.path.join(root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(text)
+
+        for rel in ("scripts/dead.py", "state/model_health.json",
+                    "tests/fixtures/walk_auth_abort_2026_10_27.txt",
+                    "docs/PKB.md"):
+            write(rel, "nemotron-3-ultra\n")
+        write(".github/workflows/clean.yml", "clean\n")
+        assert _typo_sweep_hits(root, scope) == ["scripts/dead.py:1"], \
+            "the sweep must fail for a dead id in scripts/ but not state/, " \
+            "tests/fixtures/ or docs/"
+    print("  PASS: test_typo_sweep_scope_is_behaviour_only")
 
 
 def test_no_hardcoded_models_in_workflows():
@@ -479,6 +548,7 @@ def test_the_measured_working_models_lead_and_the_known_failure_is_last():
 ALL_TESTS = [
     test_config_contract,
     test_no_stale_references,
+    test_typo_sweep_scope_is_behaviour_only,
     test_no_hardcoded_models_in_workflows,
     test_breaking_workflow_reads_config,
     test_breaking_ladder_matches_config,

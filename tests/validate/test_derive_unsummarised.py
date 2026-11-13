@@ -641,7 +641,7 @@ class NoAIReason(unittest.TestCase):
         "kind=quota_or_rate_limited rc=1 allow=0\n"
         "2026-11-05T00:56:54Z attempt=2 model=gemini/gemini-3.1-flash-lite "
         "kind=quota_or_rate_limited rc=1 allow=0\n"
-        "2026-11-05T00:57:30Z attempt=3 model=opencode/nemotron-3-ultra-free "
+        "2026-11-05T00:57:30Z attempt=3 model=opencode/nemotron-3.5-lightning-free "
         "kind=payment_required rc=1 allow=0\n"
     )
 

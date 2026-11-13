@@ -158,29 +158,29 @@ PROVIDERS = {
         # is sent. The candidate list is the SEED; `list_models()` is what
         # proves which ids this account can actually reach.
         #
-        # SEEDED FROM THE 2026-11-05 SWEEP (probe 42049082917), which answered
-        # with text from exactly these seven ids. A seed is a CLAIM TO CHECK,
-        # never a fact: `list_models()` proves it again on every run, and a seed
-        # the account no longer serves is dropped by the intersection rather than
-        # attempted. Order is for PROSE SUMMARISATION, and the measured latency
-        # only breaks ties INSIDE a class:
+        # SEEDED FROM THE 2026-11-05 SWEEP (probe 42049082917), whose seven ids
+        # all answered with text then. The ultra id was retired on 2026-11-13 and
+        # removed, leaving six. A seed is a CLAIM TO CHECK, never a fact:
+        # `list_models()` proves it again on every run, and a seed the account no
+        # longer serves is dropped by the intersection rather than attempted.
+        # Order is for PROSE SUMMARISATION, and the measured latency only breaks
+        # ties INSIDE a class:
         #
-        #   1-3 general instruct (the writers) -- the biggest first, because a
+        #   1-2 general instruct (the writers) -- the biggest first, because a
         #        bigger instruct model writes a better sentence;
-        #   4   general + vision -- prose-capable, kept for image stories;
-        #   5   note/preview build -- writes, but its 5.6s is the slowest measured;
-        #   6   reasoning-tuned -- can write, but its answer can land in
+        #   3   general + vision -- prose-capable, kept for image stories;
+        #   4   note/preview build -- writes, but its 5.6s is the slowest measured;
+        #   5   reasoning-tuned -- can write, but its answer can land in
         #        `reasoning` with an empty `content` (the 42043556280 failure);
-        #   7   code specialist -- writes the wrong register, so it goes last and
+        #   6   code specialist -- writes the wrong register, so it goes last and
         #        exists only as a last resort.
         #
-        # DROPPED, with the reason, so nobody re-adds them: the xingchen id was
-        # the EMPTY-content offender of 42043556280 and is 429 now; both gemma-4
-        # ids are 429; liquid/lfm no longer appears in the sweep; and the
-        # nemotron content-safety id is a 404 -- a stale id in a seed list is a
-        # defect, not a spare.
-        ("nvidia/nemotron-3-ultra-550b-a55b:free",
-         "nvidia/nemotron-3.5-lightning:free",
+        # DROPPED, with the reason, so nobody re-adds them: the ultra id was
+        # retired on 2026-11-13; the xingchen id was the EMPTY-content offender
+        # of 42043556280 and is 429 now; both gemma-4 ids are 429; liquid/lfm no
+        # longer appears in the sweep; and the nemotron content-safety id is a
+        # 404 -- a stale id in a seed list is a defect, not a spare.
+        ("nvidia/nemotron-3.5-lightning:free",
          "recursive/flint-v1.0:free",
          "nvidia/nemotron-3.5-super-vl:free",
          "dots-studio/dots-3-note-preview:free",
