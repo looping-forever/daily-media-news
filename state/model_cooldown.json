@@ -1,0 +1,18 @@
+{
+  "models": {
+    "gemini-key2/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-13T13:37:05.071150+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-13T19:37:05.071150+00:00"
+    },
+    "gemini/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-13T13:36:36.035707+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-13T19:36:36.035707+00:00"
+    }
+  },
+  "pool": {},
+  "schema_version": 1
+}
