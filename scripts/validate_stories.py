@@ -553,6 +553,140 @@ def jaccard(a, b):
     return len(a & b) / union
 
 
+# =====================================================================
+# SAME EVENT, NOT MERELY SAME SUBJECT
+# ---------------------------------------------------------------------
+# Run 43246133293 shipped the Nvidia CEO resignation twice, as two cards:
+#
+#   A  "Nvidia CEO Jensen Huang resigns from leadership positions amid
+#       controversy over alleged affairs"        (english.onlinekhabar.com)
+#   B  "After days of controversy, Nvidia CEO Jensen Huang has resigned"
+#                                                  (eurogamer.net)
+#
+# They got two event ids, so no event-level rule saw them as one story.
+# Title Jaccard could not either, and the numbers are why: the sets are
+# {nvidia jensen huang resigns from leadership positions amid controversy
+# over alleged affairs} and {after days controversy nvidia jensen huang
+# resigned}, so Jaccard is 4/15 = 0.27 against DEDUP_OVERLAP_THRESHOLD 0.7.
+# Dropping the threshold to 0.27 would merge unrelated stories, so the rule
+# has to know WHICH words are shared, not just how many.
+#
+# MEASURED, with the numbers this file's own tokenizer and entity extractor
+# produce:
+#
+#   pair                              entities  shared  overlap
+#   A / B (the same resignation)          4/4       4     0.571  -> merge
+#   A / "Nvidia CEO Jensen Huang
+#        denies reports he is
+#        stepping down"                   4/4       4     0.429  -> keep apart
+#   A / "Nvidia shares slide as AI
+#        chip demand cools"               4/2       1     0.167  -> keep apart
+#
+# SAME_EVENT_OVERLAP = 0.5 sits between 0.429 and 0.571. The denial control is
+# the one that matters: it names the same cast and is a DIFFERENT claim, and it
+# stays below the line because it adds words the resignation report does not
+# share. The entity-subset arm is what keeps the earnings story out before any
+# threshold is reached, so a shared company name alone is never enough.
+#: Share of the SHORTER headline's content words two same-event stories share.
+SAME_EVENT_OVERLAP = 0.5
+
+#: Words a headline capitalises for grammar, not because they name anything.
+#: Used only to tell a NAME from a sentence's first word.
+_ENTITY_STOP = frozenset("""
+a an the this that these those his her its our your their my
+after before amid over under into from with without as at by for in of on to
+and but or nor so yet if then than when where which who whom whose why how what
+new breaking report reports video watch live update updates exclusive opinion
+analysis interview review first last next more most another one two three
+here there today now still even also only just not no yes say says said
+""".split())
+
+
+def headline_entities(title):
+    """The NAMES in a headline: capitalised words minus grammar words."""
+    out = set()
+    for word in re.findall(r"[A-Za-z][A-Za-z0-9'&.\-]*", str(title or "")):
+        raw = word.rstrip(".")
+        if not raw or not raw[0].isupper():
+            continue
+        low = raw.lower()
+        if low in _ENTITY_STOP:
+            continue
+        out.add(low)
+    return out
+
+
+def _content_overlap(a, b):
+    """|A & B| / min(|A|, |B|) -- how much of the SHORTER headline is shared.
+
+    Jaccard answers "how alike are these", which a rewritten headline fails by
+    adding a clause. This answers "is everything the shorter one says also said
+    by the longer one", which is the question a duplicate asks.
+    """
+    if not a or not b:
+        return 0.0
+    return len(a & b) / float(min(len(a), len(b)))
+
+
+def _headline_rule():
+    """collect_news' own same-story test, reused rather than re-implemented.
+
+    Lazy import: the validator does not otherwise need the collector, and the
+    point of reusing it is that there is ONE definition of "one contained in the
+    other" in this codebase, not two that can drift.
+    """
+    import collect_news
+    return collect_news.normalise_headline, collect_news.same_story
+
+
+def same_event(title_a, title_b):
+    """True when two headlines report the same story.
+
+    Arm 1 is the collector's rule (normalised headlines equal, or one contained
+    in the other with STORY_OVERLAP_CHARS). Arm 2 is the same cast plus most of
+    the same words: every named entity of the shorter headline appears in the
+    longer one, at least two entities are shared, and at least
+    SAME_EVENT_OVERLAP of the shorter headline's content words are shared.
+    """
+    normalise_headline, same_story = _headline_rule()
+    if same_story(normalise_headline(title_a), normalise_headline(title_b)):
+        return True
+    ent_a, ent_b = headline_entities(title_a), headline_entities(title_b)
+    if len(ent_a & ent_b) < 2:
+        return False
+    shorter, longer = ((ent_a, ent_b) if len(ent_a) <= len(ent_b)
+                       else (ent_b, ent_a))
+    if not shorter <= longer:
+        return False
+    return _content_overlap(title_tokens(title_a),
+                            title_tokens(title_b)) >= SAME_EVENT_OVERLAP
+
+
+def _is_aggregator_reference(url):
+    """True for an unresolved Google News redirect -- an index, not a publisher.
+
+    The only aggregator signal the payload still carries: a resolved Google item
+    keeps no trace of where it came from, so a publisher that republishes another
+    outlet's story cannot be told apart by host. This is why the published time
+    is the second key below, not the first.
+    """
+    return netloc_of(url) == "news.google.com"
+
+
+def _source_preference(story):
+    """Which of two same-event stories to keep: the SMALLEST key wins.
+
+    Order: a direct publisher beats an aggregator reference, then the EARLIER
+    published time (a pickup republishes after the original), then the story the
+    model ranked first.
+    """
+    published = parse_utc_iso(story.get("published_at"))
+    return (_is_aggregator_reference(story.get("source_url")),
+            0 if published is not None else 1,
+            published.isoformat() if published is not None else "")
+
+
+
 def netloc_of(url):
     try:
         nl = urlparse(url).netloc.lower()
@@ -1521,22 +1655,40 @@ def derive_empty_outcome(raw, final, source_health, candidates=None,
                                     "returned nothing")
 
 
-def held_back_total(data, dropped):
-    """Held-back stories for this edition: what the deriver recorded, plus this stage.
+def _non_negative_int(value):
+    """A count from a payload field, or 0. Never raises, never negative."""
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
-    The deriver already withheld stories for their script; this stage withholds a few
-    more. Summing them in ONE place is what lets the page and the email state the same
-    number -- before this, each stage appended its own sentence and each reader picked
-    a different one.
+
+def held_back_record(data, dropped):
+    """The held-back numbers for this edition, each with its OWN population.
+
+    Two pools, and they are never added:
+      `count` / `pool`  -- CANDIDATES the deriver withheld for their script, out
+                           of the candidate pool it was given;
+      `stories_dropped` -- STORIES this stage dropped for the same reason, out of
+                           the stories it was given.
+
+    Run 43246133293 logged `held back 7`, `derive_unsummarised: 20 stories from
+    53 candidates`, and then a note reading "7 stories were held back because
+    they are not in English" over a 15-card edition. The arithmetic that holds:
+    53 candidates = 7 held (not English) + 46 considered, of which 20 became
+    stories; then 20 stories = 15 shipped + 5 dropped (2 already sent within the
+    TTL, 3 past the rank cap). The 7 belongs to the CANDIDATE pool, so against
+    the story pool it balanced with nothing: 53-7=46, 20-7=13, and the edition
+    carried 15. Summing the two pools (`already + dropped`) made that worse.
     """
     record = data.get("held_back") if isinstance(data, dict) else None
-    already = 0
+    count = pool = 0
     if isinstance(record, dict):
-        try:
-            already = int(record.get("count") or 0)
-        except (TypeError, ValueError):
-            already = 0
-    return already + int(dropped or 0)
+        count = _non_negative_int(record.get("count"))
+        pool = _non_negative_int(record.get("pool"))
+    return {"count": count, "pool": pool,
+            "stories_dropped": _non_negative_int(dropped)}
+
 
 
 #: The claim-status label the digest prompt requires at the start of a summary.
@@ -2014,11 +2166,14 @@ def main(argv=None):
 
     english_dropped = sum(1 for entry in filter_log
                           if entry["reason"].startswith("non_english_title"))
-    held_total = held_back_total(data, english_dropped)
-    if held_total:
+    held = held_back_record(data, english_dropped)
+    if held["count"] or held["stories_dropped"]:
         # A run that refused stories for their script must not read as a quiet
-        # day: the count goes in `notes`, the one field every surface shows.
-        notes = english_text.replace_held_back(notes, held_total)
+        # day: the counts go in `notes`, the one field every surface shows, one
+        # sentence per POPULATION so neither number is read against the other.
+        notes = english_text.replace_held_back(
+            notes, held["count"], pool=held["pool"],
+            stories=held["stories_dropped"])
 
     if not raw_stories:
         print("Input contains zero stories.")
@@ -2127,7 +2282,8 @@ def main(argv=None):
 
     after_dedup = []
     seen_urls = set()
-    seen_token_sets = []  # list of (tokens, title) already accepted this run
+    # list of (tokens, title, story) already accepted this run
+    seen_token_sets = []
     for story in after_crime:
         url_norm = normalize_url(story["source_url"])
         thash = title_hash(story["title"])
@@ -2150,16 +2306,40 @@ def main(argv=None):
             drop(story, "duplicate_in_run: same normalized URL")
             continue
         dup_title = False
-        for prev_tokens, prev_title in seen_token_sets:
+        for prev_tokens, prev_title, _prev_story in seen_token_sets:
             if jaccard(tokens, prev_tokens) >= DEDUP_OVERLAP_THRESHOLD:
                 drop(story, "duplicate_in_run: title overlap >=0.7 with %r" % prev_title[:80])
                 dup_title = True
                 break
         if dup_title:
             continue
+        # SAME EVENT, WHICH TITLE OVERLAP CANNOT SEE. Two rewrites of one story
+        # share the names and most of the words but not enough of the exact token
+        # set (0.27 for the Nvidia pair), so the threshold above never fires.
+        same = None
+        for _tokens, _title, prev_story in seen_token_sets:
+            if same_event(prev_story["title"], story["title"]):
+                same = prev_story
+                break
+        if same is not None:
+            if _source_preference(story) < _source_preference(same):
+                # The incoming story is the BETTER source: it takes the card and
+                # the earlier one leaves, so the edition never carries both and
+                # the survivor is not the less useful of the two.
+                after_dedup.remove(same)
+                seen_urls.discard(normalize_url(same["source_url"]))
+                seen_token_sets = [entry for entry in seen_token_sets
+                                   if entry[2] is not same]
+                drop(same, "duplicate_in_run: same event as %r (better source kept)"
+                     % story["title"][:80])
+            else:
+                drop(story, "duplicate_in_run: same event as %r"
+                     % same["title"][:80])
+                continue
         seen_urls.add(url_norm)
-        seen_token_sets.append((tokens, story["title"]))
+        seen_token_sets.append((tokens, story["title"], story))
         after_dedup.append(story)
+
 
     # -- Stage 6b: active-event matching / same-day report dedup --------------
     survivors = []
@@ -2287,12 +2467,17 @@ def main(argv=None):
         # hero composes its own line from `edition_kind`/`summary_counts`.
         rewritten = rewritten_note(facts, notes)
         if rewritten:
-            payload["notes"] = english_text.replace_held_back(rewritten, held_total)
-    # The held-back count is DATA now, not a number a renderer reads back out of
-    # the prose. Pass on the total this stage reached (deriver's count + its own
-    # drops) so the page line and the note sentence cannot disagree.
-    if held_total or isinstance(data.get("held_back"), dict):
-        payload["held_back"] = {"count": held_total, "reason": "not_english"}
+            payload["notes"] = english_text.replace_held_back(
+                rewritten, held["count"], pool=held["pool"],
+                stories=held["stories_dropped"])
+    # The held-back numbers are DATA now, not a number a renderer reads back out of
+    # the prose. Both populations travel with their own pool so the page line and
+    # the note sentence cannot quote a count against the wrong denominator.
+    if (held["count"] or held["stories_dropped"]
+            or isinstance(data.get("held_back"), dict)):
+        payload["held_back"] = {"count": held["count"], "pool": held["pool"],
+                                "stories_dropped": held["stories_dropped"],
+                                "reason": "not_english"}
     # THE FLOOR IS DATA, CHECKED HERE AND WRITTEN HERE. `edition_kind` describes
     # coverage only, so an edition of 2 cards whose 2 summaries are written is
     # "full" -- true about coverage, false about the floor, and that "full" is

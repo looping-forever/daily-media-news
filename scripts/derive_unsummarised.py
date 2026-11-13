@@ -440,34 +440,50 @@ def derive(candidates, now=None, held=None):
     will not accept is a candidate the collector spent a source on for nothing,
     and the count is the evidence for that.
 
-    `held` is an optional dict the caller may pass; a candidate whose title is
-    not English is counted into ``held["non_english"]`` instead of disappearing,
-    because "the page could not draw it" is a decision the payload has to report.
+    `held` is an optional dict the caller may pass; it receives `pool` (how many
+    candidates were considered) and `refused` (a reason -> count map) so the pool
+    RECONCILES on the page. Run 43246133293 printed "held back 7" and "20 stories
+    from 53 candidates" and nothing in between: 33 candidates vanished, 7 of them
+    were counted, and the edition note then claimed those 7 out of a story pool of
+    20. Every refusal is counted here now, so pool = used + held + other holds.
     """
     now = now or datetime.now(timezone.utc)
     stories, counts, skipped, seen = [], {}, {}, []
+    refused = {}
+
+    def refuse(reason):
+        refused[reason] = refused.get(reason, 0) + 1
+
     for cand in candidates or []:
         if not isinstance(cand, dict):
+            refuse("not_a_candidate")
             continue
         title = str(cand.get("title") or "").strip()
         category = str(cand.get("domain_category") or "").strip()
         url = str(cand.get("url") or "").strip()
         if not title or not category or not url.startswith("http"):
+            refuse("missing_field")
             continue
         if category not in VALID_CATEGORIES:
             skipped[category] = skipped.get(category, 0) + 1
+            refuse("not_a_category")
             continue
         if not english_text.looks_english(title):
             if isinstance(held, dict):
                 held["non_english"] = held.get("non_english", 0) + 1
+            refuse("not_english")
             continue
         if len(title) < MIN_TITLE_CHARS:
+            refuse("title_too_short")
             continue
         if counts.get(category, 0) >= PER_CATEGORY:
+            refuse("over_per_category_cap")
             continue
         tokens = title_tokens(title)
         if any(jaccard(tokens, prev) >= NEAR_DUP for prev in seen):
+            refuse("near_duplicate")
             continue
+
         host = host_of(url)
         published = cand.get("published")
         body = lead_text(cand.get("snippet"), title, category)
@@ -497,7 +513,11 @@ def derive(candidates, now=None, held=None):
         stories.append(story)
         counts[category] = counts.get(category, 0) + 1
         seen.append(tokens)
+    if isinstance(held, dict):
+        held["pool"] = len(candidates or [])
+        held["refused"] = refused
     return stories, counts, skipped
+
 
 
 #: How much of a rejected answer is kept in the debug artifact. Long enough to
@@ -652,10 +672,21 @@ def main(argv=None):
         print("  %-24s skipped %d (not a digest category)"
               % (category, skipped[category]))
     held_n = held.get("non_english", 0)
+    pool = held.get("pool") or len(candidates)
+    refused = held.get("refused") or {}
+    other = sum(n for reason, n in refused.items() if reason != "not_english")
     if held_n:
-        print("  %-24s %d (title not in English)" % ("held back", held_n))
+        print("  %-24s %d of %d (title not in English)" % ("held back", held_n, pool))
+    # THE POOL RECONCILES, IN ONE LINE: every candidate is either used, held for
+    # its script, or refused for a named reason. Without this the 2026-11-12 run
+    # printed "7 held" and "20 stories from 53 candidates" and left 26 unexplained.
+    print("  %-24s %d in = %d used + %d held + %d other (%s)"
+          % ("candidates", pool, len(stories), held_n, other,
+             ", ".join("%s %d" % (reason, n) for reason, n in sorted(refused.items())
+                       if reason != "not_english") or "none"))
     print("derive_unsummarised: %d stories from %d candidates"
           % (len(stories), len(candidates)))
+
 
     if len(stories) < MIN_STORIES:
         # Fewer than the floor means the empty/degraded path owns this run. This
@@ -748,7 +779,7 @@ def main(argv=None):
         notes = edition_kind.summary_note(kind, written, len(stories),
                                           publisher, none)
     if held_n:
-        notes = english_text.replace_held_back(notes, held_n)
+        notes = english_text.replace_held_back(notes, held_n, pool=pool)
     payload = {
         "date": args.today,
         # Derived, not assumed: 0 summaries is `unsummarised`, some is `partial`,
@@ -758,10 +789,13 @@ def main(argv=None):
         "edition_kind": kind,
         # The count the page needs to be honest about its own text.
         "summary_counts": {"summarised": written, "total": len(stories)},
-        # How many stories this stage withheld for their script, as DATA. The
-        # validator adds its own drops to this number and rewrites the sentence,
-        # so both renderers read one count instead of each re-reading the prose.
-        "held_back": {"count": held_n, "reason": "not_english"},
+        # How many CANDIDATES this stage withheld for their script, out of the
+        # pool it was given. `pool` travels with the count so the sentence can
+        # name its own population: the validator adds the stories IT dropped
+        # separately (`stories_dropped`), and the two are never summed.
+        "held_back": {"count": held_n, "pool": pool, "stories_dropped": 0,
+                      "reason": "not_english"},
+
         # No model wrote this edition; naming the deriver as the writer is what
         # lets the seal report how the digest was produced.
         "writer": {"rung": "derived", "attempt": None, "model": None},

@@ -413,11 +413,16 @@ class TheHeldBackCountIsData(unittest.TestCase):
 
     def test_the_payload_carries_the_count_the_page_prints(self):
         payload = self.run_main(self.candidates())
-        self.assertEqual({"count": 1, "reason": "not_english"},
+        self.assertEqual({"count": 1, "pool": 6, "stories_dropped": 0,
+                          "reason": "not_english"},
                          payload.get("held_back"),
-                         "the page has no count to print unless the deriver states "
-                         "it as data")
-        self.assertEqual(1, len(english_text._HELD_BACK_RE.findall(payload["notes"])))
+                         "the page has no count to print unless the deriver "
+                         "states it as data, with the pool it was taken from")
+        self.assertEqual(0, len(english_text._HELD_BACK_RE.findall(payload["notes"])),
+                         "a candidate count is stated as a story count again")
+        self.assertEqual(1, len(english_text._HELD_BACK_CANDIDATE_RE.findall(
+            payload["notes"])))
+
 
     def test_nothing_held_still_states_zero(self):
         payload = self.run_main(
@@ -429,20 +434,34 @@ class TheHeldBackCountIsData(unittest.TestCase):
 
 
 class TheValidatorDoesNotAppendASecondCount(unittest.TestCase):
-    """Validation withholds a few more stories; the total must be one number."""
+    """Two pools, two counts: this stage's drops are never added to the deriver's.
 
-    def test_it_adds_its_own_drops_to_the_carried_count(self):
-        self.assertEqual(6, vs.held_back_total({"held_back": {"count": 5}}, 1),
-                         "the page's count must be the whole edition's, not one "
-                         "stage's share of it")
+    The old design summed them ("already + dropped"), which described no
+    population that exists: run 43246133293 had 7 candidates held out of 53 and
+    a separate 5 stories dropped out of 20. 7+5=12 matches neither, and the
+    edition said "7 stories" over 15 cards.
+    """
+
+    def test_the_derivers_count_keeps_its_own_pool(self):
+        self.assertEqual({"count": 7, "pool": 53, "stories_dropped": 0},
+                         vs.held_back_record({"held_back": {"count": 7,
+                                                            "pool": 53}}, 0))
+
+    def test_this_stages_drops_are_recorded_separately(self):
+        record = vs.held_back_record({"held_back": {"count": 7, "pool": 53}}, 2)
+        self.assertEqual(2, record["stories_dropped"])
+        self.assertEqual(7, record["count"],
+                         "the pools are being summed again, and 9 is not a "
+                         "population either stage measured")
 
     def test_a_payload_without_the_field_starts_from_zero(self):
-        self.assertEqual(2, vs.held_back_total({}, 2))
-        self.assertEqual(2, vs.held_back_total({"held_back": "6"}, 2))
+        self.assertEqual({"count": 0, "pool": 0, "stories_dropped": 2},
+                         vs.held_back_record({}, 2))
 
     def test_a_malformed_count_is_not_trusted(self):
         for record in ({"count": "many"}, {"count": None}, {"held_back": True}):
-            self.assertEqual(1, vs.held_back_total(record, 1), "record %r" % (record,))
+            self.assertEqual(0, vs.held_back_record(record, 1)["count"],
+                             "record %r" % (record,))
 
 
 class TheKindFollowsTheCounts(unittest.TestCase):

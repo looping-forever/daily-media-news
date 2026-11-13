@@ -74,19 +74,40 @@ def looks_english(text):
     return not non_english_script(text)
 
 
-def held_back_note(count):
-    """The sentence a payload's notes carry when stories were refused."""
+def held_back_note(count, pool=0):
+    """The sentence a payload's notes carry when something was refused.
+
+    `pool` names the POPULATION the count was taken from, and the sentence says
+    so. With a pool the count is candidates the deriver withheld for their
+    script; without one it is stories this pipeline dropped. The two are never
+    added together: run 43246133293 withheld 7 of 53 candidates and the edition
+    note said "7 stories were held back" over a 15-card edition, which balances
+    against no pool at all (53-7=46, 20-7=13, the edition carried 15).
+    """
+    count = int(count or 0)
+    pool = int(pool or 0)
+    if count <= 0:
+        return ""
+    if pool >= count:
+        if count == 1:
+            return ("1 of the %d collected candidates was held back because its "
+                    "title is not in English." % pool)
+        return ("%d of the %d collected candidates were held back because their "
+                "titles are not in English." % (count, pool))
     if count == 1:
         return "1 story was held back because it is not in English."
     return "%d stories were held back because they are not in English." % count
 
 
-#: The two shapes `held_back_note` can produce, as one pattern. Used to WRITE one
-#: sentence with `replace_held_back`, and to read the count off OLD payloads that
-#: predate the `held_back` field.
+#: The story-population shapes, and the candidate-population shapes, as patterns.
+#: Used to WRITE one sentence each with `replace_held_back`, and to READ the count
+#: off OLD payloads that predate the `held_back` field.
 _HELD_BACK_RE = re.compile(
     r"(\d+) stor(?:y was|ies were) held back because "
     r"(?:it is|they are) not in English\.")
+_HELD_BACK_CANDIDATE_RE = re.compile(
+    r"\d+ of the \d+ collected candidates? (?:was|were) held back because "
+    r"(?:its title is|their titles are) not in English\.")
 
 
 def held_back_from_notes(notes):
@@ -101,21 +122,26 @@ def held_back_from_notes(notes):
     return int(match.group(1)) if match else 0
 
 
-def replace_held_back(notes, count):
-    """The notes with exactly ONE held-back sentence, stating `count`.
+def replace_held_back(notes, count, pool=0, stories=0):
+    """The notes with exactly ONE held-back sentence per population.
 
-    Two stages can withhold a story for its script -- the deriver and the validator --
-    and each used to APPEND its own sentence. A payload that passed through both
-    therefore carried two different numbers in one field, and every reader picked a
-    different one: the page regexed the first, the visible capped note kept whichever
-    fit in the limit. Writing the sentence instead of appending to it is what makes
-    "one count" true rather than hoped for.
+    Two stages can withhold something for its script -- the deriver withholds
+    CANDIDATES, the validator drops STORIES -- and each used to append its own
+    sentence. A payload that passed through both therefore carried two different
+    numbers in one field, and every reader picked a different one: the page
+    regexed the first, the visible capped note kept whichever fit in the limit.
+    Now each population gets its own sentence, naming itself, written here and
+    never appended elsewhere.
     """
-    text = _HELD_BACK_RE.sub("", str(notes or ""))
+    text = _HELD_BACK_CANDIDATE_RE.sub("", str(notes or ""))
+    text = _HELD_BACK_RE.sub("", text)
     text = re.sub(r"\s{2,}", " ", text).strip()
-    if not count:
-        return text
-    return (text + " " + held_back_note(count)).strip()
+    for sentence in (held_back_note(count, pool=pool),
+                     held_back_note(stories)):
+        if sentence:
+            text = (text + " " + sentence).strip()
+    return text
+
 
 
 def floor_note(kept, required):

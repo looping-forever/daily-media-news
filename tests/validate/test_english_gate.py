@@ -238,8 +238,11 @@ class DeriverHoldsBackNonEnglish(unittest.TestCase):
             payload = json.load(fh)
         self.assertEqual(5, len(payload["stories"]))
         self.assertIn("no AI model was configured or reachable", payload["notes"])
-        self.assertIn("1 story was held back because it is not in English.",
-                      payload["notes"])
+        self.assertIn("1 of the 6 collected candidates was held back because "
+                      "its title is not in English.", payload["notes"],
+                      "the count must name its own population: it was taken "
+                      "from the CANDIDATE pool, not from the five stories")
+
 
     def test_below_the_floor_still_writes_nothing(self):
         english = [

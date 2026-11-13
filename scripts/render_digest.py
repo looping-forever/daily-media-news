@@ -2530,20 +2530,26 @@ def render_page(stories, digest_time, date_val, timestamp, meta=None,
         # older payload) appends nothing, so its sentence is unchanged.
         if edition_line:
             edition_line += edition_kind.extracted_clause(extracted)
-        # A short edition must say what made it short. The count is DATA on the
-        # payload (`held_back.count`), written once by the pipeline; only a payload
-        # predating that field is read back off its notes text.
+        # A short edition must say what made it short. The counts are DATA on the
+        # payload (`held_back.count` with its `pool`, and `held_back.stories_dropped`),
+        # written once by the pipeline; only a payload predating that field is read
+        # back off its notes text. ONE SENTENCE PER POPULATION: the deriver's count
+        # is candidates out of a candidate pool, the validator's is stories out of
+        # the edition -- quoting either against the other is what made run
+        # 43246133293 print "7 stories were held back" over a 15-card edition.
         record = (meta or {}).get("held_back")
         if isinstance(record, dict):
-            try:
-                held_back = int(record.get("count") or 0)
-            except (TypeError, ValueError):
-                held_back = 0
+            held_back = _int(record.get("count"))
+            held_pool = _int(record.get("pool"))
+            held_stories = _int(record.get("stories_dropped"))
         else:
             held_back = english_text.held_back_from_notes((meta or {}).get("notes"))
-        if held_back:
-            edition_line = join_sentences(
-                edition_line, english_text.held_back_note(held_back))
+            held_pool, held_stories = 0, 0
+        for sentence in (english_text.held_back_note(held_back, pool=held_pool),
+                         english_text.held_back_note(held_stories)):
+            if sentence:
+                edition_line = join_sentences(edition_line, sentence)
+
 
     # A SHORT EDITION SAYS SO, whatever its coverage line said. This block sits
     # OUTSIDE the fallback branch on purpose: run 43235310367 shipped 2 cards, all

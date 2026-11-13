@@ -1889,7 +1889,7 @@ jobs:
           # prints COUNT=<n> last, so the number this gate reads is the number the
           # edition would carry. It writes no payload and no state.
           COUNT_LOG=/tmp/validate-count.log
-          RAW=0; SURVIVORS=0; DEDUPED=0; CANDIDATES=0
+          RAW=0; SURVIVORS=0; DEDUPED=0; CANDIDATES=0; SCHEMA=0; EVENTS=0
           if [ -s state/stories.json ]; then
             if python3 scripts/validate_stories.py --count-only \
                  --in state/stories.json \
@@ -1900,39 +1900,55 @@ jobs:
                  --today "$TODAY" > "$COUNT_LOG" 2>&1; then
               sed -n '1,5p' "$COUNT_LOG"
               RAW=$(sed -n 's/.*raw=\([0-9][0-9]*\).*/\1/p' "$COUNT_LOG" | tail -n 1)
+              SCHEMA=$(sed -n 's/.*schema-survivors=\([0-9][0-9]*\).*/\1/p' "$COUNT_LOG" | tail -n 1)
               DEDUPED=$(sed -n 's/.*after-history-dedup=\([0-9][0-9]*\).*/\1/p' "$COUNT_LOG" | tail -n 1)
+              EVENTS=$(sed -n 's/.*after-event-dedup=\([0-9][0-9]*\).*/\1/p' "$COUNT_LOG" | tail -n 1)
               SURVIVORS=$(sed -n 's/^COUNT=\([0-9][0-9]*\)$/\1/p' "$COUNT_LOG" | tail -n 1)
             else
               echo "::warning::the validator could not count the edition; treating the model-written digest as unusable"
             fi
           fi
 
-          RAW=${RAW:-0}; SURVIVORS=${SURVIVORS:-0}; DEDUPED=${DEDUPED:-0}
+          RAW=${RAW:-0}; SCHEMA=${SCHEMA:-0}; DEDUPED=${DEDUPED:-0}
+          EVENTS=${EVENTS:-0}; SURVIVORS=${SURVIVORS:-0}
           CANDIDATES=0
           if [ -s state/candidates.json ]; then
             CANDIDATES=$(python3 -c "import json;d=json.load(open('state/candidates.json'));print(len(d.get('candidates') or []))" 2>/dev/null || echo 0)
           fi
-          # ONE LINE, FOUR COUNTS: `candidates` is the collector's pool, `raw` is
-          # the MODEL's own story count, `after-history-dedup` is what survived the
-          # already-sent check, and `would-ship` is what the edition would actually
-          # carry. Naming all four is what stops raw=3 being read as a collection
-          # failure, and what makes a 4-to-2 dedup visible instead of a surprise.
-          echo "Digest provenance: candidates=${CANDIDATES} raw=${RAW} (model-written stories) after-history-dedup=${DEDUPED} would-ship=${SURVIVORS}"
+          # ONE LINE, FIVE COUNTS, EACH THE SIZE OF ITS OWN POPULATION: `raw` is the
+          # model's own story count, `schema-survivors` passed the schema,
+          # `after-history-dedup` survived the already-sent check, `after-event-dedup`
+          # survived the same-day event check, and `would-ship` is what the edition
+          # would actually carry. Naming all five is what stops raw=5 and would-ship=3
+          # being read as "3 rejected" when the schema rejected none of them.
+          echo "Digest provenance: candidates=${CANDIDATES} raw=${RAW} schema-survivors=${SCHEMA} after-history-dedup=${DEDUPED} after-event-dedup=${EVENTS} would-ship=${SURVIVORS}"
           if [ "$SURVIVORS" -ge "$STORIES_FLOOR" ]; then
-            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation and history dedup, floor ${STORIES_FLOOR}); the unsummarised fallback is not used."
+            echo "A model-written digest exists (${SURVIVORS} of ${RAW} stories survive validation and dedup, floor ${STORIES_FLOOR}); the unsummarised fallback is not used."
             exit 0
           fi
-          if [ "$SURVIVORS" != "0" ]; then
-            echo "::warning::Only ${SURVIVORS} of ${RAW} model-written stories would ship, below the ${STORIES_FLOOR}-story floor -- deriving the unsummarised edition instead."
-          fi
+          REJECTED=$((RAW - SCHEMA))
+          HISTORY_DROPS=$((SCHEMA - DEDUPED))
+          EVENT_DROPS=$((DEDUPED - EVENTS))
+          CAP_DROPS=$((EVENTS - SURVIVORS))
 
           # The deriver writes state/stories.json only ABOVE ITS OWN floor, so a
           # file still here is the too-thin model payload. Removing it first
           # means a floor miss leaves NO payload and the empty-outcome path owns
           # it, instead of a thin digest being sealed as an ordinary edition.
           rm -f state/stories.json
-          if [ "$RAW" != "0" ]; then
-            echo "::warning::All ${RAW} model-written stories were rejected by validation -- the empty edition is not shipped; deriving the unsummarised edition instead."
+          # SAY ONLY WHAT IS TRUE ABOUT THE POPULATION THE SENTENCE NAMES, and say
+          # exactly one of these. Run 43246133293 printed three in a row: "Only 3 of
+          # 5 would ship" (true), "All 5 were rejected by validation" (false -- the
+          # schema rejected none; 2 went to history dedup), and "no model produced a
+          # digest" (misleading -- the model produced 5). Four shapes, one branch each.
+          if [ "$RAW" = "0" ]; then
+            echo "::warning::The model walk returned no stories at all -- deriving the unsummarised edition from the collected candidates."
+          elif [ "$SURVIVORS" != "0" ]; then
+            echo "::warning::Only ${SURVIVORS} of ${RAW} model-written stories would ship, below the ${STORIES_FLOOR}-story floor (${REJECTED} rejected by validation, ${HISTORY_DROPS} already sent within TTL, ${EVENT_DROPS} duplicating an event already reported) -- deriving the unsummarised edition instead."
+          elif [ "$REJECTED" = "$RAW" ]; then
+            echo "::warning::All ${RAW} model-written stories were rejected by validation (0 of ${RAW} passed the schema) -- deriving the unsummarised edition instead."
+          else
+            echo "::warning::None of the ${RAW} model-written stories would ship: ${SCHEMA} passed validation, ${HISTORY_DROPS} were already sent within TTL, ${EVENT_DROPS} duplicated an event already reported today, and ${CAP_DROPS} fell below the rank cap -- deriving the unsummarised edition instead."
           fi
           if [ ! -s state/candidates.json ]; then
             echo "::warning::No collected candidates to derive from -- the empty-outcome path owns this run."
@@ -1940,8 +1956,9 @@ jobs:
           fi
           # Below the floor the deriver writes NOTHING and exits 0 on purpose:
           # the existing empty-digest classification is the owner of that case.
-          echo "::warning::No usable digest from the model walk -- deriving the unsummarised edition from the collected candidates (no model produced a digest)."
-          echo "### Fallback edition (no model wrote the digest)" >> "$GITHUB_STEP_SUMMARY"
+          # NOT "no model produced a digest": on 2026-11-12 a model produced five.
+          echo "::warning::No model-written digest met the ${STORIES_FLOOR}-story floor -- deriving the unsummarised edition from the collected candidates."
+          echo "### Fallback edition (no model-written digest met the floor)" >> "$GITHUB_STEP_SUMMARY"
           START=$(date +%s)
           python3 scripts/derive_unsummarised.py \
             --candidates state/candidates.json \
