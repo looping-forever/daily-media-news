@@ -760,13 +760,75 @@ DELIVERED_RECEIPT = {
 }
 
 
+class WatchdogRun:
+    """One execution of the health arm plus the output contract it wrote."""
+
+    def __init__(self, returncode, problems, notes, output, detail,
+                 problem_count, outputs, key_counts, repeated_problem_lines):
+        self.returncode = returncode
+        self.problems = problems
+        self.notes = notes
+        self.output = output
+        self.detail = detail
+        self.problem_count = problem_count
+        self.outputs = outputs
+        self.key_counts = key_counts
+        self.repeated_problem_lines = repeated_problem_lines
+
+    def __iter__(self):
+        # The original four-values shape stays usable at every existing call site.
+        return iter((self.returncode, self.problems, self.notes, self.output))
+
+
+def _watchdog_health_outputs(raw):
+    """Read the health step's shipped GITHUB_OUTPUT contract.
+
+    The step writes one `problems=<count>` key and one `detail=<joined>` key.
+    `detail` joins problems with `'; '` after flattening newlines. Repeated
+    `problem=` keys are exposed separately so a test can reject that drift.
+    """
+    outputs = {}
+    key_counts = {}
+    repeated_problem_lines = []
+    for line in raw.splitlines():
+        if line.startswith("problem="):
+            repeated_problem_lines.append(line)
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key_counts[key] = key_counts.get(key, 0) + 1
+        outputs[key] = value
+    try:
+        problem_count = int(outputs.get("problems", ""))
+    except (TypeError, ValueError):
+        problem_count = None
+    detail = outputs.get("detail", "")
+    problems = detail.split("; ") if problem_count and detail else []
+    return problems, detail, problem_count, outputs, key_counts, \
+        repeated_problem_lines
+
+
+def watchdog_chain_alert_detail_binding():
+    """The chain alert step's exact binding to the health step's detail."""
+    src = _read(WATCHDOG)
+    match = re.search(
+        r'(?m)^\s*DETAIL_RAW="\$\{\{ steps\.chain\.outputs\.detail \}\}"\s*$',
+        src)
+    if not match:
+        raise AssertionError(
+            "the chain alert step no longer binds DETAIL_RAW to "
+            "steps.chain.outputs.detail")
+    return match.group(0).strip()
+
+
 def run_watchdog_chain(health_payload, curl_rc=0, http="200",
                        url="https://x/h", delivery=DELIVERED_RECEIPT,
                        delivery_raw=None):
     """Execute the watchdog's own chain-arm python against a payload.
 
-    Real execution of the committed code, not a paraphrase of it. Returns
-    (exit_code, problems, notes, combined_output).
+    Real execution of the committed code, not a paraphrase of it. Unpacks as
+    (exit_code, problems, notes, combined_output); also carries the parsed
+    `problems=`/`detail=` output contract as attributes.
 
     `delivery` / `delivery_raw` drive the DELIVERY RECEIPT the arm now reads.
     `delivery_raw` writes bytes verbatim, so the "file absent" and "file
@@ -803,12 +865,14 @@ def run_watchdog_chain(health_payload, curl_rc=0, http="200",
         proc = subprocess.run([sys.executable, "-c", code], env=env,
                               capture_output=True, text=True, timeout=120)
         raw = io.open(out_path, encoding="utf-8").read()
-        problems = [l[len("problem="):]
-                    for l in raw.splitlines() if l.startswith("problem=")]
+        problems, detail, problem_count, outputs, key_counts, \
+            repeated_problem_lines = _watchdog_health_outputs(raw)
         notes = [l for l in raw.splitlines()
                  if l.startswith("note=") or l.startswith("unknown=")]
-        return proc.returncode, problems, notes, (proc.stdout or "") + \
-            (proc.stderr or "")
+        return WatchdogRun(
+            proc.returncode, problems, notes,
+            (proc.stdout or "") + (proc.stderr or ""), detail, problem_count,
+            outputs, key_counts, repeated_problem_lines)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -920,6 +984,46 @@ class WatchdogDetectsADeadChain(unittest.TestCase):
             "the arm passed with NO delivery receipt on disk. An absent file is "
             "unreadable, and unreadable must never print as healthy.\n%s" % out)
         self.assertTrue(problems, "no stated problem for a missing receipt")
+
+    def test_a_dead_chain_writes_the_shipped_output_contract(self):
+        """The health step writes one count and one joined detail key.
+
+        This is the contract the alert step reads. A repeated `problem=` key is
+        not a list in GITHUB_OUTPUT: GitHub keeps only the last value, so every
+        reason but the last would be lost.
+        """
+        run = run_watchdog_chain(json.dumps({"build": "abc"}), delivery=None)
+        self.assertEqual(
+            1, run.returncode,
+            "the dead chain did not exit 1.\n%s" % run.output)
+        self.assertEqual(
+            2, run.problem_count,
+            "the health step did not report both faults: %r" % run.outputs)
+        self.assertEqual(1, run.key_counts.get("problems"),
+                         "the health step must write exactly one problems= key")
+        self.assertEqual(1, run.key_counts.get("detail"),
+                         "the health step must write exactly one detail= key")
+        self.assertEqual(
+            [], run.repeated_problem_lines,
+            "the health step wrote repeated problem= keys; GITHUB_OUTPUT keeps "
+            "only the last value, so every reason but the last would be lost")
+        self.assertEqual(
+            run.problem_count, len(run.problems),
+            "problems= says %r but detail= joined %d problem(s): %r"
+            % (run.problem_count, len(run.problems), run.detail))
+        self.assertEqual(
+            "; ".join(run.problems), run.detail,
+            "detail= must join the problems with '; '")
+        self.assertIn("::error::", run.output,
+                      "the dead chain printed no ::error:: annotation")
+        for problem in run.problems:
+            self.assertIn(
+                "::error::breaking dispatch chain: %s" % problem, run.output,
+                "the dead chain did not print the reason %r" % problem)
+        self.assertEqual(
+            'DETAIL_RAW="${{ steps.chain.outputs.detail }}"',
+            watchdog_chain_alert_detail_binding(),
+            "the chain alert step must receive the exact joined detail")
 
     def test_an_unreadable_delivery_receipt_is_a_fault(self):
         rc, problems, _notes, out = run_watchdog_chain(

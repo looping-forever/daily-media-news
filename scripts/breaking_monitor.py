@@ -883,6 +883,11 @@ def payload_detection_source():
     val = (os.environ.get("PAYLOAD_SOURCE") or "").strip().lower()
     return val if val in DETECTION_SOURCES else DEFAULT_DETECTION_SOURCE
 
+
+def payload_headline():
+    """The Worker's tripwire headline for this run, or "" on a scheduled run."""
+    return (os.environ.get("PAYLOAD_TITLE") or "").strip()
+
 # Reduced source set (COLLECT-SMALL).
 BREAKING_NP_QUERIES = [
     "Nepal", "local district", "Tribhuvan University", "bank notice",
@@ -1377,7 +1382,110 @@ def stated_casualty_count(title):
     return count, m.group(0)
 
 
-def hard_evidence_fast_path(candidates):
+#: How long one real-world event is treated as already alerted. The four
+#: 2026-11-12/13 Makwanpur pushes spanned 14h18m, so 6h (alert_dedupe's window)
+#: would not have covered them; 24h covers a full news cycle without silencing a
+#: genuinely new event the next day.
+ALERT_REPEAT_TTL_HOURS = 24.0
+
+
+def _same_alert_event(title_a, title_b):
+    """True when two alert headlines report the same real-world event.
+
+    The shared rule is validate_stories.same_event. Its entity arm is strict:
+    "Makawanpur microbus crash" and "microbus plunges in central Nepal" name
+    the same crash but share no two capitalised names, so the alert layer also
+    accepts the same calibrated SAME_EVENT_OVERLAP when the pair shares a named
+    entity or states the same death toll. The denial (0.429) and earnings
+    (0.167) controls stay below the line.
+    """
+    if vs.same_event(title_a, title_b):
+        return True
+    overlap = vs._content_overlap(vs.title_tokens(title_a),
+                                  vs.title_tokens(title_b))
+    if overlap < vs.SAME_EVENT_OVERLAP:
+        return False
+    if vs.headline_entities(title_a) & vs.headline_entities(title_b):
+        return True
+    count_a, _ = stated_casualty_count(title_a)
+    count_b, _ = stated_casualty_count(title_b)
+    return count_a is not None and count_a == count_b
+
+
+def _same_mass_casualty_update(title_a, title_b):
+    """True when one mass-casualty story is an updated toll of the other.
+
+    Identity only, never the alert gate: the fast path still requires a toll
+    STRICTLY above UNIVERSAL_MIN_DEATH_COUNT. Two headlines that each state a
+    mass-casualty toll and share at least two content words are one incident
+    when one outlet reports 10 dead and a later one reports 14.
+    """
+    count_a, _ = stated_casualty_count(title_a)
+    count_b, _ = stated_casualty_count(title_b)
+    if count_a is None or count_b is None:
+        return False
+    if count_a < UNIVERSAL_MIN_DEATH_COUNT \
+            or count_b < UNIVERSAL_MIN_DEATH_COUNT:
+        return False
+    shared = vs.title_tokens(title_a) & vs.title_tokens(title_b)
+    return len(shared) >= 2
+
+
+def _anchor_binds(anchor_title, candidate_title):
+    """True when a candidate is the tripwire story or its updated toll."""
+    if not anchor_title:
+        return False
+    return (_same_alert_event(anchor_title, candidate_title)
+            or _same_mass_casualty_update(anchor_title, candidate_title))
+
+
+def _alert_time(value):
+    """Parse a Kathmandu-offset ISO timestamp; None when unusable."""
+    try:
+        return datetime.fromisoformat(str(value or ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _recent_alert_event(state, title, now_utc, ttl_hours=ALERT_REPEAT_TTL_HOURS,
+                        anchor_title=""):
+    """The alerted story for this title or tripwire inside the TTL, or None."""
+    cutoff = now_utc - timedelta(hours=ttl_hours)
+    anchor = (anchor_title or "").strip()
+    for ev in state.get("stories") or []:
+        if not isinstance(ev, dict) or not ev.get("alerted"):
+            continue
+        seen = _alert_time(ev.get("last_alerted"))
+        if seen is None or seen < cutoff:
+            continue
+        if _same_alert_event(title, ev.get("canonical_title") or ""):
+            return ev
+        if anchor and ev.get("alert_anchor") \
+                and _same_alert_event(anchor, ev.get("alert_anchor")):
+            return ev
+    return None
+
+
+def _bind_alert_story(verdict, candidates, anchor_title=""):
+    """The candidate the alert is grounded in, or None when it is not grounded.
+
+    The Worker tripwire is the anchor when present: a run triggered by an
+    elephant attack may not push a minibus crash that merely sat in the same
+    candidate pool. The verdict's own title must also match that candidate, so
+    the title and body cannot come from two different stories.
+    """
+    title = verdict.get("title") or ""
+    anchor = (anchor_title or "").strip()
+    for cand in candidates or []:
+        cand_title = cand.get("title") or ""
+        if anchor and not _anchor_binds(anchor, cand_title):
+            continue
+        if _same_alert_event(title, cand_title):
+            return cand
+    return None
+
+
+def hard_evidence_fast_path(candidates, anchor_title=""):
     """(verdict|None, why) -- a level-3 verdict built with NO classifier.
 
     See the block comment above for the qualification rule and the measurement.
@@ -1389,6 +1497,7 @@ def hard_evidence_fast_path(candidates):
     ladder's titles ARE model-produced, which is why that path is expected to
     come back in English; this one has no such producer, so the gate is code.
     """
+    anchor = (anchor_title or "").strip()
     for cand in candidates or []:
         title = cand.get("title", "") or ""
         # A push is rendered by a client whose fonts we do not control, and a
@@ -1396,6 +1505,10 @@ def hard_evidence_fast_path(candidates):
         # half of a mixed headline can still state a toll, so this is checked
         # before any rule reads the title.
         if not english_text.looks_english(title):
+            continue
+        # The tripwire story is the event this run was dispatched for. A
+        # different mass-casualty headline already in the pool is not it.
+        if anchor and not _anchor_binds(anchor, title):
             continue
         blob = _gate_blob(title, cand.get("snippet", "") or "")
         if len(SPORT_GOSSIP_RE.findall(blob)) >= SPORT_GOSSIP_DOMINATING_HITS:
@@ -3826,7 +3939,7 @@ def is_critical_alert(verdict, level=None):
 
 
 def record_alert_state(verdict, state, paths, first_url, today_iso, confidence,
-                       detection_source, universal_override):
+                       detection_source, universal_override, anchor_title=""):
     """Stage 8: mark the event as alerted, in memory and on disk.
 
     Shared by a real send and a HELD alert on purpose: a held alert has been
@@ -3857,6 +3970,8 @@ def record_alert_state(verdict, state, paths, first_url, today_iso, confidence,
     ev = next((e for e in state["stories"]
                if e.get("event_id") == event_id), None)
     if ev is not None:
+        if anchor_title:
+            ev["alert_anchor"] = anchor_title[:300]
         ev["alerted"] = True
         ev["alert_count"] = int(ev.get("alert_count") or 0) + 1
         ev["last_alerted"] = story_state.kathmandu_now_iso()
@@ -3876,6 +3991,7 @@ def process_alert(verdict, matched_candidates, state, paths, args,
     # Where the top tripped item came from (worker dispatch payload; the
     # standalone scheduled run has no payload -> "google-news").
     detection_source = payload_detection_source()
+    anchor = payload_headline()
 
     level = verdict["level"]
     confidence = verdict["confidence"]
@@ -4007,6 +4123,35 @@ def process_alert(verdict, matched_candidates, state, paths, args,
         return False, level, confidence, eid or "", \
             "; ".join(notes) or "below_alert_level"
 
+    # --- Repeated event, new id: one real-world event gets one push ---------
+    # The event id is per-outlet, so a follow-up story can miss the exact-id
+    # branch above. Compare the alert title with every event alerted inside
+    # the TTL; a confidence increase or a RESOLVED revival still re-alerts.
+    if eid is None:
+        recent = _recent_alert_event(state, verdict["title"], now_utc,
+                                     anchor_title=anchor)
+        if recent is not None:
+            prev_rank = CONFIDENCE_RANK.get(
+                recent.get("last_confidence") or "", 0)
+            rank_increased = CONFIDENCE_RANK[confidence] > prev_rank
+            if not rank_increased and recent.get("status") != "RESOLVED":
+                recent["last_seen"] = today_iso
+                recent["updated_at"] = story_state.kathmandu_now_iso()
+                story_state.save_state_atomic(paths["active"], state)
+                return False, level, confidence, \
+                    recent.get("event_id") or "", "duplicate_same_event"
+
+    # --- Payload binding: title and body must be ONE story object ----------
+    # A run dispatched by the elephant-attack tripwire once pushed a stale
+    # minibus-crash story that merely shared the candidate pool. No bound
+    # candidate means no alert: a wrong story is worse than a late one.
+    if anchor:
+        bound = _bind_alert_story(verdict, matched_candidates, anchor)
+        if bound is None:
+            return False, level, confidence, eid or "", (
+                "payload_unbound: alert title does not match the story that "
+                "tripped the gate")
+
     # --- Quiet hours: HOLD a non-critical alert instead of waking the owner --
     # Held, not dropped. The item waits in state/quiet_queue.json and rides the
     # one morning batch (flush_quiet_queue). The story is still marked alerted
@@ -4016,7 +4161,7 @@ def process_alert(verdict, matched_candidates, state, paths, args,
             and not is_critical_alert(verdict, level):
         event_id, _label = record_alert_state(
             verdict, state, paths, first_url, today_iso, confidence,
-            detection_source, universal_override)
+            detection_source, universal_override, anchor)
         condition = "breaking.alert:%s" % (
             verdict.get("event_key") or stable_alert_id(verdict))
         queued = alert_dedupe.enqueue_quiet(
@@ -4134,7 +4279,7 @@ def process_alert(verdict, matched_candidates, state, paths, args,
     # --- Stage 8: state updates (only after successful send/dry-run) --------
     event_id, event_label = record_alert_state(
         verdict, state, paths, first_url, today_iso, confidence,
-        detection_source, universal_override)
+        detection_source, universal_override, anchor)
 
     # --- Stage 7b: Telegram fan-out (FALLBACK, best-effort) ----------------
     # Runs only when the primary channel did NOT deliver, after the successful
@@ -4372,7 +4517,8 @@ def main(argv=None, fetch_fn=None, ai_runner=None, smtp_factory=None,
     # (see hard_evidence_fast_path for why it is authoritative and why it
     # fabricates nothing). The ladder is not consulted for that run, which is
     # recorded in the log row rather than left implicit.
-    fast_verdict, fast_why = hard_evidence_fast_path(matched)
+    fast_verdict, fast_why = hard_evidence_fast_path(
+        matched, anchor_title=payload_headline())
 
     # Stage 3: AI classify (fail-safe silence on any failure).
     write_json_atomic(paths["pending"], {

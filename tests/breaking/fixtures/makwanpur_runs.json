@@ -1,0 +1,41 @@
+{
+  "event": "One real event (Makwanpur microbus crash) produced four CRITICAL pushes, 2026-11-12/13",
+  "runs": [
+    {
+      "run_id": "43215822535",
+      "gate": "9/14",
+      "payload": "10 killed, five injured as electric microbus plunges off road in Makawanpur",
+      "candidate_title": "Death toll rises to 14 in Makwanpur microbus crash; six from same family killed - Nepalnews.com",
+      "candidate_url": "https://www.nepalnews.com/makwanpur-crash",
+      "source": "nepalnews.com",
+      "expect": "sent"
+    },
+    {
+      "run_id": "43231822031",
+      "gate": "5/17",
+      "payload": "Seven held for setting off firecrackers in Rupandehi, one injured",
+      "candidate_title": "At least 14 dead in passenger EV accident in Central Nepal - ANI News",
+      "candidate_url": "https://www.aninews.in/central-nepal-ev-accident",
+      "source": "aninews.in",
+      "expect": "payload_unbound"
+    },
+    {
+      "run_id": "43336436813",
+      "gate": "2/4",
+      "payload": "10 killed, five injured as electric microbus plunges off road in Makawanpur",
+      "candidate_title": "14 killed as microbus plunges off hilly road in central Nepal - Daily Excelsior",
+      "candidate_url": "https://www.dailyexcelsior.com/central-nepal-microbus",
+      "source": "dailyexcelsior.com",
+      "expect": "duplicate_same_event"
+    },
+    {
+      "run_id": "43352664558",
+      "gate": "1/17",
+      "payload": "Woman killed in elephant attack in Kanchanpur",
+      "candidate_title": "Minibus accident in Nepal results in 14 fatalities",
+      "candidate_url": "https://www.example-news.com/minibus-accident-nepal",
+      "source": "example-news.com",
+      "expect": "payload_unbound"
+    }
+  ]
+}
