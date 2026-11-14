@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-13T19:24:10+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -11777,7 +11777,7 @@
       "canonical_title": "M.Sc. Math IV semester makeup result 2080",
       "category": "education_tu",
       "first_seen": "2026-11-05",
-      "last_seen": "2026-11-13",
+      "last_seen": "2026-11-14",
       "first_reported": "2026-11-05",
       "last_reported": "2026-11-05",
       "importance": 0,
@@ -11797,7 +11797,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-f3630b32eb9e",
@@ -11871,7 +11871,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Queens delivered a stunning road comeback that should put the rest of college basketball on notice.",
       "latest_development": "Queens delivered a stunning road comeback that should put the rest of college basketball on notice.",
       "alerted": false,
@@ -11881,7 +11881,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-f372bd56834d",
@@ -12095,7 +12095,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "TCU coach Sonny Dykes stated that he did not notice the boos and calls for him to be fired.",
       "latest_development": "TCU coach Sonny Dykes stated that he did not notice the boos and calls for him to be fired.",
       "alerted": false,
@@ -12105,7 +12105,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-ef27775759bb",
@@ -12179,7 +12179,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The education minister's claims that 700 ropanis of Tribhuvan University land have been reclaimed are being disputed.",
       "latest_development": "The education minister's claims that 700 ropanis of Tribhuvan University land have been reclaimed are being disputed.",
       "alerted": false,
@@ -12189,7 +12189,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-cffa7512bf65",
@@ -12515,7 +12515,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "An Alpine Linux security advisory regarding an OpenSSH-server password authentication bypass vulnerability climbed to the top of Hacker News with hundreds of comments.",
       "latest_development": "An Alpine Linux security advisory regarding an OpenSSH-server password authentication bypass vulnerability climbed to the top of Hacker News with hundreds of comments.",
       "alerted": false,
@@ -12525,7 +12525,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-037ef4e34e5c",
@@ -12543,7 +12543,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "On Vercel's Hobby plan, cron jobs can run at most once a day, causing schedules like every 15 minutes to fail deployment with a limit error.",
       "latest_development": "On Vercel's Hobby plan, cron jobs can run at most once a day, causing schedules like every 15 minutes to fail deployment with a limit error.",
       "alerted": false,
@@ -12553,7 +12553,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-e360e3024d74",
@@ -12571,7 +12571,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "JSLab, a JavaScript and TypeScript scratchpad for macOS, allows packages to be installed once so they can be imported across every tab using shortcut ⌘I.",
       "latest_development": "JSLab, a JavaScript and TypeScript scratchpad for macOS, allows packages to be installed once so they can be imported across every tab using shortcut ⌘I.",
       "alerted": false,
@@ -12581,7 +12581,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-ec0e3432d6b7",
@@ -12599,7 +12599,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Financial markets reacted to potential tougher scrutiny of data centre construction and the artificial intelligence industry following US midterms.",
       "latest_development": "Financial markets reacted to potential tougher scrutiny of data centre construction and the artificial intelligence industry following US midterms.",
       "alerted": false,
@@ -12609,7 +12609,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-6f2da7c3f275",
@@ -12627,7 +12627,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12637,7 +12637,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-1bff3103f50e",
@@ -12655,7 +12655,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12665,7 +12665,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-2bd1c6768307",
@@ -12683,7 +12683,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Pope Leo, who had part of a lung removed last month, will visit Uruguay, Argentina and Peru.",
       "latest_development": "Pope Leo, who had part of a lung removed last month, will visit Uruguay, Argentina and Peru.",
       "alerted": false,
@@ -12693,7 +12693,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-43db357c978c",
@@ -12711,7 +12711,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12721,7 +12721,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-5531db7cd23a",
@@ -12739,7 +12739,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12749,7 +12749,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-86ac06c63f7e",
@@ -12767,7 +12767,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12777,7 +12777,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-e5fe44ef03a3",
@@ -12795,7 +12795,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The results mean America's two most populous cities - New York and Los Angeles - will be led by democratic socialists.",
       "latest_development": "The results mean America's two most populous cities - New York and Los Angeles - will be led by democratic socialists.",
       "alerted": false,
@@ -12805,7 +12805,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-20e7ef255689",
@@ -12823,7 +12823,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12833,7 +12833,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-c280f462d85f",
@@ -12851,7 +12851,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12861,7 +12861,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-3f54b0a9a83a",
@@ -12879,7 +12879,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12889,7 +12889,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T06:49:37+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-5859b8fa3da0",
@@ -12907,7 +12907,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12917,7 +12917,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-565526ca7eb2",
@@ -12935,7 +12935,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12945,7 +12945,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-703ed59e1fa9",
@@ -12963,7 +12963,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -12973,7 +12973,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-388600f924f1",
@@ -12991,7 +12991,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -13001,7 +13001,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-72a5c3d25dee",
@@ -13019,7 +13019,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -13029,7 +13029,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-a6a163592bf1",
@@ -13047,7 +13047,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Opening a 4.2 GB cryo-EM map three years ago crashed the author's laptop viewer and sparked the creation of NexoPeek.",
       "latest_development": "Opening a 4.2 GB cryo-EM map three years ago crashed the author's laptop viewer and sparked the creation of NexoPeek.",
       "alerted": false,
@@ -13057,7 +13057,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-8754940d2062",
@@ -13075,7 +13075,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Alibaba's Singapore list prices Qwen3.8-Max at $2.00 for input, $0.25 for cached input, and $6.00 for output per 1M tokens.",
       "latest_development": "Alibaba's Singapore list prices Qwen3.8-Max at $2.00 for input, $0.25 for cached input, and $6.00 for output per 1M tokens.",
       "alerted": false,
@@ -13085,7 +13085,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-966f7547dfee",
@@ -13103,7 +13103,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -13113,7 +13113,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-9566c939347b",
@@ -13131,7 +13131,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -13141,7 +13141,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-f921b4461166",
@@ -13159,7 +13159,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Shunsuke Takarai will direct the light-hearted ninja anime based on a concept by Kinema Citrus.",
       "latest_development": "Shunsuke Takarai will direct the light-hearted ninja anime based on a concept by Kinema Citrus.",
       "alerted": false,
@@ -13169,7 +13169,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-0a5ac29a085c",
@@ -13187,7 +13187,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Fortnite's player counts are five times higher than last week as players search for Tim Sweeney's golden ticket during the Treasure Hunters season.",
       "latest_development": "Fortnite's player counts are five times higher than last week as players search for Tim Sweeney's golden ticket during the Treasure Hunters season.",
       "alerted": false,
@@ -13197,7 +13197,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-52096e1ea1db",
@@ -13215,7 +13215,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": false,
@@ -13225,7 +13225,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T07:23:01+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-6c7c0f153e0e",
@@ -13243,7 +13243,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Kathmandu Valley Traffic Police Office successfully recovered 50 lost and stolen two-wheeled vehicles across the valley and formally handed them back to their rightful owners during a special program.",
       "latest_development": "Reported: The Kathmandu Valley Traffic Police Office successfully recovered 50 lost and stolen two-wheeled vehicles across the valley and formally handed them back to their rightful owners during a special program.",
       "alerted": false,
@@ -13253,7 +13253,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-bf6b4fc7d42f",
@@ -13271,7 +13271,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Rastriya Swatantra Party (RSP) Central Election Committee, led by chair Bhuwan KC, has officially issued a seven-point directive governing internal party elections, local conventions, and candidate selection procedures.",
       "latest_development": "Confirmed: The Rastriya Swatantra Party (RSP) Central Election Committee, led by chair Bhuwan KC, has officially issued a seven-point directive governing internal party elections, local conventions, and candidate selection procedures.",
       "alerted": false,
@@ -13281,7 +13281,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-e09fb1e51e82",
@@ -13299,7 +13299,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Analysis of Nepal Life Insurance bonus rates highlights minimum yields of approximately 56 per thousand (5.6 percent) and maximum yields reaching 85 per thousand, both outpacing standard commercial bank term deposit returns.",
       "latest_development": "Reported: Analysis of Nepal Life Insurance bonus rates highlights minimum yields of approximately 56 per thousand (5.6 percent) and maximum yields reaching 85 per thousand, both outpacing standard commercial bank term deposit returns.",
       "alerted": false,
@@ -13309,7 +13309,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-932e758c164c",
@@ -13327,7 +13327,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Electronic Arts has published 25 restored classic titles, including multiple installments in the Wing Commander and Ultima series, on Steam, GOG, and the EA App after discovering archived source tapes.",
       "latest_development": "Confirmed: Electronic Arts has published 25 restored classic titles, including multiple installments in the Wing Commander and Ultima series, on Steam, GOG, and the EA App after discovering archived source tapes.",
       "alerted": false,
@@ -13337,7 +13337,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-a850ae003e0c",
@@ -13355,7 +13355,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Netflix has officially greenlit a two-season animated series adaptation of Midnight Sun, designed to present the Twilight narrative from Edward Cullen's perspective.",
       "latest_development": "Confirmed: Netflix has officially greenlit a two-season animated series adaptation of Midnight Sun, designed to present the Twilight narrative from Edward Cullen's perspective.",
       "alerted": false,
@@ -13365,7 +13365,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-80b50e648c1b",
@@ -13383,7 +13383,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The official website for Haruka Kawachi's Namidaame to Serenade manga adaptation revealed main cast members, staff details, a teaser promotional video, and a scheduled premiere for spring 2027.",
       "latest_development": "Confirmed: The official website for Haruka Kawachi's Namidaame to Serenade manga adaptation revealed main cast members, staff details, a teaser promotional video, and a scheduled premiere for spring 2027.",
       "alerted": false,
@@ -13393,7 +13393,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": "2027-04-01",
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-1484ac7c2754",
@@ -13411,7 +13411,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Shinya Murata and Kazasa Sumita's Killing Bites manga published its 145th and final chapter on October 23, concluding a nearly 13-year serialization run ahead of the 28th compiled volume release.",
       "latest_development": "Reported: Shinya Murata and Kazasa Sumita's Killing Bites manga published its 145th and final chapter on October 23, concluding a nearly 13-year serialization run ahead of the 28th compiled volume release.",
       "alerted": false,
@@ -13421,7 +13421,7 @@
       "in_evening": "2026-11-06",
       "deadline": "2026-12-25",
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-c1deff507470",
@@ -13439,7 +13439,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: A Kenyan court sentenced doomsday cult leader Paul Mackenzie to life imprisonment after finding him guilty of ordering followers to starve 191 children and individuals to death in a forest.",
       "latest_development": "Confirmed: A Kenyan court sentenced doomsday cult leader Paul Mackenzie to life imprisonment after finding him guilty of ordering followers to starve 191 children and individuals to death in a forest.",
       "alerted": false,
@@ -13449,7 +13449,7 @@
       "in_evening": "2026-11-06",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-06T18:41:23+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
     },
     {
       "event_id": "evt-fd3392514f4d",
@@ -19375,7 +19375,7 @@
       "canonical_title": "B.Sc.CSIT II Semester-2082 Exam Center Notice",
       "category": "education_tu",
       "first_seen": "2026-11-13",
-      "last_seen": "2026-11-13",
+      "last_seen": "2026-11-14",
       "first_reported": null,
       "last_reported": null,
       "importance": 0,
@@ -19395,7 +19395,427 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-bc61fc177e67",
+      "event_key": null,
+      "canonical_title": "Starship flight 15 powers to orbit—setting up a possible catch on Saturday",
+      "category": "tech_career",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "arstechnica.com/space/2026/11/starship-flight-15-powers-to-orbit-setting-up-a-possible-catch-on-saturday"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "One way or another, the company will get some more data on Saturday.",
+      "latest_development": "One way or another, the company will get some more data on Saturday.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-5a8207332274",
+      "event_key": null,
+      "canonical_title": "US flight outage live updates: FAA grounds thousands of flights as Trump administration looks for cause of nationwide delays",
+      "category": "world_major",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "theguardian.com/us-news/live/2026/nov/13/us-politics-latest-news-updates-democrats-republicans-donald-trump-van-hollen-chuck-schumer"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Sean Duffy reported that agency technicians are investigating the nationwide ground-stop order, with the homeland security secretary stating there is currently no evidence of a cyberattack.",
+      "latest_development": "Sean Duffy reported that agency technicians are investigating the nationwide ground-stop order, with the homeland security secretary stating there is currently no evidence of a cyberattack.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-1d28cd5ffaec",
+      "event_key": null,
+      "canonical_title": "UK police open sex offence probe into comedian and author David Walliams",
+      "category": "world_major",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "aljazeera.com/news/2026/11/14/uk-police-open-sex-offence-probe-into-comedian-and-author-david-walliams"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-932ce100a7ac",
+      "event_key": null,
+      "canonical_title": "HBO’s 5-Part Crime Drama Has One of the Best Seasons in TV History",
+      "category": "gaming",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/the-wire-season-4-recommendation"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The Wire’s fourth season provided a far deeper look at Baltimore’s problems",
+      "latest_development": "The Wire’s fourth season provided a far deeper look at Baltimore’s problems",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-6033379c5fa5",
+      "event_key": null,
+      "canonical_title": "Microsoft services begin recovering after global outage",
+      "category": "world_major",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "aljazeera.com/video/newsfeed/2026/11/14/microsoft-services-begin-recovering-after-global-outage"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Microsoft services began recovering on Friday after an outage disrupted Outlook and Teams.",
+      "latest_development": "Microsoft services began recovering on Friday after an outage disrupted Outlook and Teams.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-fb1cbc488ba5",
+      "event_key": null,
+      "canonical_title": "Fallout 5 and Fallout Remasters Officially Announced",
+      "category": "gaming",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/fallout-5-fo3-remaster-new-games-bethesda-softworks"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Bethesda Softworks announced Fallout 5 alongside new releases of Fallout 3 and New Vegas.",
+      "latest_development": "Bethesda Softworks announced Fallout 5 alongside new releases of Fallout 3 and New Vegas.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-7b2f065e9df3",
+      "event_key": null,
+      "canonical_title": "Will PM Balen Shah’s India visit resolve cross-border QR payment problem?",
+      "category": "nepal",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.onlinekhabar.com/balen-shah-india-visit-qr-payment.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Three years after a bilateral agreement was signed, Nepalis remain unable to utilize digital QR payments while traveling in India.",
+      "latest_development": "Three years after a bilateral agreement was signed, Nepalis remain unable to utilize digital QR payments while traveling in India.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-a9d0557261eb",
+      "event_key": null,
+      "canonical_title": "FAA grounds all departing US flights following air traffic control communications outage",
+      "category": "nepal",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.khabarhub.com/2026/14/575510"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The regulatory agency based in Washington DC issued the directive due to a significant telecommunications failure that impacted essential aviation navigation systems.",
+      "latest_development": "The regulatory agency based in Washington DC issued the directive due to a significant telecommunications failure that impacted essential aviation navigation systems.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-6caed9dbfb8f",
+      "event_key": null,
+      "canonical_title": "Madhesh Chief Minister Yadav to seek vote of confidence today",
+      "category": "nepal",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.khabarhub.com/2026/14/575485"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Krishna Prasad Yadav is scheduled to appear before the provincial assembly in Janakpurdham this Saturday to secure support from legislators.",
+      "latest_development": "Krishna Prasad Yadav is scheduled to appear before the provincial assembly in Janakpurdham this Saturday to secure support from legislators.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-6eb9d1fcb702",
+      "event_key": null,
+      "canonical_title": "Doc-foundry – AI writes Security detection rules, then proves they work",
+      "category": "tech_career",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "github.com/mjha-arya/doc-foundry"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Article URL: https://github.com/mjha-arya/DOC-foundry Comments URL: https://news.ycombinator.com/item?id=50491753 Points: 5 # Comments: 0",
+      "latest_development": "Article URL: https://github.com/mjha-arya/DOC-foundry Comments URL: https://news.ycombinator.com/item?id=50491753 Points: 5 # Comments: 0",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-f2dcfc84bb50",
+      "event_key": null,
+      "canonical_title": "Show HN: Live map of U.S. flights during tonight's FAA nationwide ground stop",
+      "category": "tech_career",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "grounds.top"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Article URL: https://grounds.top/ Comments URL: https://news.ycombinator.com/item?id=50491545 Points: 6 # Comments: 0",
+      "latest_development": "Article URL: https://grounds.top/ Comments URL: https://news.ycombinator.com/item?id=50491545 Points: 6 # Comments: 0",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-dff1a1a9ea48",
+      "event_key": null,
+      "canonical_title": "Blizzard Officially Responds to Disappointed Overwatch Fans Over Hero 55",
+      "category": "gaming",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/overwatch-new-hero-55-hudson-damage-dps-blizzard"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Developers confirmed that the character Hudson will join the roster as a Damage role fighter rather than a support.",
+      "latest_development": "Developers confirmed that the character Hudson will join the roster as a Damage role fighter rather than a support.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-b29bec5b04c1",
+      "event_key": null,
+      "canonical_title": "North American Anime, Manga Releases, November 8-14",
+      "category": "anime",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-13/north-american-anime-manga-releases-november-8-14/.243661"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "New releases arriving this week include the second seasons of The Apothecary Diaries and Call of the Night alongside various manga titles.",
+      "latest_development": "New releases arriving this week include the second seasons of The Apothecary Diaries and Call of the Night alongside various manga titles.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-221a2e97134b",
+      "event_key": null,
+      "canonical_title": "Magic Knight Rayearth ‒ Episode 6",
+      "category": "anime",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/review/magic-knight-rayearth/episode-6/.243803"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The accelerated narrative speed of the latest installment negatively impacted the overall viewing experience.",
+      "latest_development": "The accelerated narrative speed of the latest installment negatively impacted the overall viewing experience.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
+    },
+    {
+      "event_id": "evt-7a95e29682c5",
+      "event_key": null,
+      "canonical_title": "The Ramparts of Ice Season 2 ‒ Episode 21",
+      "category": "anime",
+      "first_seen": "2026-11-14",
+      "last_seen": "2026-11-14",
+      "first_reported": "2026-11-14",
+      "last_reported": "2026-11-14",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/review/the-ramparts-of-ice-season-2/episode-21/.243802"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The reviewer finds it difficult to sympathize with Momoka despite finding some merit in her arguments.",
+      "latest_development": "The reviewer finds it difficult to sympathize with Momoka despite finding some merit in her arguments.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-14",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-14T06:43:18+05:45"
     }
   ],
   "archived": []

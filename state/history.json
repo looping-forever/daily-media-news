@@ -1,209 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "linedrivemedia.com/news/club-news-the-final-pitch-nov-5-2026-spotlighting-turnin2-prospect-makenna-bareman-news-commits-beauty-and-the-beat-dr-doom-appointment",
-      "title_hash": "d13cfa6c639f648bd01c149837969fbdc06d2e23",
-      "title": "Club News: The Final Pitch (Nov. 5, 2026): Spotlighting Turnin2-Prospect Makenna Bareman, News, Commits, 'Beauty and the Beat' & Dr. Doom Appointment - Line Drive Media",
-      "category": "gaming",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c6e3xxwk3k11o",
-      "title_hash": "02785d6b3eafa51644b51124367d696aa2280058",
-      "title": "Democratic socialist defeats incumbent Karen Bass in Los Angeles mayor's race",
-      "category": "world_major",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "dev.to/eme_gug_0821b41b948be6516/is-ssh-password-auth-really-off-on-your-server-hardening-sshdconfig-and-proving-it-from-the-2cdd",
-      "title_hash": "7a659a781f41bfda8f79f69a6d13c92c26788987",
-      "title": "Is SSH Password Auth Really Off on Your Server? Hardening sshd_config and Proving It From the Outside",
-      "category": "tech_career",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cmn04705rd8jo",
-      "title_hash": "119663c5b288d6e91a5911b0467dc0a8aee186bb",
-      "title": "Major tech stocks plunge as US midterms add to fears of AI slowdown",
-      "category": "world_major",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cqn06j0y61k6o",
-      "title_hash": "7a467682679f7084fbaaec52bb652b7e5e35c291",
-      "title": "Pope begins lengthy trip to Latin America weeks after lung cancer surgery",
-      "category": "world_major",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "dev.to/greatworkco/run-vercel-cron-more-than-once-a-day-on-the-hobby-plan-1ggb",
-      "title_hash": "2978653f5d601771c0b63469b8bc5976884dae7f",
-      "title": "Run Vercel Cron more than once a day on the Hobby plan",
-      "category": "tech_career",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "indailyqld.com.au/news/just-in/2026/11/06/alan-jones-racer-dies",
-      "title_hash": "b4912dd303ae71626374a53d9e93de53c5e11fa8",
-      "title": "'A man's man': Remembering Gold Coast F1 legend Jones - News - InDaily Queensland",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "cbr.com/one-piece-characters-who-change-the-most",
-      "title_hash": "7c965fe096a9c4d804c0f2221d573b0d35900a31",
-      "title": "10 One Piece Characters Who've Changed the Most Since the Beginning - Comic Book Resources",
-      "category": "anime",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "spokesman.com/stories/2026/nov/05/banks-brace-for-tighter-oversight-from-us-congress",
-      "title_hash": "d48097fd76b49b331985bf571252a27ceef2badd",
-      "title": "Banks brace for tighter oversight from US Congress after Democrats sweep - The Spokesman-Review",
-      "category": "bank_local",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "dev.to/ashish_624379625242c5d263/building-a-spatial-interface-for-the-protein-data-bank-notes-on-nexopeek-5fp9",
-      "title_hash": "95c4667884467be702288153cd753331567c31e4",
-      "title": "Building a Spatial Interface for the Protein Data Bank: Notes on NexoPeek",
-      "category": "tech_career",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "kathmandupost.com/national/2026/11/05/claims-of-tu-land-recovery-spark-controversy-amid-ongoing-encroachments",
-      "title_hash": "fc3b31330df3478087c83ac602eb0649b04904a9",
-      "title": "Claims of TU land recovery spark controversy amid ongoing encroachments - The Kathmandu Post",
-      "category": "education_tu",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "kutv.com/news/local/fallen-powerline-forces-redwood-road-closure-in-bluffdale",
-      "title_hash": "8a48d6362afcb27d6c7a63fa621fc511702f85c2",
-      "title": "Fallen powerline forces brief Redwood Road closure in Bluffdale - KUTV",
-      "category": "local_city",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "dev.to/mmllllzcn/gbase-databasegbase-8c-why-three-deployment-layouts-have-different-configuration-fields-1lbl",
-      "title_hash": "c5e8de9c3105e3b15b83af020dd5c1e6c5fb8a02",
-      "title": "GBase Database(GBase 8c): Why Three Deployment Layouts Have Different Configuration Fields",
-      "category": "tech_career",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "wdwnt.com/2026/11/limited-edition-avengers-dr-doom-citizen-watch-now-available-online",
-      "title_hash": "988c1799754001dfe6c9f5219d50bdba11baa300",
-      "title": "Limited-Edition Avengers Dr. Doom Citizen Watch Now Available Online - WDW News Today",
-      "category": "gaming",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-05/ninja-skooler-anime-unveils-pilot-film-images-song/.243571",
-      "title_hash": "d17bb5eab82bd38c594bb829121a61a445ec48ca",
-      "title": "Ninja Skooler Anime Unveils Pilot Film, Images, Song",
-      "category": "anime",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "dallasexpress.com/national/paraguay-president-resigns-as-lawmakers-vote-78-0-to-impeach",
-      "title_hash": "e9383d116b11d42c31cd1471cd83a599a836658a",
-      "title": "Paraguay President Resigns As Lawmakers Vote 78-0 To Impeach - Dallas Express",
-      "category": "bank_local",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "gamespot.com/articles/people-are-acting-weird-as-hell-during-fortnites-treasure-hunt",
-      "title_hash": "7423e7c0db8a1be075aa2a8b18f1974e45393556",
-      "title": "People Are Acting Weird As Hell During Fortnite’s Treasure Hunt",
-      "category": "gaming",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "dev.to/iteracomputeai/qwen38-max-vs-alibaba-international-3fmk",
-      "title_hash": "4666ee79d3ef230a2f6660c2cfae9e148fc20a33",
-      "title": "Qwen3.8-Max vs Alibaba international",
-      "category": "tech_career",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "kait8.com/2026/11/06/road-closure-announced-jonesboro",
-      "title_hash": "6410a0f7e11d555a5579eca88f8f6af9707439bd",
-      "title": "Road closure announced for Jonesboro - K8 News | Jonesboro, Arkansas",
-      "category": "local_city",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "kold.com/2026/11/05/serious-crash-closes-oracle-southbound-linda-vista",
-      "title_hash": "1895803215941997462ff1320702ee75552e38e4",
-      "title": "Serious crash closes Oracle southbound at Linda Vista - KOLD",
-      "category": "local_city",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "sports.yahoo.com/articles/urban-meyer-puts-college-football-202833221.html",
-      "title_hash": "df82c69a5ea8f062a7c84c8e659138ed679b15d6",
-      "title": "Urban Meyer Puts College Football Playoff Contender on Notice with Stark Warning - Yahoo Sports",
-      "category": "college_local",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/steam-gets-a-boatload-of-restored-wing-commanders-and-ultima-ports-after-ea-producer-stumbles-across-cupboard-of-old-tapes",
-      "title_hash": "5eb93c6aa2cbfcd5bc157c2eefa2384c7f98b1f8",
-      "title": "EA Releases 25 Restored Classic Games Across Digital Storefronts",
-      "category": "gaming",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2052911/50-lost-and-stolen-two-wheelers-found-in-the-valley",
-      "title_hash": "5227bf34c8079d43f2bbbaa0bb42552faa94af3b",
-      "title": "Kathmandu Valley Traffic Police Return 50 Recovered Two-Wheelers",
-      "category": "local_city",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2052805/life-insurance-yields-higher-returns-than-bank-term-deposits",
-      "title_hash": "95efb7c9ac7b1863dece99cc9e5b9584c76e30ad",
-      "title": "Life Insurance Bonus Rates Exceed Commercial Bank Term Deposits",
-      "category": "nepal",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/rsp-seven-point-directive-election.html",
-      "title_hash": "03f6f59754c41fae35689bad2a98aae81c7042cb",
-      "title": "RSP Issues Seven-Point Directive for Internal Elections and Selection",
-      "category": "nepal",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cm5yne5984l0o",
-      "title_hash": "a9ac932cdd3e09125346a734232ef7172942a447",
-      "title": "Kenyan Cult Leader Sentenced to Life Imprisonment for Mass Deaths",
-      "category": "world_major",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "polygon.com/twilight-midnight-sun-animated-series-two-seasons",
-      "title_hash": "fe078aa35d0123d9691ace6856b346f497f36d6a",
-      "title": "Netflix Confirms Animated Twilight Adaptation for Two Seasons",
-      "category": "gaming",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74910161",
-      "title_hash": "0d8b6a255f8036926d9df44d37c288c4025377ba",
-      "title": "Killing Bites Manga Concludes Serialization After 13-Year Run",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-06"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74910185",
-      "title_hash": "af135f41991a33c26461169b491dd9c01a4ec488",
-      "title": "Manga Adaptation Announced for Namidaame to Serenade",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-06"
-    },
-    {
       "url_normalized": "bbc.co.uk/news/articles/c35ynnpzdq51o",
       "title_hash": "2d3d2c6fb125ebf72ada76f5372571297b495c8f",
       "title": "AI stocks climb after trillions wiped from market values",
@@ -1000,6 +797,90 @@
       "title": "Stage Musical Adaptation of Webtoon The Siren: Becoming the Villain's Family to Premiere in Seoul on March 24, 2027",
       "category": "anime",
       "date_sent": "2026-11-13"
+    },
+    {
+      "url_normalized": "polygon.com/overwatch-new-hero-55-hudson-damage-dps-blizzard",
+      "title_hash": "62073c00b273c8d3a6b2ac54771a8af9d8b8665e",
+      "title": "Blizzard Officially Responds to Disappointed Overwatch Fans Over Hero 55",
+      "category": "gaming",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "github.com/mjha-arya/doc-foundry",
+      "title_hash": "5019e70a2f062a92681d0ed3d2db3984929527ab",
+      "title": "Doc-foundry – AI writes Security detection rules, then proves they work",
+      "category": "tech_career",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/14/575510",
+      "title_hash": "9af1fcddf04d2ee5887812e04b319ecde5cd0435",
+      "title": "FAA grounds all departing US flights following air traffic control communications outage",
+      "category": "nepal",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "polygon.com/fallout-5-fo3-remaster-new-games-bethesda-softworks",
+      "title_hash": "b3306c7c5cc03a87f74026c2ef211af7414062c6",
+      "title": "Fallout 5 and Fallout Remasters Officially Announced",
+      "category": "gaming",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "polygon.com/the-wire-season-4-recommendation",
+      "title_hash": "806d372cb7a7e3e051a79dbbe3b8d69b52ced575",
+      "title": "HBO’s 5-Part Crime Drama Has One of the Best Seasons in TV History",
+      "category": "gaming",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/14/575485",
+      "title_hash": "92701dd4d261b8098b1f3f6fb377a2c40d2d3db8",
+      "title": "Madhesh Chief Minister Yadav to seek vote of confidence today",
+      "category": "nepal",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/review/magic-knight-rayearth/episode-6/.243803",
+      "title_hash": "0e9175c16c198159e604f35a60f75f1f4d3ddb2b",
+      "title": "Magic Knight Rayearth ‒ Episode 6",
+      "category": "anime",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "aljazeera.com/video/newsfeed/2026/11/14/microsoft-services-begin-recovering-after-global-outage",
+      "title_hash": "a836241b02edc996cf9d06511d7c2e3af408be4c",
+      "title": "Microsoft services begin recovering after global outage",
+      "category": "world_major",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-13/north-american-anime-manga-releases-november-8-14/.243661",
+      "title_hash": "1d2fcf659180c6848929c1c1be07a504194b9cd6",
+      "title": "North American Anime, Manga Releases, November 8-14",
+      "category": "anime",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "grounds.top",
+      "title_hash": "48a1f97c12503de00581a3695ce3e01efd59840f",
+      "title": "Show HN: Live map of U.S. flights during tonight's FAA nationwide ground stop",
+      "category": "tech_career",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "arstechnica.com/space/2026/11/starship-flight-15-powers-to-orbit-setting-up-a-possible-catch-on-saturday",
+      "title_hash": "ba5326b912c3acf0dcbba443b717d9e20b4f0ead",
+      "title": "Starship flight 15 powers to orbit—setting up a possible catch on Saturday",
+      "category": "tech_career",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/review/the-ramparts-of-ice-season-2/episode-21/.243802",
+      "title_hash": "85f38101a6364458afddab6d5284ccd7f6f8c08e",
+      "title": "The Ramparts of Ice Season 2 ‒ Episode 21",
+      "category": "anime",
+      "date_sent": "2026-11-14"
     }
   ]
 }
