@@ -881,6 +881,62 @@
       "title": "The Ramparts of Ice Season 2 ‒ Episode 21",
       "category": "anime",
       "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "theguardian.com/us-news/2026/nov/13/mississippi-river-crash-new-orleans",
+      "title_hash": "1d85865ab2ee277e64ff41abc606dec746ee8eba",
+      "title": "All passengers and crew accounted for after New Orleans boat crash in ‘miracle on the Mississippi’",
+      "category": "world_major",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "fox5dc.com/news/amtrak-outage-ticket-booking-faa-ground-stop-november-13-2026",
+      "title_hash": "27d46d6796bbfd44003c465f15ef805a36338f03",
+      "title": "Amtrak booking system experiencing major issues amid nationwide FAA ground stop",
+      "category": "tech_career",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "hawaiinewsnow.com/2026/11/14/dot-all-west-coast-flights-halted-by-spacex-debris-after-faa-ground-stop",
+      "title_hash": "5d317da87dc4949c2e31a18772a85048a93ebe2a",
+      "title": "Hawaii DOT: All West Coast flights halted by SpaceX debris after FAA ground stop",
+      "category": "tech_career",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "theguardian.com/world/2026/nov/13/faa-nationwide-ground-stop-flights",
+      "title_hash": "1612bf63de1659151f1ab325de2b4490277659a6",
+      "title": "Nationwide FAA ground stop: nearly 11,000 flights delayed or canceled at airports across the US",
+      "category": "world_major",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/diplomacy/nepals-preparation-and-institutional-capacity-building-a-must-for-climate-negotiations-minister-khanal",
+      "title_hash": "4173a0a7b460bc1cc5d68b4742e88059a71ceee7",
+      "title": "Nepal’s preparation and institutional capacity building a must for climate negotiations, Minister Khanal",
+      "category": "nepal",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "theguardian.com/us-news/live/2026/nov/13/us-politics-latest-news-updates-democrats-republicans-donald-trump-van-hollen-chuck-schumer",
+      "title_hash": "fd104483ff46e56670fe203353264882c60b4540",
+      "title": "US flight outage live updates: Trump officials set to brief public hours after FAA grounds thousands of flights",
+      "category": "world_major",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/14/575518",
+      "title_hash": "58b1d9378e1505ba53049e05560a1c27eb7fb6f5",
+      "title": "Westerly winds bring partial cloud cover today",
+      "category": "nepal",
+      "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/14/575514",
+      "title_hash": "91af0fd5762bf2817ab64c16dd63a3ed6d4e80d4",
+      "title": "“Nepal needs stronger diplomatic capacity for climate talks”",
+      "category": "nepal",
+      "date_sent": "2026-11-14"
     }
   ]
 }
