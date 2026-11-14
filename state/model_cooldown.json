@@ -1,16 +1,22 @@
 {
   "models": {
+    "gemini-key2/gemini-3.1-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-14T00:56:33.339867+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-14T06:56:33.339867+00:00"
+    },
     "gemini-key2/gemini-3.5-flash-lite": {
       "hits": 1,
-      "last_hit": "2026-11-13T13:37:05.071150+00:00",
+      "last_hit": "2026-11-14T00:56:51.426298+00:00",
       "reason": "quota_exhausted",
-      "until": "2026-11-13T19:37:05.071150+00:00"
+      "until": "2026-11-14T06:56:51.426298+00:00"
     },
     "gemini/gemini-3.5-flash-lite": {
       "hits": 1,
-      "last_hit": "2026-11-13T13:36:36.035707+00:00",
+      "last_hit": "2026-11-14T00:56:17.096110+00:00",
       "reason": "quota_exhausted",
-      "until": "2026-11-13T19:36:36.035707+00:00"
+      "until": "2026-11-14T06:56:17.096110+00:00"
     }
   },
   "pool": {},
