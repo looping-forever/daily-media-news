@@ -363,6 +363,7 @@ class PrebuildNeverRecordsDeliveryTests(TempCase):
             "TODAY": "2026-10-09",
             "DRY_RUN": dry_run,
             "PHASE": phase,
+            "BACKUP_CHANNELS_ENABLED": "false",
             "TZ": "Asia/Kathmandu",
         }, self.tmp)
         marker_path = state / "last_digest_sent.json"
@@ -492,7 +493,11 @@ class PrebuildNeverRecordsDeliveryTests(TempCase):
     def test_a_full_run_still_records_its_channels(self):
         _c, _o, marker = self._run_marker("full", self.ALL_GREEN)
         self.assertEqual({"website": True, "ntfy": True,
-                          "gmail": True, "telegram": True}, marker["channels"])
+                          "gmail": False, "telegram": False}, marker["channels"])
+        self.assertEqual("disabled by decision",
+                         marker["channel_reasons"]["gmail"])
+        self.assertEqual("disabled by decision",
+                         marker["channel_reasons"]["telegram"])
 
     def test_a_dry_run_still_forces_everything_false(self):
         """The pre-existing rule must survive the new one."""
@@ -1229,6 +1234,7 @@ class BackupsDoNotFireOnPrebuildTests(unittest.TestCase):
         """BEHAVIOUR, not a substring: the exact state a prebuild is in."""
         condition = self.condition_of(GMAIL_STEP.strip("- name: "))
         context = {
+            "env.BACKUP_CHANNELS_ENABLED": "true",
             "env.FALLBACK_NOOP": "",
             "steps.deploy_website.outputs.website_ok": "true",
             "steps.send_ntfy.outputs.ntfy_ok": "false",
@@ -1247,6 +1253,7 @@ class BackupsDoNotFireOnPrebuildTests(unittest.TestCase):
     def test_the_telegram_backup_does_not_fire_on_a_prebuild(self):
         condition = self.condition_of(TELEGRAM_STEP.strip("- name: "))
         context = {
+            "env.BACKUP_CHANNELS_ENABLED": "true",
             "env.FALLBACK_NOOP": "",
             "steps.deploy_website.outputs.website_ok": "false",
             "steps.send_ntfy.outputs.ntfy_ok": "false",
@@ -1265,12 +1272,14 @@ class BackupsDoNotFireOnPrebuildTests(unittest.TestCase):
         """The term must EXCLUDE prebuilds, not suppress the backups."""
         for name, ctx in (
                 (GMAIL_STEP.strip("- name: "),
-                 {"env.FALLBACK_NOOP": "",
+                 {"env.BACKUP_CHANNELS_ENABLED": "true",
+                  "env.FALLBACK_NOOP": "",
                   "steps.deploy_website.outputs.website_ok": "false",
                   "steps.send_ntfy.outputs.ntfy_ok": "false",
                   "env.PHASE": "full"}),
                 (TELEGRAM_STEP.strip("- name: "),
-                 {"env.FALLBACK_NOOP": "",
+                 {"env.BACKUP_CHANNELS_ENABLED": "true",
+                  "env.FALLBACK_NOOP": "",
                   "steps.deploy_website.outputs.website_ok": "false",
                   "steps.send_ntfy.outputs.ntfy_ok": "false",
                   "env.PHASE": "full"})):
@@ -1279,8 +1288,22 @@ class BackupsDoNotFireOnPrebuildTests(unittest.TestCase):
                             "fallback ladder this repository depends on is "
                             "broken" % name)
 
+    def test_disabled_backups_never_fire(self):
+        context = {
+            "env.BACKUP_CHANNELS_ENABLED": "false",
+            "env.FALLBACK_NOOP": "",
+            "steps.deploy_website.outputs.website_ok": "false",
+            "steps.send_ntfy.outputs.ntfy_ok": "false",
+            "env.PHASE": "full",
+        }
+        for name in (GMAIL_STEP.strip("- name: "),
+                     TELEGRAM_STEP.strip("- name: ")):
+            self.assertFalse(evaluate_if(self.condition_of(name), context),
+                             "%r fired while disabled by decision" % name)
+
     def test_a_whole_run_of_fallback_noop_still_suppresses_everything(self):
-        context = {"env.FALLBACK_NOOP": "true",
+        context = {"env.BACKUP_CHANNELS_ENABLED": "true",
+                   "env.FALLBACK_NOOP": "true",
                    "steps.deploy_website.outputs.website_ok": "false",
                    "steps.send_ntfy.outputs.ntfy_ok": "false",
                    "env.PHASE": "full"}

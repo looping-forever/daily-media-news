@@ -15,6 +15,9 @@ env:
   COLLEGE_NAME: ${{ secrets.COLLEGE_NAME }}
   BANK_URL: ${{ secrets.BANK_URL }}
   COLLEGE_URL: ${{ secrets.COLLEGE_URL }}
+  # 2026-11-15: the owner decided Gmail and Telegram are not needed. The
+  # channel code and step names stay; flip this to 'true' to re-enable both.
+  BACKUP_CHANNELS_ENABLED: 'false'
 
 on:
   schedule:
@@ -5101,7 +5104,7 @@ jobs:
         # backups fire on. Without this term the 06:50 prebuild would see
         # ntfy_ok=false, decide a primary had failed, and email the owner a
         # half-built digest twice a day, before the slot it is meant to precede.
-        if: env.FALLBACK_NOOP != 'true' && (steps.deploy_website.outputs.website_ok != 'true' || steps.send_ntfy.outputs.ntfy_ok != 'true') && env.PHASE != 'prebuild'
+        if: env.BACKUP_CHANNELS_ENABLED == 'true' && env.FALLBACK_NOOP != 'true' && (steps.deploy_website.outputs.website_ok != 'true' || steps.send_ntfy.outputs.ntfy_ok != 'true') && env.PHASE != 'prebuild'
         continue-on-error: true
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
@@ -5201,7 +5204,7 @@ jobs:
         # `&& env.PHASE != 'prebuild'` for the same reason as the Gmail backup
         # above, and it is the same mandatory term: a prebuild reports ntfy_ok
         # false on purpose, which is exactly this step's trigger.
-        if: env.FALLBACK_NOOP != 'true' && steps.deploy_website.outputs.website_ok != 'true' && steps.send_ntfy.outputs.ntfy_ok != 'true' && env.PHASE != 'prebuild'
+        if: env.BACKUP_CHANNELS_ENABLED == 'true' && env.FALLBACK_NOOP != 'true' && steps.deploy_website.outputs.website_ok != 'true' && steps.send_ntfy.outputs.ntfy_ok != 'true' && env.PHASE != 'prebuild'
         continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -5362,7 +5365,8 @@ jobs:
 
       - name: Record delivery status
         # Writes state/last_digest_sent.json with the channels schema:
-        # {date, time, stories, empty_digest, channels: {...}, delivered}.
+        # {date, time, stories, empty_digest, channels: {...},
+        #  channel_reasons: {...}, delivered}.
         # delivered=true when at least one primary OR backup channel succeeded
         # AND THE DIGEST ACTUALLY HAD STORIES.
         # The fallback no-op guard reads this file and skips only when the
@@ -5388,6 +5392,7 @@ jobs:
           TODAY: ${{ env.TODAY }}
           DRY_RUN: ${{ env.DRY_RUN }}
           PHASE: ${{ env.PHASE }}
+          BACKUP_CHANNELS_ENABLED: ${{ env.BACKUP_CHANNELS_ENABLED }}
           TZ: Asia/Kathmandu
         run: |
           set -eo pipefail
@@ -5411,6 +5416,10 @@ jobs:
           # can be read on its own.
           phase = (os.environ.get('PHASE') or 'full').strip().lower() or 'full'
           prebuild = phase == 'prebuild'
+          # 2026-11-15: Gmail and Telegram are disabled by decision. The
+          # constant is the workflow's single switch; the code stays in place.
+          backup_enabled = (os.environ.get('BACKUP_CHANNELS_ENABLED', 'true')
+                            .strip().lower() == 'true')
           # A dry run delivered NOTHING by definition. Every per-channel flag
           # is forced False here, not just the ones the guards happen to
           # cover, so a future step that writes `true` into a flag file under
@@ -5426,8 +5435,9 @@ jobs:
           else:
               website_ok = False if dry_run else flag_ok('website')
               ntfy_ok = False if dry_run else flag_ok('ntfy')
-              gmail_ok = False if dry_run else flag_ok('gmail')
-              telegram_ok = False if dry_run else flag_ok('telegram')
+              # A disabled channel cannot borrow a stale flag from an earlier run.
+              gmail_ok = flag_ok('gmail') if backup_enabled and not dry_run else False
+              telegram_ok = flag_ok('telegram') if backup_enabled and not dry_run else False
           # A channel that delivered an EMPTY digest has not delivered a
           # digest. The count is the validator's own `stories` list, not the
           # agent's claim, and `empty_kind` is the frozen classification of
@@ -5476,6 +5486,18 @@ jobs:
           # the same slot from arming FALLBACK_NOOP on this run's marker.
           delivered = (not dry_run) and (not prebuild) and (stories > 0) and (
               website_ok or ntfy_ok or gmail_ok or telegram_ok)
+
+          def channel_reason(ok):
+              if ok:
+                  return 'delivered'
+              return 'prebuild' if prebuild else ('dry run' if dry_run else 'not delivered')
+
+          # "false" alone cannot tell a disabled channel from a failed one.
+          if not backup_enabled:
+              gmail_reason = telegram_reason = 'disabled by decision'
+          else:
+              gmail_reason = channel_reason(gmail_ok)
+              telegram_reason = channel_reason(telegram_ok)
           data = {
               'date': today,
               'time': slot,
@@ -5487,6 +5509,12 @@ jobs:
                   'ntfy': ntfy_ok,
                   'gmail': gmail_ok,
                   'telegram': telegram_ok,
+              },
+              'channel_reasons': {
+                  'website': channel_reason(website_ok),
+                  'ntfy': channel_reason(ntfy_ok),
+                  'gmail': gmail_reason,
+                  'telegram': telegram_reason,
               },
               'delivered': delivered,
               'dry_run': dry_run,

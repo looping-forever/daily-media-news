@@ -647,6 +647,9 @@ jobs:
     if: github.event.inputs.ladder_only != 'true' && (github.event_name != 'schedule' || github.event.schedule == '0 4,16 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write  # read the delivery marker and push the state ledgers
+      issues: write    # file one issue per firing alert condition
 
     steps:
       - name: Checkout repository
@@ -2595,6 +2598,84 @@ jobs:
             echo "::warning::NTFY secrets unset — annotation only (the ::error:: above still stands)"
           fi
           exit 0
+
+      - name: Open a GitHub issue on failure
+        # ntfy is both message and alarm; this step makes the alarm independent
+        # of ntfy. Each guard is copied from the alert arm it mirrors.
+        if: |
+          always() && (
+            (steps.academic.outputs.problems != '' && steps.academic.outputs.problems != '0') ||
+            (steps.worker.outputs.problems != '' && steps.worker.outputs.problems != '0') ||
+            (steps.chain.outputs.problems != '' && steps.chain.outputs.problems != '0') ||
+            steps.watch.outputs.miss == 'true'
+          )
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLOT: ${{ steps.watch.outputs.slot }}
+          TODAY: ${{ steps.watch.outputs.today }}
+          ACADEMIC_PROBLEMS: ${{ steps.academic.outputs.problems }}
+          ACADEMIC_DETAIL: ${{ steps.academic.outputs.detail }}
+          WORKER_PROBLEMS: ${{ steps.worker.outputs.problems }}
+          WORKER_DETAIL: ${{ steps.worker.outputs.detail }}
+          CHAIN_PROBLEMS: ${{ steps.chain.outputs.problems }}
+          CHAIN_DETAIL: ${{ steps.chain.outputs.detail }}
+          MISS: ${{ steps.watch.outputs.miss }}
+        run: |
+          set -uo pipefail
+
+          open_or_comment() {
+            title="$1"
+            body="$2"
+            existing="$(gh issue list --state open --search "$title in:title" \
+              --json number,url --jq '.[0] // empty | "\(.number) \(.url)"' \
+              2>/dev/null || true)"
+            if [ -n "$existing" ]; then
+              number="${existing%% *}"
+              url="${existing#* }"
+              if gh issue comment "$number" --body "$body"; then
+                echo "issue: $url (commented on open issue #$number)"
+              else
+                echo "::warning::could not comment on open issue $url"
+              fi
+            else
+              if url="$(gh issue create --title "$title" --body "$body")"; then
+                echo "issue: $url (opened)"
+              else
+                echo "::warning::could not open issue: $title"
+              fi
+            fi
+          }
+
+          if [ -n "${ACADEMIC_PROBLEMS:-}" ] && [ "$ACADEMIC_PROBLEMS" != "0" ]; then
+            DETAIL="${ACADEMIC_DETAIL:-}"
+            if [ -z "$DETAIL" ]; then
+              DETAIL="the health check reported a failure without a stated reason — read the ::error:: lines in the 'Check academic monitor health' step log."
+            fi
+            open_or_comment "Academic result monitor unhealthy" "Detail: ${DETAIL}"
+          fi
+
+          if [ -n "${WORKER_PROBLEMS:-}" ] && [ "$WORKER_PROBLEMS" != "0" ]; then
+            DETAIL="${WORKER_DETAIL:-}"
+            if [ -z "$DETAIL" ]; then
+              DETAIL="the heartbeat check reported a failure without a stated reason — read the ::error:: lines in the 'Check worker heartbeat (dead-man's switch, external arm)' step log."
+            fi
+            open_or_comment "Digest watchdog: ${SLOT} worker-heartbeat" "Detail: ${DETAIL}"
+          fi
+
+          if [ -n "${CHAIN_PROBLEMS:-}" ] && [ "$CHAIN_PROBLEMS" != "0" ]; then
+            if [ -n "${CHAIN_DETAIL:-}" ]; then
+              DETAIL="Detail: ${CHAIN_DETAIL} (${CHAIN_PROBLEMS} problem(s))."
+            else
+              DETAIL="Detail: the delivery check reported a failure without a stated reason — read the ::error:: lines in the 'Check breaking dispatch chain (delivery arm, external)' step log."
+            fi
+            open_or_comment "Digest watchdog: ${SLOT} breaking-chain" "$DETAIL"
+          fi
+
+          if [ "${MISS:-}" = "true" ]; then
+            open_or_comment "Digest watchdog: ${SLOT} digest missing for ${TODAY} (NPT)" \
+              "Detail: check the daily-news workflow runs for this slot and the worker dispatch that triggers them."
+          fi
 
       - name: Alert on missed digest
         # ntfy ping (best-effort) + ::error:: annotation + one deduped
