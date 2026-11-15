@@ -1,4 +1,4 @@
-"""The ladder opens on the rung that has been ANSWERING, and prunes only what
+"""The ladder opens on the rung that has been ANSWERING, and removes only what
 the provider says is gone.
 
 Run 42061741326 spent 99s on `gemini-3.5-flash-lite` twice while
@@ -7,9 +7,8 @@ rung first. The health file recorded the failures; nothing read them for the
 order. These tests pin the two halves of the fix:
 
   1. health order -- successes outrank an unknown rung, failures fall behind;
-  2. catalogue pruning -- an id its own provider no longer lists is dropped,
-     and a catalogue that is empty, failed, or shares nothing with the config
-     leaves the static ladder exactly as written.
+  2. catalogue absence -- an id its own provider does not list is ranked last,
+     never removed; only an explicit terminal status record removes a rung.
 """
 
 import json
@@ -101,23 +100,26 @@ class HealthOrder(unittest.TestCase):
                          "got a chance to answer")
 
 
-class CataloguePruning(unittest.TestCase):
+class CatalogueAbsence(unittest.TestCase):
     def setUp(self):
         # `_cli_reachable` reads this; an absent key is the ordinary case.
         patcher = mock.patch.dict(os.environ, {"OPENCODE_CONFIG": ""})
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _select(self, seed, catalogues, health=None):
+    def _select(self, seed, catalogues, health=None, statuses=None):
         def discover(provider):
-            return list(catalogues.get(provider, [])), {"source": "live"}
+            return list(catalogues.get(provider, [])), {
+                "source": "live",
+                "catalogue_status": dict(statuses or {}),
+            }
 
         config = {"provider": "gemini", "ladder": list(seed)}
         return ms.select(config, health or _health(), cache_path=None,
                          max_models=None, now=10.0, discover_fn=discover)
 
-    def test_a_rung_missing_from_its_providers_catalogue_is_dropped(self):
-        """The exact id is absent from a catalogue that DOES list its sibling."""
+    def test_an_absent_rung_is_kept_and_ranked_last(self):
+        """Absence from a catalogue that lists a sibling is ORDER evidence."""
         seed = ["gemini/a", "gemini/b", "opencode/c"]
 
         selected, info = self._select(seed, {
@@ -125,13 +127,13 @@ class CataloguePruning(unittest.TestCase):
             "opencode": ["opencode/c"],
         })
 
-        self.assertEqual(["gemini/a", "opencode/c"], selected,
-                         "gemini/b is not in gemini's catalogue and must not "
-                         "be walked")
+        self.assertEqual(["gemini/a", "opencode/c", "gemini/b"], selected,
+                         "gemini/b is absent but must still be walked, last")
         self.assertEqual([{"model": "gemini/b", "provider": "gemini"}],
-                         info["catalogue_missing"])
+                         info["catalogue_absent"])
+        self.assertEqual([], info["dropped_seed"])
 
-    def test_a_drop_is_logged_once_and_never_marked_as_a_failure(self):
+    def test_an_absent_rung_is_logged_once_and_never_marked_as_a_failure(self):
         """A catalogue absence is evidence of ABSENCE, not of failure.
 
         Marking it failing would cool a rung for six hours for a fact about the
@@ -141,24 +143,40 @@ class CataloguePruning(unittest.TestCase):
         health = _health()
         before = json.dumps(health, sort_keys=True)
 
-        _selected, info = self._select(seed, {"gemini": ["gemini/a"]}, health)
+        selected, info = self._select(seed, {"gemini": ["gemini/a"]}, health)
 
+        self.assertEqual(seed, selected)
+        self.assertEqual([], info["dropped_seed"])
         line = ms.format_order_log(info["order"])
         self.assertEqual(1, line.count("gemini/b"),
-                         "a drop must be stated exactly once in the order line: %r"
-                         % line)
-        self.assertIn("catalogue-missing", line)
+                         "an absence must be stated exactly once in the order "
+                         "line: %r" % line)
+        self.assertIn("catalogue-absent", line)
+        self.assertNotIn("catalogue-missing", line)
         self.assertEqual(before, json.dumps(health, sort_keys=True),
-                         "pruning must never write health")
+                         "absence must never write health")
+
+    def test_a_terminal_status_record_still_removes_the_rung(self):
+        """The one removal that is evidence: the catalogue says it is gone."""
+        seed = ["gemini/a", "gemini/b"]
+
+        selected, info = self._select(
+            seed, {"gemini": ["gemini/a"]},
+            statuses={"gemini/b": "deprecated"})
+
+        self.assertEqual(["gemini/a"], selected)
+        self.assertEqual(["gemini/b"], info["dropped_seed"])
+        self.assertIn("deprecated",
+                      info["dropped_seed_evidence"]["gemini/b"])
 
     def test_an_empty_or_failed_catalogue_leaves_the_static_ladder_intact(self):
-        """Absence of a listing is not evidence, so nothing may be pruned."""
+        """Absence of a listing is not evidence, so nothing may be reordered."""
         seed = ["gemini/a", "gemini/b"]
 
         selected, info = self._select(seed, {})
 
         self.assertEqual(seed, selected)
-        self.assertEqual([], info["catalogue_missing"])
+        self.assertEqual([], info["catalogue_absent"])
         self.assertIn("static ladder kept", info["catalogue"]["gemini"]["note"])
 
     def test_a_catalogue_that_lists_none_of_the_configured_ids_changes_nothing(self):
@@ -169,12 +187,12 @@ class CataloguePruning(unittest.TestCase):
         selected, info = self._select(seed, {"gemini": ["gemini/unrelated"]})
 
         self.assertEqual(seed, [m for m in selected if m in seed],
-                         "a catalogue with no configured id must not empty the "
-                         "provider")
-        self.assertEqual([], info["catalogue_missing"])
+                         "a catalogue with no configured id must not reorder "
+                         "the provider")
+        self.assertEqual([], info["catalogue_absent"])
 
-    def test_pruning_can_never_empty_the_ladder(self):
-        """Every provider keeps at least one rung, so the walk always has work."""
+    def test_absence_can_never_empty_the_ladder(self):
+        """Every rung stays, so the walk always has work."""
         seed = ["gemini/a", "opencode/c"]
 
         selected, info = self._select(seed, {
@@ -182,7 +200,7 @@ class CataloguePruning(unittest.TestCase):
             "opencode": [],          # a failed read, not a verdict
         })
 
-        self.assertTrue(selected, "pruning produced an empty ladder: %r" % info)
+        self.assertTrue(selected, "absence produced an empty ladder: %r" % info)
         self.assertEqual(["gemini/a", "opencode/c"], selected)
 
 
