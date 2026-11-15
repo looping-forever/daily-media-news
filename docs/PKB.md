@@ -15,32 +15,37 @@ re-checked, and §45 was added for the summariser/article, publisher-URL,
 state-push and alerting changes.
 Do not edit product source code from this file; record decisions here instead.
 
-## 1. Repo state (re-verified 2026-11-01; tip and test baselines re-checked 2026-11-09)
+## 1. Repo state (re-verified 2026-11-15; tip and test baselines re-checked 2026-11-15)
 
 - Repo: this repository (git, branch `master`). This section said `main` until
   2026-11-01; no ref of that name exists.
-- HEAD = `eb65460` ("fix: an alert that fires on a healthy run is worse than no
-  alert") at the 2026-11-09 check. Treat the tip as moving: read `git log
-  --oneline`. **Superseded 2026-11-09:** this line recorded `6c806d6` at the
-  2026-11-07 check, itself superseding `7c37a78` at the 2026-11-06 check. The
+- HEAD at the 2026-11-15 check: local `2bd185f` ("feat: ntfy is the message and
+  the alarm, so add a second alarm"). `origin/master` is `8957021` ("chore:
+  persist model cooldown state [skip ci]"), one state-only commit ahead; the
+  local checkout does not contain it. **Do not call `8957021` the local HEAD.**
+  **Superseded 2026-11-15:** this line recorded `eb65460` at the 2026-11-09
+  check and `6c806d6` at the 2026-11-07 check. The
   `71cf488`/`11cd7bd`/`d58b657`/`6c806d6` family history remains in §44.
 - Working tree MOVES DURING A SESSION, so a count here is not durable. Measured
-  2026-11-03: `git status --porcelain` printed only `?? CON` at 15:31, then
-  showed `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
+  2026-11-15 at the start of the check: `git status --porcelain` printed only
+  `?? CON`. Measured 2026-11-03: the same `?? CON` at 15:31, then
+  `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
   `tests/render/test_render_honesty.py` modified at 15:32 — with no command of
-  this session touching them, i.e. a concurrent actor. **Superseded 2026-11-03:**
-  this line recorded 10 modified files and no untracked files at the 2026-11-01
-  check. Re-run `git status`; do not trust a stored count. Nothing was committed
-  or pushed in either session.
-- Test baselines recorded by the commits, 2026-11-09: workflows **536**
-  (`eb65460`), digest **617** (3 skipped), validate **241**, collection **270**
-  (`3dd22b7`). **Superseded 2026-11-09:** this bullet recorded the 2026-11-01
-  run — workflows 482, render 488, digest 392, collection 254, weather 135, all
-  green. Render and weather were not re-measured, so do not read their old
-  counts as current. The stale-reading explanation below belongs to that older
-  reading: 476 was the count BEFORE the four manual-prebuild publish-gate tests
-  landed, and 480/252 was before the tree-problems negative control (2 tests)
-  and the wet-verdict/outlook-row invariant class (2 tests).
+  that session touching them, i.e. a concurrent actor. **Superseded
+  2026-11-03:** this line recorded 10 modified files and no untracked files at
+  the 2026-11-01 check. Re-run `git status`; do not trust a stored count.
+  Nothing was committed or pushed in either session.
+- Test baselines, 2026-11-15: breaking **120**, workflows **544**, validate
+  **287**, digest **631** (3 skipped), collection **289**, render **542** =
+  **2,413 collected, 2,410 passed, 3 skipped**. **Superseded 2026-11-15:** the
+  2026-11-09 numbers were workflows 536 (`eb65460`), digest 617 (3 skipped),
+  validate 241, collection 270 (`3dd22b7`). **Superseded 2026-11-09:** the
+  2026-11-01 run was workflows 482, render 488, digest 392, collection 254,
+  weather 135, all green; render and weather were not re-measured then, so
+  those old counts were never current. The stale-reading explanation belongs
+  to that older reading: 476 was the count BEFORE the four manual-prebuild
+  publish-gate tests landed, and 480/252 was before the tree-problems negative
+  control (2 tests) and the wet-verdict/outlook-row invariant class (2 tests).
   One digest run in between failed
   `test_the_same_input_yields_the_same_payload_bytes` because the payload title
   carries the wall clock and the two builds straddled a minute boundary; the
@@ -53,7 +58,10 @@ Do not edit product source code from this file; record decisions here instead.
   They configured the HTTP Basic gate on the Pages site, and that gate has been
   removed — the digest archive is **public by design**. See §38.4 and
   `docs/DEPLOYMENT.md` §4a.
-- Current working-tree `state/last_digest_sent.json` = `{}` (post-reset).
+- Current working-tree `state/last_digest_sent.json` is the 2026-11-15 morning
+  marker: 15 stories, `channels.website=true`, `channels.ntfy=true`,
+  `channels.gmail=false`, `channels.telegram=false`, `delivered=true`,
+  `phase=full`. **Superseded 2026-11-15:** this line said `{}` (post-reset).
 
 ## 2. Live verification (2026-08-30)
 
@@ -68,8 +76,13 @@ Do not edit product source code from this file; record decisions here instead.
 ## 3. Delivery architecture (current)
 
 - **Primary**: ntfy + website (Cloudflare Pages).
-- **Fallback**: Gmail fires only if website OR ntfy failed; Telegram only if
-  BOTH failed.
+- **Fallback**: Gmail and Telegram are **disabled by decision** (2026-11-15,
+  `2bd185f`) behind `BACKUP_CHANNELS_ENABLED: 'false'`. The code and step names
+  remain because renaming them breaks the render tests by string index;
+  re-enabling is one line. The delivery marker records `disabled by decision`,
+  not a failure. **Superseded 2026-11-15:** this line said Gmail fires only if
+  website OR ntfy failed, and Telegram only if BOTH failed; that fallback is no
+  longer armed.
 - **No-op guard**: `state/last_digest_sent.json` marker with `delivered` field;
   legacy markers treated as delivered; `delivered: false` must NOT suppress
   fallback channels.
@@ -99,6 +112,11 @@ Do not edit product source code from this file; record decisions here instead.
   Gemini rungs lead. **Superseded 2026-11-03:** this line listed
   `opencode/big-pickle` as primary. The breaking stage takes the first four
   (`breaking_monitor.py:394`) — see §42.3.
+- **Catalogue absence is order evidence, never removal (2026-11-15, `472f416`).**
+  A seed the unauthenticated runner catalogue omits is attempted last, not
+  deleted; only a terminal status record (`deprecated`, `retired`, `deleted`,
+  `removed`) removes a rung. The old `catalogue_prune` rule deleted working
+  seeds and is gone. See §44.
 - `scripts/model_selector.py --all` returns the WHOLE live-discovered free pool
   in rank order, and the agent step walks it bounded by WALL CLOCK, not by a
   count: per-attempt `timeout 480s`, whole walk `1800s`, and it stops once one
@@ -537,7 +555,7 @@ Contract (single owner, additive changes only):
   use the daily ladder. Stale IDs (`nemotron-3-ultra`, `hy3-free`) are gone
   from code; the `--standalone` history NOTEs stay as allowlisted comments
   so the flag is never re-added.
-- **`tests/breaking/test_ladder_sync.py`** (7 tests, exits nonzero on
+- **`tests/breaking/test_ladder_sync.py`** (11 tests, exits nonzero on
   failure): config contract, stale-reference scan (`*.yml`/`*.py`/`prompts/*`
   with `v2/opencode2-only` allowlist), no hardcoded `opencode/<model>` in
   `.github`, workflow config-read asserts, breaking/classifier ladder ==
@@ -546,17 +564,27 @@ Contract (single owner, additive changes only):
   fakes renamed to the new provider names (big-pickle / mimo).
 - **`.github/workflows/drift-canary.yml`** (cron `30 0 * * *` = 06:15 NPT,
   ~95 min before the morning slot): `docs-lint` job (ladder-sync test +
-  typo sweep over docs/README/templates/deploy/config/state, PKB excluded
-  as dated history + `::warning::` staleness note when Verified >30 days)
-  and `drift-canary` job (install pin → verify-gate → dispatch daily
-  `dry_run=true` + `gh run watch` → breaking `--dry-run --window-min 5
-  --max-candidates 5`). Costs one extra agent dry-run per day.
+  typo sweep over **`scripts prompts config .github deploy` only** +
+  `::warning::` staleness note when Verified >30 days) and `drift-canary` job
+  (install pin → verify-gate → dispatch daily `dry_run=true` + `gh run watch`
+  → breaking `--dry-run --window-min 5 --max-candidates 5`). Costs one extra
+  agent dry-run per day. The sweep used to scan the whole tree and went red
+  twice (`43175498769`, `43382490260`) on `state/model_health.json:98`
+  (dead-model telemetry) and
+  `tests/fixtures/walk_auth_abort_2026_10_27.txt` (the 2026-10-27 outage
+  record); neither can change a run. `tests/breaking/test_ladder_sync.py::
+  test_typo_sweep_scope_is_behaviour_only` pins the scope and proves a dead id
+  in `scripts/` still fails while the same id in `state/`, `tests/fixtures/` or
+  `docs/` does not.
 - **`.github/workflows/digest-watchdog.yml`** (cron `0 4,16 * * *` =
   09:45/21:45 NPT, ~2h after each slot): checks
   `state/last_digest_sent.json` date == today-NPT, slot matches the UTC-hour
   expectation, and `delivered` (missing = delivered, legacy `{slot: date}`
   shape supported). On miss: ntfy ping (reuses existing secrets,
-  best-effort) + `::error::` + one deduped `gh issue`, then exit 1.
+  best-effort) + `::error::` + the missed-digest `gh issue`, then exit 1. A
+  separate `Open a GitHub issue on failure` step copies all four alert guards
+  and files or comments on an issue without depending on ntfy; it never closes
+  anything automatically. See §45.
 - Timeouts/delivery gating untouched (daily 45 min, agent 35 min, breaking
   10 min; primary/backup channel order unchanged).
 
@@ -687,7 +715,12 @@ in **PLAN ORDER** (deterministic, not completion order): `name`, `kind`
 `sources_ok` / `sources_failed` keep their exact historical shape — **including
 the fact that a budget-expired task still lands in `sources_failed`** as
 "soft budget exceeded". `source_results` is the only place `skipped_budget` is
-distinguished, which is exactly why it exists.
+distinguished, which is exactly why it exists. The two console summary lines
+reconcile the same records: `sources ok: N reachable plans (incl. M empty)` and
+`source_results: T total = a ok + b empty + c failed + d skipped_budget`. The
+old line omitted the `empty` bucket. One cosmetic edge remains: a
+`skipped_budget` weather lane is counted on the second line but not in the
+first line's `failed:`.
 
 Retry + a bounded DNS pre-flight: a shared **DAEMON** resolver thread
 (`DnsResolver`, per-run instance, closed in a `finally`) with a per-call bounded
@@ -1438,9 +1471,14 @@ are as-reported by the 2026-09-28 session close.
    method on file even on the $0 plan), so the "needs a dashboard Access policy"
    half of this entry no longer applies. One dashboard action remains, and it is
    a *different* one: the Pages secret plus **Runtime → Fail closed** (§38.4).
-3. **Worker/repo drift is undetectable.** No build constant, no drift canary,
-   deploy message is `-`. The Worker now carries the fixed no-burn code; **if it
-   is ever redeployed from a stale checkout, the bug returns.**
+3. **Worker/repo drift is checked, but not self-healing.** `drift-canary.yml`'s
+   Worker build/schedule canary compares the deployed `WORKER_BUILD` ancestry
+   and reported crons, and fails closed on an unset or unresolvable stamp.
+   **Superseded 2026-11-15:** this item said "no build constant, no drift
+   canary"; the canary landed after that sentence was written. The remaining
+   risk is item 6: if Actions does not run, nothing checks. The Worker now
+   carries the fixed no-burn code; **if it is ever redeployed from a stale
+   checkout, the bug returns.**
 4. **`breaking-monitor` has no dead-man's switch** — no schedule, no watchdog
    arm. Worker death means silent, unbounded loss of breaking detection.
 5. **`GH_TOKEN` is a classic PAT with no enforced expiry.** If it expires,
@@ -1461,6 +1499,21 @@ are as-reported by the 2026-09-28 session close.
     `upload-artifact@v4` are already being forced onto Node 24.
 11. **Python cross-version drift**: local 3.13 vs runner 3.12.14, suite
     compatibility never verified.
+12. **Evening free-model quota can be exhausted.** On 2026-11-15 the evening
+    run `43719853133` tried 5 of 14 free models in one minute and got
+    `payment_required` / `Free usage limit reached` from
+    `opencode/inkling-2-small-free`; no model produced a digest, so the
+    derived edition shipped 7 stories from 51 candidates. Website and ntfy
+    delivered. This is a capacity risk, not a fixed defect: the morning slot
+    may work and the evening slot may still be forced to derive.
+13. **A private place name remains in git history before `6ad4237`** ("fix:
+    the private word the gate exists to keep out got in through prose").
+    Removing it needs a history rewrite, which is not authorised. Do not quote
+    the name in docs, code, tests or reports.
+14. **`state/ladder_probe.json` is stale evidence.** It was written
+    2026-11-03 and attempted only Gemini rungs; the free pool is listed but
+    never tried, and `judged_content` is false. It proves nothing about
+    current free-model liveness. Do not cite it as a live probe.
 
 ## 37. Verification standard and house rules (2026-09-28)
 
@@ -2386,7 +2439,7 @@ state commit was lost (`:29-33`).
   (`scripts/summarise_stubs.py:186-204`) all read the same numbers the payload
   carries.
 
-## 44. Model ladder, as it actually stands (2026-11-06; amended 2026-11-07)
+## 44. Model ladder, as it actually stands (2026-11-06; amended 2026-11-07 and 2026-11-15)
 
 - **The digest agent walk is CLI-only.** It runs `opencode run --model` against
   `config/opencode.json`'s ladder — Gemini ×4, two keys in separate projects with
@@ -2450,14 +2503,39 @@ provider, not the walk — implemented in the walk at
 rung logs why it did not
 (`scripts/llm_providers.py:1024,1034`).
 
-**Self-healing ladder (2026-11-07).** `model_selector.rank_models` orders rungs by
+**Self-healing ladder (2026-11-07; corrected 2026-11-15).**
+`model_selector.rank_models` orders rungs by
 `(cooling, -health_score, seed_pos, -release, id)`, where
 `health_score = successes − (timeout + transport + garbage + quota_notice)`. A
-rung is dropped only when its exact id is missing from its own provider's
-non-empty catalogue **and** another rung of that provider survives; a failed or
-empty catalogue keeps the static ladder. One order line per run names each rung's
-source (`[health rank N]` / `[config]`). Run `42369763864` shows it working:
-Gemini lifted to ranks 1–2, `gemini/gemini-3.1-flash-lite` demoted to rank 9.
+rung is removed only by a terminal `catalogue_status` in `GONE_STATUSES`
+(`deprecated`, `retired`, `deleted`, `removed`); absence from a non-empty
+catalogue is ORDER evidence only and moves that rung to the back of the walk.
+`catalogue_absent()` reports it; `catalogue_prune()` is gone. A failed or empty
+catalogue still keeps the static ladder. One order line per run names each
+rung's source (`[health rank N]` / `[config]`). Run `42369763864` shows the
+health ordering working: Gemini lifted to ranks 1–2,
+`gemini/gemini-3.1-flash-lite` demoted to rank 9.
+
+**The 2026-11-15 ladder incident (`472f416`).** The unauthenticated catalogue
+omitted five working seeds — `deepseek-v4.1-flash-free`, `beam-free`,
+`mimo-v2.6-flash-free`, `glm-5.3-flash-free` and `flint-40b-free` — while
+listing `nemotron-3.5-lightning-free`. The old prune reduced the ladder to
+`big-pickle`, `muse-spark`, `mimo-v2.5`, `ling-3.0` and `nemotron`, which
+answered with nothing, so the walk returned nothing for three days and the
+digests were derived. The fix keeps every seed and ranks absent ones last. Two
+`tests/workflows` assertions encoded the old prune and were corrected; the two
+`tests/breaking` tests that already encoded the new policy —
+`test_a_seed_absent_from_discovery_is_kept_not_dropped` and
+`test_the_five_rungs_40280837914_dropped_survive_that_exact_catalogue` — were
+left untouched. See §36 item 12 for the separate evening-quota risk.
+
+**Evening quota exhaustion (2026-11-15, run `43719853133`).** The run took
+2m19s, tried 5 of 14 free models in one minute, then got
+`AI_APICallError: Free usage limit reached` / `__WATCHDOG_FATAL__
+kind=payment_required` on `opencode/inkling-2-small-free`. The model walk
+returned nothing; the derived edition shipped 7 stories from 51 candidates,
+with `website` and `ntfy` true. This is a capacity outcome, not proof the
+ladder is broken.
 
 **Repair (2026-11-07).** The prompt field is `evidence`; echoing it is explicitly
 forbidden and emptiness is allowed. A stub with no publisher text is never sent
@@ -2474,7 +2552,7 @@ the run with a line naming the action to take; `quota` and `not_configured` are
 excused by name. **Its limitation, stated plainly:** the weekly cadence allows up
 to seven days of degraded editions before the alarm.
 
-## 45. 2026-11-09 — summariser partial answers, article evidence, publisher URLs, state push and alerting
+## 45. 2026-11-09 — summariser partial answers, article evidence, publisher URLs, state push and alerting (amended 2026-11-15)
 
 Everything here was read from the named commits and code; the live run claims
 were re-read from GitHub, not inferred.
@@ -2540,13 +2618,32 @@ annotation, ping or issue, and tests execute the real step body with a
 `tests/workflows/test_workflow_lint.py:8504-8763`). Run `42648802118` has all
 three alert steps `skipped`, and its log contains no alert ntfy send.
 
+**Second alarm (`2bd185f`, 2026-11-15).** `digest-watchdog.yml` gained
+`Open a GitHub issue on failure`. It copies the four existing alert guards
+verbatim (`academic`, `worker`, `chain`, `watch.miss`), uses the same
+`Detail:` text as the ntfy arms, comments on an open issue instead of opening a
+duplicate, and never closes or deletes an issue. The `watchdog` job now carries
+`contents: write` and `issues: write`. Proven live on healthy run
+`43715195610`: the issue step is `skipped`, no issue was opened and no alert
+push was made. The point is redundancy: if ntfy.sh fails, the alarm no longer
+goes with it.
+
+**Gmail and Telegram off (`2bd185f`, 2026-11-15).**
+`BACKUP_CHANNELS_ENABLED: 'false'` at `daily-news.yml:20` gates both steps; the
+code and step names stay because renaming breaks the render tests by string
+index. `Record delivery status` forces both channel flags false and writes
+`channel_reasons: {"gmail": "disabled by decision", "telegram": "disabled by
+decision"}`. Re-enabling either is one line. **Superseded 2026-11-15:** §3's
+fallback sentence described the old armed path; it is no longer current.
+
 ---
 
-Newest section: §45 (2026-11-09, the summariser partial-answer/retirement
+Newest amendments: §45 (2026-11-09, amended 2026-11-15: the second alarm and
+the Gmail/Telegram off-switch; earlier: the summariser partial-answer/retirement
 changes, bounded article text, publisher-URL and direct-feed preference, the
-state push and the alerting fixes), preceded by §44 (2026-11-06, amended
-2026-11-07: the model ladder as it actually stands, the retired GitHub Models
-family, the self-healing ladder, repair and the provider canary), then §43 (the
+state push and the alerting fixes), §44 (2026-11-06, amended 2026-11-07 and
+2026-11-15: the model ladder as it actually stands, catalogue absence as order
+evidence, the 2026-11-15 ladder incident, repair and the provider canary), then §43 (the
 single summary predicate and the counts every surface reads), then §42 (2026-11-03, the digest story floor, weather AQI, the
 breaking ladder and probe, honesty-gate recovery and `commit_state.sh`),
 followed by §41 (2026-10-10, the at-least-once delivery contract, the
