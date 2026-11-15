@@ -214,8 +214,8 @@
     "2026-11-15": {
       "evening": {
         "built_at": "2026-11-15T13:08:50Z",
-        "source_health_state": "partial",
-        "story_count": 14
+        "source_health_state": "ok",
+        "story_count": 7
       },
       "morning": {
         "actions_dispatch_at": "2026-11-15T01:36:05Z",
