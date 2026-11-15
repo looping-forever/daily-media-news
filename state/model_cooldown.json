@@ -1,5 +1,11 @@
 {
   "models": {
+    "gemini-key2/gemini-3.1-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-15T13:36:55.112359+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-15T19:36:55.112359+00:00"
+    },
     "gemini-key2/gemini-3.5-flash-lite": {
       "hits": 1,
       "last_hit": "2026-11-15T13:04:37.938433+00:00",
