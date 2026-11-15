@@ -1,5 +1,17 @@
 {
   "models": {
+    "gemini-key2/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-15T01:39:20.090876+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-15T07:39:20.090876+00:00"
+    },
+    "gemini/gemini-3.5-flash-lite": {
+      "hits": 1,
+      "last_hit": "2026-11-15T01:38:55.611086+00:00",
+      "reason": "quota_exhausted",
+      "until": "2026-11-15T07:38:55.611086+00:00"
+    },
     "opencode/ling-3.0-flash-fin-free": {
       "hits": 1,
       "last_hit": "2026-11-14T02:54:57.116715+00:00",
