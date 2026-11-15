@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -13467,7 +13467,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The developer built eight niche web applications using React and Vite hosted on Vercel, including a browser-based salvage game called salvage.run.",
       "latest_development": "The developer built eight niche web applications using React and Vite hosted on Vercel, including a browser-based salvage game called salvage.run.",
       "alerted": false,
@@ -13477,7 +13477,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-43e7ee385ce4",
@@ -13495,7 +13495,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Why SSML Matters for Voice AI If you’ve been tinkering with text‑to‑speech (TTS) lately, you’ll know that the raw output can feel a bit flat. SSML (Speech Synthesis Markup Language) is the secret sauce that lets you turn plain text into a…",
       "latest_development": "Why SSML Matters for Voice AI If you’ve been tinkering with text‑to‑speech (TTS) lately, you’ll know that the raw output can feel a bit flat. SSML (Speech Synthesis Markup Language) is the secret sauce that lets you turn plain text into a…",
       "alerted": false,
@@ -13505,7 +13505,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-0e7dd36fd03e",
@@ -13523,7 +13523,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Originally published on SAAX Protocol: https://saax-protocol.com/blog/what-escrow-security-review-actually-verifies AI disclosure: this article was researched and written by an AI operator from publicly available documentation and SAAX's…",
       "latest_development": "Originally published on SAAX Protocol: https://saax-protocol.com/blog/what-escrow-security-review-actually-verifies AI disclosure: this article was researched and written by an AI operator from publicly available documentation and SAAX's…",
       "alerted": false,
@@ -13533,7 +13533,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-7ffeb49baa9f",
@@ -13551,7 +13551,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13561,7 +13561,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-bc8254863f78",
@@ -13579,7 +13579,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Even Fuu knows that Fuu is the best character here. Queen.",
       "latest_development": "Even Fuu knows that Fuu is the best character here. Queen.",
       "alerted": false,
@@ -13589,7 +13589,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-f66a10ae0851",
@@ -13607,7 +13607,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13617,7 +13617,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-657aacb90279",
@@ -13635,7 +13635,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The 31st United Nations Climate Change Conference is scheduled to be held in Türkiye from November 9 to 20 to address the global climate crisis.",
       "latest_development": "The 31st United Nations Climate Change Conference is scheduled to be held in Türkiye from November 9 to 20 to address the global climate crisis.",
       "alerted": false,
@@ -13645,7 +13645,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-e185e745f12f",
@@ -13663,7 +13663,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13673,7 +13673,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-c81c024fd79d",
@@ -13691,7 +13691,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13701,7 +13701,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-0172458600c5",
@@ -13719,7 +13719,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13729,7 +13729,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-e03fb40e56cb",
@@ -13747,7 +13747,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13757,7 +13757,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-f973d564baf7",
@@ -13775,7 +13775,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13785,7 +13785,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-9446bc1573a7",
@@ -13803,7 +13803,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Elon Musk indicated Cybertruck production may end to prioritize manufacturing Cybercabs, which are described as autonomous taxis without a driver.",
       "latest_development": "Elon Musk indicated Cybertruck production may end to prioritize manufacturing Cybercabs, which are described as autonomous taxis without a driver.",
       "alerted": false,
@@ -13813,7 +13813,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-868d02767aff",
@@ -13859,7 +13859,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13869,7 +13869,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-21328cf9c7e7",
@@ -13887,7 +13887,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "AI stocks rebounded following a major market sell-off driven by investor fears that a Democratic election victory would slow down artificial intelligence development.",
       "latest_development": "AI stocks rebounded following a major market sell-off driven by investor fears that a Democratic election victory would slow down artificial intelligence development.",
       "alerted": false,
@@ -13897,7 +13897,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-4fb7d4c1818b",
@@ -13915,7 +13915,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13925,7 +13925,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-926fb6a166db",
@@ -13943,7 +13943,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13953,7 +13953,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-74de01732176",
@@ -13971,7 +13971,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Prosecutors are investigating the misuse of EU funds intended for upgrading the Spanish railway line where a train crash killed 69 people.",
       "latest_development": "Prosecutors are investigating the misuse of EU funds intended for upgrading the Spanish railway line where a train crash killed 69 people.",
       "alerted": false,
@@ -13981,7 +13981,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-48bf4b77fc1a",
@@ -13999,7 +13999,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14009,7 +14009,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-7a681696603e",
@@ -14027,7 +14027,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14037,7 +14037,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-7c167fed991e",
@@ -14055,7 +14055,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14065,7 +14065,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-491dbfd30a91",
@@ -14083,7 +14083,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14093,7 +14093,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-76b366f545d2",
@@ -14111,7 +14111,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The official website of the Yuru Camp△ (Laid-Back Camp) anime series revealed additional staff, theme songs, main visual (pictured), and main promotional video for Season 4 on Friday. The new season adapting Afro's slice of life manga will…",
       "latest_development": "The official website of the Yuru Camp△ (Laid-Back Camp) anime series revealed additional staff, theme songs, main visual (pictured), and main promotional video for Season 4 on Friday. The new season adapting Afro's slice of life manga will…",
       "alerted": false,
@@ -14121,7 +14121,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T06:42:58+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-861f43ab45ba",
@@ -14139,7 +14139,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University has released an urgent administrative notice regarding subject, program, section, and quota additions for its affiliated colleges and campuses across the university system.",
       "latest_development": "Confirmed: Tribhuvan University has released an urgent administrative notice regarding subject, program, section, and quota additions for its affiliated colleges and campuses across the university system.",
       "alerted": false,
@@ -14149,7 +14149,7 @@
       "in_evening": "2026-11-07",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T18:44:54+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-351e3d6f5e5b",
@@ -14167,7 +14167,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Microsoft is actively testing new Xbox cloud gaming capabilities that allow users to utilize their smartphones as wireless controllers directly on supported smart TVs without requiring a physical gamepad.",
       "latest_development": "Reported: Microsoft is actively testing new Xbox cloud gaming capabilities that allow users to utilize their smartphones as wireless controllers directly on supported smart TVs without requiring a physical gamepad.",
       "alerted": false,
@@ -14177,7 +14177,7 @@
       "in_evening": "2026-11-07",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T18:44:54+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-da627d4edbf6",
@@ -14195,7 +14195,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Ukrainian energy infrastructure sustained further damage in recent Russian missile strikes, occurring just prior to scheduled trilateral negotiations involving Ukrainian and Russian delegations in Abu Dhabi next week.",
       "latest_development": "Reported: Ukrainian energy infrastructure sustained further damage in recent Russian missile strikes, occurring just prior to scheduled trilateral negotiations involving Ukrainian and Russian delegations in Abu Dhabi next week.",
       "alerted": false,
@@ -14205,7 +14205,7 @@
       "in_evening": "2026-11-07",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-07T18:44:54+05:45"
+      "updated_at": "2026-11-15T06:41:25+05:45"
     },
     {
       "event_id": "evt-bdd4aa9e32d3",
@@ -20712,6 +20712,118 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-14T19:24:38+05:45"
+    },
+    {
+      "event_id": "evt-2cb7792be240",
+      "event_key": "tu-csit-ii-sem-exam-center-notice-2082",
+      "canonical_title": "Tribhuvan University Releases B.Sc. CSIT II Semester Exam Center Notice",
+      "category": "education_tu",
+      "first_seen": "2026-11-15",
+      "last_seen": "2026-11-15",
+      "first_reported": "2026-11-15",
+      "last_reported": "2026-11-15",
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "iost.tu.edu.np/notices/16102"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Institute of Science and Technology has officially published notice number 16102 detailing examination centers for B.Sc.CSIT II Semester-2082 students.",
+      "latest_development": "Confirmed: The Institute of Science and Technology has officially published notice number 16102 detailing examination centers for B.Sc.CSIT II Semester-2082 students.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-15",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-15T06:41:25+05:45"
+    },
+    {
+      "event_id": "evt-4316e555c68f",
+      "event_key": "nepal-rastra-bank-exchange-rate-nov-15-2026",
+      "canonical_title": "Nepal Rastra Bank Sets Foreign Currency Exchange Rates",
+      "category": "nepal",
+      "first_seen": "2026-11-15",
+      "last_seen": "2026-11-15",
+      "first_reported": "2026-11-15",
+      "last_reported": "2026-11-15",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2057752/what-is-the-exchange-rate-of-which-foreign-currency-today-28"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: According to Nepal Rastra Bank rates published via Onlinekhabar, the buying rate for one US dollar is fixed at 150.49 rupees and the selling rate at 151.09 rupees.",
+      "latest_development": "Confirmed: According to Nepal Rastra Bank rates published via Onlinekhabar, the buying rate for one US dollar is fixed at 150.49 rupees and the selling rate at 151.09 rupees.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-15",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-15",
+      "updated_at": "2026-11-15T06:41:25+05:45"
+    },
+    {
+      "event_id": "evt-314e19fbb171",
+      "event_key": "kathmandu-weather-westerly-winds-nov-15-2026",
+      "canonical_title": "Department of Hydrology and Meteorology Forecasts Light Drizzle and Cloudy Skies",
+      "category": "local_city",
+      "first_seen": "2026-11-15",
+      "last_seen": "2026-11-15",
+      "first_reported": "2026-11-15",
+      "last_reported": "2026-11-15",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.khabarhub.com/2026/15/575619"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: The Meteorological Forecasting Division reports partial influence of westerly winds bringing cloudy conditions to mountainous and hilly regions, with Kathmandu experiencing a maximum temperature of 20 degrees Celsius, minimum of 11 degrees Celsius, and 0.7 mm of forecasted precipitation.",
+      "latest_development": "Reported: The Meteorological Forecasting Division reports partial influence of westerly winds bringing cloudy conditions to mountainous and hilly regions, with Kathmandu experiencing a maximum temperature of 20 degrees Celsius, minimum of 11 degrees Celsius, and 0.7 mm of forecasted precipitation.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-15",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-15",
+      "updated_at": "2026-11-15T06:41:25+05:45"
+    },
+    {
+      "event_id": "evt-39b49ed10600",
+      "event_key": "chhath-festival-main-day-nov-15-2026",
+      "canonical_title": "Chhath Festival Main Day Celebrations Across Nepal",
+      "category": "nepal",
+      "first_seen": "2026-11-15",
+      "last_seen": "2026-11-15",
+      "first_reported": "2026-11-15",
+      "last_reported": "2026-11-15",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/15/575611"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Devotees across the country gather at rivers, ponds, and lakes today to offer holy Argha to the setting sun during the main rituals of the four-day Chhath festival.",
+      "latest_development": "Reported: Devotees across the country gather at rivers, ponds, and lakes today to offer holy Argha to the setting sun during the main rituals of the four-day Chhath festival.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-15",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-15",
+      "updated_at": "2026-11-15T06:41:25+05:45"
     }
   ],
   "archived": []

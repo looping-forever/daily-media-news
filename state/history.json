@@ -1,62 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "bbc.co.uk/news/articles/c35ynnpzdq51o",
-      "title_hash": "2d3d2c6fb125ebf72ada76f5372571297b495c8f",
-      "title": "AI stocks climb after trillions wiped from market values",
-      "category": "world_major",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cq1j33w7d232o",
-      "title_hash": "62af547e9656e5c03fc4da9e9cfd99eba74b6086",
-      "title": "Elon Musk appears to signal the end of the road for Cybertruck",
-      "category": "world_major",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "dev.to/hobbybuilder/i-built-8-small-weird-websites-on-the-side-21e4",
-      "title_hash": "127d12e0a29a0b97d85842a279efc19f6eb550be",
-      "title": "I built 8 small, weird websites on the side",
-      "category": "tech_career",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/review/magic-knight-rayearth/episode-5/.243594",
-      "title_hash": "97a355f35cf2973988f7875a21b61294ee2d30ae",
-      "title": "Magic Knight Rayearth ‒ Episode 5",
-      "category": "anime",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c6x2wwnz5445o",
-      "title_hash": "5fc9993ed75928cb5153ac2b3d402ca65e976385",
-      "title": "Spain's rail authorities face European fraud probe after Urda rail disaster",
-      "category": "world_major",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "tu.edu.np/notices/16097",
-      "title_hash": "f9352654b1810d0825b0cc25498025f9bb19c56b",
-      "title": "Tribhuvan University Issues Urgent Notice on Affiliated College Program and Quota Additions",
-      "category": "education_tu",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cm4g1nq8158po",
-      "title_hash": "0b80368c2e9fdddaa0fd5d117520e2be69d04695",
-      "title": "Ukraine Power Network Suffers Additional Damage Following Fresh Strikes",
-      "category": "world_major",
-      "date_sent": "2026-11-07"
-    },
-    {
-      "url_normalized": "eurogamer.net/xbox-cloud-gaming-phone-controller-smart-tv-nano-cloud-connect",
-      "title_hash": "7986b8389de9307140fdb7f7dd7df57403b97f7e",
-      "title": "Xbox Testing New Cloud Gaming Features Including Phone Controls on Smart TVs",
-      "category": "gaming",
-      "date_sent": "2026-11-07"
-    },
-    {
       "url_normalized": "dev.to/jedidiahrhodes8293/browser-direct-uploads-to-private-object-storage-nodejs-express-and-react-5gab",
       "title_hash": "95ae40edc8e5b2a6d46714221b976e459220a300",
       "title": "Browser Direct Uploads to Private Object Storage — Node.js, Express, and React",
@@ -1098,6 +1042,34 @@
       "title": "Winemakers are learning that conservation can be good for business",
       "category": "tech_career",
       "date_sent": "2026-11-14"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16102",
+      "title_hash": "26473fe1544dacbf70b3404cc940ad8c56c0df77",
+      "title": "Tribhuvan University Releases B.Sc. CSIT II Semester Exam Center Notice",
+      "category": "education_tu",
+      "date_sent": "2026-11-15"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/15/575619",
+      "title_hash": "4c526549058c0a828364c1a87d8feca111d2ac4d",
+      "title": "Department of Hydrology and Meteorology Forecasts Light Drizzle and Cloudy Skies",
+      "category": "local_city",
+      "date_sent": "2026-11-15"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2057752/what-is-the-exchange-rate-of-which-foreign-currency-today-28",
+      "title_hash": "b3c780a147e8c163956cc3d34e58a9e2c8604b14",
+      "title": "Nepal Rastra Bank Sets Foreign Currency Exchange Rates",
+      "category": "nepal",
+      "date_sent": "2026-11-15"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/15/575611",
+      "title_hash": "2574449f624bb39da31a0eb5e6fe26ae92448f01",
+      "title": "Chhath Festival Main Day Celebrations Across Nepal",
+      "category": "nepal",
+      "date_sent": "2026-11-15"
     }
   ]
 }
