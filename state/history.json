@@ -1266,6 +1266,111 @@
       "title": "Kathmandu Valley Experiences Temperature Rise",
       "category": "local_city",
       "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "polygon.com/most-underrated-new-rpgs",
+      "title_hash": "870e74a1bfe25b5edba1c67fe8db488b56d969a2",
+      "title": "10 Most Underrated RPGs of the Past Decade",
+      "category": "gaming",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "techcrunch.com/2026/11/15/apple-launches-new-app-to-study-how-people-use-ai-for-health",
+      "title_hash": "00a603aaf7de2bd4d4c2d9f9011fd59f60713bd1",
+      "title": "Apple launches new app to study how people use AI for health",
+      "category": "tech_career",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cx5y1pzr9604o",
+      "title_hash": "85859ebbb373c693f9ed705c9f064eae63212f39",
+      "title": "Clothing factories shut in Bangladesh as workers strike over pay",
+      "category": "world_major",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "sunshowers.io/posts/nextest-install-scripts",
+      "title_hash": "d69a7911c87bb2e50f7307d707a527ea7b3634a7",
+      "title": "Designing nextest's install scripts",
+      "category": "tech_career",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "polygon.com/pokemon-pokepark-fishing-rally-ds-found",
+      "title_hash": "1619b33263b7c7b82bc62110844c735ef7aaf60f",
+      "title": "Extremely Rare Pokémon Game Found 20 Years Later",
+      "category": "gaming",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/16/575762",
+      "title_hash": "766f1c493a2414c1ecd39bfb3c10ff763d4ad50e",
+      "title": "Farmers in Ilam busy harvesting paddy as harvest season begins",
+      "category": "nepal",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74943102",
+      "title_hash": "b58e6340bf3e58fa092c7427d0381ce266bb6998",
+      "title": "Manga 'Witch Watch' Concludes Serialization",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "theguardian.com/technology/2026/nov/16/megaspeed-company-breaks-slience-nvidia-jensen-huang-alice-huang",
+      "title_hash": "28afc391b4d202d1c93f6d1e7f3b4e7399bd88ee",
+      "title": "Megaspeed, the company linked to the downfall of Nvidia boss, says it’s a ‘legitimate and lawful business’",
+      "category": "world_major",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-15/spitz-band-drummer-tatsuo-sakiyama-seriously-injured-in-traffic-accident/.243836",
+      "title_hash": "ee6e66daa4b6c7eaaab50826b1f5329fb14bed32",
+      "title": "SPITZ Band's Drummer Tatsuo Sakiyama Seriously Injured in Traffic Accident",
+      "category": "anime",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "polygon.com/best-games-like-star-wars-galactic-racer",
+      "title_hash": "e4631f9e873bd7798047c140c03d3aa56f52f79c",
+      "title": "The 7 Best Star Wars: Galactic Racer Replacements You Can Play Right Now",
+      "category": "gaming",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "forum.torproject.org/t/security-release-0-4-9-17/22454",
+      "title_hash": "b78e0a21b23b1438d90fc45a8d8daaf7cfd85143",
+      "title": "Tor Project Issues Rapid-Response DoS-Defense Fix Amid Sustained DDoS Attack",
+      "category": "tech_career",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-15/uzono-shiniko-hokoku-manga-ends-in-4th-volume/.243817",
+      "title_hash": "cd4df590ef5462c0cf094aa042d4a263c3a6f13e",
+      "title": "Uzono Shiniko Hōkoku Manga Ends in 4th Volume",
+      "category": "anime",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/weather/weather-update-western-low-brings-patchy-clouds-to-himalayas",
+      "title_hash": "f96adfa59185fda33bf408deb0c5a97fc93351b6",
+      "title": "Weather update: Western low brings patchy clouds to Himalayas",
+      "category": "nepal",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-15/witch-watch-manga-ends-with-anime-season-2-to-air-in-2027/.243834",
+      "title_hash": "6bcf92cf2788e4361a6f3f560e6ef0bbc2d937ca",
+      "title": "Witch Watch Manga Ends With Anime Season 2 to Air in 2027",
+      "category": "anime",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "theguardian.com/world/2026/nov/16/pope-leo-speech-peru-justice-for-amazon-activists-environment",
+      "title_hash": "b870baa825a7989d4fb58ebb9cb9d2083fc1b7cb",
+      "title": "‘The blood of these brothers cries out’: Pope Leo demands justice for people killed protecting the Amazon",
+      "category": "world_major",
+      "date_sent": "2026-11-16"
     }
   ]
 }
