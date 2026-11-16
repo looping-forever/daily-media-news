@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -13831,7 +13831,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -13841,7 +13841,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-1b60e579bf76",
@@ -14223,7 +14223,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Developers can secure file uploads by utilizing a private bucket where the backend generates a single presigned PUT URL for each receipt and later returns a short-lived download link.",
       "latest_development": "Developers can secure file uploads by utilizing a private bucket where the backend generates a single presigned PUT URL for each receipt and later returns a short-lived download link.",
       "alerted": false,
@@ -14233,7 +14233,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-a3d225052bb2",
@@ -14251,7 +14251,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "For a logistics AI application, maintain security by storing generated images in private buckets and issuing time-limited signed links to avoid proxying media bytes through the server.",
       "latest_development": "For a logistics AI application, maintain security by storing generated images in private buckets and issuing time-limited signed links to avoid proxying media bytes through the server.",
       "alerted": false,
@@ -14261,7 +14261,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-faa577f76526",
@@ -14279,7 +14279,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Zambo established a new daily usage record of 4,255 receipts, nearly doubling the previous high of 2,235.",
       "latest_development": "Zambo established a new daily usage record of 4,255 receipts, nearly doubling the previous high of 2,235.",
       "alerted": false,
@@ -14289,7 +14289,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-35da58348cde",
@@ -14307,7 +14307,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Players can customize their own experience using the Rulehouse platform.",
       "latest_development": "Players can customize their own experience using the Rulehouse platform.",
       "alerted": false,
@@ -14317,7 +14317,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-d562c1e225dc",
@@ -14335,7 +14335,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14345,7 +14345,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-0e55d65564fd",
@@ -14363,7 +14363,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14373,7 +14373,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-e44b96ec941b",
@@ -14391,7 +14391,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14401,7 +14401,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-e395b91509d8",
@@ -14419,7 +14419,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The indie title has surged in popularity on Steam, currently drawing more than 150,000 players at the same time.",
       "latest_development": "The indie title has surged in popularity on Steam, currently drawing more than 150,000 players at the same time.",
       "alerted": false,
@@ -14429,7 +14429,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-7415903b30f6",
@@ -14447,7 +14447,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14457,7 +14457,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-8a559c043578",
@@ -14475,7 +14475,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Fortnite players can expect the next treasure hours event at 10 AM PT on Fridays during the Fortnite Chapter 7 mini season, along with bonus rewards.",
       "latest_development": "Fortnite players can expect the next treasure hours event at 10 AM PT on Fridays during the Fortnite Chapter 7 mini season, along with bonus rewards.",
       "alerted": false,
@@ -14485,7 +14485,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-d65ac9d483ba",
@@ -14503,7 +14503,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14513,7 +14513,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-3bbe7f61d60d",
@@ -14531,7 +14531,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14541,7 +14541,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-a107aff054fd",
@@ -14559,7 +14559,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14569,7 +14569,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-4e8ebba2b713",
@@ -14587,7 +14587,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Six people were killed in a random shooting in Krakow's main square, and three bodies were found at the gunman's home.",
       "latest_development": "Six people were killed in a random shooting in Krakow's main square, and three bodies were found at the gunman's home.",
       "alerted": false,
@@ -14597,7 +14597,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-7677eb6c4f1d",
@@ -14615,7 +14615,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Neither the incumbent prime minister nor his challenger achieved a parliamentary majority in the recent election held last week.",
       "latest_development": "Neither the incumbent prime minister nor his challenger achieved a parliamentary majority in the recent election held last week.",
       "alerted": false,
@@ -14625,7 +14625,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-2036f33a499c",
@@ -14643,7 +14643,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14653,7 +14653,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-a6ed4c0be46d",
@@ -14671,7 +14671,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14681,7 +14681,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-40f876ab7345",
@@ -14699,7 +14699,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Santiago Peña lost his position following a crisis that prevented millions of customers from accessing their funds.",
       "latest_development": "Santiago Peña lost his position following a crisis that prevented millions of customers from accessing their funds.",
       "alerted": false,
@@ -14709,7 +14709,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-21c3d47d52d5",
@@ -14727,7 +14727,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The television production based on Kashiko Amane's manga announced new voice actors and its closing musical track this Saturday.",
       "latest_development": "The television production based on Kashiko Amane's manga announced new voice actors and its closing musical track this Saturday.",
       "alerted": false,
@@ -14737,7 +14737,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-50149a3dec6a",
@@ -14755,7 +14755,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Two new voice actors have joined the upcoming anime adaptation of Chinkururi and Nanashina's light novel series, Gacha Girls Corps.",
       "latest_development": "Two new voice actors have joined the upcoming anime adaptation of Chinkururi and Nanashina's light novel series, Gacha Girls Corps.",
       "alerted": false,
@@ -14765,7 +14765,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-b58ffc39ae46",
@@ -14783,7 +14783,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14793,7 +14793,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-3d2dc0de0d1f",
@@ -14811,7 +14811,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -14821,7 +14821,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T06:43:04+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-1fef95e659bc",
@@ -14839,7 +14839,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Nepal U-19 women’s cricket team has been declared the winner of the Belt and Road Series in China after the final against Hong Kong was abandoned due to rain. Nepal concluded the tournament with four wins in six matches, finishing as the unbeaten side in the group standings.",
       "latest_development": "Confirmed: The Nepal U-19 women’s cricket team has been declared the winner of the Belt and Road Series in China after the final against Hong Kong was abandoned due to rain. Nepal concluded the tournament with four wins in six matches, finishing as the unbeaten side in the group standings.",
       "alerted": false,
@@ -14849,7 +14849,7 @@
       "in_evening": "2026-11-08",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T18:41:33+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-fe56e12261f1",
@@ -14867,7 +14867,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Researchers from Hainan Normal University and collaborating institutions have identified a previously unknown frog species within the tropical rainforests of Hainan Island. The discovery is being highlighted by investigators as a positive indicator for the biodiversity and ecological health of the region.",
       "latest_development": "Reported: Researchers from Hainan Normal University and collaborating institutions have identified a previously unknown frog species within the tropical rainforests of Hainan Island. The discovery is being highlighted by investigators as a positive indicator for the biodiversity and ecological health of the region.",
       "alerted": false,
@@ -14877,7 +14877,7 @@
       "in_evening": "2026-11-08",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T18:41:33+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-5169f8d80f1d",
@@ -14895,7 +14895,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The US military is establishing a 20-member task force focused on mapping and obstructing land-based transport routes utilized for the illegal shipment of weaponry and contraband into Iran. The initiative follows ongoing monitoring of regional supply lines.",
       "latest_development": "Reported: The US military is establishing a 20-member task force focused on mapping and obstructing land-based transport routes utilized for the illegal shipment of weaponry and contraband into Iran. The initiative follows ongoing monitoring of regional supply lines.",
       "alerted": false,
@@ -14905,7 +14905,7 @@
       "in_evening": "2026-11-08",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T18:41:33+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-28f008df3121",
@@ -14923,7 +14923,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Two individuals, aged 27 and 28, died after a truck collided with their motorcycle near Ganesh Petrol Pump in Itahari-13, Sunsari. Local police confirmed the victims were Sparsh Aryal and Saswat P.",
       "latest_development": "Reported: Two individuals, aged 27 and 28, died after a truck collided with their motorcycle near Ganesh Petrol Pump in Itahari-13, Sunsari. Local police confirmed the victims were Sparsh Aryal and Saswat P.",
       "alerted": false,
@@ -14933,7 +14933,7 @@
       "in_evening": "2026-11-08",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T19:22:15+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-875b4cdf9191",
@@ -14951,7 +14951,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Recent analysis indicates that over the past eight years, Nepal has received approximately $3.19 billion in climate finance, with 63% being concessional loans and only 30% in direct grants.",
       "latest_development": "Reported: Recent analysis indicates that over the past eight years, Nepal has received approximately $3.19 billion in climate finance, with 63% being concessional loans and only 30% in direct grants.",
       "alerted": false,
@@ -14961,7 +14961,7 @@
       "in_evening": "2026-11-08",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-08T19:22:15+05:45"
+      "updated_at": "2026-11-16T06:41:46+05:45"
     },
     {
       "event_id": "evt-0b4c82f8c775",
@@ -21832,6 +21832,118 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-15T19:23:04+05:45"
+    },
+    {
+      "event_id": "evt-b3d2146f0d9b",
+      "event_key": "tu-affiliate-quota-update",
+      "canonical_title": "Tribhuvan University Publishes Important Notice Regarding College Affiliations",
+      "category": "education_tu",
+      "first_seen": "2026-11-16",
+      "last_seen": "2026-11-16",
+      "first_reported": "2026-11-16",
+      "last_reported": "2026-11-16",
+      "importance": 0,
+      "personal_relevance": 9,
+      "sources": [
+        "tu.edu.np/notices/16097"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University has issued an urgent notice concerning the addition of subjects, programs, sections, and quotas for affiliated colleges, requiring immediate attention from campus administration.",
+      "latest_development": "Confirmed: Tribhuvan University has issued an urgent notice concerning the addition of subjects, programs, sections, and quotas for affiliated colleges, requiring immediate attention from campus administration.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-16",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-16T06:41:46+05:45"
+    },
+    {
+      "event_id": "evt-be03e41e1856",
+      "event_key": "tu-bsc-entrance-deadline-ext",
+      "canonical_title": "Tribhuvan University Extends B.Sc. Entrance Exam Application Deadline",
+      "category": "education_tu",
+      "first_seen": "2026-11-16",
+      "last_seen": "2026-11-16",
+      "first_reported": "2026-11-16",
+      "last_reported": "2026-11-16",
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "iost.tu.edu.np/notices/16111"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Institute of Science and Technology (IOST) at Tribhuvan University has extended the application deadline for B.Sc. entrance examinations to accommodate eligible students.",
+      "latest_development": "Confirmed: The Institute of Science and Technology (IOST) at Tribhuvan University has extended the application deadline for B.Sc. entrance examinations to accommodate eligible students.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-16",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-16T06:41:46+05:45"
+    },
+    {
+      "event_id": "evt-f9f8050ea71e",
+      "event_key": "nrb-forex-rates-nov16",
+      "canonical_title": "Foreign Exchange Rates Update for Nepal",
+      "category": "bank_local",
+      "first_seen": "2026-11-16",
+      "last_seen": "2026-11-16",
+      "first_reported": "2026-11-16",
+      "last_reported": "2026-11-16",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.nepalnews.com/s/business/nepal-rastra-bank-publishes-foreign-exchange-rates-for-today-3"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has published today's foreign exchange rates, listing the US Dollar buying rate at Rs 150.49 and selling rate at Rs 151.09, and the Euro at Rs 165.88 buying and Rs 166.54 selling.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has published today's foreign exchange rates, listing the US Dollar buying rate at Rs 150.49 and selling rate at Rs 151.09, and the Euro at Rs 165.88 buying and Rs 166.54 selling.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-16",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-16",
+      "updated_at": "2026-11-16T06:41:46+05:45"
+    },
+    {
+      "event_id": "evt-2c0050d7daa1",
+      "event_key": "kathmandu-temp-rise-nov16",
+      "canonical_title": "Kathmandu Valley Experiences Temperature Rise",
+      "category": "local_city",
+      "first_seen": "2026-11-16",
+      "last_seen": "2026-11-16",
+      "first_reported": "2026-11-16",
+      "last_reported": "2026-11-16",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/16/575766"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The minimum temperature in the Kathmandu Valley increased by 2.4 degrees Celsius over the last 24 hours, reaching 12.4 degrees Celsius as of Monday morning.",
+      "latest_development": "Reported: The minimum temperature in the Kathmandu Valley increased by 2.4 degrees Celsius over the last 24 hours, reaching 12.4 degrees Celsius as of Monday morning.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-16",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-16",
+      "updated_at": "2026-11-16T06:41:46+05:45"
     }
   ],
   "archived": []

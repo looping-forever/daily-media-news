@@ -1,90 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "dev.to/jedidiahrhodes8293/browser-direct-uploads-to-private-object-storage-nodejs-express-and-react-5gab",
-      "title_hash": "95ae40edc8e5b2a6d46714221b976e459220a300",
-      "title": "Browser Direct Uploads to Private Object Storage — Node.js, Express, and React",
-      "category": "tech_career",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "pcgamer.com/games/puzzle/chess-is-immediately-more-fun-if-you-jettison-most-of-the-rules-and-replace-them-with-weapons-grade-game-boy-advance",
-      "title_hash": "003dddd215322a2f5ad8fd2e0704f58dc754f655",
-      "title": "Chess is immediately more fun if you jettison most of the rules and replace them with weapons-grade Game Boy Advance",
-      "category": "gaming",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "polygon.com/probably-stolen-cyberpunk-shopkeeping-simulator-steam-hit",
-      "title_hash": "16d25dd96f89a7d9be14d640be0d620890b6d83f",
-      "title": "Cyberpunk 2077 Meets Papers, Please in Steam’s Latest Surprise Viral Hit",
-      "category": "gaming",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "polygon.com/fornite-treasure-hours-chapter-7-mini-season-c7ms",
-      "title_hash": "a687b599a2c32613355ffee4f3d8345fbe64bcab",
-      "title": "Fortune treasure hours schedule in the Fortnite Chapter 7 mini season",
-      "category": "gaming",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cmy8367lj5xlo",
-      "title_hash": "0525a400d6d830c2fa718d88815f2761f68e2a2a",
-      "title": "Israel's president tasks opposition leader Eisenkot with forming government",
-      "category": "world_major",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c68jzzvjgdy9o",
-      "title_hash": "5e5bf3766f30d8c673c59aebaebf8d08789bbd6a",
-      "title": "Paraguay's former president charged after bank collapse",
-      "category": "world_major",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "dev.to/yannicksterling6563/tenant-isolated-ai-image-storage-cheap-signed-downloads-no-open-bucket-4lp2",
-      "title_hash": "a9ea34d6e3c6d65979b55a3c39d7dfd6f92f5734",
-      "title": "Tenant-Isolated AI Image Storage: Cheap Signed Downloads, No Open Bucket",
-      "category": "tech_career",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2054071/us-forms-task-force-to-block-land-routes-to-iran",
-      "title_hash": "1e904a480476e32f25cddf2bbcae268b901d7c55",
-      "title": "Updated: US Announces Task Force to Disrupt Illegal Land Routes to Iran",
-      "category": "world_major",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/sports/nepal-clinches-title-of-u-19-womens-cricket-tournament",
-      "title_hash": "c72b761cdedbd751a8846a17ac2fbac3c84ac374",
-      "title": "Nepal Wins Belt and Road U-19 Women’s Cricket Tournament",
-      "category": "nepal",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2054074/new-species-of-frog-discovered-on-chinas-hainan-island",
-      "title_hash": "15146114718b6ddfa38ff061de9de3758a469271",
-      "title": "New Frog Species Discovered in Hainan Tropical Rainforest",
-      "category": "nepal",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2053791/nepal-receives-twice-as-much-climate-finance-in-loans-as-grants",
-      "title_hash": "2b0c830eba10ab278dd7ab9bef6ce3a27dccd47b",
-      "title": "Climate finance for Nepal shows high loan-to-grant ratio",
-      "category": "nepal",
-      "date_sent": "2026-11-08"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/society/two-people-killed-due-to-truck-hit-in-itahari",
-      "title_hash": "c607b8d6f23ade6cbfb0183f6e16339dfca3d420",
-      "title": "Two people killed in motorcycle accident in Itahari",
-      "category": "local_city",
-      "date_sent": "2026-11-08"
-    },
-    {
       "url_normalized": "onlinekhabar.com/2026/11/2054209/this-is-the-foreign-currency-exchange-rate-for-today-33",
       "title_hash": "e322cc9fa4b0bba3d7706068fdd096418ec5843a",
       "title": "US Dollar Exchange Rate for November 9, 2026",
@@ -1322,6 +1238,34 @@
       "title": "‘Shameless venality’: how a flurry of lawsuits has thwarted Trump’s self-enrichment schemes",
       "category": "world_major",
       "date_sent": "2026-11-15"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16111",
+      "title_hash": "a984646f93c9414d709610549984fc49de01a437",
+      "title": "Tribhuvan University Extends B.Sc. Entrance Exam Application Deadline",
+      "category": "education_tu",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "tu.edu.np/notices/16097",
+      "title_hash": "8aca73e368cfb014e91479b3e27556d71720c3aa",
+      "title": "Tribhuvan University Publishes Important Notice Regarding College Affiliations",
+      "category": "education_tu",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/business/nepal-rastra-bank-publishes-foreign-exchange-rates-for-today-3",
+      "title_hash": "a0618524d8e101819b93c67836dab2485f349cc7",
+      "title": "Foreign Exchange Rates Update for Nepal",
+      "category": "bank_local",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/16/575766",
+      "title_hash": "2b2f57c5be736bb320a08afa30f6a376f54eed4f",
+      "title": "Kathmandu Valley Experiences Temperature Rise",
+      "category": "local_city",
+      "date_sent": "2026-11-16"
     }
   ]
 }
