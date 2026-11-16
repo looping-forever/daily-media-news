@@ -208,8 +208,8 @@
     "2026-11-16": {
       "evening": {
         "built_at": "2026-11-16T12:57:40Z",
-        "source_health_state": "partial",
-        "story_count": 4
+        "source_health_state": "ok",
+        "story_count": 15
       },
       "morning": {
         "actions_dispatch_at": "2026-11-16T01:35:33Z",
