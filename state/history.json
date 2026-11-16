@@ -1371,6 +1371,34 @@
       "title": "‘The blood of these brothers cries out’: Pope Leo demands justice for people killed protecting the Amazon",
       "category": "world_major",
       "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/business/finance-minister-dr-wagle-stresses-on-bad-loan-recovery",
+      "title_hash": "44a9ac68932f057cc98d3ebbabafe9344f00a522",
+      "title": "Finance Minister Dr. Wagle Directs Nepal Bank Limited to Prioritize Bad Loan Recovery",
+      "category": "bank_local",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "nytimes.com/2026/11/16/world/europe/russia-ukraine-winter-campaign.html",
+      "title_hash": "7bdd4e9e6bf77e2a90646f95fec9092999dea1da",
+      "title": "Intense Russian Bombing Campaign Targets Ukrainian Heating and Water Infrastructure",
+      "category": "world_major",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2059014/long-term-solution-to-be-sought-with-india-to-export-electricity-to-bangladesh",
+      "title_hash": "12574292419fd11f745cef4d5d2418521948f950",
+      "title": "Nepal and India Explore Long-Term Framework for Power Export to Bangladesh",
+      "category": "nepal",
+      "date_sent": "2026-11-16"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cw987343352go",
+      "title_hash": "5597b8510aca4ec4c81ee8b3e40043d1cd5995aa",
+      "title": "Five EU Nations Plan Asylum Return Hub in Rwanda",
+      "category": "world_major",
+      "date_sent": "2026-11-16"
     }
   ]
 }
