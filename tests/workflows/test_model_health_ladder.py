@@ -309,7 +309,11 @@ class GroqCliRungs(unittest.TestCase):
             self.assertEqual({"allam-2-7b"}, set(block["models"]))
             for model in block["models"].values():
                 self.assertEqual(131072, model["limit"]["context"])
-                self.assertEqual(32768, model["limit"]["output"])
+                # THE MODEL'S SERVING CEILING, not a global number. 32768 here
+                # made the CLI send `max_tokens: 32768`, and Groq refused BOTH
+                # groq rungs with `max_tokens must be <= 4096` before either
+                # wrote a character (dry run 44027504920).
+                self.assertEqual(4096, model["limit"]["output"])
 
 
 if __name__ == "__main__":

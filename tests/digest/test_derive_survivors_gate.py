@@ -27,6 +27,7 @@ Offline: temp directories, the real scripts, stdlib only.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,7 @@ DERIVE_STEP = "Derive the unsummarised edition"
 DERIVER = "scripts/derive_unsummarised.py"
 COUNTER = "scripts/validate_stories.py --count-only"
 FIXTURE_CONFIG = str(W.REPO_ROOT / "tests" / "fixtures" / "config")
+PROMPT = W.REPO_ROOT / "prompts" / "daily-digest.md"
 
 
 def step_body():
@@ -235,6 +237,74 @@ class TheCounterBehaviourTests(unittest.TestCase):
                               source_url="https://tuexam.example.edu.np/schedule")]
 
         self.assertEqual("2", self.run_counter(stories))
+
+class ThePromptAsksForABufferAboveTheFloorTests(unittest.TestCase):
+    """An answer AT the floor ships BELOW it once dedup runs.
+
+    DRY RUN 44027504920: attempt 1 on `gemini/gemini-3.1-flash-lite` wrote THREE
+    stories and validation plus history dedup suppressed all three (`0 shippable
+    of 3`). The prompt asked for 5-15 with a soft floor of 4, so a 3-story answer
+    was inside the instruction and could never survive against the 4-story ship
+    floor. THE FIX DOES NOT MOVE THE FLOOR AND DOES NOT WEAKEN DEDUP: the writer
+    is asked for a real buffer above the floor, and says why in one clause.
+    """
+
+    FLOOR_RE = re.compile(r"^\s*STORIES_FLOOR:\s*(\d+)\s*$", re.MULTILINE)
+    BUFFER_RE = re.compile(r"aim for AT LEAST (\d+) stories")
+    TARGET_RE = re.compile(r"Target (\d+)-(\d+) stories TOTAL")
+
+    def prompt(self):
+        return " ".join(PROMPT.read_text(encoding="utf-8").split())
+
+    def floor(self):
+        path = W.REPO_ROOT / ".github" / "workflows" / WORKFLOW
+        match = self.FLOOR_RE.search(path.read_text(encoding="utf-8"))
+        self.assertTrue(match, "the workflow states no STORIES_FLOOR")
+        return int(match.group(1))
+
+    def test_the_floor_itself_is_not_lowered(self):
+        self.assertEqual(4, self.floor(),
+                         "the ship floor moved. The buffer is the fix; a lower "
+                         "floor ships a thinner edition than before")
+
+    def test_the_buffer_is_at_least_three_times_the_floor(self):
+        match = self.BUFFER_RE.search(self.prompt())
+        self.assertTrue(match,
+                        "the prompt asks for no story buffer at all, so a "
+                        "model can answer at the floor and die in dedup")
+
+        asked, floor = int(match.group(1)), self.floor()
+        self.assertGreaterEqual(
+            asked, 3 * floor,
+            "the prompt asks for %d stories against a floor of %d, which is "
+            "not a real buffer: dry run 44027504920 lost 3 of 3 to validation "
+            "and history dedup" % (asked, floor))
+
+    def test_the_target_range_starts_at_the_buffer(self):
+        """A range beginning below the buffer would quietly undo it."""
+        buffer_match = self.BUFFER_RE.search(self.prompt())
+        target_match = self.TARGET_RE.search(self.prompt())
+        self.assertTrue(buffer_match and target_match,
+                        "the prompt states no buffer and/or no target range")
+
+        low, high = int(target_match.group(1)), int(target_match.group(2))
+        self.assertGreaterEqual(low, int(buffer_match.group(1)),
+                                "the target range starts at %d, below the "
+                                "%s-story buffer" % (low, buffer_match.group(1)))
+        self.assertGreater(high, low, "the target range is not a range")
+
+    def test_the_buffer_says_why_and_still_forbids_padding(self):
+        text = self.prompt()
+        start = text.index("BUFFER (soft)")
+        clause = text[start:start + 400].lower()
+
+        self.assertIn("dedup", clause,
+                      "the buffer states a number and no reason; the model has "
+                      "no way to know the loss is downstream")
+        self.assertIn("validation", clause)
+        self.assertIn("not a mandate to pad", clause,
+                      "the buffer dropped the padding ban, so a model may pad "
+                      "its way to the number")
 
 
 if __name__ == "__main__":

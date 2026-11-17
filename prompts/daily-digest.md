@@ -241,12 +241,13 @@ promotional event is never urgent/action-worthy (never level-3).
 - 5-6 — moderate
 - 1-4 — exclude
 
-The digest favors 7-10. Target 5-15 stories TOTAL across all domains. Fewer is
+The digest favors 7-10. Target 12-15 stories TOTAL across all domains. Fewer is
 fine; zero is acceptable. Never pad to hit a number.
-- FLOOR (soft): when enough relevant candidates exist, aim for AT LEAST 4
-  stories. Downstream filtering (spoiler veto, dedup, crime filter) can zero a
-  1-2 story digest, so a small buffer protects the daily digest. This is a
-  floor, not a mandate to pad — quality still beats quantity.
+- BUFFER (soft): when enough relevant candidates exist, aim for AT LEAST 12
+  stories, because validation, the spoiler veto and 7-day history dedup can drop
+  half of them before the edition ships. This is a buffer, not a mandate to pad
+  — a story that fails the LITMUS TEST is dropped, never counted. Quality still
+  beats quantity.
 
 ## SPOILER RULES (ABSOLUTE PRIORITY within entertainment)
 

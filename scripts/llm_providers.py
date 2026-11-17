@@ -72,6 +72,16 @@ USER_AGENT = ("dmnews-digest/1.0 "
 #: from an empty one, so the cap is generous on purpose.
 MAX_TOKENS = 1024
 
+#: The largest `max_tokens` Groq serves for `allam-2-7b`. Dry run 44027504920
+#: proved it: `groq/allam-2-7b` and `groq-key2/allam-2-7b` both died before
+#: producing a character with `max_tokens must be <= 4096`, because one global
+#: number was declared for a ceiling that is a fact about the MODEL. A rung that
+#: always fails on its own token budget is worse than no rung: it burns a walk
+#: attempt. Declared here AND in config/opencode-cli.json -- the CLI builds its
+#: request from that file, this adapter builds its own -- and the two are checked
+#: against each other by tests/digest/test_llm_providers.py.
+GROQ_MAX_OUTPUT = 4096
+
 #: The probe's whole input. Fixed, tiny and answerable in one word, so a failure
 #: is about the provider and never about the prompt.
 PROBE_PROMPT = "reply with the single word OK"
@@ -109,6 +119,10 @@ class Provider:
     models: tuple          # candidate ids, best first; corrected by the probe
     timeout: int           # the socket ceiling for ONE call, in seconds
     free_only: bool = False
+    #: The largest `max_tokens` this endpoint will SERVE for the ids above, or 0
+    #: when no ceiling has been measured. It is a per-model fact and it can only
+    #: ever SHORTEN a request (`output_budget`), never extend one.
+    max_output: int = 0
 
 
 #: The second Google project. Same endpoint and models as `gemini`, different
@@ -155,6 +169,7 @@ PROVIDERS = {
         "GROQ_API_KEY",
         ("allam-2-7b",),
         60,
+        max_output=GROQ_MAX_OUTPUT,
     ),
     # The second Groq account: the same endpoint and model, a different key.
     "groq-key2": Provider(
@@ -164,6 +179,7 @@ PROVIDERS = {
         GROQ_KEY2_ENV,
         ("allam-2-7b",),
         60,
+        max_output=GROQ_MAX_OUTPUT,
     ),
     "openrouter": Provider(
         "openrouter",
@@ -446,6 +462,20 @@ def effective_timeout(name, requested=None):
     return max(1, int(min(cap, float(requested))))
 
 
+def output_budget(name, requested=MAX_TOKENS):
+    """The `max_tokens` one request may actually ask for.
+
+    The serving ceiling belongs to the MODEL, not to one global number, and it
+    can only ever SHORTEN the ask -- the same arithmetic as `effective_timeout`.
+    An unmeasured provider (`max_output` 0) is left exactly as the caller asked:
+    a guessed cap would truncate an answer that was working.
+    """
+    cap = provider(name).max_output
+    if not cap:
+        return int(requested)
+    return max(1, min(int(requested), int(cap)))
+
+
 def redact(text, key=""):
     """Strip a credential (and anything that looks like one) out of *text*.
 
@@ -473,7 +503,7 @@ def request_spec(name, model_id, prompt, key, timeout=None, max_tokens=MAX_TOKEN
         "model": model_for(name, model_id),
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0,
-        "max_tokens": int(max_tokens),
+        "max_tokens": output_budget(name, max_tokens),
         "stream": False,
     }
     return {

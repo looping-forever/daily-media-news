@@ -6,10 +6,11 @@ name: Daily Media News Digest
 # College" reaches the owner's phone looking correct and is not.
 env:
   # THE ONE STORY FLOOR, stated once. prompts/daily-digest.md asks the writer
-  # for at least 4; the walk's acceptance check and the derive gate both read
-  # this value, so a digest can never be "good enough" for one and too thin for
-  # the other. 2026-11-01 run 41369743596 shipped a 2-story edition because the
-  # acceptance check only asked whether the file parsed.
+  # for a 12-story buffer so this floor survives realistic dedup loss; the
+  # walk's acceptance check and the derive gate both read this value, so a
+  # digest can never be "good enough" for one and too thin for the other.
+  # 2026-11-01 run 41369743596 shipped a 2-story edition because the acceptance
+  # check only asked whether the file parsed.
   STORIES_FLOOR: 4
   BANK_NAME: ${{ secrets.BANK_NAME }}
   COLLEGE_NAME: ${{ secrets.COLLEGE_NAME }}

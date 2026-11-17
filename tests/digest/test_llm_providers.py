@@ -160,6 +160,64 @@ class RequestShapeTests(unittest.TestCase):
         self.assertEqual(7, spec["timeout"])
 
 
+class GroqOutputCeilingTests(unittest.TestCase):
+    """Groq refuses `max_tokens` above 4096 for `allam-2-7b`.
+
+    DRY RUN 44027504920: `groq/allam-2-7b` and `groq-key2/allam-2-7b` both died
+    before producing output with `Command failed: max_tokens must be <= 4096`,
+    because config/opencode-cli.json declared `output: 32768` for a ceiling that
+    is a fact about the MODEL. A rung that always fails on its own token budget
+    is worse than no rung -- it burns a walk attempt for nothing -- so the number
+    is 4096 in the CLI config and in this adapter, and a request that asks for
+    more is CLAMPED rather than sent to be refused.
+    """
+
+    DECLARED = 4096
+
+    def test_the_cli_config_declares_groqs_real_serving_limit(self):
+        doc = json.loads((REPO_ROOT / "config" / "opencode-cli.json")
+                         .read_text(encoding="utf-8"))
+
+        for name in ("groq", "groq-key2"):
+            models = doc["provider"][name]["models"]
+            self.assertTrue(models, "%s declares no model at all" % name)
+            for model, block in models.items():
+                self.assertEqual(
+                    self.DECLARED, block["limit"]["output"],
+                    "%s/%s declares a ceiling the endpoint refuses; the CLI "
+                    "turns that number into max_tokens, so the rung dies before "
+                    "it writes a character" % (name, model))
+
+    def test_the_adapter_and_the_cli_config_are_one_number(self):
+        self.assertEqual(self.DECLARED, lp.GROQ_MAX_OUTPUT)
+        for name in ("groq", "groq-key2"):
+            self.assertEqual(
+                self.DECLARED, lp.provider(name).max_output,
+                "%s would ask for more output than the endpoint serves" % name)
+
+    def test_a_walk_request_never_exceeds_the_declared_limit(self):
+        for name in ("groq", "groq-key2"):
+            with self.subTest(provider=name):
+                ask = self.DECLARED * 8
+                self.assertEqual(self.DECLARED, lp.output_budget(name, ask),
+                                 "a request above the serving limit is not "
+                                 "clamped, so the rung is refused before it "
+                                 "starts")
+                spec = lp.request_spec(name, None, "p", "k", timeout=30,
+                                       max_tokens=ask)
+                self.assertEqual(self.DECLARED,
+                                 json.loads(spec["body"])["max_tokens"],
+                                 "the body still carries a max_tokens the "
+                                 "endpoint rejects: %s" % spec["body"])
+
+    def test_a_budget_under_the_ceiling_is_left_alone(self):
+        """The clamp only ever SHORTENS: a smaller ask must survive verbatim."""
+        body = json.loads(lp.request_spec("groq", None, "p", "k",
+                                          max_tokens=1024)["body"])
+
+        self.assertEqual(1024, body["max_tokens"])
+
+
 class MissingKeyTests(unittest.TestCase):
     def test_no_key_means_not_configured_and_no_request(self):
         seen, calls = transport_returning(200, OK_BODY)
