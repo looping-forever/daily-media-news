@@ -1532,6 +1532,34 @@
       "title": "Rasuwa’s scenic Dilpu Kunda seeks its place on tourism map",
       "category": "nepal",
       "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2059747/machhapuchhre-bank-and-taptapsend-sign-remittance-service-operation-agreement",
+      "title_hash": "8e40cfede59d320804b9a92fcd15f8ae38fcdbd9",
+      "title": "Machhapuchhre Bank signs remittance agreement with Taptap Send",
+      "category": "bank_local",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "english.nepalpress.com/2026/11/17/nea-to-export-56-mw-and-import-350-mw-of-electricity-from-india",
+      "title_hash": "ac210c7ee440488bdbd54be3f98c5f4d8c55deda",
+      "title": "NEA to import 350 MW of electricity from India",
+      "category": "nepal",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "nytimes.com/2026/11/17/world/europe/ukraine-kyiv-russia-kerch-bridge-crimea.html",
+      "title_hash": "6fa1a6f18edff7d8ca8b2e8785301d22b024117f",
+      "title": "Ukraine attacks Kerch Bridge connecting Russia to Crimea",
+      "category": "world_major",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/crq5vl1l6z2po",
+      "title_hash": "05d6259cbcfe17fd4b518927b872eacd1f2efa75",
+      "title": "Update: Mozambique opposition leader faces trial",
+      "category": "world_major",
+      "date_sent": "2026-11-17"
     }
   ]
 }
