@@ -12,6 +12,13 @@ env:
   # 2026-11-01 run 41369743596 shipped a 2-story edition because the acceptance
   # check only asked whether the file parsed.
   STORIES_FLOOR: 4
+  # THE PROMPT'S SOFT BUFFER, stated here only so a TOP-UP can ask for the
+  # remainder in numbers. It is the prompt's own "aim for AT LEAST 12" line;
+  # nothing rejects a payload against it, and the floor above stays the only
+  # gate. Dry run 44049081005: the model sent 3, 3 and 4 raw stories (2
+  # shippable) and every edition was discarded, so the top-up says how many
+  # ADDITIONAL stories would still reach this buffer.
+  STORIES_BUFFER: 12
   BANK_NAME: ${{ secrets.BANK_NAME }}
   COLLEGE_NAME: ${{ secrets.COLLEGE_NAME }}
   BANK_URL: ${{ secrets.BANK_URL }}
@@ -1233,15 +1240,25 @@ jobs:
           # provider block in config/opencode-cli.json. Absent means its two
           # rungs contribute nothing, exactly as this step worked before.
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
-          # Groq's OpenAI-compatible endpoint, with a second account for its own allowance.
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          # NO GROQ KEY HERE, AND THAT IS THE POINT. Groq cannot call tools
+          # ("tool calling is not supported with this model"), so both
+          # `groq/allam-2-7b` rungs failed on the walk's very first turn and
+          # spent a ladder position doing it. They are gone from
+          # config/opencode.json and config/opencode-cli.json. Groq still
+          # summarises the derived edition through scripts/llm_providers.py,
+          # which reads GROQ_API_KEY in the derive step below and demonstrably
+          # succeeds there.
         run: |
           set -eo pipefail
           # The floor comes from the workflow-level env, and a run that lost it
           # must fail here rather than accept everything: an unset floor makes
           # `[ "$count" -lt "" ]` false, i.e. every thin digest passes.
           : "${STORIES_FLOOR:?the workflow-level STORIES_FLOOR is missing; the acceptance gate has no floor}"
+          # The prompt's soft buffer, read for the TOP-UP's arithmetic only. A
+          # repository that lost it still walks; the top-up just asks for the
+          # floor's shortfall instead of the buffer's.
+          BUFFER=${STORIES_BUFFER:-12}
+          case "$BUFFER" in ''|*[!0-9]*) BUFFER=12 ;; esac
           # ---- SIMULATED POOL REFUSAL: MANUAL DISPATCH ONLY -------------------
           # Stops BEFORE `resolve_ladder`, which is the first thing in this step
           # that would reach the network (the selector discovers the live pool)
@@ -1429,6 +1446,10 @@ jobs:
           # away, so a single retry is the difference between a real digest and
           # an unsummarised one. Bounded so it can never become a loop.
           quota_retry_used=0
+          # One TOP-UP per attempt, so this counts CONTINUATIONS, not attempts:
+          # it is printed at the end so the log states how many thin payloads
+          # were continued instead of discarded.
+          topups_made=0
           # THE RETRY LADDER, and why these numbers are what they are now.
           #
           # MEASURED BURN, 2026-10-27: 112 model attempts in one day on this
@@ -1456,6 +1477,16 @@ jobs:
           # credentials is that model's entitlement; the SAME refusal from two
           # different models is the shared credential, and only that is fatal.
           AUTH_GLOBAL_MODELS=2
+          # THE PROMPT THE MODEL RECEIVES, ONCE. An ordinary attempt gets the
+          # rendered prompt; a TOP-UP gets the same prompt with its brief
+          # appended, so it is the same task continued rather than a different
+          # request arriving at the same rung.
+          emit_prompt() {
+            python3 scripts/render_prompt.py prompts/daily-digest.md
+            if [ -n "${PROMPT_EXTRA:-}" ] && [ -f "${PROMPT_EXTRA:-}" ]; then
+              cat "$PROMPT_EXTRA"
+            fi
+          }
           # ONE attempt = one model, one candidate set. Extracted because the
           # bounded reduced-candidate retry must run the IDENTICAL pipeline: a
           # near-copy would drift, and a retry that differs from the attempt it
@@ -1463,7 +1494,17 @@ jobs:
           run_digest_attempt() {
             model="$1"
             allow="$2"
-            echo "=== Attempt $tried with $model (allow ${allow}s) ==="
+            # The third argument is the TOP-UP brief: the facts the model needs
+            # to continue (what it returned, what was suppressed and why, the
+            # headlines already accepted, how many more stories to send).
+            PROMPT_EXTRA="${3:-}"
+            # ONE TOP-UP PER ATTEMPT, reset here so "one" is true by
+            # construction: the flag belongs to THIS attempt, and a fresh
+            # attempt (next rung, reduced set, quota retry) earns its own.
+            topup_used=0
+            if [ -z "$PROMPT_EXTRA" ]; then
+              echo "=== Attempt $tried with $model (allow ${allow}s) ==="
+            fi
             run_rc=0
             # The watchdog sits INSIDE `timeout`: timeout still owns the total
             # allowance, and the watchdog owns all three measured deaths -- the
@@ -1477,7 +1518,7 @@ jobs:
             # completion; the CLI's own log lines are the only liveness there
             # is. Without them the watchdog would judge every attempt by its
             # startup window and kill working models.
-            if python3 scripts/render_prompt.py prompts/daily-digest.md | timeout "$allow" python3 scripts/model_watchdog.py \
+            if emit_prompt | timeout "$allow" python3 scripts/model_watchdog.py \
               --model "$model" -- \
               opencode run \
               --auto \
@@ -1502,6 +1543,10 @@ jobs:
           # and active-event state, so it can never accept a payload the derive
           # gate would reject. A rejected file is REMOVED so no later step ships it.
           stories_ok() {
+            # WHY the payload failed, so the caller can tell a THIN payload
+            # (valid, worth continuing) from a broken one (nothing to continue).
+            short_kind=""
+            short_history_only=0
             [ "$run_rc" = "0" ] && [ -f state/stories.json ] || return 1
             WALK_COUNT_LOG=/tmp/walk-count.log
             if ! python3 scripts/validate_stories.py --count-only \
@@ -1523,8 +1568,122 @@ jobs:
             if [ "$_count" -lt "$STORIES_FLOOR" ]; then
               echo "Rejecting state/stories.json: ${_count} shippable of ${_raw} stories after validation and dedup, below the shipped floor of ${STORIES_FLOOR}"
               rm -f state/stories.json
+              short_kind="floor"
+              short_count="$_count"
+              short_raw="$_raw"
+              # WHY they were suppressed, split into the two kinds a TOP-UP
+              # must tell apart. `history_only` is the case a continuation
+              # cannot fix: every dropped story is already in the reader's
+              # history, so asking the same model to continue this payload
+              # would be answered with the same headlines and suppressed again.
+              _sup=$(grep -E '^  suppressed:' "$WALK_COUNT_LOG" || true)
+              short_already=$(printf '%s' "$_sup" | sed -n 's/.*already-sent=\([0-9][0-9]*\).*/\1/p')
+              _event=$(printf '%s' "$_sup" | sed -n 's/.*event-dupe=\([0-9][0-9]*\).*/\1/p')
+              _dupe=$(printf '%s' "$_sup" | sed -n 's/.*duplicate-in-payload=\([0-9][0-9]*\).*/\1/p')
+              _valid=$(printf '%s' "$_sup" | sed -n 's/.*validation=\([0-9][0-9]*\).*/\1/p')
+              short_already=${short_already:-0}
+              short_other=$(( ${_event:-0} + ${_dupe:-0} + ${_valid:-0} ))
+              if [ "$short_already" -gt 0 ] && [ "$short_other" = "0" ]; then
+                short_history_only=1
+              else
+                short_history_only=0
+              fi
               return 1
             fi
+          }
+          # THE TOP-UP: ONE CONTINUATION OF THE SAME RUNG WHEN THE PAYLOAD WAS
+          # THIN RATHER THAN BROKEN. Dry run 44049081005 asked for >=12 stories;
+          # the model returned 3, 3 and 4 raw (2 shippable each), every attempt
+          # was rejected by the floor of 4, the edition was discarded and a
+          # derived 15-card edition shipped. The model was not broken -- it
+          # ignored the buffer -- so the same rung is asked ONCE more and told
+          # what it sent, what was suppressed and why, which headlines it already
+          # has, and how many ADDITIONAL distinct stories are still needed.
+          #
+          # Bounded three ways, so it can never become the loop this walk spent a
+          # month removing: one per attempt (`topup_used`), inside the same walk
+          # deadline (so it can never borrow the delivery stages' minutes), and
+          # never identical to the call it continues (the brief is the change).
+          top_up_if_worth_it() {
+            [ "$short_kind" = "floor" ] || return 1
+            [ "${topup_used:-0}" = "0" ] || return 1
+            # A payload with ZERO shippable stories has no edition to continue:
+            # the brief would name no accepted headline and ask the model to
+            # start again, which is exactly what the next rung is for.
+            [ "${short_count:-0}" -gt 0 ] || return 1
+            # Nothing a continuation can do: every drop was a story already in
+            # the reader's history. Repeating those headlines is suppressed again.
+            [ "${short_history_only:-0}" = "0" ] || return 1
+            remaining=$(( deadline - $(date +%s) ))
+            topup_allow=$(( remaining < PER ? remaining : PER ))
+            if [ "$topup_allow" -lt "$MIN" ]; then
+              echo "No top-up for $1: ${remaining}s of the walk left, below the ${MIN}s one attempt needs. The rung is discarded exactly as before."
+              return 1
+            fi
+            top_up "$1" "$topup_allow"
+          }
+          top_up() {
+            model="$1"
+            allow="$2"
+            needed=$(( BUFFER - short_count ))
+            [ "$needed" -ge 1 ] || needed=1
+            floor_short=$(( STORIES_FLOOR - short_count ))
+            TOPUP_BRIEF=/tmp/topup-brief.md
+            {
+              echo ""
+              echo "## TOP-UP: continue the edition you already wrote"
+              echo ""
+              echo "Your previous answer to this SAME task was valid but TOO SHORT."
+              echo "Do not start over and do not re-research what you have already done."
+              echo ""
+              echo "- Raw stories you returned: ${short_raw}"
+              echo "- Stories that would actually ship after validation and dedup: ${short_count}"
+              echo "- Stories suppressed before shipping: $(( short_raw - short_count )) (already sent within the TTL: ${short_already:-0}; same event as another story: $(( short_raw - short_count - ${short_already:-0} ))}; the rest failed validation)"
+              echo ""
+              echo "Headlines you already have. Do NOT repeat them and do NOT re-send them:"
+              grep '^  accepted: ' "$WALK_COUNT_LOG" 2>/dev/null | sed 's/^  accepted: /- /' || true
+              echo ""
+              echo "Send ${needed} ADDITIONAL distinct stories -- different events from the headlines"
+              echo "above -- so this edition reaches the ${BUFFER}-story buffer. That also clears"
+              echo "the shipped floor of ${STORIES_FLOOR} (it needs ${floor_short} more than you have now)."
+              echo "Write the WHOLE edition to state/stories.json: the stories above plus the new"
+              echo "ones, every field the OUTPUT CONTRACT requires."
+            } > "$TOPUP_BRIEF"
+            echo "=== Top-up for attempt $tried with $model (allow ${allow}s): ${short_count} shippable of ${short_raw} raw, asking for ${needed} more distinct stories ==="
+            topups_made=$((topups_made+1))
+            run_digest_attempt "$model" "$allow" "$TOPUP_BRIEF"
+            topup_used=1
+            if stories_ok; then return 0; fi
+            # A QUOTA REFUSAL THAT STATES ITS OWN DELAY IS NOT A DEAD END. Google
+            # AI Studio answers `Please retry in 54.1s`; that is a per-minute
+            # window, not a spent allowance. Wait exactly as long as it asked --
+            # but only while the walk can still afford the attempt after it, so a
+            # stated delay can never run past the walk's own deadline.
+            topup_kind=$(python3 scripts/model_selector.py --classify \
+              --log state/agent-log.txt --rc "$run_rc" 2>/dev/null || echo other)
+            if [ "$topup_kind" = "quota_or_rate_limited" ]; then
+              delay=$(python3 scripts/model_selector.py --retry-after-sec \
+                --log state/agent-log.txt 2>/dev/null || true)
+              case "$delay" in
+                ''|*[!0-9]*) delay="" ;;
+                0) delay="" ;;
+              esac
+              remaining=$(( deadline - $(date +%s) ))
+              if [ -n "$delay" ] && [ "$delay" -lt $(( remaining - MIN )) ]; then
+                echo "Top-up refused on quota; the provider states a ${delay}s retry delay and the walk has ${remaining}s left, so waiting ${delay}s and asking $model once more."
+                sleep "$delay"
+                remaining=$(( deadline - $(date +%s) ))
+                topup_allow=$(( remaining < PER ? remaining : PER ))
+                if [ "$topup_allow" -ge "$MIN" ]; then
+                  run_digest_attempt "$model" "$topup_allow" "$TOPUP_BRIEF"
+                  topup_used=1
+                  if stories_ok; then return 0; fi
+                fi
+              elif [ -n "$delay" ]; then
+                echo "Top-up refused on quota with a stated ${delay}s retry delay, but only ${remaining}s of the ${BUDGET}s walk remain and one attempt needs ${MIN}s. Not waiting: giving up on this rung as before."
+              fi
+            fi
+            return 1
           }
           digest_success() {
             printf '%s attempt=%d model=%s kind=ok rc=%s allow=%s\n' \
@@ -1596,6 +1755,12 @@ jobs:
                 digest_success "$model" "$allow"
                 break
               fi
+              # THIN, NOT BROKEN: continue the SAME rung once. See top_up() for
+              # why, and for the three bounds that keep it from being a loop.
+              if top_up_if_worth_it "$model"; then
+                digest_success "$model" "$topup_allow"
+                break
+              fi
               # NO STORIES FILE, rc 0, AND THE ONE RETRY IS UNSPENT. Measured: a
               # 600s attempt on the full candidate set wrote nothing while a
               # smaller input finished in 23.7s, so the useful second attempt is
@@ -1603,7 +1768,13 @@ jobs:
               # oversized input repeats the failure and spends the pool. Bounded
               # to one per run (`reduced_retry_used`), so it adds a single attempt
               # and can never double the walk.
+              # A TOP-UP SPENDS THIS RUNG'S SECOND CHANCE. When the payload was
+              # valid but thin, the continuation above is the better second
+              # attempt on this model: it keeps the work already done. Adding a
+              # shrunk-input attempt on top of it would be a THIRD call to one
+              # rung, which is the burn this walk exists to avoid.
               if [ "$run_rc" = "0" ] && [ "$reduced_retry_used" = "0" ] \
+                && [ "${topup_used:-0}" = "0" ] \
                 && [ -f state/candidates.json ] \
                 && [ -f state/candidates_model.json ] \
                 && python3 scripts/reduce_candidates.py --in state/candidates.json \
@@ -1625,6 +1796,12 @@ jobs:
                 mv -f state/candidates.model_trimmed.json state/candidates_model.json
                 if stories_ok; then
                   digest_success "$model" "$allow"
+                  break
+                fi
+                # The reduced set is a fresh attempt, so it earns its own single
+                # continuation -- still inside the same walk deadline.
+                if top_up_if_worth_it "$model"; then
+                  digest_success "$model" "$topup_allow"
                   break
                 fi
               fi
@@ -1662,6 +1839,10 @@ jobs:
                   run_digest_attempt "$model" "$allow"
                   if stories_ok; then
                     digest_success "$model" "$allow"
+                    break
+                  fi
+                  if top_up_if_worth_it "$model"; then
+                    digest_success "$model" "$topup_allow"
                     break
                   fi
                   kind=$(python3 scripts/model_selector.py --classify \
@@ -1879,6 +2060,7 @@ jobs:
             sleep "$nap"
           done
           END=$(date +%s)
+          echo "Top-ups: ${topups_made} thin payload(s) continued in-place instead of being discarded (one per attempt, inside the ${BUDGET}s walk bound)."
           STAGE_KEY=agent STAGE_DUR=$((END-START)) python3 -c "import json,os;p='state/timings.json';os.makedirs(os.path.dirname(p) or '.',exist_ok=True);d=json.load(open(p)) if os.path.isfile(p) else {};d[os.environ['STAGE_KEY']]=int(os.environ['STAGE_DUR']);json.dump(d,open(p,'w'),indent=2)"
           if [ "$ok" = "1" ] && [ "$cycle" -gt 1 ]; then
             echo "Contention cleared: the digest was produced on walk cycle ${cycle} after $((cycle-1)) backoff(s)."

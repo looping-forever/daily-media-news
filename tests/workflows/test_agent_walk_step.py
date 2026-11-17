@@ -115,6 +115,12 @@ def stamp_step_run_block():
 #:   zero     write a valid-but-EMPTY stories list and exit 0 -- the 2026-11-01
 #:            shape that the old parse-only check accepted
 #:   three    write three stories, one below the floor
+#:   three_then_full   three stories, then a full buffer on the SECOND call --
+#:            the top-up's own case, on the SAME model
+#:   three_then_quota_then_full  three, then a refusal that states `retry in
+#:            54.1s`, then a full buffer -- the stated-delay wait, on one rung
+#:   four_mixed  4 raw, 2 shippable: one already sent (history), one duplicate
+#:            inside the payload -- thin, and NOT fixable by history alone
 #:   quota_once  first call 429, second call ok -- the retry's own case
 #:   garbage  write INVALID JSON and exit 0 -- an exit code is not evidence
 #:   nofile   write nothing and exit 0
@@ -140,7 +146,6 @@ if [ "${1:-}" = "models" ]; then
   printf '%s\n' ${STUB_OPENCODE_MODELS:-}
   exit 0
 fi
-cat >/dev/null                      # drain the prompt on stdin
 model=""
 prev=""
 for arg in "$@"; do
@@ -148,6 +153,18 @@ for arg in "$@"; do
   prev="$arg"
 done
 printf '%s\n' "$model" >> "${STUB_OPENCODE_LOG:?}"
+# THE PROMPT ITSELF, when a test asks for it. The top-up must arrive as the SAME
+# prompt plus a brief, and a test that only counted calls could not tell that
+# from a bare second attempt. Appended with a delimiter per call so "which
+# attempt saw the brief" is answerable.
+if [ -n "${STUB_PROMPT_LOG:-}" ]; then
+  {
+    printf '\n<<<PROMPT %s>>>\n' "$model"
+    cat
+  } >> "$STUB_PROMPT_LOG"
+else
+  cat >/dev/null                    # drain the prompt on stdin
+fi
 outcome=""
 for entry in ${STUB_OPENCODE_PLAN:-}; do
   if [ "${entry%%:*}" = "$model" ]; then outcome="${entry#*:}"; fi
@@ -162,14 +179,56 @@ s2='{"title":"Beta transit line opens","summary":"The new transit line began ser
 s3='{"title":"Gamma school plan approved","summary":"The school board approved the plan.","category":"education_tu","priority":4,"source_url":"https://example.com/gamma","reliability":"tier2","spoiler_level":"none"}'
 s4='{"title":"Delta library reopens","summary":"The library reopened after repairs.","category":"local_city","priority":3,"source_url":"https://example.com/delta","reliability":"tier3","spoiler_level":"none"}'
 s5='{"title":"Epsilon water project starts","summary":"Work began on the water project.","category":"nepal","priority":2,"source_url":"https://example.com/epsilon","reliability":"tier3","spoiler_level":"none"}'
+# Gamma's headline again from a DIFFERENT url: one event filed twice inside the
+# same payload. The validator keeps the first and drops this one as a duplicate
+# in the run, which is the case a top-up CAN fix.
+s3_again='{"title":"Gamma school plan approved","summary":"The school board approved the plan.","category":"education_tu","priority":4,"source_url":"https://example.com/gamma-2","reliability":"tier2","spoiler_level":"none"}'
 four="$s1,$s2,$s3,$s4"
 four_fresh="$s2,$s3,$s4,$s5"
+four_mixed="$s1,$s2,$s3,$s3_again"
 three="$s1,$s2,$s3"
 case "$outcome" in
   ok)      printf '{"stories": [%s]}\n' "$four" > state/stories.json ; exit 0 ;;
   ok_fresh) printf '{"stories": [%s]}\n' "$four_fresh" > state/stories.json ; exit 0 ;;
   zero)    printf '{"stories": []}\n' > state/stories.json ; exit 0 ;;
   three)   printf '{"stories": [%s]}\n' "$three" > state/stories.json ; exit 0 ;;
+  four_mixed) printf '{"stories": [%s]}\n' "$four_mixed" > state/stories.json ; exit 0 ;;
+  three_then_full)
+    # THE TOP-UP'S OWN CASE, measured: the first answer is valid but thin (3
+    # stories, below the floor of 4), the SECOND call on the SAME model answers
+    # with a full buffer. A walk without a continuation discards the first
+    # answer and moves to the next rung, which is dry run 44049081005.
+    counter="${STUB_OPENCODE_LOG:?}.three_then_full"
+    n=0
+    if [ -f "$counter" ]; then n=$(cat "$counter"); fi
+    n=$((n+1))
+    printf '%s' "$n" > "$counter"
+    if [ "$n" -ge 2 ]; then
+      printf '{"stories": [%s]}\n' "$four_fresh" > state/stories.json
+    else
+      printf '{"stories": [%s]}\n' "$three" > state/stories.json
+    fi
+    exit 0 ;;
+  three_then_quota_then_full)
+    # THE MEASURED GOOGLE SHAPE, in the top-up: thin answer, then a refusal that
+    # STATES its own delay (`Please retry in 54.1s`), then the full answer. The
+    # walk must wait the stated number and ask again; it must not treat a
+    # per-minute window as a spent allowance.
+    counter="${STUB_OPENCODE_LOG:?}.three_then_quota"
+    n=0
+    if [ -f "$counter" ]; then n=$(cat "$counter"); fi
+    n=$((n+1))
+    printf '%s' "$n" > "$counter"
+    if [ "$n" -ge 3 ]; then
+      printf '{"stories": [%s]}\n' "$four_fresh" > state/stories.json
+      exit 0
+    fi
+    if [ "$n" -ge 2 ]; then
+      printf 'AI_APICallError: generate_content_free_tier_input_token_count, limit: 250000 ... Please retry in 54.1s.\n' >&2
+      exit 1
+    fi
+    printf '{"stories": [%s]}\n' "$three" > state/stories.json
+    exit 0 ;;
   four_one_sent)
     # 4 raw, 3 shippable: the caller seeds history with s1, so the real ship
     # gate drops exactly one story and the walk must not stop here.
@@ -269,11 +328,14 @@ done
 if [ "$is_selector" -ne 1 ]; then
   exec "$real" "$@"
 fi
-# CLASSIFICATION IS NOT DISCOVERY. `--classify` is pure text analysis, so it is
-# forwarded to the real selector: stubbing it would replace the shipped
-# circuit breaker with a shim that always says "other".
+# CLASSIFICATION AND THE RETRY HINT ARE NOT DISCOVERY. `--classify` and
+# `--retry-after-sec` are pure text analysis, so they are forwarded to the real
+# selector: stubbing them would replace the shipped circuit breaker and the
+# provider's own wait with shims that always say "other" and "no delay".
 for arg in "$@"; do
-  if [ "$arg" = "--classify" ]; then exec "$real" "$@"; fi
+  if [ "$arg" = "--classify" ] || [ "$arg" = "--retry-after-sec" ]; then
+    exec "$real" "$@"
+  fi
 done
 info_out=""
 prev=""
@@ -370,7 +432,9 @@ if [ "$is_selector" -ne 1 ]; then
   exec "$real" "$@"
 fi
 for arg in "$@"; do
-  if [ "$arg" = "--classify" ]; then exec "$real" "$@"; fi
+  if [ "$arg" = "--classify" ] || [ "$arg" = "--retry-after-sec" ]; then
+    exec "$real" "$@"
+  fi
 done
 budget="${STUB_BUDGET:?}"
 for arg in "$@"; do
@@ -543,12 +607,14 @@ class AgentWalkHarness(unittest.TestCase):
         declare it).
         """
         log = self.tmp / "opencode_calls.txt"
+        prompt_log = self.tmp / "opencode_prompts.txt"
         timeout_log = self.tmp / "timeout_args.txt"
         record_log = self.tmp / "record_calls.txt"
         clock = self.tmp / "clock.txt"
         sleep_log = self.tmp / "sleep_args.txt"
         select_log = self.tmp / "select_calls.txt"
-        for path in (log, timeout_log, record_log, clock, sleep_log, select_log):
+        for path in (log, prompt_log, timeout_log, record_log, clock, sleep_log,
+                     select_log):
             path.write_text("", encoding="utf-8")
         env = self.step_env()
         env.update({
@@ -568,6 +634,7 @@ class AgentWalkHarness(unittest.TestCase):
                                     "gemini-key2/gemini-3.5-flash-lite "
                                     "gemini-key2/gemini-3.1-flash-lite",
             "STUB_OPENCODE_LOG": str(log),
+            "STUB_PROMPT_LOG": str(prompt_log),
             "STUB_TIMEOUT_LOG": str(timeout_log),
             "STUB_SLEEP_LOG": str(sleep_log),
             "STUB_SELECT_LOG": str(select_log),
@@ -583,6 +650,7 @@ class AgentWalkHarness(unittest.TestCase):
                                  cwd=self.tmp, bash=self.bash, timeout=120)
         return proc, {
             "models": log.read_text(encoding="utf-8").split(),
+            "prompts": self.prompts(prompt_log.read_text(encoding="utf-8")),
             "allowances": timeout_log.read_text(encoding="utf-8").split(),
             "naps": sleep_log.read_text(encoding="utf-8").split(),
             "selects": select_log.read_text(encoding="utf-8").split(),
@@ -593,6 +661,13 @@ class AgentWalkHarness(unittest.TestCase):
         }
 
     # -- readers -----------------------------------------------------------
+
+    @staticmethod
+    def prompts(text):
+        """[(model, prompt text)] in the order the stub received them."""
+        parts = re.split(r"\n<<<PROMPT (\S+)>>>\n", text)
+        return [(parts[i], parts[i + 1])
+                for i in range(1, len(parts) - 1, 2)]
 
     @staticmethod
     def attempts(stdout):
@@ -962,18 +1037,34 @@ class AcceptanceFloorTests(AgentWalkHarness):
             pool=["opencode/a", "opencode/b"],
             plan="opencode/a:three opencode/b:ok")
         self.assertGreen(proc, "three-then-real")
-        self.assertEqual(["opencode/a", "opencode/b"], art["models"],
-                         "a 3-story payload was accepted; the floor is 4. "
-                         "Invoked: %r" % (art["models"],))
+        # THE SAME RUNG IS ASKED ONCE MORE FIRST. Dry run 44049081005 returned
+        # 3, 3 and 4 raw stories (2 shippable each) and every attempt breached
+        # the floor, so the walk discarded all three and shipped a derived
+        # edition. The model was not broken -- it ignored the 12-story buffer --
+        # so `opencode/a` appears TWICE: attempt 1, then its one top-up. Only
+        # then does the ladder move to `opencode/b`.
+        self.assertEqual(["opencode/a", "opencode/a", "opencode/b"], art["models"],
+                         "a 3-story payload either passed the floor or was not "
+                         "continued once before the ladder moved. Invoked: %r\n"
+                         "stdout:\n%s" % (art["models"], proc.stdout))
         self.assertIn(
             "Rejecting state/stories.json: 3 shippable of 3 stories", proc.stdout)
+        self.assertIn("=== Top-up for attempt 1 with opencode/a", proc.stdout,
+                      "the thin payload was continued without saying so:\n%s"
+                      % proc.stdout)
+        self.assertIn(
+            "Top-ups: 1 thin payload(s) continued in-place", proc.stdout,
+            "the count of continuations is not reported:\n%s" % proc.stdout)
         writer = json.loads((art["stories"].parent / "digest_writer.json")
                             .read_text(encoding="utf-8"))
-        self.assertEqual("ladder", writer["rung"],
+        self.assertEqual({"rung": "ladder", "attempt": 2, "model": "opencode/b"},
+                         writer,
                          "the second model's payload was recorded as the primary "
                          "rung, so the seal would call a fallback edition fresh; "
                          "and it must not say 'fallback', which is the product's "
                          "name for an edition no model wrote")
+        self.assertEqual(4, len(json.loads(
+            art["stories"].read_text(encoding="utf-8"))["stories"]))
 
     def test_four_stories_is_accepted_at_the_floor(self):
         proc, art = self.run_step(
@@ -1004,6 +1095,201 @@ class AcceptanceFloorTests(AgentWalkHarness):
             art["stories"].exists(),
             "the rejected payload survived the walk. A later step would seal it "
             "as a normal edition, which is the 2-story digest all over again.")
+
+
+class TopUpTests(AgentWalkHarness):
+    """A THIN payload is continued on the same rung instead of discarded.
+
+    THE MEASUREMENT THIS PINS. Dry run 44049081005 asked for at least 12 stories
+    and the model returned 3, 3 and 4 raw -- 2 shippable each -- so every
+    attempt breached the floor of 4, all three were thrown away, and the derive
+    stage built the edition instead. The model was not broken; it answered a
+    long request with a short edition. The fix is to say so to the SAME model
+    once: what it sent, what was suppressed and why, the headlines it already
+    holds, and how many more distinct stories are still needed.
+
+    Bounded by construction, and each bound is a test here: one continuation per
+    attempt, never outside the walk deadline, and never a continuation that
+    could not possibly help (zero shippable stories, or every drop a story the
+    reader has already been sent).
+    """
+
+    def test_a_thin_payload_is_continued_once_on_the_same_rung(self):
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:three_then_full",
+            per=360, min_attempt=90)
+        self.assertGreen(proc, "thin-then-continued")
+        self.assertEqual(
+            ["opencode/a", "opencode/a"], art["models"],
+            "the thin payload was not continued on the same rung, so the walk "
+            "discarded a valid edition and moved down the ladder -- exactly the "
+            "outcome dry run 44049081005 shipped. Invoked: %r\nstdout:\n%s"
+            % (art["models"], proc.stdout))
+        self.assertIn("on attempt 1 (opencode/a)", proc.stdout,
+                      "the continued attempt is not reported as attempt 1:\n%s"
+                      % proc.stdout)
+        writer = json.loads((art["stories"].parent / "digest_writer.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual({"rung": "primary", "attempt": 1, "model": "opencode/a"},
+                         writer,
+                         "a continuation is the SAME rung and the SAME attempt, "
+                         "so the seal must still read it as a healthy primary "
+                         "edition")
+        self.assertEqual(4, len(json.loads(
+            art["stories"].read_text(encoding="utf-8"))["stories"]))
+
+    def test_the_brief_tells_the_model_what_it_has_and_what_is_needed(self):
+        _proc, art = self.run_step(
+            pool=["opencode/a"], plan="opencode/a:three_then_full")
+        first, second = art["prompts"][0][1], art["prompts"][1][1]
+        self.assertNotIn("TOP-UP", first,
+                         "the FIRST attempt already carried a brief, so it was "
+                         "not a clean attempt")
+        self.assertIn("## TOP-UP: continue the edition you already wrote", second)
+        for headline in ("Alpha city budget passes", "Beta transit line opens",
+                         "Gamma school plan approved"):
+            self.assertIn("- %s" % headline, second,
+                          "the brief does not name a headline the model already "
+                          "wrote, so it may spend the continuation repeating it")
+        self.assertIn("Stories that would actually ship after validation and "
+                      "dedup: 3", second)
+        # BUFFER (12) minus what it already has (3): the buffer, not the floor,
+        # is what the prompt asks for and what the continuation must ask for.
+        self.assertIn("Send 9 ADDITIONAL distinct stories", second)
+        self.assertIn("the shipped floor of 4 (it needs 1 more than you have "
+                      "now)", second)
+
+    def test_a_shortfall_from_mixed_causes_is_continued(self):
+        """A dedup drop inside the payload is a cause worth continuing for.
+
+        Not the history-only case: 4 raw stories, one already sent (history) and
+        one filed twice in the same answer, so 2 shippable -- below the floor of
+        4. Only the FIRST of those causes is unfixable by asking again.
+        """
+        history = self.tmp / "state" / "history.json"
+        history.write_text(json.dumps({
+            "stories": [{"title": "Alpha city budget passes",
+                         "url": "https://example.com/alpha"}]}), encoding="utf-8")
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:four_mixed opencode/b:ok_fresh")
+        self.assertEqual(
+            ["opencode/a", "opencode/a", "opencode/b"], art["models"],
+            "a mixed-cause shortfall was not continued (or was continued twice). "
+            "Invoked: %r\nstdout:\n%s" % (art["models"], proc.stdout))
+        brief = art["prompts"][1][1]
+        self.assertIn("Stories that would actually ship after validation and "
+                      "dedup: 2", brief)
+        self.assertIn("already sent within the TTL: 1", brief,
+                      "the brief does not separate the history drop from the "
+                      "duplicate in the payload")
+        self.assertIn("same event as another story: 1", brief)
+        self.assertIn("Send 10 ADDITIONAL distinct stories", brief)
+
+    def test_a_stated_retry_delay_is_waited_out_and_the_rung_asked_again(self):
+        """`Please retry in 54.1s` is a per-minute window, not a spent day.
+
+        Google AI Studio refuses THIS request with that sentence. Waiting the
+        number it states costs 55s; abandoning the rung costs a whole ladder
+        position, which is what the two keyed Gemini rungs did on 2026-11-05.
+        """
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:three_then_quota_then_full",
+            per=360, min_attempt=90)
+        self.assertGreen(proc, "thin-quota-wait")
+        self.assertEqual(["opencode/a", "opencode/a", "opencode/a"], art["models"],
+                         "the stated delay was not waited out, so the rung was "
+                         "abandoned on a refusal that clears in under a minute. "
+                         "Invoked: %r\nstdout:\n%s" % (art["models"], proc.stdout))
+        self.assertEqual(["55"], art["naps"],
+                         "the wait is not the provider's own number (54.1s "
+                         "rounded UP to 55, because waking a tenth early hears "
+                         "the same refusal). Recorded: %r\nstdout:\n%s"
+                         % (art["naps"], proc.stdout))
+        self.assertIn("the walk has", proc.stdout)
+        self.assertIn("on attempt 1 (opencode/a)", proc.stdout)
+
+    def test_a_delay_that_does_not_fit_the_walk_is_not_waited(self):
+        """A stated delay must never be slept into the delivery stages' time.
+
+        Same refusal, a walk that cannot pay for one attempt after the wait: the
+        honest move is to give up on the rung exactly as before, and say so.
+        The refire happens through the ALREADY-BOUNDED one-per-run quota retry,
+        which is why the model still appears a third time -- it is not a second
+        wait, and nothing was slept.
+        """
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:three_then_quota_then_full",
+            budget=120, per=90, min_attempt=90)
+        self.assertEqual([], art["naps"],
+                         "the walk slept %r seconds with no room for the attempt "
+                         "the sleep was for:\n%s" % (art["naps"], proc.stdout))
+        self.assertIn("Not waiting", proc.stdout,
+                      "the skipped wait is silent, so a lost rung looks like a "
+                      "provider that never answered:\n%s" % proc.stdout)
+        self.assertIn("re-tries opencode/a after one quota refusal", proc.stdout,
+                      "the third call is not the bounded quota retry, so the walk "
+                      "found another way to spend an attempt:\n%s" % proc.stdout)
+
+    def test_the_history_only_shortfall_is_not_continued(self):
+        """THE CASE A CONTINUATION CANNOT FIX, and must not spend a call on.
+
+        Every drop is a story the reader has already received. Asking the same
+        model again returns the same headlines, which are suppressed again, so
+        the attempt is finished -- the next rung is the only useful move.
+        """
+        history = self.tmp / "state" / "history.json"
+        history.write_text(json.dumps({
+            "stories": [{"title": "Alpha city budget passes",
+                         "url": "https://example.com/alpha"}]}), encoding="utf-8")
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:four_one_sent opencode/b:ok_fresh")
+        self.assertGreen(proc, "history-only-then-real")
+        self.assertEqual(["opencode/a", "opencode/b"], art["models"],
+                         "the walk continued an attempt whose only shortfall was "
+                         "stories it had already sent. Invoked: %r\nstdout:\n%s"
+                         % (art["models"], proc.stdout))
+        self.assertNotIn("Top-up for attempt 1", proc.stdout)
+        self.assertIn("Top-ups: 0 thin payload(s) continued", proc.stdout)
+
+    def test_an_empty_payload_is_not_continued(self):
+        """Zero shippable stories is a broken answer, not a thin one."""
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:zero opencode/b:ok")
+        self.assertGreen(proc, "empty-then-real")
+        self.assertEqual(["opencode/a", "opencode/b"], art["models"],
+                         "an empty payload was continued. There is no edition to "
+                         "continue and no headline to name, so the brief would ask "
+                         "the model to start over on the same rung. Invoked: %r"
+                         % (art["models"],))
+        self.assertNotIn("Top-up for attempt 1", proc.stdout)
+
+    def test_the_awarded_allowance_is_the_remainder_never_the_per_attempt_cap(self):
+        """The continuation is inside the SAME deadline, so it cannot overspend.
+
+        With a 500s walk and a 600s per-attempt cap the cap never binds: the
+        first attempt gets the remainder, and the continuation gets a remainder
+        that is SMALLER by the time the first attempt spent. Granting it the cap
+        again would let one rung spend more than the walk has.
+        """
+        _proc, art = self.run_step(
+            pool=["opencode/a"], plan="opencode/a:three_then_full",
+            budget=500, per=600, min_attempt=90, clock_step=5)
+        self.assertEqual(2, len(art["allowances"]),
+                         "the continuation was not granted an allowance at all: "
+                         "%r" % (art["allowances"],))
+        first, second = int(art["allowances"][0]), int(art["allowances"][1])
+        self.assertLessEqual(first, 500)
+        self.assertLess(second, first,
+                        "the continuation was granted %ss after a first attempt "
+                        "of %ss: it is being given a fresh cap instead of the "
+                        "walk's remaining time" % (second, first))
+        self.assertGreaterEqual(second, 90)
 
 
 class WalkAcceptsOnlyWhatTheShipGateWouldShip(AgentWalkHarness):

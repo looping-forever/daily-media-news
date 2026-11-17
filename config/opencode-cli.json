@@ -46,40 +46,6 @@
           }
         }
       }
-    },
-    "groq": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Groq (free tier)",
-      "options": {
-        "baseURL": "https://api.groq.com/openai/v1",
-        "apiKey": "{env:GROQ_API_KEY}"
-      },
-      "models": {
-        "allam-2-7b": {
-          "name": "Allam 2 7B",
-          "limit": {
-            "context": 131072,
-            "output": 4096
-          }
-        }
-      }
-    },
-    "groq-key2": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Groq (free tier, second account)",
-      "options": {
-        "baseURL": "https://api.groq.com/openai/v1",
-        "apiKey": "{env:GROQ_API_KEY_2}"
-      },
-      "models": {
-        "allam-2-7b": {
-          "name": "Allam 2 7B",
-          "limit": {
-            "context": 131072,
-            "output": 4096
-          }
-        }
-      }
     }
   }
 }

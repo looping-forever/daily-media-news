@@ -2389,6 +2389,33 @@ def main(argv=None):
               "after-history-dedup=%d after-event-dedup=%d final=%d"
               % (len(raw_stories), stage2_counts["kept"], len(after_dedup),
                  len(survivors), len(final_stories)))
+        # WHY A SHORT PAYLOAD IS SHORT, in the model's own terms. The walk
+        # re-prompts the same rung with these facts instead of discarding an
+        # edition that was only thin (dry run 44049081005 returned 3, 3 and 4 raw
+        # stories -- 2 shippable each -- and every attempt was thrown away).
+        # `foreign_promo_demoted` is a demotion, not a suppression: that story
+        # stays in the pipeline, so counting it here would overstate the drop.
+        reasons = {"already-sent": 0, "event-dupe": 0,
+                   "duplicate-in-payload": 0, "validation": 0}
+        for entry in filter_log:
+            reason = entry["reason"]
+            if reason.startswith("foreign_promo_demoted"):
+                continue
+            if reason.startswith("duplicate_of_history"):
+                reasons["already-sent"] += 1
+            elif reason.startswith("duplicate_of_active_event"):
+                reasons["event-dupe"] += 1
+            elif reason.startswith("duplicate_in_run"):
+                reasons["duplicate-in-payload"] += 1
+            else:
+                reasons["validation"] += 1
+        print("  suppressed: %d of %d (already-sent=%d event-dupe=%d "
+              "duplicate-in-payload=%d validation=%d)"
+              % (sum(reasons.values()), len(raw_stories),
+                 reasons["already-sent"], reasons["event-dupe"],
+                 reasons["duplicate-in-payload"], reasons["validation"]))
+        for story in final_stories:
+            print("  accepted: %s" % story["title"])
         print("COUNT=%d" % len(final_stories))
         return 0
 

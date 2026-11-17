@@ -205,7 +205,17 @@ class CatalogueAbsence(unittest.TestCase):
 
 
 class GroqCliRungs(unittest.TestCase):
-    """Groq is a CLI fallback between Gemini and the shared free pool."""
+    """Groq is NOT a CLI walk rung any more; it is still a summariser rung.
+
+    The ordering and catalogue rules below are exercised with `groq/*` SEED ids
+    because they are generic provider rules -- an external provider's rung is
+    ranked behind Gemini and ahead of the shared pool, an absent catalogue entry
+    is reordered rather than removed. What changed on 2026-11-17 is only that
+    the shipped ladder no longer SEEDS one: `groq/allam-2-7b` answers `tool
+    calling is not supported with this model`, so it could never complete a
+    walk turn (dry run 44049081005) while answering the summariser's plain HTTP
+    call perfectly well.
+    """
 
     def setUp(self):
         root = Path(__file__).resolve().parents[2]
@@ -227,7 +237,14 @@ class GroqCliRungs(unittest.TestCase):
                              _health(), cache_path=None, max_models=None,
                              now=10.0, discover_fn=discover)
 
-    def test_every_groq_rung_sits_between_gemini_and_the_free_pool(self):
+    def test_the_shipped_ladder_seeds_no_groq_rung_and_keeps_gemini_first(self):
+        """TEN RUNGS, NONE OF THEM GROQ, AND STILL ORDERED BY POOL.
+
+        This replaced an assertion that BOTH Groq rungs sat between Gemini and
+        the opencode pool. The rungs are gone, so the interesting claim is now
+        the boundary itself: nothing in the shipped seed is a Groq id, and the
+        two free pools still follow the two Gemini keys.
+        """
         ladder = self.config["ladder"]
         gemini = [i for i, m in enumerate(ladder)
                   if m.startswith(("gemini/", "gemini-key2/"))]
@@ -235,9 +252,12 @@ class GroqCliRungs(unittest.TestCase):
                 if m.startswith(("groq/", "groq-key2/"))]
         pool = [i for i, m in enumerate(ladder) if m.startswith("opencode/")]
 
-        self.assertTrue(gemini and groq and pool)
-        self.assertLess(max(gemini), min(groq))
-        self.assertLess(max(groq), min(pool))
+        self.assertEqual([], groq,
+                         "a Groq rung is back in config/opencode.json; its model "
+                         "cannot call tools, so it fails every walk on turn one")
+        self.assertTrue(gemini and pool)
+        self.assertLess(max(gemini), min(pool))
+        self.assertEqual(10, len(ladder))
 
         selected, _info = self._select(None, {"OPENCODE_CONFIG": ""})
         self.assertEqual(ladder, selected)
@@ -297,23 +317,22 @@ class GroqCliRungs(unittest.TestCase):
         self.assertEqual(["gemini/a"], selected)
         self.assertEqual(["groq/gone"], info["dropped_seed"])
 
-    def test_the_cli_config_declares_both_groq_providers(self):
+    def test_the_cli_config_declares_no_groq_walk_provider(self):
+        """GROQ IS NOT A WALK PROVIDER ANY MORE (2026-11-17).
+
+        Dry run 44049081005: both `groq/allam-2-7b` rungs failed every attempt
+        with `tool calling is not supported with this model`, so a provider
+        block here buys a ladder position that cannot complete one turn. Groq
+        still summarises the derived edition over HTTP -- scripts/llm_providers.py
+        owns that ladder and keeps its own 4096-token ceiling -- so its absence
+        from the CLI config is the walk's boundary, not the provider's.
+        """
         doc = json.loads(self.cli_config.read_text(encoding="utf-8"))
-        for name, env in (("groq", "GROQ_API_KEY"),
-                          ("groq-key2", "GROQ_API_KEY_2")):
-            block = doc["provider"][name]
-            self.assertEqual("@ai-sdk/openai-compatible", block["npm"])
-            self.assertEqual("https://api.groq.com/openai/v1",
-                             block["options"]["baseURL"])
-            self.assertEqual("{env:%s}" % env, block["options"]["apiKey"])
-            self.assertEqual({"allam-2-7b"}, set(block["models"]))
-            for model in block["models"].values():
-                self.assertEqual(131072, model["limit"]["context"])
-                # THE MODEL'S SERVING CEILING, not a global number. 32768 here
-                # made the CLI send `max_tokens: 32768`, and Groq refused BOTH
-                # groq rungs with `max_tokens must be <= 4096` before either
-                # wrote a character (dry run 44027504920).
-                self.assertEqual(4096, model["limit"]["output"])
+        for name in ("groq", "groq-key2"):
+            self.assertNotIn(
+                name, doc["provider"],
+                "config/opencode-cli.json declares a `%s` provider again, so a "
+                "groq rung can be discovered by a walk that cannot use it" % name)
 
 
 if __name__ == "__main__":

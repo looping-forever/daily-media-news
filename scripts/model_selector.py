@@ -846,21 +846,33 @@ DIGEST_WINDOW_TRAIL_SEC = 60 * 60
 
 _AUTO = object()
 
-#: `Retry-After: 300`, `retry-after=300`, `retry after 300s`. Seconds only: an
-#: HTTP-date form would need a clock agreement this repo cannot verify, and the
-#: measured value is a seconds count.
-_RETRY_AFTER_RE = re.compile(r"retry[-_ ]?after\W{0,3}(\d{1,6})", re.I)
+#: `Retry-After: 300`, `retry-after=300`, `Please retry in 54.1s`. Seconds only:
+#: an HTTP-date form would need a clock agreement this repo cannot verify, and the
+#: measured value is a seconds count. The `retry in Ns` shape is the one Google
+#: AI Studio actually sends -- dry run 44049081005 carried
+#: `Please retry in 54.1s` and the delay was ignored because nothing matched it.
+_RETRY_AFTER_RE = re.compile(
+    r"retry[-_ ]?after\W{0,3}(\d{1,6})"          # Retry-After: 300
+    r"|retry in\s+(\d{1,6}(?:\.\d+)?)\s*s",      # Please retry in 54.1s
+    re.I)
 
 
 def retry_after_from_text(text):
-    """Seconds from the provider's Retry-After in `text`, or None if absent."""
+    """Seconds from the provider's own retry hint in `text`, or None.
+
+    Rounded UP: waking a tenth of a second early hears the same refusal, and the
+    caller only ever uses this to decide whether the delay still fits a budget.
+    """
     found = _RETRY_AFTER_RE.search(text or "")
     if not found:
         return None
+    raw = found.group(1) or found.group(2)
     try:
-        return int(found.group(1))
+        seconds = float(raw)
     except (TypeError, ValueError):
         return None
+    whole = int(seconds)
+    return whole if whole == seconds else whole + 1
 
 
 def pool_row(doc):
@@ -1421,7 +1433,10 @@ def classify_failure(text, returncode=0):
           Go". BEFORE quota on purpose: that refusal sentence also carries
          "usage limit", and reading it as throttle walks the whole ladder to
          hear the same refusal from every rung;
-      5. quota_or_rate_limited -- 429/quota/Retry-After;
+      5. quota_or_rate_limited -- 429/quota/Retry-After, OR any stated retry
+         delay ("Please retry in 54.1s"): the provider saying when to return is
+         the same statement as being throttled now, and it is the number the
+         caller can wait out;
       6. slow_or_stalled -- the watchdog marker, or rc 124 (what `timeout`
          reports for its own kill);
       7. provider_outage -- 5xx and `UnknownError` with NO not-found marker;
@@ -1441,7 +1456,14 @@ def classify_failure(text, returncode=0):
         return "auth"
     if codes & {402} or any(m in low for m in _PAYMENT_MARKERS):
         return "payment_required"
-    if codes & {429} or any(m in low for m in _QUOTA_MARKERS):
+    if codes & {429} or any(m in low for m in _QUOTA_MARKERS) \
+            or _RETRY_AFTER_RE.search(text or ""):
+        # A PROVIDER THAT STATES WHEN TO COME BACK IS THROTTLED, whatever words
+        # it chooses. Gemini's free tier says `limit: 250000 ... Please retry in
+        # 40.095354008s` with no "quota" and no "429" in the sentence, so without
+        # this the walk both mislabelled the refusal AND ignored the one number
+        # that says exactly how long to wait -- and `--retry-after-sec` reads the
+        # same regex, so classification and the delay can never disagree.
         return "quota_or_rate_limited"
     if WATCHDOG_MARKER.lower() in low or int(returncode or 0) == 124:
         return "slow_or_stalled"
@@ -2112,6 +2134,11 @@ def _main(argv=None):
                         help="seconds from the provider's Retry-After (with "
                              "--pool-refused); omitted or unreadable means the "
                              "file's own default")
+    parser.add_argument("--retry-after-sec", dest="retry_after_sec",
+                        action="store_true",
+                        help="print the provider's stated retry delay from the "
+                             "attempt log (--log) as whole seconds, or print "
+                             "nothing when it stated none")
     args = parser.parse_args(argv)
 
     if args.record:
@@ -2135,6 +2162,15 @@ def _main(argv=None):
 
     if args.classify:
         print(classify_failure(_read_log_tail(args.log), args.rc))
+        return 0
+
+    if args.retry_after_sec:
+        # The walk asks this BEFORE it chooses to wait: a delay it can fit is
+        # slept, one it cannot is not started. Printing nothing (rather than 0)
+        # keeps "no hint given" distinct from "a hint of zero seconds".
+        seconds = retry_after_from_text(_read_log_tail(args.log))
+        if seconds is not None:
+            print(seconds)
         return 0
 
     if args.pool_refused:

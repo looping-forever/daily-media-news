@@ -78,12 +78,12 @@ EXPECTED_LADDER = [
     "gemini/gemini-3.1-flash-lite",
     "gemini-key2/gemini-3.5-flash-lite",
     "gemini-key2/gemini-3.1-flash-lite",
-    # CLI Groq rungs, added 2026-11-17. Both free accounts are tried before
-    # the shared opencode pool, whose bucket refuses every id at once. The
-    # account returned model_not_found for the two Llama ids, so only the id
-    # it actually serves is kept.
-    "groq/allam-2-7b",
-    "groq-key2/allam-2-7b",
+    # THE TWO CLI GROQ RUNGS WERE REMOVED 2026-11-17. They were added on
+    # 2026-11-16 and measured the next day in dry run 44049081005: both
+    # `groq/allam-2-7b` rungs fail `tool calling is not supported with this
+    # model`, so they occupied two ladder positions and burned attempts on every
+    # walk. Groq still summarises the derived edition over HTTP
+    # (scripts/llm_providers.py), where it demonstrably answers. TEN rungs.
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",
     "opencode/mimo-v2.6-flash-free",

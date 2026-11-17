@@ -20,9 +20,8 @@ caller depends on, and nothing about the prompts:
                                  -- the words model_selector already speaks.
     THE PAID GUARD            -- an OpenRouter id without `:free` is refused
                                  before a byte is sent.
-    THE LADDER ORDER          -- Gemini, then Groq and its second account,
-                                 OpenRouter, Mistral, then the free pool, in BOTH
-                                 consumers.
+    THE LADDER ORDER          -- Gemini, then Groq, OpenRouter, Mistral, then
+                                 the free pool, in BOTH consumers.
     NO KEY IN ANY OUTPUT      -- not in a result, a debug line, a workflow or
                                  this file.
 """
@@ -174,19 +173,27 @@ class GroqOutputCeilingTests(unittest.TestCase):
 
     DECLARED = 4096
 
-    def test_the_cli_config_declares_groqs_real_serving_limit(self):
+    def test_the_cli_config_declares_no_groq_provider(self):
+        """GROQ LEFT THE CLI CONFIG ON 2026-11-17; THE ADAPTER KEPT ITS CEILING.
+
+        The walk cannot use Groq -- `tool calling is not supported with this
+        model` (dry run 44049081005) -- so both CLI provider blocks were
+        removed. The summariser is a plain HTTP call and Groq answers it, so
+        `scripts/llm_providers.py` still carries Groq with the 4096 ceiling the
+        tests below pin. Two surfaces, two decisions; this test guards the one
+        that changed, and asserts the ceiling is NOT silently applied to a
+        provider the CLI no longer has.
+        """
         doc = json.loads((REPO_ROOT / "config" / "opencode-cli.json")
                          .read_text(encoding="utf-8"))
 
         for name in ("groq", "groq-key2"):
-            models = doc["provider"][name]["models"]
-            self.assertTrue(models, "%s declares no model at all" % name)
-            for model, block in models.items():
-                self.assertEqual(
-                    self.DECLARED, block["limit"]["output"],
-                    "%s/%s declares a ceiling the endpoint refuses; the CLI "
-                    "turns that number into max_tokens, so the rung dies before "
-                    "it writes a character" % (name, model))
+            self.assertNotIn(
+                name, doc["provider"],
+                "a `%s` provider block returned to config/opencode-cli.json, so "
+                "a walk can try a model that cannot call tools" % name)
+        # The adapter is unchanged and still the authority for the HTTP ladder.
+        self.assertEqual(self.DECLARED, lp.GROQ_MAX_OUTPUT)
 
     def test_the_adapter_and_the_cli_config_are_one_number(self):
         self.assertEqual(self.DECLARED, lp.GROQ_MAX_OUTPUT)
@@ -528,7 +535,12 @@ class PaidOpenRouterGuardTests(unittest.TestCase):
 
 
 class LadderOrderTests(unittest.TestCase):
-    """Gemini, then Groq and its second key, OpenRouter, Mistral, free pool."""
+    """Gemini, then Groq, OpenRouter, Mistral, free pool.
+
+    The second Groq account left the ladder on 2026-11-17 with the two CLI Groq
+    rungs; `test_config_groq_rungs_stay_in_the_groq_block_without_duplicates`
+    still seeds both accounts because it pins the REORDERING, not the config.
+    """
 
     def test_ordered_ladder_places_every_block_in_the_stated_order(self):
         got = lp.ordered_ladder(list(CONFIG_LADDER), environ=KEYS)
@@ -576,10 +588,10 @@ class LadderOrderTests(unittest.TestCase):
             got = ss.ladder_models(transport=send)
         providers = [lp.provider_of(m) for m in got]
         self.assertEqual(
-            [None, None, "groq", "groq-key2", "openrouter", "mistral"],
+            [None, None, "groq", "openrouter", "mistral", None],
             providers[:6],
-            "the digest ladder must be gemini, both Groq accounts, the other "
-            "keyed providers, then the free pool -- got %r" % (got,))
+            "the digest ladder must be gemini, Groq, the other keyed providers, "
+            "then the free pool -- got %r" % (got,))
         self.assertTrue(providers[6:], "the free pool must still be walked")
         self.assertEqual({None}, set(providers[6:]),
                          "nothing may follow the free pool -- got %r" % (got,))
