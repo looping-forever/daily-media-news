@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -14979,7 +14979,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Following devastating floods in the Bhote Koshi river in August 2026 that resulted in over 1,450 deaths and widespread destruction, Nepal is highlighting the reality of climate-induced disasters at the COP-31 climate conference to seek international climate justice.",
       "latest_development": "Reported: Following devastating floods in the Bhote Koshi river in August 2026 that resulted in over 1,450 deaths and widespread destruction, Nepal is highlighting the reality of climate-induced disasters at the COP-31 climate conference to seek international climate justice.",
       "alerted": false,
@@ -14989,7 +14989,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T06:42:10+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-0eae322f78c7",
@@ -15007,7 +15007,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Today, on the fourth day of the Tihar festival, the cow is being honored and worshipped across Nepal, a traditional practice held to bring prosperity and express gratitude to livestock.",
       "latest_development": "Reported: Today, on the fourth day of the Tihar festival, the cow is being honored and worshipped across Nepal, a traditional practice held to bring prosperity and express gratitude to livestock.",
       "alerted": false,
@@ -15017,7 +15017,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T06:42:10+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-c6ad696ff998",
@@ -15035,7 +15035,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Nepal Rastra Bank has set the buying rate for one US dollar at NPR 149.96 and the selling rate at NPR 150.56 for today, November 9, 2026.",
       "latest_development": "Confirmed: The Nepal Rastra Bank has set the buying rate for one US dollar at NPR 149.96 and the selling rate at NPR 150.56 for today, November 9, 2026.",
       "alerted": false,
@@ -15045,7 +15045,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-09",
-      "updated_at": "2026-11-09T06:42:10+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-c3442ae9ba45",
@@ -15063,7 +15063,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The video game title 'Warhammer Blood Bowl' has been officially delayed, with the new release window scheduled for early 2027.",
       "latest_development": "Reported: The video game title 'Warhammer Blood Bowl' has been officially delayed, with the new release window scheduled for early 2027.",
       "alerted": false,
@@ -15073,7 +15073,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T06:42:10+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-c37659afd0cb",
@@ -15091,7 +15091,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: A dry landslide occurred at Ghopte Bhir in Ichchhakamana Rural Municipality-4 at 5:00 AM today, completely blocking the Prithvi Highway in both directions.",
       "latest_development": "Confirmed: A dry landslide occurred at Ghopte Bhir in Ichchhakamana Rural Municipality-4 at 5:00 AM today, completely blocking the Prithvi Highway in both directions.",
       "alerted": false,
@@ -15101,7 +15101,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-09",
-      "updated_at": "2026-11-09T07:21:58+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-e28ded51d051",
@@ -15119,7 +15119,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Department of Hydrology and Meteorology reports partial cloud cover in hilly and mountainous regions today, with a slight possibility of light rain or snowfall in some areas.",
       "latest_development": "Confirmed: The Department of Hydrology and Meteorology reports partial cloud cover in hilly and mountainous regions today, with a slight possibility of light rain or snowfall in some areas.",
       "alerted": false,
@@ -15129,7 +15129,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-09",
-      "updated_at": "2026-11-09T07:21:58+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-14a88613282e",
@@ -15147,7 +15147,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -15157,7 +15157,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T13:51:51+05:45",
+      "updated_at": "2026-11-17T06:42:57+05:45",
       "last_confidence": "HIGH",
       "detection_source": "google-news"
     },
@@ -15177,7 +15177,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Docker best practices: Docker has revolutionized application development, offering lean and secure container images. This article discusses five essential practices for efficient and secure containerization.",
       "latest_development": "Docker best practices: Docker has revolutionized application development, offering lean and secure container images. This article discusses five essential practices for efficient and secure containerization.",
       "alerted": false,
@@ -15187,7 +15187,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-efd763a70d4f",
@@ -15205,7 +15205,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A rental house faces the choice: keep the main wall's P1.95 setup for a cinematic look or switch to P2.6, allocating the difference, to meet client's request.",
       "latest_development": "A rental house faces the choice: keep the main wall's P1.95 setup for a cinematic look or switch to P2.6, allocating the difference, to meet client's request.",
       "alerted": false,
@@ -15215,7 +15215,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-cb8cd987ba22",
@@ -15233,7 +15233,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Finance Minister Swarnim Wagle leaves for COP31 in Turkey to attend the 31st Conference of the Parties (COP31) to the United Nations Framework Convention on Climate Change (UNFCCC).",
       "latest_development": "Finance Minister Swarnim Wagle leaves for COP31 in Turkey to attend the 31st Conference of the Parties (COP31) to the United Nations Framework Convention on Climate Change (UNFCCC).",
       "alerted": false,
@@ -15243,7 +15243,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-b662fb06e34f",
@@ -15261,7 +15261,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Finance Minister Dr Swarnim Wagle departs for Turkey to participate in COP31, the 31st Conference of the Parties to the UNFCCC.",
       "latest_development": "Finance Minister Dr Swarnim Wagle departs for Turkey to participate in COP31, the 31st Conference of the Parties to the UNFCCC.",
       "alerted": false,
@@ -15271,7 +15271,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-fe0d775e540d",
@@ -15289,7 +15289,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: CPN (UML) Chairman and former Prime Minister KP Sharma Oli has said that the worship of cows (Gai Puja) severs as a means of a cultural awakening, highlighting the coexistence between humans and animal world. Similarly, it…",
       "latest_development": "KATHMANDU: CPN (UML) Chairman and former Prime Minister KP Sharma Oli has said that the worship of cows (Gai Puja) severs as a means of a cultural awakening, highlighting the coexistence between humans and animal world. Similarly, it…",
       "alerted": false,
@@ -15299,7 +15299,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-27bf66ffeffb",
@@ -15317,7 +15317,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: The Kathmandu Gorkhas scored 180 for eight in 20 overs to set Chitwan Rhinos a target of 181 in the Nepal Premier League (NPL) on Monday. Batting first after losing the toss at the TU International Cricket Ground in Kirtipur…",
       "latest_development": "KATHMANDU: The Kathmandu Gorkhas scored 180 for eight in 20 overs to set Chitwan Rhinos a target of 181 in the Nepal Premier League (NPL) on Monday. Batting first after losing the toss at the TU International Cricket Ground in Kirtipur…",
       "alerted": false,
@@ -15327,7 +15327,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-d567348c4204",
@@ -15345,7 +15345,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Ostensible graphics card company and definite AI giants Nvidia have commissioned an independent investigation into themselves, amid reports that CEO Jensen Huang had an extramarital affair with a suspected Chinese spy. Per both the New…",
       "latest_development": "Ostensible graphics card company and definite AI giants Nvidia have commissioned an independent investigation into themselves, amid reports that CEO Jensen Huang had an extramarital affair with a suspected Chinese spy. Per both the New…",
       "alerted": false,
@@ -15355,7 +15355,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-dce42d8e0a87",
@@ -15373,7 +15373,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The billionaire tech executive finds himself mired in a personal and national security scandal.",
       "latest_development": "The billionaire tech executive finds himself mired in a personal and national security scandal.",
       "alerted": false,
@@ -15383,7 +15383,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-3ed6c656953a",
@@ -15401,7 +15401,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15411,7 +15411,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-511bbbfc04d9",
@@ -15429,7 +15429,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15439,7 +15439,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-f86ca916670c",
@@ -15457,7 +15457,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Studio CCO Ed Boon is currently polling fans to determine the official title for the upcoming installment, offering three potential naming options.",
       "latest_development": "Studio CCO Ed Boon is currently polling fans to determine the official title for the upcoming installment, offering three potential naming options.",
       "alerted": false,
@@ -15467,7 +15467,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-fc4d0dbaa6b9",
@@ -15485,7 +15485,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Following a report by the New York Times, the company officially launched an inquiry after its leader confessed to a relationship with an executive accused of espionage.",
       "latest_development": "Following a report by the New York Times, the company officially launched an inquiry after its leader confessed to a relationship with an executive accused of espionage.",
       "alerted": false,
@@ -15495,7 +15495,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-8986d787a086",
@@ -15513,7 +15513,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Police declined to disclose their nationalities but said none of them lived in South Africa.",
       "latest_development": "Police declined to disclose their nationalities but said none of them lived in South Africa.",
       "alerted": false,
@@ -15523,7 +15523,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-6c4d78c0b103",
@@ -15541,7 +15541,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15551,7 +15551,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-9149423fb87b",
@@ -15569,7 +15569,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15579,7 +15579,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-95f684d252e2",
@@ -15597,7 +15597,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15607,7 +15607,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-0bce6ddbbca0",
@@ -15625,7 +15625,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Six people were killed in the shooting, and three bodies of the suspect's family members were found at their home.",
       "latest_development": "Six people were killed in the shooting, and three bodies of the suspect's family members were found at their home.",
       "alerted": false,
@@ -15635,7 +15635,7 @@
       "in_evening": "2026-11-09",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-85bd75a851ef",
@@ -15653,7 +15653,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15663,7 +15663,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-70f3a6838f23",
@@ -15681,7 +15681,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15691,7 +15691,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-86d337e11c3d",
@@ -15709,7 +15709,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15719,7 +15719,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-a6dbec37789b",
@@ -15737,7 +15737,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15747,7 +15747,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-e03a7d801646",
@@ -15765,7 +15765,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Avex Pictures launched an official website for the television adaptation of Sekina Aoi and Ryou Tsuzura's manga on Friday.",
       "latest_development": "Avex Pictures launched an official website for the television adaptation of Sekina Aoi and Ryou Tsuzura's manga on Friday.",
       "alerted": false,
@@ -15775,7 +15775,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-56e89dedd527",
@@ -15793,7 +15793,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15803,7 +15803,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-36ca9f96b729",
@@ -15821,7 +15821,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "During the Spy x Family Anime Extra Mission II special event held on Sunday, production staff confirmed the upcoming projects with a new teaser visual.",
       "latest_development": "During the Spy x Family Anime Extra Mission II special event held on Sunday, production staff confirmed the upcoming projects with a new teaser visual.",
       "alerted": false,
@@ -15831,7 +15831,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-b620f33aad3a",
@@ -15849,7 +15849,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15859,7 +15859,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-00d7aa9d2294",
@@ -15877,7 +15877,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -15887,7 +15887,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-09T19:25:03+05:45"
+      "updated_at": "2026-11-17T06:42:57+05:45"
     },
     {
       "event_id": "evt-138b7a17c413",
@@ -22924,6 +22924,426 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-16T19:23:39+05:45"
+    },
+    {
+      "event_id": "evt-25a0a6a35be9",
+      "event_key": null,
+      "canonical_title": "Muktinath Rath Yatra concludes, month-long Mahayagya begins today",
+      "category": "nepal",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.khabarhub.com/2026/17/575858"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The procession reached its final destination at Gajendramoksha Divya Dham in Triveni Dham on Monday after departing from the sacred site on October 25.",
+      "latest_development": "The procession reached its final destination at Gajendramoksha Divya Dham in Triveni Dham on Monday after departing from the sacred site on October 25.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-be2b13abad37",
+      "event_key": null,
+      "canonical_title": "Trump defends commerce secretary Lutnick for allegedly slow-walking Nvidia chip export restrictions – live",
+      "category": "world_major",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "theguardian.com/us-news/live/2026/nov/16/donald-trump-asia-visit-democrats-republicans-elizabeth-warren-faa-air-disruption-latest-news-updates"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The president supported his nominee after Treasury Secretary Scott Bessent accused the commerce department of hindering the implementation of bans on advanced AI chip exports.",
+      "latest_development": "The president supported his nominee after Treasury Secretary Scott Bessent accused the commerce department of hindering the implementation of bans on advanced AI chip exports.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-3cdf85254cd5",
+      "event_key": null,
+      "canonical_title": "NRB announces today’s foreign exchange rates",
+      "category": "nepal",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.khabarhub.com/2026/17/575852"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The central bank established the buying rate for one US dollar at Rs 149.98 and the selling rate at Rs 150.58.",
+      "latest_development": "The central bank established the buying rate for one US dollar at Rs 149.98 and the selling rate at Rs 150.58.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-bc74b610b91f",
+      "event_key": null,
+      "canonical_title": "UK seeks closer ties with EU after Brexit fail",
+      "category": "world_major",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "aljazeera.com/news/2026/11/17/uk-seeks-closer-ties-with-eu-after-brexit-fail"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Prime Minister Andy Burnham claims the nation experienced greater losses than gains following its departure from the bloc.",
+      "latest_development": "Prime Minister Andy Burnham claims the nation experienced greater losses than gains following its departure from the bloc.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-0620194cccb7",
+      "event_key": null,
+      "canonical_title": "Labor policy backflip will allow more backpackers to work in regional Australia",
+      "category": "world_major",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "theguardian.com/australia-news/2026/nov/17/labor-backpacker-policy-backflip-work-regional-australia-holiday-visas"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The government revised its plan to increase the limit for people eligible to stay a third year on a holidaymaker visa from 5,000 to 25,000.",
+      "latest_development": "The government revised its plan to increase the limit for people eligible to stay a third year on a holidaymaker visa from 5,000 to 25,000.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-27d2235f9492",
+      "event_key": null,
+      "canonical_title": "Nepal at One Year: Promise, Resistance and the Test of Strategic Stability",
+      "category": "nepal",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "english.khabarhub.com/2026/17/575733"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Six months into Balendra Shah's term as Prime Minister, the country navigates the aftermath of a September 2025 uprising and a March 2026 election.",
+      "latest_development": "Six months into Balendra Shah's term as Prime Minister, the country navigates the aftermath of a September 2025 uprising and a March 2026 election.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-be900590b308",
+      "event_key": null,
+      "canonical_title": "'Avengers: Doomsday' Star Says He Was Lied to About His Next Big Role",
+      "category": "gaming",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/anthony-mackie-jamie-dornan-interview-12-12-12"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Anthony Mackie realized he had been misled about the nature of his role in the November 13 Apple TV heist thriller 12 12 12, which was falsely pitched as a production similar to The Italian Job.",
+      "latest_development": "Anthony Mackie realized he had been misled about the nature of his role in the November 13 Apple TV heist thriller 12 12 12, which was falsely pitched as a production similar to The Italian Job.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-b181920597c3",
+      "event_key": null,
+      "canonical_title": "Cybersecurity AI startup Corma reaches $1B valuation in about 3 months",
+      "category": "tech_career",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "techcrunch.com/2026/11/16/cybersecurity-ai-startup-corma-reaches-1b-valuation-in-about-3-months"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The company secured $125 million in Series A funding led by NEA just three months after launching its artificial intelligence product.",
+      "latest_development": "The company secured $125 million in Series A funding led by NEA just three months after launching its artificial intelligence product.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-17e95887a362",
+      "event_key": null,
+      "canonical_title": "[SPLASH'26] Mojo: Towards One Systems Language for All Hardware",
+      "category": "tech_career",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "youtube.com/watch"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-f43428087847",
+      "event_key": null,
+      "canonical_title": "Show HN: Sutra-OS – A self-hosted ontology platform",
+      "category": "tech_career",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "github.com/0nelight/sutra-os"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "This open-source project has gathered 18 points and three comments on Hacker News.",
+      "latest_development": "This open-source project has gathered 18 points and three comments on Hacker News.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-33542caf4e0c",
+      "event_key": null,
+      "canonical_title": "How 2026's Best Video Games Were Made",
+      "category": "gaming",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "polygon.com/2026-games-of-the-year-how-were-made"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Developers from franchises including Resident Evil, Control, and Star Wars are sharing production insights ahead of the announcement of Game of the Year nominees.",
+      "latest_development": "Developers from franchises including Resident Evil, Control, and Star Wars are sharing production insights ahead of the announcement of Game of the Year nominees.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-e6e4548ceb75",
+      "event_key": null,
+      "canonical_title": "Tetsuya Tsutsui Launches New Ortrans Manga",
+      "category": "anime",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-16/tetsuya-tsutsui-launches-new-ortrans-manga/.243867"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "This upcoming series, which premieres in Shueisha's Young Jump magazine on January 21, follows detectives investigating child disappearances at a juvenile training school.",
+      "latest_development": "This upcoming series, which premieres in Shueisha's Young Jump magazine on January 21, follows detectives investigating child disappearances at a juvenile training school.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-c5915b88e4dd",
+      "event_key": null,
+      "canonical_title": "That 007 First Light theme song I didn't like is up for a Grammy Award",
+      "category": "gaming",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "pcgamer.com/games/action/that-007-first-light-theme-song-i-didnt-like-is-up-for-a-grammy-award"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "No summary available.",
+      "latest_development": "No summary available.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-004ac15282df",
+      "event_key": null,
+      "canonical_title": "D.I.C.E. Awards Honors Nintendo Game Creator Shigeru Miyamoto With Inaugural Legend Award",
+      "category": "anime",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-16/d.i.c.e-awards-honors-nintendo-game-creator-shigeru-miyamoto-with-inaugural-legend-award/.243870"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "The creator of Super Mario Bros. and The Legend of Zelda received this honor, which is scheduled to be presented just once every ten years.",
+      "latest_development": "The creator of Super Mario Bros. and The Legend of Zelda received this honor, which is scheduled to be presented just once every ten years.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
+    },
+    {
+      "event_id": "evt-02eb497f6274",
+      "event_key": null,
+      "canonical_title": "Manga 'Diamond no Kouzai' Gets TV Anime",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-17",
+      "last_seen": "2026-11-17",
+      "first_reported": "2026-11-17",
+      "last_reported": "2026-11-17",
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "myanimelist.net/news/74946798"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "TOHO animation launched a portal for the adaptation of Oohashi Hirai's work on Tuesday, showcasing an announcement visual alongside key staff members.",
+      "latest_development": "TOHO animation launched a portal for the adaptation of Oohashi Hirai's work on Tuesday, showcasing an announcement visual alongside key staff members.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-17",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-17T06:42:57+05:45"
     }
   ],
   "archived": []
