@@ -204,5 +204,115 @@ class CatalogueAbsence(unittest.TestCase):
         self.assertEqual(["gemini/a", "opencode/c"], selected)
 
 
+class GroqCliRungs(unittest.TestCase):
+    """Groq is a CLI fallback between Gemini and the shared free pool."""
+
+    def setUp(self):
+        root = Path(__file__).resolve().parents[2]
+        self.config = ms.load_config(str(root / "config" / "opencode.json"))
+        self.cli_config = root / "config" / "opencode-cli.json"
+
+    def _select(self, seed, env, catalogues=None):
+        catalogues = catalogues or {}
+
+        def discover(provider):
+            return list(catalogues.get(provider, [])), {
+                "source": "live",
+                "catalogue_status": {},
+            }
+
+        with mock.patch.dict(os.environ, env):
+            return ms.select(self.config if seed is None else
+                             {"provider": "gemini", "ladder": list(seed)},
+                             _health(), cache_path=None, max_models=None,
+                             now=10.0, discover_fn=discover)
+
+    def test_every_groq_rung_sits_between_gemini_and_the_free_pool(self):
+        ladder = self.config["ladder"]
+        gemini = [i for i, m in enumerate(ladder)
+                  if m.startswith(("gemini/", "gemini-key2/"))]
+        groq = [i for i, m in enumerate(ladder)
+                if m.startswith(("groq/", "groq-key2/"))]
+        pool = [i for i, m in enumerate(ladder) if m.startswith("opencode/")]
+
+        self.assertTrue(gemini and groq and pool)
+        self.assertLess(max(gemini), min(groq))
+        self.assertLess(max(groq), min(pool))
+
+        selected, _info = self._select(None, {"OPENCODE_CONFIG": ""})
+        self.assertEqual(ladder, selected)
+
+    def test_a_healthy_groq_rung_never_outranks_an_unknown_gemini_rung(self):
+        doc = _health()
+        _sick(doc, "groq/healthy", successes=5)
+        seed = ["gemini/unknown", "groq/healthy"]
+
+        ordered = ms.rank_models(seed, seed=seed, health=doc, now=1_000_000.0)
+
+        self.assertEqual(seed, ordered)
+
+    def test_an_empty_groq_key_contributes_no_rung(self):
+        selected, info = self._select(
+            None,
+            {"OPENCODE_CONFIG": str(self.cli_config),
+             "GEMINI_API_KEY": "present",
+             "GEMINI_API_KEY_2": "present",
+             "GROQ_API_KEY": "",
+             "GROQ_API_KEY_2": "   "})
+
+        self.assertEqual([], [m for m in selected
+                              if m.startswith(("groq/", "groq-key2/"))])
+        self.assertEqual([], [m for m in info["seed"]
+                              if m.startswith(("groq/", "groq-key2/"))])
+        self.assertTrue([m for m in selected if m.startswith("opencode/")])
+
+    def test_an_absent_groq_catalogue_rung_is_reordered_not_removed(self):
+        seed = ["gemini/a", "groq/llama-3.3-70b-versatile",
+                "groq/allam-2-7b", "opencode/free"]
+
+        selected, info = self._select(
+            seed, {"OPENCODE_CONFIG": ""},
+            {"gemini": ["gemini/a"],
+             "groq": ["groq/llama-3.3-70b-versatile"],
+             "opencode": ["opencode/free"]})
+
+        self.assertEqual(["gemini/a", "groq/llama-3.3-70b-versatile",
+                          "opencode/free", "groq/allam-2-7b"], selected)
+        self.assertEqual([{"model": "groq/allam-2-7b", "provider": "groq"}],
+                         info["catalogue_absent"])
+        self.assertEqual([], info["dropped_seed"])
+
+    def test_a_groq_gone_status_still_removes_the_rung(self):
+        seed = ["gemini/a", "groq/gone"]
+        with mock.patch.dict(os.environ, {"OPENCODE_CONFIG": ""}):
+            selected, info = ms.select(
+                {"provider": "gemini", "ladder": seed}, _health(),
+                cache_path=None, max_models=None, now=10.0,
+                discover_fn=lambda provider: (
+                    ["gemini/a"] if provider == "gemini" else [],
+                    {"source": "live",
+                     "catalogue_status": ({} if provider == "gemini" else
+                                          {"groq/gone": "retired"})}))
+
+        self.assertEqual(["gemini/a"], selected)
+        self.assertEqual(["groq/gone"], info["dropped_seed"])
+
+    def test_the_cli_config_declares_both_groq_providers(self):
+        doc = json.loads(self.cli_config.read_text(encoding="utf-8"))
+        for name, env in (("groq", "GROQ_API_KEY"),
+                          ("groq-key2", "GROQ_API_KEY_2")):
+            block = doc["provider"][name]
+            self.assertEqual("@ai-sdk/openai-compatible", block["npm"])
+            self.assertEqual("https://api.groq.com/openai/v1",
+                             block["options"]["baseURL"])
+            self.assertEqual("{env:%s}" % env, block["options"]["apiKey"])
+            self.assertEqual({"llama-3.3-70b-versatile",
+                              "llama-3.1-8b-instant",
+                              "allam-2-7b"}, set(block["models"]))
+            for model in block["models"].values():
+                self.assertEqual(131072, model["limit"]["context"])
+                self.assertEqual(32768, model["limit"]["output"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1493,5 +1493,22 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
         seeds = [m for m in seeds if m.startswith(tuple(prefixes))]
     gemini = [m for m in seeds if m.startswith(GEMINI_PREFIXES)]
     rest = [m for m in seeds if not m.startswith(GEMINI_PREFIXES)]
-    return tuple(gemini) + ladder_rungs(environ, transport=transport,
-                                        resolve=resolve, log=log) + tuple(rest)
+    http = list(ladder_rungs(environ, transport=transport,
+                             resolve=resolve, log=log))
+    # A config seed names an HTTP provider too. Keep every one of its rungs in
+    # that provider's block, ahead of the generated rung, and never duplicate.
+    seed_by_provider, other = {}, []
+    for model in rest:
+        name = provider_of(model)
+        if name:
+            seed_by_provider.setdefault(name, []).append(model)
+        else:
+            other.append(model)
+    composed = list(gemini)
+    for name in LADDER_PROVIDERS:
+        generated = [m for m in http if provider_of(m) == name]
+        for model in seed_by_provider.get(name, []) + generated:
+            if model not in composed:
+                composed.append(model)
+    composed.extend(other)
+    return tuple(composed)

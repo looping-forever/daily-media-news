@@ -867,13 +867,13 @@ def test_a_model_that_timed_out_is_not_tried_first_on_the_next_run():
         # the cap doing its job, not a veto, so the no-veto property is
         # asserted where it is decided -- on the selection itself.
         pool = bm.ai_classify.last_info.get("discovered") or []
-        # Room for the seed AND the catalogue: since 2026-10-30 the seed is 8
-        # rungs, so a cap of len(pool) is itself a depth cap and would cut the
-        # demoted model instead of proving it is still reachable.
+        # No cap at all: any finite cap can cut the demoted rung once the
+        # configured seed grows, which would prove a depth cap rather than a
+        # veto. The property under test is reachability, so ask for everything.
         unconstrained, _info = ms.select(
             bm._opencode_config(), ms.load_health(
                 os.path.join(sd, bm.MODEL_HEALTH_FILENAME)),
-            cache_path=None, max_models=len(pool) + len(bm.AI_MODELS), now=1e18,
+            cache_path=None, max_models=None, now=1e18,
             discover_fn=lambda p: (list(pool), {"source": "live"}))
         assert bm.AI_MODELS[0] in unconstrained, (
             "REORDER ONLY, NEVER A VETO: a cooling model must still be "

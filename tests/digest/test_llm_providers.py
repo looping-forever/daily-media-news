@@ -484,6 +484,37 @@ class LadderOrderTests(unittest.TestCase):
              "opencode/beam-free"),
             tuple(got))
 
+    def test_config_groq_rungs_stay_in_the_groq_block_without_duplicates(self):
+        seeds = list(CONFIG_LADDER[:4]) + [
+            "groq/llama-3.3-70b-versatile",
+            "groq/llama-3.1-8b-instant",
+            "groq/allam-2-7b",
+            "groq-key2/llama-3.3-70b-versatile",
+            "groq-key2/llama-3.1-8b-instant",
+            "groq-key2/allam-2-7b",
+        ] + list(CONFIG_LADDER[4:])
+        env = dict(KEYS_BOTH_GROQ, GEMINI_API_KEY_2="test-gemini-key2")
+
+        got = lp.ordered_ladder(seeds, environ=env)
+
+        self.assertEqual(len(got), len(set(got)), got)
+        self.assertEqual(
+            ("gemini/gemini-3.5-flash-lite",
+             "gemini/gemini-3.1-flash-lite",
+             "gemini-key2/gemini-3.5-flash-lite",
+             "gemini-key2/gemini-3.1-flash-lite",
+             "groq/llama-3.3-70b-versatile",
+             "groq/llama-3.1-8b-instant",
+             "groq/allam-2-7b",
+             "groq-key2/llama-3.3-70b-versatile",
+             "groq-key2/llama-3.1-8b-instant",
+             "groq-key2/allam-2-7b",
+             "openrouter/" + lp.PROVIDERS["openrouter"].models[0],
+             "mistral/" + lp.PROVIDERS["mistral"].models[0],
+             "opencode/deepseek-v4.1-flash-free",
+             "opencode/beam-free"),
+            tuple(got))
+
     def test_the_summariser_walks_the_same_order(self):
         # A fake catalogue: `ladder_models` resolves the HTTP ids against what
         # the account serves, and a test must never open a socket.
@@ -495,14 +526,15 @@ class LadderOrderTests(unittest.TestCase):
             got = ss.ladder_models(transport=send)
         providers = [lp.provider_of(m) for m in got]
         self.assertEqual(
-            [None, None, "groq", "openrouter", "mistral"],
-            providers[:5],
-            "the digest ladder must be gemini, the three keyed providers in "
-            "order, then the free pool -- got %r" % (got,))
-        self.assertTrue(providers[5:], "the free pool must still be walked")
-        self.assertEqual({None}, set(providers[5:]),
+            [None, None, "groq", "groq", "groq", "groq-key2", "groq-key2",
+             "groq-key2", "openrouter", "mistral"],
+            providers[:10],
+            "the digest ladder must be gemini, both Groq accounts, the other "
+            "keyed providers, then the free pool -- got %r" % (got,))
+        self.assertTrue(providers[10:], "the free pool must still be walked")
+        self.assertEqual({None}, set(providers[10:]),
                          "nothing may follow the free pool -- got %r" % (got,))
-        self.assertTrue(all(m.startswith("opencode/") for m in got[5:]),
+        self.assertTrue(all(m.startswith("opencode/") for m in got[10:]),
                         "everything after Mistral must be the free pool -- "
                         "got %r" % (got,))
 

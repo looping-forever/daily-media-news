@@ -78,6 +78,14 @@ EXPECTED_LADDER = [
     "gemini/gemini-3.1-flash-lite",
     "gemini-key2/gemini-3.5-flash-lite",
     "gemini-key2/gemini-3.1-flash-lite",
+    # CLI Groq rungs, added 2026-11-17. Both free accounts are tried before
+    # the shared opencode pool, whose bucket refuses every id at once.
+    "groq/llama-3.3-70b-versatile",
+    "groq/llama-3.1-8b-instant",
+    "groq/allam-2-7b",
+    "groq-key2/llama-3.3-70b-versatile",
+    "groq-key2/llama-3.1-8b-instant",
+    "groq-key2/allam-2-7b",
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",
     "opencode/mimo-v2.6-flash-free",

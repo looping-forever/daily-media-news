@@ -1232,6 +1232,9 @@ jobs:
           # provider block in config/opencode-cli.json. Absent means its two
           # rungs contribute nothing, exactly as this step worked before.
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          # Groq's OpenAI-compatible endpoint, with a second account for its own allowance.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
         run: |
           set -eo pipefail
           # The floor comes from the workflow-level env, and a run that lost it

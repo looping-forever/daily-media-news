@@ -463,6 +463,10 @@ class AgentWalkHarness(unittest.TestCase):
                 # The second Google project, a separate secret and allowance.
                 text = text.replace("${{ secrets.GEMINI_API_KEY_2 }}",
                                     "test-gemini-key2")
+                # Groq is a fallback; empty here keeps the walk on Gemini and
+                # the pool unless a test explicitly supplies a key.
+                text = text.replace("${{ secrets.GROQ_API_KEY }}", "")
+                text = text.replace("${{ secrets.GROQ_API_KEY_2 }}", "")
                 # The simulation switch. Empty and `workflow_dispatch` are what
                 # every ORDINARY run sees: the input is unset on a real dispatch
                 # and the event name is the manual one here because the harness

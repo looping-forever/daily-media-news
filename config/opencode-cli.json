@@ -46,6 +46,68 @@
           }
         }
       }
+    },
+    "groq": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Groq (free tier)",
+      "options": {
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "{env:GROQ_API_KEY}"
+      },
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "Llama 3.3 70B Versatile",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        },
+        "llama-3.1-8b-instant": {
+          "name": "Llama 3.1 8B Instant",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        },
+        "allam-2-7b": {
+          "name": "Allam 2 7B",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        }
+      }
+    },
+    "groq-key2": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Groq (free tier, second account)",
+      "options": {
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "{env:GROQ_API_KEY_2}"
+      },
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "Llama 3.3 70B Versatile",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        },
+        "llama-3.1-8b-instant": {
+          "name": "Llama 3.1 8B Instant",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        },
+        "allam-2-7b": {
+          "name": "Allam 2 7B",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          }
+        }
+      }
     }
   }
 }

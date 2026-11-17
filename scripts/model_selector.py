@@ -1659,30 +1659,34 @@ def rank_models(candidates, seed=(), health=None, now=0, release=None,
       0. catalogue absence -- an unlisted rung goes to the back of THIS walk.
            Absence is not proof it is gone (run 40280837914), so it still
            keeps its place in the ladder; only a GONE_STATUSES record removes.
-      1. cooling down  -- a model that just cost us time goes last, whatever
-           its history says. A cooling rung is a COST, not a preference.
-      2. health score  -- successes minus failures, highest first. A rung that
-           has answered outranks one that never has, and one that has failed
-           more than it answered falls behind an unmeasured rung. This is the
-           change measured on run 42061741326: eleven failures on the first
-           rung bought twelve more first attempts, while a working rung sat
-           behind it in the seed.
-      3. the owner's seed order -- only a TIE-BREAK now, between rungs health
+      1. provider block -- the seed's provider order is absolute. Gemini rungs
+           stay ahead of Groq, and Groq stays ahead of the shared opencode
+           pool, even when health memory has measured Groq and not Gemini.
+      2. cooling down  -- a model that just cost us time goes last, whatever
+           its history says. A cooling rung is a COST, not a preference. It
+           cannot cross a provider block: provider preference wins.
+      3. health score  -- successes minus failures, highest first, inside one
+           provider block. The 2026-10-25 run proved a working rung must not
+           sit behind eleven failures in the same block.
+      4. the owner's seed order -- only a TIE-BREAK now, between rungs health
            cannot separate. big-pickle still leads an unknown field.
-      4. release date, then id -- deterministic, and only ever separating two
+      5. release date, then id -- deterministic, and only ever separating two
            models health memory has never distinguished.
     """
     health = (health or {}).get("models") or {}
     release = release or {}
     seed_pos = {m: i for i, m in enumerate(seed)}
+    provider_pos = {name: i for i, name in enumerate(_seed_providers(seed))}
     unknown = len(seed_pos)
+    unknown_provider = len(provider_pos)
     absent = set(absent or ())
     candidates = list(candidates)
 
     def key(model):
         row = health.get(model) or {}
         return (
-            1 if on_cooldown(row, now) else 0,   # a cooling rung ends the list
+            provider_pos.get(_provider_name(model), unknown_provider),
+            1 if on_cooldown(row, now) else 0,   # cooling last, inside a block
             -health_score(row),                  # most reliable first
             seed_pos.get(model, unknown),        # the owner breaks a tie
             -int(release.get(model) or 0),       # untried: newer first
@@ -1888,6 +1892,7 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
     # so a ladder of two Gemini projects plus the free pool still costs one
     # request per provider. A provider the seed does not name is never asked.
     catalogues = {provider: list(pool)}
+    status_by_id = dict(disc.get("catalogue_status") or {})
     for name in _seed_providers(seed):
         if name in catalogues:
             continue
@@ -1900,6 +1905,10 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
             continue
         catalogues[name] = [m for m in (extra or [])
                             if isinstance(m, str) and m]
+        # A provider's own status map is the only evidence for its rungs.
+        for model_id, status in ((_meta or {}).get("catalogue_status") or {}).items():
+            if status and not status_by_id.get(model_id):
+                status_by_id[model_id] = status
 
     absent = catalogue_absent(seed, catalogues, info)
     absent_ids = {d["model"] for d in absent}
@@ -1910,7 +1919,6 @@ def select(config, health, cache_path=None, state_note=None, max_models=4,
     # nothing, because the unauthenticated catalogue the runner sees is a
     # different, smaller list that omits five working models. An absent rung is
     # ranked last, not deleted.
-    status_by_id = disc.get("catalogue_status") or {}
     kept = []
     for m in seed:
         status = status_by_id.get(m)
