@@ -255,9 +255,19 @@ def rendered_prompt_chars(prompt_path=None):
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)
-    import private_values  # noqa: E402  (deliberate: after the sys.path insert)
+    try:
+        import private_values  # noqa: E402  (deliberate: after the sys.path insert)
+    except ImportError:
+        private_values = None
+    if not os.path.isfile(prompt_path):
+        return 0
     with open(prompt_path, "r", encoding="utf-8") as handle:
-        return len(private_values.substitute_tokens(handle.read()))
+        text = handle.read()
+    if private_values is None:
+        # A measurement aid is missing; the placeholder count is still honest enough
+        # to report, and it must never stop the payload from being written.
+        return len(text)
+    return len(private_values.substitute_tokens(text))
 
 
 def total_payload_chars(payload, prompt_path=None):
@@ -302,16 +312,23 @@ def main(argv=None):
         fh.write("\n")
     os.replace(tmp_path, args.out_path)
 
-    stats = measure(kept)
+    stats = None
+    try:
+        stats = measure(kept)
+    except Exception:
+        # The payload is already on disk; a broken measurement must not exit non-zero,
+        # because the workflow treats a non-zero exit as "restore the full set".
+        stats = None
     print("trim_candidates: %d -> %d candidate(s) (cap %d, snippet %d) -> %s"
           % (before, len(kept["candidates"]), args.cap, args.snippet_cap,
              args.out_path))
-    print("trim_candidates: prompt %d + candidates %d = %d chars, ~%d tokens "
-          "(budget %d chars: %s)"
-          % (stats["prompt_chars"], stats["candidates_chars"],
-             stats["total_chars"], stats["total_est_tokens"],
-             stats["budget_chars"],
-             "ok" if stats["within_budget"] else "OVER"))
+    if stats is not None:
+        print("trim_candidates: prompt %d + candidates %d = %d chars, ~%d tokens "
+              "(budget %d chars: %s)"
+              % (stats["prompt_chars"], stats["candidates_chars"],
+                 stats["total_chars"], stats["total_est_tokens"],
+                 stats["budget_chars"],
+                 "ok" if stats["within_budget"] else "OVER"))
     return 0
 
 

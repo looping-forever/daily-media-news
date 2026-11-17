@@ -353,5 +353,49 @@ class FieldsThePromptNeverUsesAreDropped(unittest.TestCase):
         self.assertNotIn("_kind", row)
 
 
+class AMeasurementFailureNeverDiscardsThePayload(unittest.TestCase):
+    """A printed number is not worth losing the payload over.
+
+    The workflow restores the FULL candidate set when trim_candidates.py exits
+    non-zero, so a crash AFTER the write replaces a good trimmed file with the
+    very payload that hits the wall. Found by running the shipped workflow block
+    against a tree where the prompt sat somewhere else.
+    """
+
+    def test_a_missing_prompt_counts_as_zero_instead_of_raising(self):
+        with tempfile.TemporaryDirectory(prefix="trim-noprompt-") as tmp:
+            self.assertEqual(
+                0, tc.rendered_prompt_chars(os.path.join(tmp, "absent.md")),
+                "a measurement aid that is not on disk must not abort the trim")
+
+    def test_a_broken_measurement_still_writes_the_trimmed_payload(self):
+        full = seventy_two_candidates()
+        with tempfile.TemporaryDirectory(prefix="trim-measure-") as tmp:
+            in_path = os.path.join(tmp, "candidates.json")
+            out_path = os.path.join(tmp, "candidates_model.json")
+            with open(in_path, "w", encoding="utf-8") as handle:
+                json.dump(full, handle, ensure_ascii=False, indent=2)
+
+            original = tc.measure
+
+            def exploding_measure(*args, **kwargs):
+                raise RuntimeError("estimator unavailable")
+
+            tc.measure = exploding_measure
+            try:
+                rc = tc.main(["--in", in_path, "--out", out_path])
+            finally:
+                tc.measure = original
+
+            self.assertEqual(
+                0, rc,
+                "a non-zero exit makes the workflow copy the full set over the "
+                "trim, which is the wall this module exists to remove")
+            with open(out_path, "r", encoding="utf-8") as handle:
+                model = json.load(handle)
+            self.assertEqual(72, model["candidates_total"])
+            self.assertLessEqual(len(model["candidates"]), tc.MODEL_MAX_CANDIDATES)
+
+
 if __name__ == "__main__":
     unittest.main()
