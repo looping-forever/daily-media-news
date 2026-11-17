@@ -144,11 +144,14 @@ MAX_TOTAL = 140
 #: it can classify anything. It was 4 until 2026-11-12, when run 43235310367 kept
 #: exactly 4 per section and lost 472 rows to this cap -- and the edition still
 #: came out at 2 cards because history dedup then removed half of what survived.
-#: 8 per section is the pool that leaves ~4 after a repeat-heavy dedup, and with
-#: 6-7 sections it is ~56 rows, still far below the 140-row ceiling that was
-#: measured too large to read. The prompt states the cap, so an absent candidate
-#: is never read as a quiet day.
-MAX_PER_DOMAIN = 8
+#: 2026-11-17: four delivered editions shipped from the derived fallback after
+#: the model walk wrote only 5 rows and history dedup removed 3. The latest
+#: model-written run had 475 available rows and dropped 420 to this cap; the next
+#: run had 444 available and dropped 391. The cap, not the supply, was the limit.
+#: 12 per section adds 20 rows across the five binding sections (53 -> 73), still
+#: below the 140-row ceiling. The prompt states the cap, so an absent candidate is
+#: never read as a quiet day.
+MAX_PER_DOMAIN = 12
 
 TITLE_JACCARD_THRESHOLD = 0.7
 SNIPPET_MAX_CHARS = 300
