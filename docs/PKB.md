@@ -13,40 +13,48 @@ self-healing ladder, the repair prompt/clock changes and the provider canary.
 **2026-11-09:** §1's HEAD and test baselines, §42.6 and §25's 24h figure were
 re-checked, and §45 was added for the summariser/article, publisher-URL,
 state-push and alerting changes.
+**2026-11-17:** §1's HEAD, working tree and test baselines were re-checked,
+and §46 was added for the three measured walls, the accepted-attempt writer
+label, the Groq walk removal and the live model-written proof.
 Do not edit product source code from this file; record decisions here instead.
 
-## 1. Repo state (re-verified 2026-11-15; tip and test baselines re-checked 2026-11-15)
+## 1. Repo state (re-verified 2026-11-17; tip and test baselines re-checked 2026-11-17)
 
 - Repo: this repository (git, branch `master`). This section said `main` until
   2026-11-01; no ref of that name exists.
-- HEAD at the 2026-11-15 check: local `2bd185f` ("feat: ntfy is the message and
-  the alarm, so add a second alarm"). `origin/master` is `8957021` ("chore:
-  persist model cooldown state [skip ci]"), one state-only commit ahead; the
-  local checkout does not contain it. **Do not call `8957021` the local HEAD.**
-  **Superseded 2026-11-15:** this line recorded `eb65460` at the 2026-11-09
-  check and `6c806d6` at the 2026-11-07 check. The
+- HEAD at the 2026-11-17 check: local `163bf3b` ("fix: continue thin digest
+  payloads once; drop the Groq walk rungs"). `origin/master` is the same
+  commit; local and remote are level, with no state-only commit ahead.
+  **Superseded 2026-11-17:** this line recorded local `2bd185f` and origin
+  `8957021` at the 2026-11-15 check, `eb65460` at the 2026-11-09 check and
+  `6c806d6` at the 2026-11-07 check. The
   `71cf488`/`11cd7bd`/`d58b657`/`6c806d6` family history remains in §44.
 - Working tree MOVES DURING A SESSION, so a count here is not durable. Measured
-  2026-11-15 at the start of the check: `git status --porcelain` printed only
-  `?? CON`. Measured 2026-11-03: the same `?? CON` at 15:31, then
-  `daily-news.yml`, `tests/digest/test_prebuild_phase.py` and
+  2026-11-17 at the start of the check: `git status --porcelain` printed only
+  `?? CON`. Measured 2026-11-15: the same `?? CON`. Measured 2026-11-03: the
+  same `?? CON` at 15:31, then `daily-news.yml`,
+  `tests/digest/test_prebuild_phase.py` and
   `tests/render/test_render_honesty.py` modified at 15:32 — with no command of
   that session touching them, i.e. a concurrent actor. **Superseded
   2026-11-03:** this line recorded 10 modified files and no untracked files at
   the 2026-11-01 check. Re-run `git status`; do not trust a stored count.
-  Nothing was committed or pushed in either session.
-- Test baselines, 2026-11-15: breaking **120**, workflows **544**, validate
-  **287**, digest **631** (3 skipped), collection **289**, render **542** =
-  **2,413 collected, 2,410 passed, 3 skipped**. **Superseded 2026-11-15:** the
-  2026-11-09 numbers were workflows 536 (`eb65460`), digest 617 (3 skipped),
-  validate 241, collection 270 (`3dd22b7`). **Superseded 2026-11-09:** the
-  2026-11-01 run was workflows 482, render 488, digest 392, collection 254,
-  weather 135, all green; render and weather were not re-measured then, so
-  those old counts were never current. The stale-reading explanation belongs
-  to that older reading: 476 was the count BEFORE the four manual-prebuild
-  publish-gate tests landed, and 480/252 was before the tree-problems negative
-  control (2 tests) and the wet-verdict/outlook-row invariant class (2 tests).
-  One digest run in between failed
+  Nothing was committed or pushed before this check; this session commits
+  `docs/PKB.md` only.
+- Test baseline at the 2026-11-17 check, four suites: digest **666** (3
+  skipped), workflows **562**, breaking **120**, validate **287** = **1,635
+  ran, 0 failed**. Collection and render were not measured this check.
+  **Superseded 2026-11-17:** the 2026-11-15 six-suite baseline was breaking
+  120, workflows 544, validate 287, digest 631 (3 skipped), collection 289,
+  render 542 = 2,413 collected, 2,410 passed, 3 skipped. **Superseded
+  2026-11-15:** the 2026-11-09 numbers were workflows 536 (`eb65460`), digest
+  617 (3 skipped), validate 241, collection 270 (`3dd22b7`). **Superseded
+  2026-11-09:** the 2026-11-01 run was workflows 482, render 488, digest 392,
+  collection 254, weather 135, all green; render and weather were not
+  re-measured then, so those old counts were never current. The stale-reading
+  explanation belongs to that older reading: 476 was the count BEFORE the four
+  manual-prebuild publish-gate tests landed, and 480/252 was before the
+  tree-problems negative control (2 tests) and the wet-verdict/outlook-row
+  invariant class (2 tests). One digest run in between failed
   `test_the_same_input_yields_the_same_payload_bytes` because the payload title
   carries the wall clock and the two builds straddled a minute boundary; the
   test alone passed on re-run and the full suite then passed 392.
@@ -2636,26 +2644,130 @@ index. `Record delivery status` forces both channel flags false and writes
 decision"}`. Re-enabling either is one line. **Superseded 2026-11-15:** §3's
 fallback sentence described the old armed path; it is no longer current.
 
+## 46. 2026-11-17 — three measured walls, the accepted-attempt writer, Groq's walk exit, and the run that proved the model path
+
+The old sentence "the free-model daily quota was spent" was not one wall. Three
+measured walls explained the discarded editions, and each has its own fix.
+
+### 46.1 The walk accepted what the ship gate would throw away (`8320f04`)
+
+Dry run `44020088151` wrote 4 raw stories, one of which was already in history;
+the ship gate counted 3 survivors against a floor of 4, but the walk's raw-count
+gate called the same payload a success and stopped. The derive stage then
+deleted the model-written edition and built the fallback. `stories_ok()` now
+runs the same `validate_stories.py --count-only` pipeline, against the same
+history and active-event state, before accepting anything
+(`.github/workflows/daily-news.yml:1534-1593`). The regression is
+`test_four_raw_three_shippable_due_to_already_sent_is_not_a_success`
+(`tests/workflows/test_agent_walk_step.py:1306`); it asserts the next rung is
+tried and `digest_writer.json` names attempt 2, not a relabelled attempt 1.
+
+### 46.2 Gemini's 250k is INPUT tokens per minute, not a daily allowance (`4e889d3`, `7d442db`)
+
+Dry run `44031039679` wrote 2 stories, then its second attempt died with
+`generate_content_free_tier_input_token_count, limit: 250000 ... input tokens
+per minute limit exceeded`. An agentic attempt re-sends its whole context every
+turn, so an untrimmed collection was the wall itself. The model now reads a
+trimmed copy — 40 candidates, snippet 160 characters, title 220, word-boundary
+ellipsis, and an 80,000-character payload budget
+(`scripts/trim_candidates.py:55-91`, `:188-201`). `state/candidates.json` is
+never mutated and still feeds validation, media passthrough, the derive fallback
+and the audit upload; only `state/candidates_model.json` shrinks
+(`.github/workflows/daily-news.yml:1290-1314`). `7d442db` keeps the trimmed copy
+when the payload measurement fails. The module's own measurement records
+179,827 characters before this cap and 70,053 after, about 45k → 17.5k
+estimated tokens (`trim_candidates.py:81-90`).
+
+### 46.3 A 12–15 prompt produced 3–4 stories, so a buffer cannot carry the floor (`163bf3b`)
+
+Dry run `44049081005` returned 3, 3 and 4 raw stories (2 shippable each); every
+attempt was rejected by the floor of 4 and the edition was discarded. The model
+was not broken — it answered a long request with a short edition. The top-up is
+one continuation of the same rung, per attempt, and only when the payload had at
+least one shippable story and was not short solely because of already-sent
+history. It names the accepted headlines, what was suppressed and why, and how
+many additional distinct stories are needed
+(`.github/workflows/daily-news.yml:1594-1687`, `:1758-1762`). A quota refusal
+that states `Please retry in Ns` is waited out only when the delay leaves enough
+of the walk to pay for the attempt (`:1657-1684`); `WALK_TOTAL_BUDGET_SEC = 1800`
+(`scripts/model_selector.py:1247`). The top-up therefore cannot become a loop or
+borrow the delivery stages' minutes.
+
+### 46.4 The writer label is the accepted attempt, never `fallback` (`399c5b9`)
+
+Run `44042548200` produced a model-written edition on the ladder's second rung
+but recorded `{"rung": "fallback", ...}`, while the derive gate beside it said
+the unsummarised fallback was not used. The label now comes from the producer
+that shipped the payload: `digest_success` writes `state/digest_writer.json`
+with the `attempt_rung` set immediately before that attempt, and the stamp step
+reads it (`.github/workflows/daily-news.yml:1694-1701`, `:1738-1745`). Ladder
+positions are `primary` or `ladder`; `fallback` remains the product's word for an
+edition NO model wrote.
+
+### 46.5 Groq is an HTTP summariser, not an agent-walk rung (`033deb8`, `a0e80cc`, `163bf3b`)
+
+`GROQ_API_KEY_2` added `groq-key2/*` HTTP rungs directly behind `groq/*`
+(`scripts/llm_providers.py:136-182`), and the Groq output ceiling is 4096
+(`GROQ_MAX_OUTPUT = 4096`, `:83`). Both Groq CLI rungs were then removed from the
+walk because the served model fails `tool calling is not supported with this
+model`; the configured ladder is now ten rungs — four Gemini and six
+`opencode/*` seeds (`config/opencode.json:5-16`;
+`.github/workflows/daily-news.yml:1243-1250`). Live discovery can still add pool
+ids: run `44076910082` resolved 16 rungs. Groq still serves the summariser
+through `scripts/llm_providers.py`.
+
+### 46.6 The 2026-11-17 run proves the model path, not delivery
+
+Run `44076910082` at `163bf3b` finished success. Its artifact
+`state/stories.validated.json` has `edition_kind: "full"`, seven stories, and
+`summary_counts: {"summarised": 7, "publisher": 0, "extracted": 0, "none": 0,
+"total": 7}` — 7/7 AI-written. The writer is `{"rung": "ladder", "attempt": 2,
+"model": "gemini/gemini-3.1-flash-lite"}`. Provenance:
+`candidates=73 raw=8 schema-survivors=8 after-history-dedup=7
+after-event-dedup=7 would-ship=7`, with floor 4 and kept 7. Attempt 1 still hit
+the Gemini per-minute input wall (`limit: 250000`, `Please retry in 8.314s`),
+was cooled for 6h, and attempt 2 produced the edition; top-ups used: 0. The
+run's delivery marker says `dry_run: true`, `delivered: false`, so this proves
+generation, not publication.
+
+### 46.7 Open risk, stated plainly
+
+Attempt 1 still hits Gemini's per-minute input quota on a heavy evening. An
+occasional fallback is therefore expected capacity behaviour, not a defect. The
+top-up keeps a thin answer from being discarded; it does not remove that wall.
+
+### 46.8 Baselines at `163bf3b`
+
+The four-suite baseline is digest **666** (3 skipped), workflows **562**,
+breaking **120** and validate **287** — **1,635 ran, 0 failed**. Collection and
+render were not measured this check. See §1 for the superseded six-suite
+baseline.
+
 ---
 
-Newest amendments: §45 (2026-11-09, amended 2026-11-15: the second alarm and
-the Gmail/Telegram off-switch; earlier: the summariser partial-answer/retirement
-changes, bounded article text, publisher-URL and direct-feed preference, the
-state push and the alerting fixes), §44 (2026-11-06, amended 2026-11-07 and
-2026-11-15: the model ladder as it actually stands, catalogue absence as order
-evidence, the 2026-11-15 ladder incident, repair and the provider canary), then §43 (the
-single summary predicate and the counts every surface reads), then §42 (2026-11-03, the digest story floor, weather AQI, the
-breaking ladder and probe, honesty-gate recovery and `commit_state.sh`),
-followed by §41 (2026-10-10, the at-least-once delivery contract, the
-single-cron dispatcher, and the health check that hid a half-applied deploy),
-and §40 (2026-10-10, the delivery-ledger mirror and the two open
-redesigns), §39 (2026-10-03, worker liveness — **its Check-16 sentence and its
-cron arithmetic are corrected/superseded by §41**) and §38 (2026-10-03,
-digest archive origin access control). §§38-40 are the security control, the
-worker liveness contract and the open redesigns; §§31-37 are the
+Newest amendments: §46 (2026-11-17: the three measured walls, the accepted-attempt
+writer label, Groq's HTTP-only role and ten-rung configured walk, and run
+`44076910082` as model-path proof rather than delivery), §45 (2026-11-09,
+amended 2026-11-15: the second alarm and the Gmail/Telegram off-switch; earlier:
+the summariser partial-answer/retirement changes, bounded article text,
+publisher-URL and direct-feed preference, the state push and the alerting
+fixes), §44 (2026-11-06, amended 2026-11-07 and 2026-11-15: the model ladder as
+it actually stands, catalogue absence as order evidence, the 2026-11-15 ladder
+incident, repair and the provider canary), then §43 (the single summary
+predicate and the counts every surface reads), then §42 (2026-11-03, the digest
+story floor, weather AQI, the breaking ladder and probe, honesty-gate recovery
+and `commit_state.sh`), followed by §41 (2026-10-10, the at-least-once delivery
+contract, the single-cron dispatcher, and the health check that hid a
+half-applied deploy), and §40 (2026-10-10, the delivery-ledger mirror and the
+two open redesigns), §39 (2026-10-03, worker liveness — **its Check-16
+sentence and its cron arithmetic are corrected/superseded by §41**) and §38
+(2026-10-03, digest archive origin access control). §§38-40 are the security
+control, the worker liveness contract and the open redesigns; §§31-37 are the
 personal-relevance, weather-engine, guardrail, operations and risk record;
-§§23-30 are the phase-1 reliability rebuild. Read §§23-45 first for current
+§§23-30 are the phase-1 reliability rebuild. Read §§23-46 first for current
 reality, and read **§38 before making any claim about the digest archive's
 privacy**.
+
+HEAD at this amendment: `163bf3b`.
 
 
