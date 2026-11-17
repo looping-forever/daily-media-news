@@ -1490,6 +1490,48 @@
       "title": "UK seeks closer ties with EU after Brexit fail",
       "category": "world_major",
       "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "theguardian.com/us-news/2026/nov/16/fiona-hippo-eats-hat-cincinnati",
+      "title_hash": "8e398836cd991816bc73a9ef4be386d033a4f7c4",
+      "title": "Fiona the hippo under veterinary care after eating hat at Cincinnati zoo",
+      "category": "world_major",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "theguardian.com/world/2026/nov/16/eu-states-immigration-return-hubs-rwanda",
+      "title_hash": "2e80e8a86e2dbf1afed1695b54634851bcbd79a1",
+      "title": "Five EU states announce plans for immigration ‘return hubs’ in Rwanda",
+      "category": "world_major",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "english.onlinekhabar.com/lumbini-sudurpaschim-high-stakes-npl.html",
+      "title_hash": "faf28679b730543964261f89c929e6a5d0f6b6b5",
+      "title": "Lumbini and Sudurpaschim set for high-stakes battle for direct place in NPL final",
+      "category": "nepal",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/climate/minister-chaudhary-requests-additional-support-from-adb",
+      "title_hash": "274ed03faad0ea432d13e01175bbdbea1822dba1",
+      "title": "Minister Chaudhary requests additional support from ADB",
+      "category": "nepal",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "blog.report-uri.com/worlds-largest-brands-infected-with-malware-via-optimizely",
+      "title_hash": "0bfe7642f5e31d77332402f25b73a8a55eba0eb5",
+      "title": "Optimizely Compromised, Served Malware on Zoom, GitLab",
+      "category": "tech_career",
+      "date_sent": "2026-11-17"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/17/575854",
+      "title_hash": "cc6c2b7c5987ee3cf4396e86a67157b5b2561538",
+      "title": "Rasuwa’s scenic Dilpu Kunda seeks its place on tourism map",
+      "category": "nepal",
+      "date_sent": "2026-11-17"
     }
   ]
 }
