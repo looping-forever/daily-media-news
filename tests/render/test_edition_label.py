@@ -531,6 +531,34 @@ class TheSubjectStatesTheDerivedKind(unittest.TestCase):
         subject = self.subject_of({"digest_time": "morning", "stories": []})
         self.assertEqual("Daily Media News - morning - 2026-11-05", subject)
 
+    def test_a_model_written_partial_edition_gets_the_model_note(self):
+        """The note names the AI because an AI wrote it -- never "fallback".
+
+        Run 44042548200 sealed a fully model-written digest as
+        `writer.rung = "fallback"` (it was the ladder's second rung) while the
+        derive gate beside it said the unsummarised fallback was not used. The
+        word a reader is shown has to come from who wrote the edition.
+        """
+        data = self.payload("partial", 4, 15)
+        data["writer"] = {"rung": "ladder", "attempt": 2, "model": "gemini/x"}
+        subject = self.subject_of(data)
+        self.assertIn("AI summary for 4 of 15 stories", subject,
+                      "a model-written partial edition does not name the AI that "
+                      "wrote it: %r" % subject)
+        self.assertNotIn("fallback", subject,
+                         "a model-written edition is called a fallback edition: "
+                         "%r" % subject)
+
+    def test_a_derived_edition_still_reports_the_fallback_wording(self):
+        data = self.payload("partial", 4, 15)
+        data["writer"] = {"rung": "derived", "attempt": None, "model": None}
+        subject = self.subject_of(data)
+        self.assertIn("fallback edition (4 of 15 stories summarised)", subject,
+                      "an edition NO model wrote lost the only word that says so: "
+                      "%r" % subject)
+        self.assertNotIn("AI summary for", subject,
+                         "a derived edition claims an AI summary: %r" % subject)
+
 
 class TheSealAndTheWorkerReadTheDerivedKind(unittest.TestCase):
     """The two consumers that cannot be executed here are pinned as TEXT.

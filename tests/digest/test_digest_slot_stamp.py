@@ -186,14 +186,46 @@ class TheStampCarriesTheWriterTests(unittest.TestCase):
     def test_a_model_written_payload_names_the_rung_that_wrote_it(self):
         result, payload = self._run(
             {"digest_time": "morning", "stories": [{"title": "s"}]},
-            writer={"rung": "fallback", "attempt": 3, "model": "opencode/x"})
+            writer={"rung": "ladder", "attempt": 3, "model": "opencode/x"})
         self.assertEqual(0, result.returncode, result.stderr or result.stdout)
         self.assertEqual(
-            {"rung": "fallback", "attempt": 3, "model": "opencode/x"},
+            {"rung": "ladder", "attempt": 3, "model": "opencode/x"},
             payload.get("writer"),
             "the artifact cannot say a fallback edition is degraded if the "
             "payload never carries the rung. Payload: %r" % payload)
-        self.assertIn("Digest writer: fallback", result.stdout)
+        self.assertIn("Digest writer: ladder", result.stdout)
+
+    def test_the_accepted_attempt_record_wins_over_a_present_edition_kind(self):
+        """Run 44042548200: a MODEL-WRITTEN digest labelled `fallback`.
+
+        That edition was written by a model, on the ladder's second rung, and its
+        four stories all carried a summary -- yet it sealed as
+        `{"rung": "fallback", "attempt": 2, "model": "gemini/..."}` while the
+        derive gate beside it said "the unsummarised fallback is not used".
+        `edition_kind` is computed for EVERY edition, so testing it before the
+        walk's own record is what let a model-written payload be labelled as if
+        no model had written it.
+        """
+        record = {"rung": "ladder", "attempt": 2,
+                  "model": "gemini/gemini-3.1-flash-lite"}
+        result, payload = self._run(
+            {"digest_time": "morning", "edition_kind": "full",
+             "summary_counts": {"summarised": 4, "total": 4},
+             "stories": [{"title": "s"}]},
+            writer=record)
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertEqual(record, payload.get("writer"),
+                         "a model-written edition was relabelled from the "
+                         "payload's edition_kind instead of from the record of "
+                         "the attempt that was accepted. Payload: %r" % payload)
+        self.assertNotIn("fallback", str(payload.get("writer")),
+                         "a model-written edition names itself a fallback "
+                         "edition, which is the name for an edition NO model "
+                         "wrote. Writer: %r" % (payload.get("writer"),))
+        self.assertIn("Digest writer: ladder (attempt 2, model "
+                      "'gemini/gemini-3.1-flash-lite')", result.stdout,
+                      "the log cannot say which model and rung produced this "
+                      "edition:\n%s" % result.stdout)
 
     def test_a_derived_payload_names_the_deriver_and_no_model(self):
         result, payload = self._run(
@@ -205,6 +237,32 @@ class TheStampCarriesTheWriterTests(unittest.TestCase):
             payload.get("writer"),
             "an unsummarised edition must name the deriver, not inherit a "
             "writer record from an earlier step")
+
+    def test_the_derivers_own_statement_beats_a_stale_walk_record(self):
+        """The walk can accept and the derive gate can still replace the payload.
+
+        These are the two producer statements: the deriver writes
+        `writer.rung = "derived"` into the payload it wrote, and an accepting
+        walk writes `state/digest_writer.json`. If the payload in hand is the
+        deriver's, IT is the statement that describes it -- reading the walk's
+        record first would give a derived edition a model's note, which is the
+        run 44042548200 disagreement in the other direction.
+        """
+        result, payload = self._run(
+            {"digest_time": "morning", "edition_kind": "partial",
+             "writer": {"rung": "derived", "attempt": None, "model": None},
+             "stories": [{"title": "s"}]},
+            writer={"rung": "ladder", "attempt": 2, "model": "gemini/x"})
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertEqual(
+            {"rung": "derived", "attempt": None, "model": None},
+            payload.get("writer"),
+            "the deriver's payload was relabelled as model-written from a "
+            "record left by an earlier accepted attempt. Payload: %r" % payload)
+        self.assertIn("Digest writer: derived", result.stdout)
+        self.assertNotIn("gemini/x", result.stdout,
+                         "an edition NO model wrote named a model:\n%s"
+                         % result.stdout)
 
     def test_a_primary_rung_is_carried_unchanged(self):
         result, payload = self._run(

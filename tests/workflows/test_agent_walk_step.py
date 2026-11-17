@@ -89,6 +89,19 @@ def agent_step_run_block():
     )
 
 
+STAMP_STEP_NAME = "Stamp the digest slot from DIGEST_TIME"
+
+
+def stamp_step_run_block():
+    """The stamp step's `run:` text: the only reader of the walk's record."""
+    for _job, step, run, _step in W.iter_run_blocks(WORKFLOW):
+        if step == STAMP_STEP_NAME:
+            return run
+    raise AssertionError(
+        "no `run:` block named %r in %s. The step that carries the accepted "
+        "attempt's rung into the payload is gone." % (STAMP_STEP_NAME, WORKFLOW))
+
+
 # --------------------------------------------------------------------------
 # Stubs
 # --------------------------------------------------------------------------
@@ -956,9 +969,11 @@ class AcceptanceFloorTests(AgentWalkHarness):
             "Rejecting state/stories.json: 3 shippable of 3 stories", proc.stdout)
         writer = json.loads((art["stories"].parent / "digest_writer.json")
                             .read_text(encoding="utf-8"))
-        self.assertEqual("fallback", writer["rung"],
+        self.assertEqual("ladder", writer["rung"],
                          "the second model's payload was recorded as the primary "
-                         "rung, so the seal would call a fallback edition fresh")
+                         "rung, so the seal would call a fallback edition fresh; "
+                         "and it must not say 'fallback', which is the product's "
+                         "name for an edition no model wrote")
 
     def test_four_stories_is_accepted_at_the_floor(self):
         proc, art = self.run_step(
@@ -1038,9 +1053,75 @@ class WalkAcceptsOnlyWhatTheShipGateWouldShip(AgentWalkHarness):
         writer = json.loads((art["stories"].parent / "digest_writer.json")
                             .read_text(encoding="utf-8"))
         self.assertEqual(
-            {"rung": "fallback", "attempt": 2, "model": "opencode/b"}, writer,
+            {"rung": "ladder", "attempt": 2, "model": "opencode/b"}, writer,
             "the accepted edition must be attempt 2's model-written payload, "
             "not attempt 1's 3-shippable payload relabelled as healthy")
+
+
+class TheRungIsTheAcceptedAttemptTests(AgentWalkHarness):
+    """The rung comes from the attempt that was ACCEPTED, not from a default.
+
+    Run 44042548200: attempt 2 (`gemini/gemini-3.1-flash-lite`) wrote a complete
+    model-written edition with 4 of 5 stories surviving the floor, and the
+    payload still recorded `{"rung": "fallback", ...}` -- the product's name for
+    an edition NO model wrote -- while the derive gate beside it said the
+    unsummarised fallback was not used.
+
+    The walk's exit status is not evidence either way: the step is
+    `continue-on-error`, so a non-zero exit still hands an accepted payload on.
+    The label has to come from the record written at acceptance.
+    """
+
+    def test_a_non_zero_step_exit_still_names_the_accepted_attempt(self):
+        # The timings write is the step's LAST command. A corrupt file makes it
+        # fail AFTER the payload was accepted, which is the shape a real run can
+        # take: the step exits non-zero and the accepted payload is still there.
+        (self.tmp / "state" / "timings.json").write_text(
+            "not json", encoding="utf-8")
+        # The measured shape: attempt 1 is below the floor, attempt 2 on the
+        # LADDER's second rung writes the edition that ships.
+        proc, art = self.run_step(pool=["opencode/a", "opencode/b"],
+                                  plan="opencode/a:three opencode/b:ok")
+        self.assertNotEqual(
+            0, proc.returncode,
+            "the harness did not reproduce the shape under test: the step was "
+            "expected to fail after acceptance. stdout:\n%s" % proc.stdout)
+        self.assertTrue(art["stories"].is_file(),
+                        "the accepted payload was lost even though the walk had "
+                        "already accepted it")
+        record = json.loads((art["stories"].parent / "digest_writer.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual(
+            {"rung": "ladder", "attempt": 2, "model": "opencode/b"}, record,
+            "a non-zero step exit changed the record of the attempt that was "
+            "accepted: it must name attempt 2's model and a ladder rung. "
+            "Record: %r" % (record,))
+        self.assertNotIn(
+            "fallback", json.dumps(record).lower(),
+            "a model-written edition names itself a fallback edition, which is "
+            "the name for an edition NO model wrote. Record: %r" % (record,))
+
+        stamped = W.run_bash_script(
+            stamp_step_run_block(),
+            env_overrides={"DIGEST_TIME": "morning"}, cwd=self.tmp,
+            bash=self.bash, timeout=60)
+        self.assertEqual(0, stamped.returncode,
+                         "the stamp step failed on the accepted payload:\n%s\n%s"
+                         % (stamped.stdout, stamped.stderr))
+        payload = json.loads(art["stories"].read_text(encoding="utf-8"))
+        self.assertEqual(
+            record, payload.get("writer"),
+            "the stamp did not carry the accepted attempt's rung into the "
+            "payload. Payload writer: %r" % (payload.get("writer"),))
+        self.assertIn(
+            "Digest writer: ladder (attempt 2, model 'opencode/b')",
+            stamped.stdout,
+            "the log cannot say which model and rung produced this edition:\n%s"
+            % stamped.stdout)
+        self.assertNotIn(
+            "Digest writer: fallback", stamped.stdout,
+            "a model-written edition was reported as a fallback edition:\n%s"
+            % stamped.stdout)
 
 
 # ==========================================================================

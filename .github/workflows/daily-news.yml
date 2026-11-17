@@ -1411,6 +1411,10 @@ jobs:
           case "$MIN" in ''|*[!0-9]*) MIN=90;; esac
           deadline=$(( $(date +%s) + BUDGET ))
           tried=0
+          # Named by the branch that runs the attempt, never by a default: an
+          # empty value here means no attempt has been made, and `digest_success`
+          # writes that fact instead of inventing a rung for it.
+          attempt_rung=""
           last_err="unknown"
           cycle=0
           contention_only=0
@@ -1530,8 +1534,12 @@ jobs:
             python3 scripts/model_selector.py --record "$1" ok || true
             # WHICH RUNG WROTE IT. The artifact needs this: a digest from the
             # primary rung is healthy, one from a later rung or a retry is a
-            # degraded edition and must never seal as fresh.
-            ATTEMPT="$tried" MODEL="$1" RUNG="${attempt_rung:-primary}" python3 -c "import json,os;a=int(os.environ['ATTEMPT']);json.dump({'rung':os.environ['RUNG'],'attempt':a,'model':os.environ['MODEL']},open('state/digest_writer.json','w',encoding='utf-8'))" || true
+            # degraded edition and must never seal as fresh. The value comes from
+            # the attempt that was ACCEPTED -- `attempt_rung` is set immediately
+            # before every `run_digest_attempt` -- never from a default, and this
+            # record is the ONLY statement a model-written payload has about its
+            # author. The stamp step reads it, so nothing downstream re-decides.
+            ATTEMPT="$tried" MODEL="$1" RUNG="$attempt_rung" python3 -c "import json,os;a=int(os.environ['ATTEMPT']);json.dump({'rung':os.environ['RUNG'],'attempt':a,'model':os.environ['MODEL']},open('state/digest_writer.json','w',encoding='utf-8'))" || true
             ok=1
           }
           : > state/agent-attempts.log
@@ -1569,10 +1577,13 @@ jobs:
                 break
               fi
               # WHICH RUNG THIS ATTEMPT IS. The ladder's FIRST model is the
-              # primary rung, any later one is a fallback, and the two one-shot
-              # retries below name themselves. This is what the seal reads, so a
-              # wrong label here is a thin edition sealed as healthy.
-              if [ "$tried" = "0" ]; then attempt_rung="primary"; else attempt_rung="fallback"; fi
+              # primary rung, any later one is a `ladder` rung, and the two
+              # one-shot retries below name themselves. This is what the seal
+              # reads, so a wrong label here is a thin edition sealed as healthy.
+              # `ladder`, never `fallback`: "fallback edition" is the product's
+              # name for an edition NO MODEL wrote, so a model-written digest
+              # that happens to sit on the second rung must not carry that word.
+              if [ "$tried" = "0" ]; then attempt_rung="primary"; else attempt_rung="ladder"; fi
               tried=$((tried+1))
               rm -f state/stories.json
               run_digest_attempt "$model" "$allow"
@@ -2056,14 +2067,22 @@ jobs:
           if written != slot:
               print('Slot correction: the payload said %r, this run is %r' % (written, slot))
           payload['digest_time'] = slot
-          # WHICH RUNG WROTE THIS EDITION, carried into the payload so the seal
-          # can say a fallback edition is degraded. A derived edition has no
-          # model by definition; a model-written one names the attempt that
-          # wrote it, recorded by `digest_success`.
+          # WHICH PRODUCER SHIPPED THIS EDITION, read from that producer's own
+          # statement and from nothing else. Two statements exist: the deriver
+          # writes `writer.rung = "derived"` into the payload it writes, and an
+          # accepting walk writes `state/digest_writer.json` naming the attempt it
+          # accepted. The derived statement wins, because the walk can accept and
+          # the derive gate can still replace the payload; otherwise the accepted
+          # record wins. `edition_kind` is NOT authorship -- validation computes it
+          # for every edition, model-written ones included -- so it is only the
+          # last resort for a payload that carries no producer statement at all.
           writer = None
-          if str(payload.get('edition_kind') or '') in ('unsummarised', 'partial', 'full'):
+          declared = payload.get('writer')
+          declared_rung = (str(declared.get('rung') or '').strip()
+                           if isinstance(declared, dict) else '')
+          if declared_rung.lower() == 'derived':
               writer = {'rung': 'derived', 'attempt': None, 'model': None}
-          elif os.path.isfile('state/digest_writer.json'):
+          if writer is None and os.path.isfile('state/digest_writer.json'):
               try:
                   with open('state/digest_writer.json', encoding='utf-8') as fh:
                       recorded = json.load(fh)
@@ -2075,6 +2094,12 @@ jobs:
                   writer = {'rung': str(recorded.get('rung')),
                             'attempt': recorded.get('attempt'),
                             'model': recorded.get('model')}
+          if writer is None and declared_rung:
+              writer = {'rung': declared_rung,
+                        'attempt': declared.get('attempt'),
+                        'model': declared.get('model')}
+          if writer is None and str(payload.get('edition_kind') or '') in ('unsummarised', 'partial', 'full'):
+              writer = {'rung': 'derived', 'attempt': None, 'model': None}
           if writer is not None:
               payload['writer'] = writer
               print('Digest writer: %s (attempt %r, model %r)'
