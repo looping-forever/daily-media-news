@@ -115,6 +115,15 @@ state/ntfy_payload.json
 # and the cleanup cannot leave it in the working tree.
 state/summarise-debug.json
 
+# The model-facing slice of the candidate set that scripts/trim_candidates.py
+# writes for the agent walk, and its one-per-category fallback. They are a
+# hand-over between two steps in one run, never a repository fact: the FULL set
+# in state/candidates.json is the collection of record. Removed by "Clean
+# transient state files"; listed here so a run killed between the write and the
+# cleanup cannot leave a payload in the working tree.
+state/candidates_model.json
+state/candidates.model_trimmed.json
+
 # Test / dry-run artifacts (never commit)
 state/email.txt
 pytest_output.txt

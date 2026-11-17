@@ -1021,7 +1021,7 @@ jobs:
         # Never touches state/history.json or state/digest-archive/.
         run: |
           set -eo pipefail
-          rm -f state/stories.json state/stories.validated.json state/email.html state/email.txt state/candidates.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok
+          rm -f state/stories.json state/stories.validated.json state/email.html state/email.txt state/candidates.json state/candidates_model.json state/candidates_limited.json state/candidates.model_trimmed.json state/timings.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok
 
       - name: Record checkout timing
         if: env.FALLBACK_NOOP != 'true'
@@ -1215,7 +1215,7 @@ jobs:
           TODAY: ${{ env.TODAY }}
           DIGEST_TIME: ${{ steps.digest_time.outputs.time }}
           TZ: Asia/Kathmandu
-          CANDIDATES_PATH: ${{ github.workspace }}/state/candidates.json
+          CANDIDATES_PATH: ${{ github.workspace }}/state/candidates_model.json
           # The simulation switch, read from `github.event.inputs` -- which only
           # a workflow_dispatch populates -- and the event name beside it, so
           # the script can refuse the flag on any other event. A cron run gets
@@ -1269,6 +1269,31 @@ jobs:
               echo "Digest not built: 0 attempt(s) over 1 cycle(s) in 0 min. The walk stopped on a quota wall (last error: quota_or_rate_limited on simulated (shared pool)): simulated, so no id was tried and no cooldown was recorded. The derive step below builds the unsummarised edition from the collected candidates."
               exit 1
             fi
+          fi
+          # ---- MODEL-FACING PAYLOAD ------------------------------------------
+          # THE FREE TIER'S INPUT BILL IS PAID ONCE PER TURN. Dry run 44031039679
+          # wrote 2 stories, then its second attempt died with
+          # `generate_content_free_tier_input_token_count, limit: 250000 ...
+          # input tokens per minute limit exceeded`. An agentic attempt re-sends
+          # its whole context on every turn, so an untrimmed collection is the
+          # wall itself -- not output quality, not the model.
+          #
+          # The agent therefore reads a TRIMMED copy. state/candidates.json keeps
+          # every collected candidate and is what validation, media passthrough,
+          # the derive fallback and the audit upload all read; only the file the
+          # model is told to open shrinks. On a trim failure the full file is
+          # copied into place: a digest that may hit the wall beats no digest.
+          if [ -f state/candidates.json ]; then
+            if python3 scripts/trim_candidates.py \
+                 --in state/candidates.json \
+                 --out state/candidates_model.json; then
+              :
+            else
+              echo "::warning::trim_candidates.py failed: the agent reads the FULL candidate set, so the walk may hit the free-tier input-token wall"
+              cp state/candidates.json state/candidates_model.json
+            fi
+          else
+            echo "::warning::no state/candidates.json to trim: the agent runs against an absent candidate set"
           fi
           # ---- PROVIDER PREFLIGHT -------------------------------------------
           # The leading rungs are a second provider, and that provider exists
@@ -1569,21 +1594,24 @@ jobs:
               # and can never double the walk.
               if [ "$run_rc" = "0" ] && [ "$reduced_retry_used" = "0" ] \
                 && [ -f state/candidates.json ] \
+                && [ -f state/candidates_model.json ] \
                 && python3 scripts/reduce_candidates.py --in state/candidates.json \
                      --out state/candidates_limited.json --per-category 1; then
                 reduced_retry_used=1
-                # The prompt names state/candidates.json as PRIMARY INPUT, so the
-                # reduced set is swapped INTO that path and the full set restored
-                # afterwards: an env var alone would leave the agent reading the
-                # oversized file the retry exists to avoid.
-                cp state/candidates.json state/candidates.full.json
-                cp state/candidates_limited.json state/candidates.json
+                # The prompt names state/candidates_model.json as PRIMARY INPUT,
+                # so the reduced set is swapped INTO that path and the trimmed
+                # file restored afterwards. `state/candidates.json` -- the FULL
+                # set that validation, media passthrough and the audit upload
+                # read -- is never touched, so the retry cannot shrink what the
+                # ship gate sees.
+                cp state/candidates_model.json state/candidates.model_trimmed.json
+                cp state/candidates_limited.json state/candidates_model.json
                 tried=$((tried+1))
                 rm -f state/stories.json
                 attempt_rung="reduced"
-                echo "Attempt $tried re-tests $model on the reduced candidate set (one bounded retry per run; the full set is restored afterwards)"
+                echo "Attempt $tried re-tests $model on the reduced candidate set (one bounded retry per run; the trimmed set is restored afterwards)"
                 run_digest_attempt "$model" "$allow"
-                mv -f state/candidates.full.json state/candidates.json
+                mv -f state/candidates.model_trimmed.json state/candidates_model.json
                 if stories_ok; then
                   digest_success "$model" "$allow"
                   break
@@ -5666,6 +5694,10 @@ jobs:
           # (`json.dump(..., ensure_ascii=False, indent=2)`) with the fixture
           # text lengths: 1,403,697 bytes = 1.34 MiB for 3,300 candidates, about
           # 2.0 MiB at the SNIPPET_MAX_CHARS ceiling, kept 7 days.
+          #
+          # state/candidates_model.json rides beside it because it is the payload
+          # the MODEL actually read: a quota postmortem needs both the full set
+          # and the trimmed copy that was trimmed from it.
           path: |
             state/email.html
             state/email.txt
@@ -5673,6 +5705,7 @@ jobs:
             state/agent-log.txt
             state/ntfy_payload.json
             state/candidates.json
+            state/candidates_model.json
             state/summarise-debug.json
             docs/digests/${{ env.TODAY }}-${{ steps.digest_time.outputs.time }}.html
           retention-days: 7
@@ -5815,7 +5848,7 @@ jobs:
         # immediately after the mirror is written, so nothing later sees it.
         run: |
           set -eo pipefail
-          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_limited.json state/candidates.full.json state/timings.json state/digest_writer.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json state/summarise-debug.json
+          rm -f state/stories.json state/email.txt state/agent-log.txt state/candidates.json state/candidates_model.json state/candidates_limited.json state/candidates.model_trimmed.json state/timings.json state/digest_writer.json state/.website_ok state/.ntfy_ok state/.gmail_ok state/.telegram_ok state/ntfy_payload.json state/summarise-debug.json
 
       - name: Commit state changes
         # DRY_RUN guard: `git push` is an outward-facing side effect, so a dry

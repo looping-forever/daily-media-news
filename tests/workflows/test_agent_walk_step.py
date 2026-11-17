@@ -196,7 +196,7 @@ case "$outcome" in
     if [ -f "$counter" ]; then n=$(cat "$counter"); fi
     n=$((n+1))
     printf '%s' "$n" > "$counter"
-    if [ "$n" -ge 2 ] && grep -q candidates_per_category state/candidates.json 2>/dev/null; then
+    if [ "$n" -ge 2 ] && grep -q candidates_per_category state/candidates_model.json 2>/dev/null; then
       printf '{"stories": [%s]}\n' "$four" > state/stories.json
       exit 0
     fi
@@ -427,6 +427,9 @@ class AgentWalkHarness(unittest.TestCase):
         for name in ("model_watchdog.py", "model_selector.py",
                      "render_prompt.py", "private_values.py",
                      "reduce_candidates.py",
+                     # The step trims the candidate payload before the walk; the
+                     # measurement that number exists for is asserted here too.
+                     "trim_candidates.py",
                      # The walk now accepts exactly what the derive gate would
                      # ship, by running the real validator. Its whole import
                      # closure is copied, not stubbed: a stand-in here would
@@ -464,7 +467,7 @@ class AgentWalkHarness(unittest.TestCase):
             "TODAY": "2026-10-18",
             "DIGEST_TIME": "morning",
             "TZ": "Asia/Kathmandu",
-            "CANDIDATES_PATH": "%s/state/candidates.json" % self.tmp,
+            "CANDIDATES_PATH": "%s/state/candidates_model.json" % self.tmp,
         }
         # Workflow-level `env:` reaches every step, so the harness must supply it
         # too. STORIES_FLOOR lives there -- one line defines the floor for the
@@ -1221,9 +1224,16 @@ class ReducedCandidateRetryTests(AgentWalkHarness):
             encoding="utf-8"))
         self.assertEqual(
             6, len(full["candidates"]),
-            "the full candidate set must be restored: later steps read this "
-            "file and must see collection's own output")
+            "the full candidate set must be untouched by the retry: later steps "
+            "read this file and must see collection's own output")
         self.assertNotIn("candidates_per_category", full)
+        model = json.loads((self.tmp / "state" / "candidates_model.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual(
+            6, len(model["candidates"]),
+            "the trimmed file must be RESTORED after the retry, or the next "
+            "cycle would run on the one-per-category set")
+        self.assertNotIn("candidates_per_category", model)
 
     def test_the_retry_cannot_double_the_walk(self):
         """Three models, all failing without a file -> four calls, not six."""
@@ -1246,6 +1256,91 @@ class ReducedCandidateRetryTests(AgentWalkHarness):
         self.assertEqual(1, proc.returncode)
         self.assertEqual(["opencode/a"], art["models"])
         self.assertNotIn("re-tests", proc.stdout)
+
+
+# ==========================================================================
+# 2b. The model-facing payload -- trimmed for the model, full on disk
+# ==========================================================================
+
+
+class ModelPayloadTrimTests(AgentWalkHarness):
+    """The step must trim ONE file and leave the collected set alone.
+
+    Measured (dry run 44031039679): the free tier's 250,000 input-tokens-per-
+    minute ceiling killed the second attempt of a walk whose first attempt had
+    already written 2 stories. An agentic attempt re-sends its whole context on
+    every turn, so the collection itself is the wall. The shipped step therefore
+    trims the payload the agent reads.
+
+    What must NOT change: `state/candidates.json` is what validation, media
+    passthrough, the derive fallback and the audit upload read. If the trim ever
+    rewrote it, the ship gate would start judging a subset and silently drop
+    stories whose source row it could no longer see.
+    """
+
+    DOMAINS = ("world", "nepal", "tech_career", "local_city", "entertainment",
+               "education_tu", "college_local", "bank_local", "weather_forecast")
+
+    def seed_full_payload(self, per_domain=8):
+        rows = []
+        for dom in self.DOMAINS:
+            for i in range(per_domain):
+                rows.append({
+                    "title": "%s story %d with a headline of realistic length" % (dom, i),
+                    "url": "https://news.example.test/%s/%d?utm_source=rss&utm_medium=feed" % (dom, i),
+                    "source": "news.example.test",
+                    "published": "2026-10-1%dT0%d:00:00+00:00" % (i % 10, i % 10),
+                    "snippet": ("%s report %d: " % (dom, i)) + "detail " * 40,
+                    "domain_category": dom,
+                    "language": "en",
+                })
+        payload = {"collected_at": "2026-10-18T00:00:00+00:00",
+                   "sources_ok": ["a"], "sources_failed": [],
+                   "source_results": [{"name": "a", "ok": True}],
+                   "weather_summary": "clear", "weather_advice": [],
+                   "candidates": rows}
+        path = self.tmp / "state" / "candidates.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+        return path, payload
+
+    def test_the_agent_reads_a_trimmed_file_and_the_full_set_is_untouched(self):
+        path, payload = self.seed_full_payload()
+        before = path.read_bytes()
+
+        proc, _art = self.run_step(pool=["opencode/a"], plan="opencode/a:ok")
+        self.assertGreen(proc, "trimmed payload")
+
+        self.assertIn("trim_candidates:", proc.stdout,
+                      "the step did not report trimming the payload:\n%s"
+                      % proc.stdout)
+        self.assertEqual(
+            before, path.read_bytes(),
+            "state/candidates.json was rewritten: the full collection must stay "
+            "on disk byte for byte, because validation and the audit upload read "
+            "that file, not the trimmed copy")
+
+        model_path = self.tmp / "state" / "candidates_model.json"
+        self.assertTrue(model_path.is_file(),
+                        "the step did not write the file the agent is told to read")
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        self.assertLess(
+            len(model["candidates"]), len(payload["candidates"]),
+            "the model-facing payload was not reduced at all")
+        self.assertLessEqual(len(model["candidates"]), 40,
+                             "the model-facing candidate count is uncapped")
+        self.assertEqual(len(payload["candidates"]),
+                         model["candidates_total"],
+                         "the trimmed file must say how many rows the FULL "
+                         "collection held, or the agent cannot tell a capped "
+                         "domain from a quiet one")
+        self.assertNotIn("source_results", model,
+                         "a top-level field the prompt never uses is still being "
+                         "paid for on every turn")
+        # Every row kept is a row the collector really wrote -- the trim may not
+        # invent, reorder into a different claim, or drop the URL.
+        full_urls = {c["url"] for c in payload["candidates"]}
+        self.assertTrue({c["url"] for c in model["candidates"]} <= full_urls)
 
 
 # ==========================================================================
