@@ -1460,18 +1460,38 @@ jobs:
               run_rc=$?
             fi
           }
-          # ACCEPTANCE IS THE FLOOR, NOT PARSEABILITY. Until 2026-11-02 this only
-          # asked whether the file parsed, so run 41369743596 logged "Agent wrote
-          # valid state/stories.json on attempt 1" over a payload with ZERO
-          # stories, and a 2-story edition shipped as a healthy one. The count is
-          # read through the same `stories` list the validator reads, and a
-          # rejected file is REMOVED so no later step can ship it.
+          # ACCEPTANCE IS THE SHIP GATE, NOT PARSEABILITY OR RAW COUNT. Until
+          # 2026-11-02 this only asked whether the file parsed, so run 41369743596
+          # logged "Agent wrote valid state/stories.json on attempt 1" over a
+          # payload with ZERO stories, and a 2-story edition shipped as a healthy
+          # one. Dry run 44020088151 then exposed the second half: the walk counted
+          # 4 raw stories and stopped, while the derive gate counted 3 shippable
+          # after one was already sent within TTL -- so the walk's own success was
+          # DELETED and a fallback derived. The walk now runs the SAME
+          # `validate_stories.py --count-only` pipeline, against the same history
+          # and active-event state, so it can never accept a payload the derive
+          # gate would reject. A rejected file is REMOVED so no later step ships it.
           stories_ok() {
             [ "$run_rc" = "0" ] && [ -f state/stories.json ] || return 1
-            _count=$(python3 -c "import json,sys;d=json.load(open('state/stories.json'));s=d.get('stories') if isinstance(d,dict) else d;print(len(s)) if isinstance(s,list) else sys.exit(1)") || return 1
+            WALK_COUNT_LOG=/tmp/walk-count.log
+            if ! python3 scripts/validate_stories.py --count-only \
+                 --in state/stories.json \
+                 --history state/history.json \
+                 --state state/active_stories.json \
+                 --candidates state/candidates.json \
+                 --config-dir config \
+                 --today "$TODAY" > "$WALK_COUNT_LOG" 2>&1; then
+              echo "Rejecting state/stories.json: the ship-gate validator could not count it"
+              rm -f state/stories.json
+              return 1
+            fi
+            grep -E 'raw=' "$WALK_COUNT_LOG" || true
+            _count=$(sed -n 's/^COUNT=\([0-9][0-9]*\)$/\1/p' "$WALK_COUNT_LOG" | tail -n 1)
+            _raw=$(sed -n 's/.*raw=\([0-9][0-9]*\).*/\1/p' "$WALK_COUNT_LOG" | tail -n 1)
             case "$_count" in ''|*[!0-9]*) return 1 ;; esac
+            _raw=${_raw:-0}
             if [ "$_count" -lt "$STORIES_FLOOR" ]; then
-              echo "Rejecting state/stories.json: ${_count} stories, below the shipped floor of ${STORIES_FLOOR}"
+              echo "Rejecting state/stories.json: ${_count} shippable of ${_raw} stories after validation and dedup, below the shipped floor of ${STORIES_FLOOR}"
               rm -f state/stories.json
               return 1
             fi

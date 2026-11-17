@@ -140,14 +140,28 @@ for entry in ${STUB_OPENCODE_PLAN:-}; do
   if [ "${entry%%:*}" = "$model" ]; then outcome="${entry#*:}"; fi
 done
 if [ -z "$outcome" ]; then outcome="1"; fi
-# AT THE SHIPPED FLOOR. The acceptance check requires STORIES_FLOOR (4) stories,
-# so a one-story success would now be rejected -- correctly. This is what a
-# healthy writer produces.
-four='{"id":"s1"},{"id":"s2"},{"id":"s3"},{"id":"s4"}'
+# AT THE SHIPPED FLOOR, AND VALID FOR THE REAL SHIP GATE. The walk runs
+# `validate_stories.py --count-only`, so these fixtures carry every field the
+# schema requires. A bare `{"id":"s1"}` would be dropped by the schema and make
+# every "ok" case read as a floor miss.
+s1='{"title":"Alpha city budget passes","summary":"The council approved the annual budget.","category":"local_city","priority":6,"source_url":"https://example.com/alpha","reliability":"tier1","spoiler_level":"none"}'
+s2='{"title":"Beta transit line opens","summary":"The new transit line began service.","category":"world_major","priority":5,"source_url":"https://example.com/beta","reliability":"tier2","spoiler_level":"none"}'
+s3='{"title":"Gamma school plan approved","summary":"The school board approved the plan.","category":"education_tu","priority":4,"source_url":"https://example.com/gamma","reliability":"tier2","spoiler_level":"none"}'
+s4='{"title":"Delta library reopens","summary":"The library reopened after repairs.","category":"local_city","priority":3,"source_url":"https://example.com/delta","reliability":"tier3","spoiler_level":"none"}'
+s5='{"title":"Epsilon water project starts","summary":"Work began on the water project.","category":"nepal","priority":2,"source_url":"https://example.com/epsilon","reliability":"tier3","spoiler_level":"none"}'
+four="$s1,$s2,$s3,$s4"
+four_fresh="$s2,$s3,$s4,$s5"
+three="$s1,$s2,$s3"
 case "$outcome" in
   ok)      printf '{"stories": [%s]}\n' "$four" > state/stories.json ; exit 0 ;;
+  ok_fresh) printf '{"stories": [%s]}\n' "$four_fresh" > state/stories.json ; exit 0 ;;
   zero)    printf '{"stories": []}\n' > state/stories.json ; exit 0 ;;
-  three)   printf '{"stories": [{"id":"s1"},{"id":"s2"},{"id":"s3"}]}\n' > state/stories.json ; exit 0 ;;
+  three)   printf '{"stories": [%s]}\n' "$three" > state/stories.json ; exit 0 ;;
+  four_one_sent)
+    # 4 raw, 3 shippable: the caller seeds history with s1, so the real ship
+    # gate drops exactly one story and the walk must not stop here.
+    printf '{"stories": [%s]}\n' "$four" > state/stories.json
+    exit 0 ;;
   quota_once)
     # THE MEASURED SHAPE THE SINGLE RETRY EXISTS FOR: the first call is refused
     # pre-generation, the second on the SAME model answers. A walk that never
@@ -412,9 +426,25 @@ class AgentWalkHarness(unittest.TestCase):
         # same reason as model_watchdog.py: the step really runs them.
         for name in ("model_watchdog.py", "model_selector.py",
                      "render_prompt.py", "private_values.py",
-                     "reduce_candidates.py"):
+                     "reduce_candidates.py",
+                     # The walk now accepts exactly what the derive gate would
+                     # ship, by running the real validator. Its whole import
+                     # closure is copied, not stubbed: a stand-in here would
+                     # re-create the arithmetic disagreement this test exists
+                     # to catch.
+                     "validate_stories.py", "story_state.py",
+                     "source_health.py", "english_text.py",
+                     "edition_kind.py", "check_public_sanitisation.py",
+                     "collect_news.py", "weather_advice.py", "devanagari.py"):
             shutil.copy(str(REPO_ROOT / "scripts" / name),
                         str(self.tmp / "scripts" / name))
+        # The validator reads these three; without them it exits non-zero and
+        # every fixture looks like a floor miss.
+        config_dir = self.tmp / "config"
+        config_dir.mkdir(exist_ok=True)
+        for name in ("collection.json", "interests.yml", "profile.yml"):
+            shutil.copy(str(REPO_ROOT / "config" / name),
+                        str(config_dir / name))
         self.bin_dir = self.tmp / "bin"
         W.install_stub_on_path(
             self.bin_dir, _STUB_OPENCODE, name="opencode")
@@ -904,8 +934,8 @@ class AcceptanceFloorTests(AgentWalkHarness):
             "stopped on it. Invoked: %r\nstdout:\n%s"
             % (art["models"], proc.stdout))
         self.assertIn(
-            "Rejecting state/stories.json: 0 stories, below the shipped floor "
-            "of 4", proc.stdout,
+            "Rejecting state/stories.json: 0 shippable of 0 stories after "
+            "validation and dedup, below the shipped floor of 4", proc.stdout,
             "the rejection is not reported with its count and the floor, so a "
             "thin attempt is invisible in the log:\n%s" % proc.stdout)
         self.assertNotIn("on attempt 1 (opencode/a)", proc.stdout,
@@ -919,7 +949,8 @@ class AcceptanceFloorTests(AgentWalkHarness):
         self.assertEqual(["opencode/a", "opencode/b"], art["models"],
                          "a 3-story payload was accepted; the floor is 4. "
                          "Invoked: %r" % (art["models"],))
-        self.assertIn("Rejecting state/stories.json: 3 stories", proc.stdout)
+        self.assertIn(
+            "Rejecting state/stories.json: 3 shippable of 3 stories", proc.stdout)
         writer = json.loads((art["stories"].parent / "digest_writer.json")
                             .read_text(encoding="utf-8"))
         self.assertEqual("fallback", writer["rung"],
@@ -956,6 +987,57 @@ class AcceptanceFloorTests(AgentWalkHarness):
             "the rejected payload survived the walk. A later step would seal it "
             "as a normal edition, which is the 2-story digest all over again.")
 
+
+class WalkAcceptsOnlyWhatTheShipGateWouldShip(AgentWalkHarness):
+    """4 raw stories are not 4 shippable stories when one was already sent.
+
+    THE SYMPTOM THIS PINS. Dry run 44020088151: attempt 1 wrote 4 raw stories,
+    the walk's raw-count gate called that success and stopped, and the derive
+    stage's real validator counted 3 after history dedup (one story was already
+    sent within TTL). The derive stage then DELETED the good model-written
+    edition and built the fallback. The walk must use the ship gate's own
+    arithmetic, not a raw count and not a guessed offset.
+    """
+
+    def test_four_raw_three_shippable_due_to_already_sent_is_not_a_success(self):
+        history = self.tmp / "state" / "history.json"
+        history.write_text(json.dumps({
+            "stories": [{
+                "title": "Alpha city budget passes",
+                "url": "https://example.com/alpha",
+            }]
+        }), encoding="utf-8")
+
+        proc, art = self.run_step(
+            pool=["opencode/a", "opencode/b"],
+            plan="opencode/a:four_one_sent opencode/b:ok_fresh")
+
+        self.assertGreen(proc, "ttl-shortfall-then-real")
+        self.assertEqual(
+            ["opencode/a", "opencode/b"], art["models"],
+            "the walk accepted 4 raw stories whose real post-history count was "
+            "3, so it stopped on the exact payload that dry run 44020088151 "
+            "then discarded. Invoked: %r\nstdout:\n%s"
+            % (art["models"], proc.stdout))
+        self.assertIn("raw=4", proc.stdout)
+        self.assertIn("after-history-dedup=3", proc.stdout)
+        self.assertIn(
+            "Rejecting state/stories.json: 3 shippable of 4 stories after "
+            "validation and dedup, below the shipped floor of 4", proc.stdout,
+            "the walk did not report the ship-gate arithmetic that rejected "
+            "the attempt:\n%s" % proc.stdout)
+        self.assertNotIn("on attempt 1 (opencode/a)", proc.stdout)
+
+        self.assertEqual(
+            4, len(json.loads(art["stories"].read_text(encoding="utf-8"))["stories"]),
+            "the run must end with a genuinely shippable 4-story edition, not "
+            "a fallback derived after the walk discarded the first one")
+        writer = json.loads((art["stories"].parent / "digest_writer.json")
+                            .read_text(encoding="utf-8"))
+        self.assertEqual(
+            {"rung": "fallback", "attempt": 2, "model": "opencode/b"}, writer,
+            "the accepted edition must be attempt 2's model-written payload, "
+            "not attempt 1's 3-shippable payload relabelled as healthy")
 
 
 # ==========================================================================

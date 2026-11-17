@@ -153,7 +153,7 @@ PROVIDERS = {
         "https://api.groq.com/openai/v1/chat/completions",
         "https://api.groq.com/openai/v1/models",
         "GROQ_API_KEY",
-        ("llama-3.3-70b-versatile",),
+        ("allam-2-7b",),
         60,
     ),
     # The second Groq account: the same endpoint and model, a different key.
@@ -162,7 +162,7 @@ PROVIDERS = {
         "https://api.groq.com/openai/v1/chat/completions",
         "https://api.groq.com/openai/v1/models",
         GROQ_KEY2_ENV,
-        ("llama-3.3-70b-versatile",),
+        ("allam-2-7b",),
         60,
     ),
     "openrouter": Provider(

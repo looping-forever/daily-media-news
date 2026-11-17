@@ -486,11 +486,7 @@ class LadderOrderTests(unittest.TestCase):
 
     def test_config_groq_rungs_stay_in_the_groq_block_without_duplicates(self):
         seeds = list(CONFIG_LADDER[:4]) + [
-            "groq/llama-3.3-70b-versatile",
-            "groq/llama-3.1-8b-instant",
             "groq/allam-2-7b",
-            "groq-key2/llama-3.3-70b-versatile",
-            "groq-key2/llama-3.1-8b-instant",
             "groq-key2/allam-2-7b",
         ] + list(CONFIG_LADDER[4:])
         env = dict(KEYS_BOTH_GROQ, GEMINI_API_KEY_2="test-gemini-key2")
@@ -503,11 +499,7 @@ class LadderOrderTests(unittest.TestCase):
              "gemini/gemini-3.1-flash-lite",
              "gemini-key2/gemini-3.5-flash-lite",
              "gemini-key2/gemini-3.1-flash-lite",
-             "groq/llama-3.3-70b-versatile",
-             "groq/llama-3.1-8b-instant",
              "groq/allam-2-7b",
-             "groq-key2/llama-3.3-70b-versatile",
-             "groq-key2/llama-3.1-8b-instant",
              "groq-key2/allam-2-7b",
              "openrouter/" + lp.PROVIDERS["openrouter"].models[0],
              "mistral/" + lp.PROVIDERS["mistral"].models[0],
@@ -518,7 +510,7 @@ class LadderOrderTests(unittest.TestCase):
     def test_the_summariser_walks_the_same_order(self):
         # A fake catalogue: `ladder_models` resolves the HTTP ids against what
         # the account serves, and a test must never open a socket.
-        send, _ = router({"groq": ["llama-3.3-70b-versatile"],
+        send, _ = router({"groq": ["allam-2-7b"],
                           "openrouter": ["recursive/flint-v1.0:free"],
                           "mistral": ["mistral-small-latest"]})
         lp.clear_catalogue()
@@ -526,15 +518,14 @@ class LadderOrderTests(unittest.TestCase):
             got = ss.ladder_models(transport=send)
         providers = [lp.provider_of(m) for m in got]
         self.assertEqual(
-            [None, None, "groq", "groq", "groq", "groq-key2", "groq-key2",
-             "groq-key2", "openrouter", "mistral"],
-            providers[:10],
+            [None, None, "groq", "groq-key2", "openrouter", "mistral"],
+            providers[:6],
             "the digest ladder must be gemini, both Groq accounts, the other "
             "keyed providers, then the free pool -- got %r" % (got,))
-        self.assertTrue(providers[10:], "the free pool must still be walked")
-        self.assertEqual({None}, set(providers[10:]),
+        self.assertTrue(providers[6:], "the free pool must still be walked")
+        self.assertEqual({None}, set(providers[6:]),
                          "nothing may follow the free pool -- got %r" % (got,))
-        self.assertTrue(all(m.startswith("opencode/") for m in got[10:]),
+        self.assertTrue(all(m.startswith("opencode/") for m in got[6:]),
                         "everything after Mistral must be the free pool -- "
                         "got %r" % (got,))
 
@@ -834,7 +825,7 @@ class ServedModelTests(unittest.TestCase):
     def test_an_unreadable_catalogue_keeps_the_configured_id(self):
         send, _ = transport_returning(503, "down")
         got = lp.served_model("groq", transport=send, environ=KEYS)
-        self.assertEqual("llama-3.3-70b-versatile", got["model"])
+        self.assertEqual("allam-2-7b", got["model"])
         self.assertEqual("catalogue_unreadable", got["reason"],
                          "a failed GET is not evidence of an unserved id")
         self.assertEqual("transport", got["catalogue_reason"])

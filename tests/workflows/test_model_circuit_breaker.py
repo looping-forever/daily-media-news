@@ -711,63 +711,64 @@ class AllFailBoundTests(unittest.TestCase):
         """THE SILENCE BOUND, COMPUTED FROM THE TABLE.
 
             gemini x4 60 + 60 + 60 + 60 = 240   <- two keys, unmeasured rungs
-            groq x6   60 + 60 + 60 + 60 + 60 + 60 = 360
+            groq x2   60 + 60 = 120
             deepseek 60 + beam 240 + mimo 60 + nemotron 60 + glm 60 + flint 60
                 = 540s
-            = 1140s = 19 min
+            = 900s = 15 min
 
         Before the per-model table every rung cost one global window; before
         the watchdog a dead rung cost its full cap. The point of computing it
         FROM the table is that adding, removing or re-measuring a model moves
         this number without anyone editing a test -- which is exactly what
         happened on 2026-10-30 when two rungs joined carrying no measurement,
-        and again on 2026-11-06 when the second Gemini key added two more.
+        again on 2026-11-06 when the second Gemini key added two more, and
+        again when the account-proven Groq rung replaced two 404 Llama ids.
         """
         ladder = ms.ladder_model_ids()
-        self.assertEqual(16, len(ladder), ladder)
-        self.assertEqual(1140, ms.worst_case_all_fail_sec(ladder))
-        self.assertEqual(1140, ms.worst_case_all_fail_sec(),
+        self.assertEqual(12, len(ladder), ladder)
+        self.assertEqual(900, ms.worst_case_all_fail_sec(ladder))
+        self.assertEqual(900, ms.worst_case_all_fail_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(1170, ms.worst_case_all_fail_sec(ladder,
-                                                        overhead_sec=30))
-        # A seventeenth, unmeasured rung costs only the default window.
-        self.assertEqual(1200, ms.worst_case_all_fail_sec(
+        self.assertEqual(930, ms.worst_case_all_fail_sec(ladder,
+                                                       overhead_sec=30))
+        # A thirteenth, unmeasured rung costs only the default window.
+        self.assertEqual(960, ms.worst_case_all_fail_sec(
             ladder + ["opencode/some-new-free"]))
-        self.assertLess(1140, 1800,
+        self.assertLess(900, 1800,
                         "the all-silent bound must stay inside the walk budget")
-        self.assertLess(1140, len(ladder) * ms.WALK_PER_ATTEMPT_SEC)
+        self.assertLess(900, len(ladder) * ms.WALK_PER_ATTEMPT_SEC)
 
     def test_a_ladder_without_beam_is_cheaper_which_proves_the_table_is_read(self):
         """If the table were ignored, dropping beam would change nothing."""
         ladder = [m for m in ms.ladder_model_ids()
                   if m != "opencode/beam-free"]
         # beam's 240s window is the only measured one above the default, so
-        # removing it must take exactly 240s off the 1140s total.
-        self.assertEqual(900, ms.worst_case_all_fail_sec(ladder))
-        self.assertLess(ms.worst_case_all_fail_sec(ladder), 1140)
+        # removing it must take exactly 240s off the 900s total.
+        self.assertEqual(660, ms.worst_case_all_fail_sec(ladder))
+        self.assertLess(ms.worst_case_all_fail_sec(ladder), 900)
 
     def test_the_arithmetic_of_an_emit_then_stall_walk(self):
         """THE OTHER WORST CASE, and a different number from the silence bound.
 
         An attempt that never opens the model call costs its FIRST-OUTPUT window
-        (1140s over the sixteen rungs). An attempt that opens the call and then
+        (900s over the twelve rungs). An attempt that opens the call and then
         goes quiet is measured from its last LOG line, so it costs
         first-output + INTER_TOKEN, truncated by the per-attempt cap:
 
             deepseek   min( 60 + 420, 480) = 480
             beam       min(240 + 420, 480) = 480   <- the cap is binding
-            the other fourteen             = 480 each
-            = 7680s
+            the other ten                  = 480 each
+            = 5760s
 
         Longer than the 1800s walk budget, which is the honest reading: in this
         mode the budget and the cap bound the run, not the windows.
         """
         ladder = ms.ladder_model_ids()
-        self.assertEqual(16, len(ladder), ladder)
-        self.assertEqual(7680, ms.worst_case_emit_then_stall_sec(ladder))
-        self.assertEqual(7680, ms.worst_case_emit_then_stall_sec(),
+        self.assertEqual(12, len(ladder), ladder)
+        self.assertEqual(5760, ms.worst_case_emit_then_stall_sec(ladder))
+        self.assertEqual(5760, ms.worst_case_emit_then_stall_sec(),
                          "the default must be the configured ladder")
-        self.assertEqual(7710, ms.worst_case_emit_then_stall_sec(
+        self.assertEqual(5790, ms.worst_case_emit_then_stall_sec(
             ladder, overhead_sec=30))
         self.assertEqual(
             480,
@@ -1055,11 +1056,7 @@ class LadderPurityTests(unittest.TestCase):
         "gemini/gemini-3.1-flash-lite",
         "gemini-key2/gemini-3.5-flash-lite",
         "gemini-key2/gemini-3.1-flash-lite",
-        "groq/llama-3.3-70b-versatile",
-        "groq/llama-3.1-8b-instant",
         "groq/allam-2-7b",
-        "groq-key2/llama-3.3-70b-versatile",
-        "groq-key2/llama-3.1-8b-instant",
         "groq-key2/allam-2-7b",
         "opencode/deepseek-v4.1-flash-free",
         "opencode/beam-free",

@@ -79,12 +79,10 @@ EXPECTED_LADDER = [
     "gemini-key2/gemini-3.5-flash-lite",
     "gemini-key2/gemini-3.1-flash-lite",
     # CLI Groq rungs, added 2026-11-17. Both free accounts are tried before
-    # the shared opencode pool, whose bucket refuses every id at once.
-    "groq/llama-3.3-70b-versatile",
-    "groq/llama-3.1-8b-instant",
+    # the shared opencode pool, whose bucket refuses every id at once. The
+    # account returned model_not_found for the two Llama ids, so only the id
+    # it actually serves is kept.
     "groq/allam-2-7b",
-    "groq-key2/llama-3.3-70b-versatile",
-    "groq-key2/llama-3.1-8b-instant",
     "groq-key2/allam-2-7b",
     "opencode/deepseek-v4.1-flash-free",
     "opencode/beam-free",

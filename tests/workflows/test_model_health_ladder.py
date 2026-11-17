@@ -267,18 +267,18 @@ class GroqCliRungs(unittest.TestCase):
         self.assertTrue([m for m in selected if m.startswith("opencode/")])
 
     def test_an_absent_groq_catalogue_rung_is_reordered_not_removed(self):
-        seed = ["gemini/a", "groq/llama-3.3-70b-versatile",
+        seed = ["gemini/a", "groq/absent-model",
                 "groq/allam-2-7b", "opencode/free"]
 
         selected, info = self._select(
             seed, {"OPENCODE_CONFIG": ""},
             {"gemini": ["gemini/a"],
-             "groq": ["groq/llama-3.3-70b-versatile"],
+             "groq": ["groq/allam-2-7b"],
              "opencode": ["opencode/free"]})
 
-        self.assertEqual(["gemini/a", "groq/llama-3.3-70b-versatile",
-                          "opencode/free", "groq/allam-2-7b"], selected)
-        self.assertEqual([{"model": "groq/allam-2-7b", "provider": "groq"}],
+        self.assertEqual(["gemini/a", "groq/allam-2-7b",
+                          "opencode/free", "groq/absent-model"], selected)
+        self.assertEqual([{"model": "groq/absent-model", "provider": "groq"}],
                          info["catalogue_absent"])
         self.assertEqual([], info["dropped_seed"])
 
@@ -306,9 +306,7 @@ class GroqCliRungs(unittest.TestCase):
             self.assertEqual("https://api.groq.com/openai/v1",
                              block["options"]["baseURL"])
             self.assertEqual("{env:%s}" % env, block["options"]["apiKey"])
-            self.assertEqual({"llama-3.3-70b-versatile",
-                              "llama-3.1-8b-instant",
-                              "allam-2-7b"}, set(block["models"]))
+            self.assertEqual({"allam-2-7b"}, set(block["models"]))
             for model in block["models"].values():
                 self.assertEqual(131072, model["limit"]["context"])
                 self.assertEqual(32768, model["limit"]["output"])
