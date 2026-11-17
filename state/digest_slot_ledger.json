@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-11-17T00:58:49Z",
+  "as_of": "2026-11-17T12:57:08Z",
   "days": {
     "2026-11-11": {
       "evening": {
@@ -206,10 +206,26 @@
       }
     },
     "2026-11-17": {
+      "evening": {
+        "built_at": "2026-11-17T12:57:01Z",
+        "source_health_state": "ok",
+        "story_count": 4
+      },
       "morning": {
-        "built_at": "2026-11-17T00:58:36Z",
-        "source_health_state": "degraded",
-        "story_count": 6
+        "actions_dispatch_at": "2026-11-17T01:36:05Z",
+        "actions_dispatch_reason": null,
+        "attempts": 3,
+        "build": "723ebbf",
+        "deduped_via": null,
+        "edition": "partial",
+        "first_ntfy_sent_at": "2026-11-17T01:38:48Z",
+        "kind": "partial",
+        "ntfy_sent_at": "2026-11-17T01:38:48Z",
+        "pending_at": "2026-11-17T01:35:25Z",
+        "scheduled_instant": "2026-11-17T01:35:00Z",
+        "sequence_id": "dmn-2026-11-17-morning",
+        "state": "sent",
+        "trigger_source": "worker"
       }
     }
   },
