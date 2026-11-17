@@ -187,6 +187,10 @@ ALLOWED_SECRETS = frozenset({
     # behaves exactly as it did before -- which is why the allowlist entry is
     # safe to ship before the secrets exist.
     "GROQ_API_KEY",
+    # The second Groq account, the same provider with its own allowance. Its
+    # rungs follow `groq/*` only while the secret is set; absent or blank
+    # contributes no rung, so the single-key ladder is unchanged.
+    "GROQ_API_KEY_2",
     "MISTRAL_API_KEY",
     "OPENROUTER_API_KEY",
     "NTFY_SERVER",

@@ -24,7 +24,7 @@ jobs:
   canary:
     name: Every provider family still authenticates, lists and answers
     runs-on: ubuntu-24.04
-    # Five probes, one retried at most, each bounded by the adapter's own cap.
+    # Six probes, one retried at most, each bounded by the adapter's own cap.
     timeout-minutes: 6
     steps:
       - name: Check out the adapter the canary reuses
@@ -38,6 +38,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # The second account, the same provider and endpoint.
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |

@@ -25,9 +25,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import llm_providers as lp  # noqa: E402
 
-#: Every family this repository can walk. The second Gemini project is separate
-#: because it is a second account with its own allowance, and its absence is a
-#: setting rather than a fault.
+#: Every family this repository can walk. The second Gemini project and the
+#: second Groq account are separate because each is a separate allowance, and
+#: an absence is a setting rather than a fault.
 FAMILIES = ("gemini", lp.GEMINI_KEY2_PROVIDER) + lp.LADDER_PROVIDERS
 
 #: Verdicts that are NOT a failure, with the reason printed beside the row.

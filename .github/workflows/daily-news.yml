@@ -1865,12 +1865,14 @@ jobs:
           # The second Google project: a separate free allowance. Unset means
           # its two rungs contribute nothing, exactly as before.
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
-          # The three keyed HTTP fallbacks behind Gemini, read by
-          # scripts/llm_providers.py at CALL time. Absent ones are skipped
-          # silently, so a repository without any of them behaves exactly as it
+          # The keyed HTTP fallbacks behind Gemini, read by
+          # scripts/llm_providers.py at CALL time. Absent ones contribute no
+          # rung, so a repository without any of them behaves exactly as it
           # did before: gemini rungs, then the free pool. Referenced by NAME
           # only; the values never reach a log, an artifact or a debug record.
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # The second Groq account: one more rung while this is set.
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           # The same committed demotion ledger the repair step reads, so a rung
@@ -2116,6 +2118,7 @@ jobs:
           # The same second project the deriver walks. Unset contributes nothing.
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           # RUN 42061741326: gemini-3.5-flash-lite answered nothing twice (rc=1,

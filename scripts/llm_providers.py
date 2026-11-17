@@ -1,4 +1,4 @@
-"""llm_providers.py -- one OpenAI-compatible chat adapter, three providers.
+"""llm_providers.py -- one OpenAI-compatible chat adapter for keyed providers.
 
 WHY THIS EXISTS. Every model call in this repository went through ONE account's
 allowance: the two `gemini/*` rungs (a single Google AI Studio key) and the
@@ -8,9 +8,9 @@ the pool answered `payment_required`, and the edition shipped with publisher
 text under every headline. One provider's spent allowance became the whole
 pipeline's outage.
 
-The owner added three repository secrets -- `GROQ_API_KEY`,
+The owner added four repository secrets -- `GROQ_API_KEY`, `GROQ_API_KEY_2`,
 `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` -- and this module is the single
-adapter that talks to all three. They are OpenAI-compatible chat-completion
+adapter that talks to them. They are OpenAI-compatible chat-completion
 endpoints, so the request shape is IDENTICAL across them and differs only in
 the URL, the model id and the credential. One shape means one set of failure
 mappings, and a provider's quirks cannot grow a second health system beside
@@ -44,6 +44,10 @@ this adapter as well would give one provider two code paths and two timeouts.
 (`GEMINI_API_KEY_2`). It is also a CLI rung, and it is in this table only so the
 probe can report both accounts' quotas. The two projects have separate free
 allowances, so one 429 must not cool the other's rungs.
+
+`groq-key2` is the SAME Groq endpoint and model called with a SECOND account's
+key (`GROQ_API_KEY_2`). Unlike the Gemini second project it is a real HTTP rung,
+ordered directly behind `groq/*`, because the walk already talks to Groq here.
 """
 
 import json
@@ -107,20 +111,24 @@ class Provider:
     free_only: bool = False
 
 
-#: THE LADDER ORDER, AND THE ONLY PLACE IT IS WRITTEN. Gemini is absent on
-#: purpose: its rungs come first from `config/opencode.json` and are walked by
-#: the CLI, so the two blocks are composed in `ordered_ladder()` instead of
-#: being flattened into one hardcoded list that can rot (the 2026-10-13 lesson).
-LADDER_PROVIDERS = ("groq", "openrouter", "mistral")
-
-#: The set `provider_of()` recognises: the ladder providers and nothing else.
-
 #: The second Google project. Same endpoint and models as `gemini`, different
 #: account and free allowance. Named with a dash so `provider_of()` keeps
 #: returning None and the rungs stay on the CLI path.
 GEMINI_KEY2_PROVIDER = "gemini-key2"
 GEMINI_KEY2_ENV = "GEMINI_API_KEY_2"
 GEMINI_PREFIXES = ("gemini/", GEMINI_KEY2_PROVIDER + "/")
+
+#: The second Groq account. Same endpoint and model as `groq`, different key.
+GROQ_KEY2_PROVIDER = "groq-key2"
+GROQ_KEY2_ENV = "GROQ_API_KEY_2"
+
+#: THE LADDER ORDER, AND THE ONLY PLACE IT IS WRITTEN. Gemini is absent on
+#: purpose: its rungs come first from `config/opencode.json` and are walked by
+#: the CLI, so the two blocks are composed in `ordered_ladder()` instead of
+#: being flattened into one hardcoded list that can rot (the 2026-10-13 lesson).
+#: The second Groq account follows `groq` directly and leaves the ladder without
+#: its key.
+LADDER_PROVIDERS = ("groq", GROQ_KEY2_PROVIDER, "openrouter", "mistral")
 
 PROVIDERS = {
     "gemini": Provider(
@@ -145,6 +153,15 @@ PROVIDERS = {
         "https://api.groq.com/openai/v1/chat/completions",
         "https://api.groq.com/openai/v1/models",
         "GROQ_API_KEY",
+        ("llama-3.3-70b-versatile",),
+        60,
+    ),
+    # The second Groq account: the same endpoint and model, a different key.
+    "groq-key2": Provider(
+        "groq-key2",
+        "https://api.groq.com/openai/v1/chat/completions",
+        "https://api.groq.com/openai/v1/models",
+        GROQ_KEY2_ENV,
         ("llama-3.3-70b-versatile",),
         60,
     ),
@@ -1387,9 +1404,11 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
                  refresh=False):
     """The configured provider rungs, in ladder order, as full rung ids.
 
-    A provider with no key is SKIPPED SILENTLY -- its absence is a repository
+    A provider with no key contributes no rung -- its absence is a repository
     setting, not a model failure, and a rung that cannot be called would cost
-    the walk an attempt to learn what one `os.environ` lookup already says.
+    the walk an attempt to learn what one `os.environ` lookup already says. The
+    keyed providers name that absence in the log; the optional second Groq
+    account stays silent so a single-key repository's ladder is unchanged.
 
     `resolve=True` asks each provider's catalogue for the ids it actually serves
     (`served_models`), which is the production path: the probe showed the seed ids
@@ -1401,11 +1420,12 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
     rungs = []
     for name in LADDER_PROVIDERS:
         if not configured(name, environ):
-            # STILL NOT A RUNGS, BUT NO LONGER SILENT. Run 42144852087 ended
-            # with "3 of 6 free models tried" and no fourth provider; the run
-            # log could not say that groq/openrouter/mistral were absent because
-            # their keys are absent. The rung set is identical; the explanation
-            # is now in the log.
+            # The second Groq account is optional: without its key the ladder
+            # must read exactly as the single-key ladder did before, log included.
+            if name == GROQ_KEY2_PROVIDER:
+                continue
+            # Every other absent key is named: a log that cannot say why a
+            # provider contributed no rung sends the reader to the ladder.
             if log:
                 log("llm_providers: %s contributes no rung -- no key configured"
                     % name)
@@ -1436,7 +1456,8 @@ def ladder_rungs(environ=None, transport=None, resolve=False, log=None,
 
 def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
                    resolve=False, log=None):
-    """`seeds` re-ordered as: both Gemini keys, then Groq/OpenRouter/Mistral, then the rest.
+    """`seeds` re-ordered as: both Gemini keys, then Groq and its second key,
+    OpenRouter, Mistral, then the rest.
 
     Gemini rungs stay first because they are the owner's stated preference,
     and the free OpenCode pool stays LAST because its shared bucket is the one
@@ -1447,6 +1468,11 @@ def ordered_ladder(seeds, prefixes=(), environ=None, transport=None,
     `gemini-key2/*` seeds sit directly behind `gemini/*` while `GEMINI_API_KEY_2`
     is set, and disappear with one log line when it is not. That is the same
     behaviour a repository with one key has today.
+
+    The second Groq account follows the same ordering rule: `groq-key2/*` sits
+    directly behind `groq/*` while `GROQ_API_KEY_2` is set. An absent or blank
+    key contributes no rung and no log line, so the single-key ladder is
+    byte-identical to what it was before.
 
     `prefixes` is the existing CLI-reachability filter: an empty tuple means
     "no filter" (the summariser, which owns no CLI), and a non-empty tuple keeps

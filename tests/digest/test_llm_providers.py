@@ -20,8 +20,9 @@ caller depends on, and nothing about the prompts:
                                  -- the words model_selector already speaks.
     THE PAID GUARD            -- an OpenRouter id without `:free` is refused
                                  before a byte is sent.
-    THE LADDER ORDER          -- Gemini, then Groq, OpenRouter, Mistral, then the
-                                 free pool, in BOTH consumers.
+    THE LADDER ORDER          -- Gemini, then Groq and its second account,
+                                 OpenRouter, Mistral, then the free pool, in BOTH
+                                 consumers.
     NO KEY IN ANY OUTPUT      -- not in a result, a debug line, a workflow or
                                  this file.
 """
@@ -56,6 +57,9 @@ KEYS = {
 #: order tests pin what a repository with ONE Gemini key does today, and the
 #: second-key tests opt in explicitly.
 KEYS_BOTH = dict(KEYS, GEMINI_API_KEY_2="test-gemini-key2")
+
+#: The second Groq account's key, kept separate for the same reason.
+KEYS_BOTH_GROQ = dict(KEYS, GROQ_API_KEY_2="test-groq-key2")
 
 OK_BODY = json.dumps({"choices": [{"message": {"content": "OK"}}]})
 
@@ -160,7 +164,8 @@ class MissingKeyTests(unittest.TestCase):
     def test_no_key_means_not_configured_and_no_request(self):
         seen, calls = transport_returning(200, OK_BODY)
         with mock.patch.dict(os.environ, {}, clear=False):
-            for name in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY"):
+            for name in ("GROQ_API_KEY", "GROQ_API_KEY_2",
+                         "OPENROUTER_API_KEY", "MISTRAL_API_KEY"):
                 os.environ.pop(name, None)
             got = lp.call("groq", "prompt", transport=seen)
         self.assertFalse(got.ok)
@@ -169,7 +174,8 @@ class MissingKeyTests(unittest.TestCase):
 
     def test_an_unconfigured_provider_is_absent_from_both_ladders(self):
         with mock.patch.dict(os.environ, {}, clear=False):
-            for name in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY",
+            for name in ("GROQ_API_KEY", "GROQ_API_KEY_2",
+                         "OPENROUTER_API_KEY", "MISTRAL_API_KEY",
                          "GEMINI_API_KEY_2"):
                 os.environ.pop(name, None)
             self.assertEqual((), lp.ladder_rungs())
@@ -464,7 +470,7 @@ class PaidOpenRouterGuardTests(unittest.TestCase):
 
 
 class LadderOrderTests(unittest.TestCase):
-    """Gemini, then Groq, then OpenRouter, then Mistral, then the free pool."""
+    """Gemini, then Groq and its second key, OpenRouter, Mistral, free pool."""
 
     def test_ordered_ladder_places_every_block_in_the_stated_order(self):
         got = lp.ordered_ladder(list(CONFIG_LADDER), environ=KEYS)
@@ -572,10 +578,82 @@ class SecondGeminiKeyTests(unittest.TestCase):
 
         rows = lp.probe_rows(transport=send, environ=KEYS_BOTH)
         keyed = [r for r in rows if "| key=" in r]
-        self.assertEqual(5, len(keyed),
-                         "one row per provider: two Gemini keys and the three "
+        self.assertEqual(6, len(keyed),
+                         "one row per provider: two Gemini keys and the four "
                          "keyed HTTP providers -- got %r" % (rows,))
         self.assertTrue([r for r in rows if r.startswith("gemini-key2 | ")],
+                        rows)
+
+
+class SecondGroqKeyTests(unittest.TestCase):
+    """A second Groq account is an independent HTTPS rung behind the first."""
+
+    def test_the_second_key_is_its_own_rung_right_after_the_first(self):
+        got = lp.ordered_ladder(list(CONFIG_LADDER), environ=KEYS_BOTH_GROQ)
+        self.assertEqual(
+            ("gemini/gemini-3.5-flash-lite",
+             "gemini/gemini-3.1-flash-lite",
+             "groq/" + lp.PROVIDERS["groq"].models[0],
+             "groq-key2/" + lp.PROVIDERS["groq-key2"].models[0],
+             "openrouter/" + lp.PROVIDERS["openrouter"].models[0],
+             "mistral/" + lp.PROVIDERS["mistral"].models[0],
+             "opencode/deepseek-v4.1-flash-free",
+             "opencode/beam-free"),
+            tuple(got))
+
+    def test_an_absent_second_key_leaves_the_single_key_ladder_untouched(self):
+        log = []
+        got = lp.ordered_ladder(list(CONFIG_LADDER), environ=KEYS,
+                                log=log.append)
+        self.assertEqual([], [m for m in got if m.startswith("groq-key2/")])
+        self.assertEqual(1, len([m for m in got if m.startswith("groq/")]),
+                         "the first account's rung must be untouched")
+        self.assertFalse(any("GROQ_API_KEY_2" in line for line in log),
+                         "an absent optional key must not change the log: %r"
+                         % (log,))
+
+    def test_a_blank_second_key_never_produces_an_empty_rung(self):
+        got = lp.ordered_ladder(list(CONFIG_LADDER),
+                                environ=dict(KEYS, GROQ_API_KEY_2="   "))
+        self.assertEqual([], [m for m in got if m.startswith("groq-key2/")])
+
+    def test_each_groq_rung_uses_its_own_key(self):
+        calls = []
+
+        def send(spec):
+            calls.append(spec)
+            return 200, OK_BODY
+
+        first = lp.call("groq", "p", transport=send,
+                        environ=KEYS_BOTH_GROQ)
+        second = lp.call("groq-key2", "p", transport=send,
+                         environ=KEYS_BOTH_GROQ)
+        self.assertTrue(first.ok)
+        self.assertTrue(second.ok)
+        self.assertEqual("Bearer test-groq-key",
+                         calls[0]["headers"]["Authorization"])
+        self.assertEqual("Bearer test-groq-key2",
+                         calls[1]["headers"]["Authorization"])
+        self.assertEqual("groq-key2", lp.provider_of(
+            "groq-key2/" + lp.PROVIDERS["groq-key2"].models[0]))
+
+    def test_a_blank_second_key_makes_no_request(self):
+        calls = []
+
+        def send(spec):
+            calls.append(spec)
+            return 200, OK_BODY
+
+        got = lp.call("groq-key2", "p", transport=send,
+                      environ={"GROQ_API_KEY_2": "   "})
+        self.assertEqual("not_configured", got.reason)
+        self.assertEqual([], calls)
+
+    def test_the_probe_prints_a_row_for_each_groq_key(self):
+        send, _ = router({"groq": ["llama-3.3-70b-versatile"]})
+        rows = lp.probe_rows(transport=send, environ=KEYS_BOTH_GROQ)
+        self.assertTrue([r for r in rows if r.startswith("groq | ")], rows)
+        self.assertTrue([r for r in rows if r.startswith("groq-key2 | ")],
                         rows)
 
 
@@ -660,11 +738,11 @@ class ProbeTests(unittest.TestCase):
                 "groq | key=present | models=1 | chosen=llama-3.3-70b-versatile "
                 "| tried=1 | status=200 | ms=")])
         self.assertRegex(groq_row, r"ms=\d+ \| verdict=ok$")
-        # FIVE: gemini, the second Google project, and the three keyed
-        # providers. GitHub Models is gone -- retired 2026-07-30, and its host
-        # answers 200 with plain-text `OK` to every path, so a row for it would
-        # prove nothing at all.
-        self.assertEqual(5, len([r for r in rows if "| key=" in r]))
+        # SIX: gemini, the second Google project, and the four HTTP providers,
+        # including the second Groq account. GitHub Models is gone -- retired
+        # 2026-07-30, and its host answers 200 with plain-text `OK` to every
+        # path, so a row for it would prove nothing at all.
+        self.assertEqual(6, len([r for r in rows if "| key=" in r]))
 
     def test_an_absent_key_reports_not_configured_and_makes_no_request(self):
         send, calls = self._router()

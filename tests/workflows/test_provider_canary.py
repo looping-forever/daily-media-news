@@ -114,7 +114,13 @@ class TheTableTests(unittest.TestCase):
                     if row.startswith("  ") and (" %s " % name) in row]
             self.assertEqual(1, len(hits),
                              "%s must appear once -- output: %r" % (name, out))
-        self.assertIn("canary: 5 families checked", out)
+        self.assertIn("canary: 6 families checked", out)
+
+    def test_the_second_groq_account_is_its_own_family(self):
+        rc, out = run({}, environ=dict(ENV, GROQ_API_KEY_2="k6"))
+        self.assertEqual(0, rc)
+        line = [row for row in out.splitlines() if "groq-key2" in row][0]
+        self.assertIn("ok", line)
 
 
 class TheWorkflowTests(unittest.TestCase):
