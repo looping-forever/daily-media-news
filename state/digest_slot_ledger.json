@@ -209,7 +209,7 @@
       "evening": {
         "built_at": "2026-11-17T12:57:01Z",
         "source_health_state": "ok",
-        "story_count": 4
+        "story_count": 10
       },
       "morning": {
         "actions_dispatch_at": "2026-11-17T01:36:05Z",
