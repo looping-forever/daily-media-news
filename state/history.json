@@ -1658,6 +1658,55 @@
       "title": "Police Arrest 21 Individuals in Nationwide Drug Operations Across 10 Districts",
       "category": "nepal",
       "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2060434/tribhuvan-university-is-adding-subjects-to-affiliated-colleges-what-are-the-criteria",
+      "title_hash": "41ffb2627c299b67c880441749710a6e78c4b998",
+      "title": "Tribhuvan University Prepares to Add New Subjects in Affiliated Colleges After 10 Years",
+      "category": "education_tu",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "theguardian.com/world/live/2026/nov/18/apec-summit-live-updates-xi-putin-trump-world-leaders-gather-in-china",
+      "title_hash": "de73a1b90bb195fc7820892daadbfc03736b18da",
+      "title": "Global Leaders Gather in Shenzhen for Apec Summit Discussions",
+      "category": "world_major",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/business/nrb-reports-rs-410-billion-profit-transfers-rs-42-billion-to-government",
+      "title_hash": "d344e91cbe85e8e42ce8e6f37af5c366ad925b2e",
+      "title": "Nepal Rastra Bank Reports NPR 410 Billion Net Profit and Transfers NPR 42 Billion to Government",
+      "category": "bank_local",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2060433/surgery-now-within-three-days-through-expanded-service-at-tu-teaching-hospital",
+      "title_hash": "17061b6430e62165ba67f32f01edd61cf7ad3746",
+      "title": "TU Teaching Hospital Introduces Expanded Services Aimed at Reducing Surgery Waits to Three Days",
+      "category": "local_city",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74951901",
+      "title_hash": "fd362ac42860ff1cc977fd2d89dc3bf342f6228e",
+      "title": "Sakamoto Days Second Season Unveils Cast Additions and Opening Theme",
+      "category": "anime",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-18/spice-and-wolf-merchant-meets-the-wise-wolf-season-2-to-debut-in-january/.243941",
+      "title_hash": "136832b89e0cbad17d1ae796c451e166a3e2a208",
+      "title": "Spice & Wolf: Merchant Meets the Wise Wolf Season 2 Scheduled to Premiere in January",
+      "category": "anime",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/chronicles-medieval-devs-raw-power-are-bankrupt-but-their-sandbox-rpg-lives-on-at-a-new-studio-co-founded-by-satisfactory-devs-coffee-stain",
+      "title_hash": "1144dc0a7d86a5339621568a51536df8d9d41e34",
+      "title": "Coffee Stain Acquires Intellectual Property Rights and Assets for Chronicles: Medieval",
+      "category": "gaming",
+      "date_sent": "2026-11-18"
     }
   ]
 }
