@@ -1,11 +1,5 @@
 {
   "models": {
-    "gemini/gemini-3.5-flash-lite": {
-      "hits": 1,
-      "last_hit": "2026-11-17T12:56:13.270714+00:00",
-      "reason": "quota_exhausted",
-      "until": "2026-11-17T18:56:13.270714+00:00"
-    },
     "opencode/iceman-free": {
       "hits": 1,
       "last_hit": "2026-11-17T01:37:41.179838+00:00",
