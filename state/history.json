@@ -1707,6 +1707,62 @@
       "title": "Coffee Stain Acquires Intellectual Property Rights and Assets for Chronicles: Medieval",
       "category": "gaming",
       "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "nytimes.com/live/2026/11/18/world/trump-china-asia-apec",
+      "title_hash": "5ca52c1eada8c77d0a39cc3466ed114957dae097",
+      "title": "Update: APEC Summit in Shenzhen",
+      "category": "world_major",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "techcrunch.com/2026/11/18/nvidia-clarifies-when-it-will-and-wont-keep-financing-neoclouds",
+      "title_hash": "ee454079b46e396c4ce8c27d0208194d57bd69a6",
+      "title": "Nvidia Financing for Neoclouds",
+      "category": "tech_career",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2060561/only-one-director-will-attend-all-board-meetings-of-the-nepal-rastra-bank",
+      "title_hash": "4436e37d009b6a8d0eb0decf17d216134acaca83",
+      "title": "Update: Nepal Rastra Bank Board Meeting Attendance",
+      "category": "nepal",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/steamdb-will-add-affiliate-links-to-authorised-game-retailers-and-a-new-tab-dedicated-to-mods-first-update-since-nexus-mods-takeover-confirms",
+      "title_hash": "9131b5f267abc6385391d8f4bb2db496f1b68478",
+      "title": "SteamDB and Nexus Mods Update",
+      "category": "gaming",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2060526/lumbini-development-fund-vice-president-and-member-secretary-assume-charge",
+      "title_hash": "213304bf26d54ae89f90d914232aa714c7869807",
+      "title": "Lumbini Development Fund Leadership Assumes Charge",
+      "category": "nepal",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/tourism/myagdi-allocates-rs-17-5-million-for-24-tourism-infrastructure-projects",
+      "title_hash": "682e52515fd386b96781e089ecc437daf9979034",
+      "title": "Myagdi Infrastructure Projects Funded",
+      "category": "nepal",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "gamespot.com/articles/gta-6-owner-take-twos-stock-explodes-after-high-review-scores-but-its-still-down-massively-this-year",
+      "title_hash": "94545105485ff3072c8d409111fb9222d9bfe48d",
+      "title": "Take-Two Interactive Stock Performance",
+      "category": "gaming",
+      "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "arstechnica.com/space/2026/11/voyager-1-at-one-light-day-historian-revisits-golden-records-forgotten-details",
+      "title_hash": "8cb439705dff4e2b38700c6cdbffb921965fe73f",
+      "title": "Voyager 1 Golden Record Details",
+      "category": "tech_career",
+      "date_sent": "2026-11-18"
     }
   ]
 }
