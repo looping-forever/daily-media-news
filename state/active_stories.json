@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -15905,7 +15905,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Nepal Rastra Bank has fixed the foreign exchange rates for Tuesday, November 10, 2026. The US Dollar is set at a buy rate of 149.99 NPR and a sell rate of 150.59 NPR, while the Euro buy rate is 167.89 NPR.",
       "latest_development": "Confirmed: Nepal Rastra Bank has fixed the foreign exchange rates for Tuesday, November 10, 2026. The US Dollar is set at a buy rate of 149.99 NPR and a sell rate of 150.59 NPR, while the Euro buy rate is 167.89 NPR.",
       "alerted": false,
@@ -15915,7 +15915,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-10",
-      "updated_at": "2026-11-10T06:41:43+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-0d50be029a48",
@@ -15933,7 +15933,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Today marks the start of Nepal Sambat 1147 and the fifth day of the Tihar festival (Yama Panchaka), which includes the worship of Govardhan, Bali, cows, and farmers. The President issued a message encouraging progress toward social equality.",
       "latest_development": "Confirmed: Today marks the start of Nepal Sambat 1147 and the fifth day of the Tihar festival (Yama Panchaka), which includes the worship of Govardhan, Bali, cows, and farmers. The President issued a message encouraging progress toward social equality.",
       "alerted": false,
@@ -15943,7 +15943,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-10",
-      "updated_at": "2026-11-10T06:41:43+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-84f159847a44",
@@ -15961,7 +15961,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepal Premier League (NPL) fixture today features a match between Sudurpaschim Royals and Janakpur Bolts at the TU Cricket Ground. The game is scheduled to commence at 5:00 PM.",
       "latest_development": "Reported: The Nepal Premier League (NPL) fixture today features a match between Sudurpaschim Royals and Janakpur Bolts at the TU Cricket Ground. The game is scheduled to commence at 5:00 PM.",
       "alerted": false,
@@ -15971,7 +15971,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "17:00",
-      "updated_at": "2026-11-10T07:21:47+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-8d63b197a597",
@@ -15989,7 +15989,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: US President Trump stated that the FBI is investigating Nvidia CEO Jensen Huang regarding an alleged affair with a person described as a Chinese spy. The President confirmed he spoke with Huang about the matter on Monday.",
       "latest_development": "Reported: US President Trump stated that the FBI is investigating Nvidia CEO Jensen Huang regarding an alleged affair with a person described as a Chinese spy. The President confirmed he spoke with Huang about the matter on Monday.",
       "alerted": false,
@@ -15999,7 +15999,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T07:21:47+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-63191bd2a03b",
@@ -16017,7 +16017,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Irrigation and Water Resources Management Project in Dang has completed the construction of 48 kilometers of embankment along the Rapti River. This initiative has reportedly protected and reclaimed 1,440 hectares of cultivable land from the confluence of Dang-Pyuthan to the Indian border in Banke.",
       "latest_development": "Confirmed: The Irrigation and Water Resources Management Project in Dang has completed the construction of 48 kilometers of embankment along the Rapti River. This initiative has reportedly protected and reclaimed 1,440 hectares of cultivable land from the confluence of Dang-Pyuthan to the Indian border in Banke.",
       "alerted": false,
@@ -16027,7 +16027,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T07:21:47+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-ff5199c49417",
@@ -16045,7 +16045,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: AI company Anthropic plans to raise $64bn through an initial public offering, offering shares priced between $70 and $78. The significant stock market debut highlights major capital influx into foundational AI development.",
       "latest_development": "Reported: AI company Anthropic plans to raise $64bn through an initial public offering, offering shares priced between $70 and $78. The significant stock market debut highlights major capital influx into foundational AI development.",
       "alerted": false,
@@ -16055,7 +16055,7 @@
       "in_evening": "2026-11-10",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T18:41:48+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-ab8cceb823f6",
@@ -16073,7 +16073,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Valve has updated Steam store pages to display framerate estimation graphs derived from aggregated performance data collected from hardware users. The feature provides hardware performance insights directly on game listings.",
       "latest_development": "Reported: Valve has updated Steam store pages to display framerate estimation graphs derived from aggregated performance data collected from hardware users. The feature provides hardware performance insights directly on game listings.",
       "alerted": false,
@@ -16083,7 +16083,7 @@
       "in_evening": "2026-11-10",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T18:41:48+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-e00e87707eb3",
@@ -16101,7 +16101,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Publisher Nexon announced that Embark Studios' extraction shooter Arc Raiders has surpassed 17 million copies sold during its first anniversary, though future revenue is projected to decline. The milestone underscores the title's commercial adoption.",
       "latest_development": "Reported: Publisher Nexon announced that Embark Studios' extraction shooter Arc Raiders has surpassed 17 million copies sold during its first anniversary, though future revenue is projected to decline. The milestone underscores the title's commercial adoption.",
       "alerted": false,
@@ -16111,7 +16111,7 @@
       "in_evening": "2026-11-10",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T18:41:48+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-e0eae879b17e",
@@ -16129,7 +16129,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Foreign Minister Shisir Khanal, speaking on behalf of Least Developed Countries at COP31 in Antalya, has called for stronger international climate finance and support for vulnerable nations.",
       "latest_development": "Reported: Foreign Minister Shisir Khanal, speaking on behalf of Least Developed Countries at COP31 in Antalya, has called for stronger international climate finance and support for vulnerable nations.",
       "alerted": false,
@@ -16139,7 +16139,7 @@
       "in_evening": "2026-11-10",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T19:22:13+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-a2c886410019",
@@ -16157,7 +16157,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Newar community gathered at Basantapur, Kathmandu, to celebrate the New Year, Nepal Sambat, with traditional music and festivities.",
       "latest_development": "Reported: The Newar community gathered at Basantapur, Kathmandu, to celebrate the New Year, Nepal Sambat, with traditional music and festivities.",
       "alerted": false,
@@ -16167,7 +16167,7 @@
       "in_evening": "2026-11-10",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-10T19:22:13+05:45"
+      "updated_at": "2026-11-18T06:41:22+05:45"
     },
     {
       "event_id": "evt-4e32df6a633e",
@@ -23932,6 +23932,202 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-17T19:28:15+05:45"
+    },
+    {
+      "event_id": "evt-73c1ca12925e",
+      "event_key": "nepal-cop31-mountain-climate-program-2027",
+      "canonical_title": "Nepal Proposes Three-Point Mountain Climate Program at COP-31",
+      "category": "nepal",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": "2026-11-18",
+      "last_reported": "2026-11-18",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.khabarhub.com/2026/18/575967"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Government of Nepal is advancing a three-point proposal at the 31st Conference of the Parties (COP-31) in Turkey to establish a dedicated mountain climate program beginning in 2027.",
+      "latest_development": "Reported: The Government of Nepal is advancing a three-point proposal at the 31st Conference of the Parties (COP-31) in Turkey to establish a dedicated mountain climate program beginning in 2027.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-18",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2027-01-01",
+      "updated_at": "2026-11-18T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-ed775eae8aa5",
+      "event_key": "kathmandu-morning-temperature-9-8-c",
+      "canonical_title": "Kathmandu Morning Temperature Rises to 9.8 Degrees Celsius",
+      "category": "nepal",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": "2026-11-18",
+      "last_reported": "2026-11-18",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/18/575965"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Meteorological records show Kathmandu Valley experienced a slightly warmer start on Wednesday, with the morning minimum temperature climbing to 9.8 degrees Celsius.",
+      "latest_development": "Reported: Meteorological records show Kathmandu Valley experienced a slightly warmer start on Wednesday, with the morning minimum temperature climbing to 9.8 degrees Celsius.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-18",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-18T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-4583e014321e",
+      "event_key": "nepal-supreme-court-civil-service-trade-union",
+      "canonical_title": "Supreme Court Constitutional Bench to Review Civil Service Trade Union Dispute",
+      "category": "nepal",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": "2026-11-18",
+      "last_reported": "2026-11-18",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "onlinekhabar.com/2026/11/2059927/civil-service-trade-union-dispute-in-constitutional-court"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Nepal's Supreme Court has assigned a constitutional bench led by designated judges to hear and resolve the legal dispute surrounding the government's decision regarding civil service trade unions.",
+      "latest_development": "Reported: Nepal's Supreme Court has assigned a constitutional bench led by designated judges to hear and resolve the legal dispute surrounding the government's decision regarding civil service trade unions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-18",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-18T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-2b1c1eb0aced",
+      "event_key": "microsoft-ignite-copilot-office-integration",
+      "canonical_title": "Microsoft Unveils Office Suite Integration Inside Copilot at Ignite Keynote",
+      "category": "tech_career",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": "2026-11-18",
+      "last_reported": "2026-11-18",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "arstechnica.com/gadgets/2026/11/microsoft-calls-copilot-the-new-os-for-work-at-ignite-keynote"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Confirmed: Microsoft announced at its Ignite keynote that core productivity applications including Word, Excel, and PowerPoint now operate directly inside Copilot as part of its new workplace OS architecture.",
+      "latest_development": "Confirmed: Microsoft announced at its Ignite keynote that core productivity applications including Word, Excel, and PowerPoint now operate directly inside Copilot as part of its new workplace OS architecture.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-18",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-18T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-62b935b1a16c",
+      "event_key": "apple-support-community-closure-archive",
+      "canonical_title": "Archive Team Begins Archiving Apple Support Community Ahead of Closure",
+      "category": "tech_career",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": "2026-11-18",
+      "last_reported": "2026-11-18",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "wiki.archiveteam.org"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Archive Team has initiated preservation efforts for the Apple Support Community discussion boards ahead of their scheduled closure on November 20, 2026.",
+      "latest_development": "Reported: Archive Team has initiated preservation efforts for the Apple Support Community discussion boards ahead of their scheduled closure on November 20, 2026.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-18",
+      "in_evening": null,
+      "deadline": "2026-11-20",
+      "effective_date": "2026-11-20",
+      "updated_at": "2026-11-18T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-c9ea2b7c36af",
+      "event_key": "nvidia-quarterly-earnings-jensen-huang-exit",
+      "canonical_title": "Nvidia Reports Strong Quarterly Financial Results Following Executive Changes",
+      "category": "tech_career",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": "2026-11-18",
+      "last_reported": "2026-11-18",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "bbc.co.uk/news/articles/cm2kl50vkwkdo"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nvidia reported strong quarterly financial earnings on Tuesday and projected continued revenue growth following the recent executive departure of Jensen Huang.",
+      "latest_development": "Confirmed: Nvidia reported strong quarterly financial earnings on Tuesday and projected continued revenue growth following the recent executive departure of Jensen Huang.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-18",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-18T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-49bcda0d93ef",
+      "event_key": "rpg-maker-u2u-steam-release-jan-28",
+      "canonical_title": "RPG Maker U2U Software Scheduled for PC Release via Steam on January 28",
+      "category": "anime",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-17/rpg-maker-u2u-software-launches-for-pc-via-steam-on-january-28/.243702"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Confirmed: Developers announced that RPG Maker U2U software will launch for PC users via Steam on January 28, bringing new creation toolsets to game developers.",
+      "latest_development": "Confirmed: Developers announced that RPG Maker U2U software will launch for PC users via Steam on January 28, bringing new creation toolsets to game developers.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": "2027-01-28",
+      "effective_date": "2027-01-28",
+      "updated_at": "2026-11-18T06:41:22+05:45"
     }
   ],
   "archived": []
