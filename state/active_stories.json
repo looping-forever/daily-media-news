@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-18T19:23:34+05:45"
+      "updated_at": "2026-11-19T06:41:43+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -16185,7 +16185,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A financial research dashboard has an awkward retrieval constraint: a corrected PDF must become searchable without making yesterday's citations impossible to explain. That changes the architecture more than the choice of vector database…",
       "latest_development": "A financial research dashboard has an awkward retrieval constraint: a corrected PDF must become searchable without making yesterday's citations impossible to explain. That changes the architecture more than the choice of vector database…",
       "alerted": false,
@@ -16195,7 +16195,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-e9fa5b885ab1",
@@ -16213,7 +16213,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Anthropic announced on November 10, 2026 that Claude is now, for practical purposes, an office suite. Not a chatbot with a few document tricks — a workspace with spreadsheets, a whiteboard, a data tool, and meeting notes on the way. If…",
       "latest_development": "Anthropic announced on November 10, 2026 that Claude is now, for practical purposes, an office suite. Not a chatbot with a few document tricks — a workspace with spreadsheets, a whiteboard, a data tool, and meeting notes on the way. If…",
       "alerted": false,
@@ -16223,7 +16223,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-92e16d8e24ac",
@@ -16241,7 +16241,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Vinícius Jr sends surprise message to boy who lost his legs in Sudan's war.",
       "latest_development": "Vinícius Jr sends surprise message to boy who lost his legs in Sudan's war.",
       "alerted": false,
@@ -16251,7 +16251,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-6eaabdfdf7db",
@@ -16269,7 +16269,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "President Trump welcomed a congressional halt to Pete Hegseths impeachment while Democrats may retry next year.",
       "latest_development": "President Trump welcomed a congressional halt to Pete Hegseths impeachment while Democrats may retry next year.",
       "alerted": false,
@@ -16279,7 +16279,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-317d8b99efe0",
@@ -16297,7 +16297,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sonia Gandhi's memoir revisits love, loss and political inheritance, offering a deeply personal defence of her family and its legacy.",
       "latest_development": "Sonia Gandhi's memoir revisits love, loss and political inheritance, offering a deeply personal defence of her family and its legacy.",
       "alerted": false,
@@ -16307,7 +16307,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-a937abc86931",
@@ -16325,7 +16325,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Double amputee Zaher told the BBC last year about his favourite footballer and a dream of being able to walk again.",
       "latest_development": "Double amputee Zaher told the BBC last year about his favourite footballer and a dream of being able to walk again.",
       "alerted": false,
@@ -16335,7 +16335,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-09258f6a3fac",
@@ -16353,7 +16353,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16363,7 +16363,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-82d575b6bafc",
@@ -16381,7 +16381,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Tekken 8's Season 3 character, Roger Jr., will launch in early access on November 11.",
       "latest_development": "Tekken 8's Season 3 character, Roger Jr., will launch in early access on November 11.",
       "alerted": false,
@@ -16391,7 +16391,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-1e2c51a8c3f5",
@@ -16409,7 +16409,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16419,7 +16419,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-4217005612e0",
@@ -16437,7 +16437,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16447,7 +16447,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-1b006115ff3d",
@@ -16465,7 +16465,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sony cancelled the live service game Fairgames, which was announced in 2023 without further development.",
       "latest_development": "Sony cancelled the live service game Fairgames, which was announced in 2023 without further development.",
       "alerted": false,
@@ -16475,7 +16475,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-a3ef943d7cc3",
@@ -16493,7 +16493,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Christopher Nolan's The Odyssey will be released on VOD and Blu-ray/DVD on November 19th.",
       "latest_development": "Christopher Nolan's The Odyssey will be released on VOD and Blu-ray/DVD on November 19th.",
       "alerted": false,
@@ -16503,7 +16503,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-3d30ee8d3637",
@@ -16521,7 +16521,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16531,7 +16531,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-ec480d3f6b24",
@@ -16549,7 +16549,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16559,7 +16559,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-d97a64b16ae0",
@@ -16577,7 +16577,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16587,7 +16587,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T06:43:32+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-706585876664",
@@ -16633,7 +16633,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16643,7 +16643,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-1e278840c6ad",
@@ -16689,7 +16689,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "The official X account for author Nana Mikoshiba announced on Tuesday that the Hyouken no Majutsushi ga Sekai wo Suberu: Sekai Saikyou no Majutsushi de Aru Shounen wa, Majutsu Gakuin ni Nyuugaku suru (The Iceblade Sorcerer Shall Rule the…",
       "latest_development": "The official X account for author Nana Mikoshiba announced on Tuesday that the Hyouken no Majutsushi ga Sekai wo Suberu: Sekai Saikyou no Majutsushi de Aru Shounen wa, Majutsu Gakuin ni Nyuugaku suru (The Iceblade Sorcerer Shall Rule the…",
       "alerted": false,
@@ -16699,7 +16699,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-d79bf013ae68",
@@ -16717,7 +16717,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16727,7 +16727,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-246036e6ae48",
@@ -16745,7 +16745,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16755,7 +16755,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-05c74e078fc9",
@@ -16773,7 +16773,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16783,7 +16783,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-98f08807e3e3",
@@ -16801,7 +16801,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16811,7 +16811,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-fa280e0340f2",
@@ -16829,7 +16829,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16839,7 +16839,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-ab8e57a4cf6c",
@@ -16857,7 +16857,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "President Trump praises the failure of impeachment efforts against Secretary of War Pete Hegseth, while Rep. Massie is labeled a 'major loser' after the House blocks impeachment calls.",
       "latest_development": "President Trump praises the failure of impeachment efforts against Secretary of War Pete Hegseth, while Rep. Massie is labeled a 'major loser' after the House blocks impeachment calls.",
       "alerted": false,
@@ -16867,7 +16867,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-5aa11757e550",
@@ -16885,7 +16885,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Steam's age verification process in Australia now takes your account's age into account.",
       "latest_development": "Steam's age verification process in Australia now takes your account's age into account.",
       "alerted": false,
@@ -16895,7 +16895,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-b9faef3a7650",
@@ -16913,7 +16913,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Have you ever tried navigating a clunky hospital portal? Between the cryptic department names and the endless clicking, it’s a UI nightmare. But what if your computer could \"see\" the screen, reason like a human, and handle the entire…",
       "latest_development": "Have you ever tried navigating a clunky hospital portal? Between the cryptic department names and the endless clicking, it’s a UI nightmare. But what if your computer could \"see\" the screen, reason like a human, and handle the entire…",
       "alerted": false,
@@ -16923,7 +16923,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-c5e23231cf5b",
@@ -16941,7 +16941,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "An order export makes a tempting work queue: take the first 2,000 rows, click download, and repeat. That works only if the limit counts orders and each row has the same relationship to a document. Neither assumption belongs in a billing…",
       "latest_development": "An order export makes a tempting work queue: take the first 2,000 rows, click download, and repeat. That works only if the limit counts orders and each row has the same relationship to a document. Neither assumption belongs in a billing…",
       "alerted": false,
@@ -16951,7 +16951,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-f6e18804c24a",
@@ -16969,7 +16969,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "You want the text out of a PDF, a Word file, or a web page — with the headings and tables still looking like headings and tables. Then you can paste it into a notes app, or cut it into chunks for AI search (RAG). Copy and paste from a PDF…",
       "latest_development": "You want the text out of a PDF, a Word file, or a web page — with the headings and tables still looking like headings and tables. Then you can paste it into a notes app, or cut it into chunks for AI search (RAG). Copy and paste from a PDF…",
       "alerted": false,
@@ -16979,7 +16979,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-ca4338bf323d",
@@ -16997,7 +16997,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17007,7 +17007,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-03af90bdd3a6",
@@ -17025,7 +17025,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "KATHMANDU: Minister for Information and Communications Dr Bikram Timilsina has called for stronger international cooperation and investment in resilient communication infrastructure to ensure uninterrupted services during disasters.…",
       "latest_development": "KATHMANDU: Minister for Information and Communications Dr Bikram Timilsina has called for stronger international cooperation and investment in resilient communication infrastructure to ensure uninterrupted services during disasters.…",
       "alerted": false,
@@ -17035,7 +17035,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-87902325ef34",
@@ -17053,7 +17053,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "American justice officials linked three suspects with Iranian ties to multiple plotted attacks including an incident near a US-linked UK airbase.",
       "latest_development": "American justice officials linked three suspects with Iranian ties to multiple plotted attacks including an incident near a US-linked UK airbase.",
       "alerted": false,
@@ -17063,7 +17063,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-6ecd8a0d75aa",
@@ -17081,7 +17081,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17091,7 +17091,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-6bad9c3ce818",
@@ -17109,7 +17109,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17119,7 +17119,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-6bf302e9f486",
@@ -17137,7 +17137,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17147,7 +17147,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-11T07:23:52+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-7e8a7029ac8b",
@@ -17165,7 +17165,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Sony's latest sales data reveals that the PlayStation 5 has officially crossed the 100 million consoles sold milestone as of November 10. This achievement comes nearly six years after the console's initial global release.",
       "latest_development": "Confirmed: Sony's latest sales data reveals that the PlayStation 5 has officially crossed the 100 million consoles sold milestone as of November 10. This achievement comes nearly six years after the console's initial global release.",
       "alerted": false,
@@ -17175,7 +17175,7 @@
       "in_evening": "2026-11-11",
       "deadline": null,
       "effective_date": "2026-11-10",
-      "updated_at": "2026-11-11T18:43:17+05:45"
+      "updated_at": "2026-11-19T06:41:32+05:45"
     },
     {
       "event_id": "evt-d6f499e00704",
@@ -24772,6 +24772,454 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-18T19:23:34+05:45"
+    },
+    {
+      "event_id": "evt-cb68c8194456",
+      "event_key": "tu-iost-bsc-retake-results",
+      "canonical_title": "Tribhuvan University IOST Publishes B.Sc. Retake Entrance Exam Results",
+      "category": "education_tu",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "iost.tu.edu.np/notices/16179"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology has officially published the results for the B.Sc. retake entrance examination, following notices issued under reference 16179.",
+      "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology has officially published the results for the B.Sc. retake entrance examination, following notices issued under reference 16179.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-d63ee9c43441",
+      "event_key": "tu-bit-exam-center-2082",
+      "canonical_title": "Tribhuvan University IOST Releases Bachelor in Information Technology Exam Center Notice",
+      "category": "education_tu",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "iost.tu.edu.np/notices/16101"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology has released examination center details for the Bachelor in Information Technology (BIT) Second Semester 2082 under notice reference 16101.",
+      "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology has released examination center details for the Bachelor in Information Technology (BIT) Second Semester 2082 under notice reference 16101.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-9abbbd78c455",
+      "event_key": "cyclone-akvan-westerly-weather-nepal",
+      "canonical_title": "Partial Influence of Westerly Winds and Cyclone Akvan Expected Across Nepal",
+      "category": "local_city",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2060689/partial-impact-of-cyclone-akwan-cloudy-in-some-places-fog-in-terai-madhesh"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Department of Hydrology and Meteorology reports that Nepal is experiencing the partial influence of westerly winds and Cyclone Akvan, bringing partly cloudy skies to parts of the country and morning fog to the Terai region.",
+      "latest_development": "Reported: The Department of Hydrology and Meteorology reports that Nepal is experiencing the partial influence of westerly winds and Cyclone Akvan, bringing partly cloudy skies to parts of the country and morning fog to the Terai region.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-4e2a7c427e5d",
+      "event_key": "kathmandu-min-temp-9.5c",
+      "canonical_title": "Kathmandu Valley Records Minimum Temperature of 9.5 Degrees Celsius",
+      "category": "local_city",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 9,
+      "sources": [
+        "english.khabarhub.com/2026/19/576100"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Meteorological records show that Kathmandu Valley recorded a minimum temperature of 9.5 degrees Celsius on Thursday morning, marking a slight drop compared to previous days.",
+      "latest_development": "Reported: Meteorological records show that Kathmandu Valley recorded a minimum temperature of 9.5 degrees Celsius on Thursday morning, marking a slight drop compared to previous days.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-05e91c4d6fb5",
+      "event_key": "birgunj-customs-revenue-kartik",
+      "canonical_title": "Birgunj Customs Office Exceeds Monthly Revenue Collection Target",
+      "category": "nepal",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": "2026-11-19",
+      "last_reported": "2026-11-19",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2060691/birgunj-customs-revenue-collection-exceeds-target"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "DEVELOPING",
+      "known_facts": "Confirmed: The Birgunj Customs Office reported that it collected 17 billion in revenue during the month of Kartik, exceeding its set target for the current fiscal year.",
+      "latest_development": "Confirmed: The Birgunj Customs Office reported that it collected 17 billion in revenue during the month of Kartik, exceeding its set target for the current fiscal year.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-19",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-19",
+      "updated_at": "2026-11-19T06:41:43+05:45"
+    },
+    {
+      "event_id": "evt-1923b4b184d6",
+      "event_key": "kanchanpur-farmers-sugarcane-shift",
+      "canonical_title": "Kanchanpur Farmers Shift Toward Sugarcane Cultivation Over Traditional Crops",
+      "category": "nepal",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2060694/farmers-in-kanchanpur-are-turning-to-sugarcane-farming-instead-of-rice-and-wheat-expecting-their-income-to-double"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Farmers in Kanchanpur are increasingly replacing traditional paddy and wheat cultivation with sugarcane farming, anticipating double the financial returns.",
+      "latest_development": "Reported: Farmers in Kanchanpur are increasingly replacing traditional paddy and wheat cultivation with sugarcane farming, anticipating double the financial returns.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-1159aff5b914",
+      "event_key": "sarlahi-arrest-drugs-ammunition",
+      "canonical_title": "Police Arrest Two Indian Nationals in Sarlahi with Contraband and Ammunition",
+      "category": "nepal",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "english.khabarhub.com/2026/19/576098"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Law enforcement authorities in Sarlahi arrested two Indian citizens in possession of illegal drugs, pistol ammunition, and pharmaceutical injections.",
+      "latest_development": "Reported: Law enforcement authorities in Sarlahi arrested two Indian citizens in possession of illegal drugs, pistol ammunition, and pharmaceutical injections.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-9327932d93fd",
+      "event_key": "microsoft-ceo-satya-nadella-buyout-strategy",
+      "canonical_title": "Microsoft CEO Satya Nadella Discusses Recent Workforce Buyout Program",
+      "category": "tech_career",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "techcrunch.com/2026/11/18/microsoft-ceo-satya-nadella-explains-why-he-asked-60k-employees-to-quit"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Microsoft CEO Satya Nadella addressed the rationale behind offering voluntary buyouts to 60,000 employees during October rather than executing standard involuntary layoffs.",
+      "latest_development": "Reported: Microsoft CEO Satya Nadella addressed the rationale behind offering voluntary buyouts to 60,000 employees during October rather than executing standard involuntary layoffs.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-0b594e56f449",
+      "event_key": "van-gogh-painting-record-auction-190m",
+      "canonical_title": "Van Gogh Painting Sets Record at Auction Following Provenance Dispute",
+      "category": "world_major",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 4,
+      "sources": [
+        "bbc.co.uk/news/articles/c5dj1dkwzvzwo"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: Vincent van Gogh's 1890 painting Châtaigniers en fleurs sold for a record 190.4 million dollars at auction after resolving historical disputes concerning its Nazi-era provenance.",
+      "latest_development": "Reported: Vincent van Gogh's 1890 painting Châtaigniers en fleurs sold for a record 190.4 million dollars at auction after resolving historical disputes concerning its Nazi-era provenance.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-f2789d26b76c",
+      "event_key": "us-faa-ground-stop-contractor-blame",
+      "canonical_title": "US Transportation Secretary Blames Contractor for Nationwide FAA Ground Stop",
+      "category": "world_major",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "theguardian.com/us-news/live/2026/nov/18/donald-trump-mary-peltola-alaska-hakeem-jeffries-democrats-republicans-congress-house-senate-midterms-latest-news-updates"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: US Transportation Secretary Sean Duffy attributed a nationwide aviation ground stoppage to contractor L3Harris, stating that the underlying system failure was not identified quickly enough.",
+      "latest_development": "Reported: US Transportation Secretary Sean Duffy attributed a nationwide aviation ground stoppage to contractor L3Harris, stating that the underlying system failure was not identified quickly enough.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-b11bba6f3469",
+      "event_key": "colombia-rejects-us-joint-military-plan",
+      "canonical_title": "Colombia Rejects Joint Military Plan With United States Against Drug Cartels",
+      "category": "world_major",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 4,
+      "sources": [
+        "nytimes.com/2026/11/18/world/americas/colombia-us-joint-military.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: The Colombian government officially rejected a joint military proposal with the United States to target drug cartels directly on Colombian soil.",
+      "latest_development": "Reported: The Colombian government officially rejected a joint military proposal with the United States to target drug cartels directly on Colombian soil.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-88de92f0515b",
+      "event_key": "pew-research-india-religious-demographics",
+      "canonical_title": "Pew Research Center Releases Survey on Religious Demographics in India",
+      "category": "world_major",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "bbc.co.uk/news/articles/cqd01epyrz1do"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: A comprehensive Pew Research Center study on India indicates that the nation will remain predominantly Hindu while projecting faster growth rates for its Muslim population.",
+      "latest_development": "Reported: A comprehensive Pew Research Center study on India indicates that the nation will remain predominantly Hindu while projecting faster growth rates for its Muslim population.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-3eef65d05edb",
+      "event_key": "tu-notices-nov-19",
+      "canonical_title": "Tribhuvan University Exam Notices: B.Sc. Results and College Program Updates",
+      "category": "education_tu",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": "2026-11-19",
+      "last_reported": "2026-11-19",
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "iost.tu.edu.np/notices/16179"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Institute of Science and Technology (IOST) has published results for the B.Sc. re-entrance examination. Additionally, Tribhuvan University has issued a formal notice regarding the addition of new academic programs or subjects in affiliated campuses and colleges.",
+      "latest_development": "Confirmed: The Institute of Science and Technology (IOST) has published results for the B.Sc. re-entrance examination. Additionally, Tribhuvan University has issued a formal notice regarding the addition of new academic programs or subjects in affiliated campuses and colleges.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-19",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:43+05:45"
+    },
+    {
+      "event_id": "evt-b7609c4cd26b",
+      "event_key": "nepal-weather-akwan-nov19",
+      "canonical_title": "Weather Forecast: Partial Impact of Cyclone Akwan",
+      "category": "local_city",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": "2026-11-19",
+      "last_reported": "2026-11-19",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.khabarhub.com/2026/19/576103"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal is experiencing the partial influence of westerly winds and Cyclone Akwan. Kathmandu recorded a minimum temperature of 9.5°C early Thursday morning, and residents in the Terai-Madhesh region can expect foggy conditions.",
+      "latest_development": "Confirmed: Nepal is experiencing the partial influence of westerly winds and Cyclone Akwan. Kathmandu recorded a minimum temperature of 9.5°C early Thursday morning, and residents in the Terai-Madhesh region can expect foggy conditions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-19",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-19",
+      "updated_at": "2026-11-19T06:41:43+05:45"
+    },
+    {
+      "event_id": "evt-8590d999fe98",
+      "event_key": "sarlahi-arrests-nov19",
+      "canonical_title": "Two Indian Nationals Arrested in Sarlahi with Contraband",
+      "category": "nepal",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": "2026-11-19",
+      "last_reported": "2026-11-19",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.khabarhub.com/2026/19/576098"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Sarlahi police have arrested two Indian nationals found in possession of illegal drugs, pistol ammunition, and various injections.",
+      "latest_development": "Confirmed: Sarlahi police have arrested two Indian nationals found in possession of illegal drugs, pistol ammunition, and various injections.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-19",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:43+05:45"
+    },
+    {
+      "event_id": "evt-c6ada4d42ce6",
+      "event_key": "faa-ground-stop-contractor",
+      "canonical_title": "Global Market Update: FAA Ground Stop Blamed on Contractor",
+      "category": "world_major",
+      "first_seen": "2026-11-19",
+      "last_seen": "2026-11-19",
+      "first_reported": "2026-11-19",
+      "last_reported": "2026-11-19",
+      "importance": 0,
+      "personal_relevance": 4,
+      "sources": [
+        "theguardian.com/us-news/live/2026/nov/18/donald-trump-mary-peltola-alaska-hakeem-jeffries-democrats-republicans-congress-house-senate-midterms-latest-news-updates"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The US transportation secretary has officially attributed the nationwide FAA ground stoppage to a failure by the contractor, L3Harris, stating that the issue was not identified quickly enough.",
+      "latest_development": "Reported: The US transportation secretary has officially attributed the nationwide FAA ground stoppage to a failure by the contractor, L3Harris, stating that the issue was not identified quickly enough.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-19",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-19T06:41:43+05:45"
     }
   ],
   "archived": []

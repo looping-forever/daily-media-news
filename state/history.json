@@ -1,167 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "bbc.co.uk/news/articles/c687z7g4xr97o",
-      "title_hash": "42f496143baf8ff8f3e39b5d2c91227967baf82c",
-      "title": "'They will kill you too': Sonia Gandhi's turbulent journey in Indian politics",
-      "category": "world_major",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "polygon.com/the-odyssey-christopher-nolan-home-release-date",
-      "title_hash": "ee44d7cd4db2009537cc51002aa1a4aa79f03657",
-      "title": "Christopher Nolan's The Odyssey Officially Sets Home Release Date",
-      "category": "gaming",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/paullovelace/claude-is-now-an-office-suite-sheets-whiteboards-data-5d51",
-      "title_hash": "9ff7ab7eb03a38e9733a14f8d94dd05c3e1f662c",
-      "title": "Claude Is Now an Office Suite: Sheets, Whiteboards, Data",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/thalynrift3485/incremental-indexing-for-financial-research-dashboards-4-stages-that-preserve-freshness-1eed",
-      "title_hash": "ce27ddae84f1ec017f8eaeb527ff3b64aa5a230b",
-      "title": "Incremental Indexing for Financial Research Dashboards — 4 Stages That Preserve Freshness",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/jslab/prettier-on-demand-on-run-on-save-m57",
-      "title_hash": "abb8e569bd4852be99d0b785a7a31446b0d3605a",
-      "title": "Prettier on demand, on run, on save",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cqm26mmpp2p1o",
-      "title_hash": "401da7e5c612bb467541550bd0fb6bcdebc38218",
-      "title": "Real Madrid's Vinícius Jr sends surprise message to boy who lost his legs in Sudan's war",
-      "category": "world_major",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "pcgamer.com/gaming-industry/sony-cancels-another-live-service-game-ahead-of-release-but-at-least-there-wont-be-any-layoffs-this-time",
-      "title_hash": "96e291dc9304dc8445d095edc59f4c494c3a222e",
-      "title": "Sony cancels another live service game ahead of release, but at least there won't be any layoffs this time",
-      "category": "gaming",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-10/tekken-8-game-streams-roger-jr-starter-guide/.243701",
-      "title_hash": "00ee9a194284fba6695779f41525f08c71744db4",
-      "title": "Tekken 8 Game Streams Roger Jr. Starter Guide",
-      "category": "anime",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/wellallytech/automate-the-impossible-building-a-closed-loop-medical-appointment-agent-with-browser-use-gpt-4v-17mo",
-      "title_hash": "b7f9acfea17b922ce305dc3de64a769ab0364b30",
-      "title": "Automate the Impossible: Building a Closed-Loop Medical Appointment Agent with Browser-use & GPT-4V 🚀",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/tidybytetools/how-to-turn-a-pdf-or-word-file-into-markdown-for-ai-and-notes-5fp1",
-      "title_hash": "496fabee584f207b64f65f0264419f4b23f16735",
-      "title": "How to turn a PDF or Word file into Markdown for AI and notes",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/diplomacy/minister-timilsina-calls-for-global-support-to-rebuild-disaster-hit-communication-infrastructure",
-      "title_hash": "6b75bc04791f3f3d70f53197c4547ec48ce2cf3a",
-      "title": "Minister Timilsina calls for global support to rebuild disaster-hit communication infrastructure",
-      "category": "nepal",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/browser_act_e2505dbdf454a/partition-invoice-exports-by-document-count-not-order-rows-8oe",
-      "title_hash": "7e1f7d1d780e196f0a284c267300ffaa73ad58ac",
-      "title": "Partition invoice exports by document count, not order rows",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "pcgamer.com/software/platforms/steams-age-verification-in-australia-now-takes-your-accounts-age-into-consideration",
-      "title_hash": "070c6ed51461111ba5afdd9c343c7382be0df40a",
-      "title": "Steam's age verification in Australia now takes your account's age into consideration",
-      "category": "gaming",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/c3rryrryk59zo",
-      "title_hash": "1582c4a582178e1601bbcccc2b80ff0f85b3bb15",
-      "title": "Three Iran-backed suspects plotted attacks including RAF Fairford incident, US says",
-      "category": "world_major",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "eurogamer.net/playstation-5-100-million-sales-november-2026",
-      "title_hash": "f7a36ab32dccf7d361e5966d2d689de4e1f6c0c1",
-      "title": "PlayStation 5 Surpasses 100 Million Units Sold",
-      "category": "gaming",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "polygon.com/zelda-ocarina-of-time-dungeons-ranked",
-      "title_hash": "7b64339f0e0cfd62e26ed59131c6a3d3cb98e7a3",
-      "title": "All Zelda: Ocarina of Time Dungeons, Ranked From Worst to Best",
-      "category": "gaming",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/oleksii_sorokin_411f31dd9/announcing-the-alphagrowth-mcp-server-27-web3-tools-for-claude-chatgpt-and-cursor-3m5n",
-      "title_hash": "520093d5a64364f8e368a6355d691eacc31e3e5e",
-      "title": "Announcing the AlphaGrowth MCP Server: 27 Web3 Tools for Claude, ChatGPT, and Cursor",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "pcgamer.com/hardware/graphics-cards/apparently-now-we-wont-see-a-24-gb-rtx-5080-which-is-probably-actually-good-for-our-wallets",
-      "title_hash": "b3786c3862f16c487ce9d66cc6e62a15a24cf452",
-      "title": "Apparently now we *won’t* see a 24 GB RTX 5080, which is probably actually good for our wallets",
-      "category": "gaming",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cmkg5jr59835o",
-      "title_hash": "bff1ebaa27ba5973b3484b4d3ef7a7e3a0154eec",
-      "title": "Egyptian journalist's retrial adjourned as UN warns of 'assaults on press freedom'",
-      "category": "world_major",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cwg5r8zrm11mo",
-      "title_hash": "5a361625953fcee48f299159a3f83744577acc8c",
-      "title": "Four grizzly bears killed in Canada after fatal attack on mother and daughter",
-      "category": "world_major",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/t1m4lc/how-i-built-a-multi-country-price-comparator-as-a-solo-dev-static-first-workers-d1-and-a-lot-of-1ff8",
-      "title_hash": "402ab69fb73a3bc4fcf55bbd447db27c2a76dbb5",
-      "title": "How I built a multi-country price comparator as a solo dev: static-first, Workers, D1 and a lot of feed matching",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "dev.to/shamsxnahid/is-cursors-composer-25-worth-it-for-everyday-basic-usage-4lka",
-      "title_hash": "55173ad92bb8b60c04bf6399149325237c974a17",
-      "title": "Is Cursor's Composer 2.5 worth it for everyday basic usage?",
-      "category": "tech_career",
-      "date_sent": "2026-11-11"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cwe9kzv0g0v7o",
-      "title_hash": "a6de594e7e1774ec01643a105e10ddab17406cba",
-      "title": "Kenya discharges last Ebola patient in major milestone towards virus-free status",
-      "category": "world_major",
-      "date_sent": "2026-11-11"
-    },
-    {
       "url_normalized": "onlinekhabar.com/2026/11/2055819/climate-crisis-is-overwhelming-the-worlds-preparedness-and-response-capacity",
       "title_hash": "44618fd8fe94d628b9a2df28c015fec9a58f9f22",
       "title": "UN Secretary-General Urges Accelerated Climate Action at COP-31",
@@ -1763,6 +1602,41 @@
       "title": "Voyager 1 Golden Record Details",
       "category": "tech_career",
       "date_sent": "2026-11-18"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16179",
+      "title_hash": "d15a254ede3131adabf73cc768f0c49710e3b342",
+      "title": "Tribhuvan University Exam Notices: B.Sc. Results and College Program Updates",
+      "category": "education_tu",
+      "date_sent": "2026-11-19"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/19/576103",
+      "title_hash": "18459dbbc919b00cb01f81896f1f9bedb7e96445",
+      "title": "Weather Forecast: Partial Impact of Cyclone Akwan",
+      "category": "local_city",
+      "date_sent": "2026-11-19"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2060691/birgunj-customs-revenue-collection-exceeds-target",
+      "title_hash": "3c70714e878ddc32dbc8018b34c3d056035dda07",
+      "title": "Birgunj Customs Revenue Exceeds Monthly Target",
+      "category": "nepal",
+      "date_sent": "2026-11-19"
+    },
+    {
+      "url_normalized": "theguardian.com/us-news/live/2026/nov/18/donald-trump-mary-peltola-alaska-hakeem-jeffries-democrats-republicans-congress-house-senate-midterms-latest-news-updates",
+      "title_hash": "0093fc7a803396eea34a53ba94a8233a44aed545",
+      "title": "Global Market Update: FAA Ground Stop Blamed on Contractor",
+      "category": "world_major",
+      "date_sent": "2026-11-19"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/19/576098",
+      "title_hash": "7beae878150ccb0b92546711abd2e8f64e3e5fab",
+      "title": "Two Indian Nationals Arrested in Sarlahi with Contraband",
+      "category": "nepal",
+      "date_sent": "2026-11-19"
     }
   ]
 }
