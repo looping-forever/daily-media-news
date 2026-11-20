@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -16605,7 +16605,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16615,7 +16615,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-bc3d2461397b",
@@ -16661,7 +16661,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -16671,7 +16671,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-621d0eeba869",
@@ -17193,7 +17193,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Tourist arrivals in Gosainkunda have begun to rise again as access routes recover from damage caused by the Bhote Koshi floods on August 26, 2026. The area remains a major site for religious and natural tourism in the Rasuwa district.",
       "latest_development": "Reported: Tourist arrivals in Gosainkunda have begun to rise again as access routes recover from damage caused by the Bhote Koshi floods on August 26, 2026. The area remains a major site for religious and natural tourism in the Rasuwa district.",
       "alerted": false,
@@ -17203,7 +17203,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T06:41:57+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-24909ba13dee",
@@ -17221,7 +17221,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: During the COP-31 leadership summit in Antalya, Turkey, UN Secretary-General António Guterres warned that the climate crisis is escalating faster than the world's ability to prepare and respond. He has called on world leaders to aggressively intensify greenhouse gas emission reduction efforts.",
       "latest_development": "Reported: During the COP-31 leadership summit in Antalya, Turkey, UN Secretary-General António Guterres warned that the climate crisis is escalating faster than the world's ability to prepare and respond. He has called on world leaders to aggressively intensify greenhouse gas emission reduction efforts.",
       "alerted": false,
@@ -17231,7 +17231,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T06:41:57+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-d9fca61aac9c",
@@ -17249,7 +17249,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Democrat Scott Colom has been elected to the US Senate in Mississippi, marking the first time in over 140 years that a black person has been elected to the Senate from the state. The results were confirmed as part of the recent US elections.",
       "latest_development": "Reported: Democrat Scott Colom has been elected to the US Senate in Mississippi, marking the first time in over 140 years that a black person has been elected to the Senate from the state. The results were confirmed as part of the recent US elections.",
       "alerted": false,
@@ -17259,7 +17259,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T06:41:57+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-63344ab2da6b",
@@ -17277,7 +17277,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Emergency crews are currently searching for individuals potentially buried beneath the debris of the three-story Brooklyn structure.",
       "latest_development": "Emergency crews are currently searching for individuals potentially buried beneath the debris of the three-story Brooklyn structure.",
       "alerted": false,
@@ -17287,7 +17287,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-38776ddb5fc6",
@@ -17305,7 +17305,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Taocarts developers implemented this feature to address the most frequent inquiry from buyers on their cross-border reverse-commerce platform.",
       "latest_development": "Taocarts developers implemented this feature to address the most frequent inquiry from buyers on their cross-border reverse-commerce platform.",
       "alerted": false,
@@ -17315,7 +17315,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-cfd55078c302",
@@ -17333,7 +17333,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Developers should prioritize standard queues for most retries and only utilize FIFO options when they specifically need duplicate suppression lasting five minutes.",
       "latest_development": "Developers should prioritize standard queues for most retries and only utilize FIFO options when they specifically need duplicate suppression lasting five minutes.",
       "alerted": false,
@@ -17343,7 +17343,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-2ecf226ac19b",
@@ -17361,7 +17361,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Users are invited to register and provide feedback on the currently available platform at the web address exit719.com.",
       "latest_development": "Users are invited to register and provide feedback on the currently available platform at the web address exit719.com.",
       "alerted": false,
@@ -17371,7 +17371,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-3c81282ade86",
@@ -17389,7 +17389,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Exactly 2,486 passengers used the transport provided by the Armed Police Force across Kathmandu during the Tihar holiday.",
       "latest_development": "Exactly 2,486 passengers used the transport provided by the Armed Police Force across Kathmandu during the Tihar holiday.",
       "alerted": false,
@@ -17399,7 +17399,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-a36000c1a595",
@@ -17417,7 +17417,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17427,7 +17427,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-539e43a3da9e",
@@ -17445,7 +17445,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17455,7 +17455,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-73cd61fe8deb",
@@ -17473,7 +17473,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17483,7 +17483,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-3bc73a8ebc6d",
@@ -17501,7 +17501,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This brutal first-person game integrates specific mechanics and design elements inspired by both Dark Souls and the Elder Scrolls series.",
       "latest_development": "This brutal first-person game integrates specific mechanics and design elements inspired by both Dark Souls and the Elder Scrolls series.",
       "alerted": false,
@@ -17511,7 +17511,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-22137a4834b0",
@@ -17529,7 +17529,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17539,7 +17539,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-2e95517c5b56",
@@ -17557,7 +17557,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Experts warn that actual improvements for citizens depend on implementing changes that surpass the commitments currently stated in the document.",
       "latest_development": "Experts warn that actual improvements for citizens depend on implementing changes that surpass the commitments currently stated in the document.",
       "alerted": false,
@@ -17567,7 +17567,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-158ca667bd75",
@@ -17585,7 +17585,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17595,7 +17595,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-61ed0e1069df",
@@ -17613,7 +17613,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17623,7 +17623,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-84faf5c13242",
@@ -17641,7 +17641,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17651,7 +17651,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-5f5b91e5317e",
@@ -17669,7 +17669,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17679,7 +17679,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-a163691faaf5",
@@ -17697,7 +17697,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17707,7 +17707,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-48aad35ab81d",
@@ -17725,7 +17725,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17735,7 +17735,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-fd0bd61a5084",
@@ -17753,7 +17753,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The third season of the anime is scheduled to debut on January 10.",
       "latest_development": "The third season of the anime is scheduled to debut on January 10.",
       "alerted": false,
@@ -17763,7 +17763,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-68acfa9c711e",
@@ -17781,7 +17781,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17791,7 +17791,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-4c88dfec89e8",
@@ -17809,7 +17809,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Production company Pony Canyon has opened an official website for this adaptation by creator Tomoko Ninomiya.",
       "latest_development": "Production company Pony Canyon has opened an official website for this adaptation by creator Tomoko Ninomiya.",
       "alerted": false,
@@ -17819,7 +17819,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-bf638fb20762",
@@ -17837,7 +17837,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17847,7 +17847,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-9beb65bb16fb",
@@ -17865,7 +17865,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17875,7 +17875,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-e90ba8dff253",
@@ -17893,7 +17893,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17903,7 +17903,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T07:22:51+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-559c90d1bc14",
@@ -17949,7 +17949,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -17959,7 +17959,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T17:57:58+05:45",
+      "updated_at": "2026-11-20T06:41:33+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
     },
@@ -17979,7 +17979,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Authorities have identified three additional victims of the EV vehicle accident that occurred this morning in Chishapani Gadi, Bhimphedi rural municipality. The deceased have been identified as Rakesh Yadav (35), Chotu Ray (28), and Sudesh Yadav (approx. 17), all from Sarlahi.",
       "latest_development": "Reported: Authorities have identified three additional victims of the EV vehicle accident that occurred this morning in Chishapani Gadi, Bhimphedi rural municipality. The deceased have been identified as Rakesh Yadav (35), Chotu Ray (28), and Sudesh Yadav (approx. 17), all from Sarlahi.",
       "alerted": false,
@@ -17989,7 +17989,7 @@
       "in_evening": "2026-11-12",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T18:41:30+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-829fe0d2a385",
@@ -18007,7 +18007,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Nepal Police have arrested 44 individuals for illegal gambling in separate operations. In Kathmandu, 37 people were taken into custody at a homestay in Kageshwori Manohara Municipality, while additional arrests occurred in Tanahun.",
       "latest_development": "Reported: Nepal Police have arrested 44 individuals for illegal gambling in separate operations. In Kathmandu, 37 people were taken into custody at a homestay in Kageshwori Manohara Municipality, while additional arrests occurred in Tanahun.",
       "alerted": false,
@@ -18017,7 +18017,7 @@
       "in_evening": "2026-11-12",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T18:41:30+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-2ba4d3733383",
@@ -18035,7 +18035,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Humble Bundle's recent website redesign has removed the option for 2-factor authentication, significantly reducing account security for users. It is recommended that users remove saved payment information until security measures are restored.",
       "latest_development": "Reported: Humble Bundle's recent website redesign has removed the option for 2-factor authentication, significantly reducing account security for users. It is recommended that users remove saved payment information until security measures are restored.",
       "alerted": false,
@@ -18045,7 +18045,7 @@
       "in_evening": "2026-11-12",
       "deadline": null,
       "effective_date": "2026-11-12",
-      "updated_at": "2026-11-12T18:41:30+05:45"
+      "updated_at": "2026-11-20T06:41:33+05:45"
     },
     {
       "event_id": "evt-95c919fbe362",
@@ -18063,7 +18063,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -18073,7 +18073,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-12T20:10:01+05:45",
+      "updated_at": "2026-11-20T06:41:33+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
     },
@@ -25836,6 +25836,286 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-19T19:21:49+05:45"
+    },
+    {
+      "event_id": "evt-1c3e23e11798",
+      "event_key": "tu-coordination-division-quotation-notice",
+      "canonical_title": "Tribhuvan University Invites Procurement Quotations for Coordination Division",
+      "category": "education_tu",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "tu.edu.np/notices/16221"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University's coordination division has officially issued a formal notice inviting sealed procurement quotations and bids under notice reference number 16221.",
+      "latest_development": "Confirmed: Tribhuvan University's coordination division has officially issued a formal notice inviting sealed procurement quotations and bids under notice reference number 16221.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-642563133b4b",
+      "event_key": "tu-bit-second-semester-exam-center",
+      "canonical_title": "Tribhuvan University Publishes BIT Second Semester Exam Center Notice",
+      "category": "education_tu",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "iost.tu.edu.np/notices/16101"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology has issued the official examination center notice for Bachelor in Information Technology second semester exams under notice 16101.",
+      "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology has issued the official examination center notice for Bachelor in Information Technology second semester exams under notice 16101.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-983b37ff8994",
+      "event_key": "karnali-ride-sharing-fare-regulation",
+      "canonical_title": "Karnali Province Moves to Regulate Ride-Sharing Fares and Fees",
+      "category": "nepal",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "onlinekhabar.com/2026/11/2061550/preparations-to-set-ride-sharing-fares-in-karnali-arbitrary-fees-to-be-controlled"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Authorities in Karnali Province have initiated formal procedures to establish standardized fare rates and service fees for ride-sharing and self-drive vehicle services to control arbitrary pricing.",
+      "latest_development": "Reported: Authorities in Karnali Province have initiated formal procedures to establish standardized fare rates and service fees for ride-sharing and self-drive vehicle services to control arbitrary pricing.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-d7fae0d45b08",
+      "event_key": "tribhuvan-highway-traffic-restriction-ekadashi",
+      "canonical_title": "Tribhuvan Highway Traffic Affected Due to Religious Festival Fair",
+      "category": "local_city",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2061545/traffic-on-tribhuvan-highway-to-be-affected-today-urges-to-take-alternative-routes"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: The district administration has advised travelers to use alternative routes as public vehicle movement along the Tribhuvan Highway near Trikhandeshwar Mahadev temple in Bheemfedi is disrupted due to the Haribodhini Ekadashi festival fair.",
+      "latest_development": "Reported: The district administration has advised travelers to use alternative routes as public vehicle movement along the Tribhuvan Highway near Trikhandeshwar Mahadev temple in Bheemfedi is disrupted due to the Haribodhini Ekadashi festival fair.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-20",
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-2f919f10329a",
+      "event_key": "nrb-foreign-exchange-rates-nov20",
+      "canonical_title": "Nepal Rastra Bank Publishes Official Foreign Exchange Rates",
+      "category": "bank_local",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 9,
+      "sources": [
+        "english.khabarhub.com/2026/20/576252"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has officially published today's foreign currency exchange rates, establishing the buying rate for one US dollar at Rs 148.97.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has officially published today's foreign currency exchange rates, establishing the buying rate for one US dollar at Rs 148.97.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-20",
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-808c0cba1c40",
+      "event_key": "10th-national-games-lumbini-allocation",
+      "canonical_title": "Four Events of the 10th National Games Allocated to Lumbini Province",
+      "category": "nepal",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2061540/four-games-of-the-10th-national-games-in-lumbini-banke-and-bardiya-await-the-competition"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Preparations have accelerated in Banke and Bardiya districts as four sports events of the upcoming 10th National Games are officially assigned to Lumbini Province.",
+      "latest_development": "Reported: Preparations have accelerated in Banke and Bardiya districts as four sports events of the upcoming 10th National Games are officially assigned to Lumbini Province.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-f97ed3ac585c",
+      "event_key": "criterion-channel-speed-racer-streaming",
+      "canonical_title": "Criterion Channel Adds Speed Racer Anime to Streaming Lineup",
+      "category": "anime",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-19/criterion-channel-adds-speed-racer-anime/.243995"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The Criterion Channel has officially announced the addition of the classic Speed Racer anime series, offering both English and Japanese versions starting in December.",
+      "latest_development": "Reported: The Criterion Channel has officially announced the addition of the classic Speed Racer anime series, offering both English and Japanese versions starting in December.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-12-01",
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-d4428be27878",
+      "event_key": "kaminaki-sekai-manga-conclusion-vol14",
+      "canonical_title": "Manga Adaptation Kaminaki Sekai no Kamisama Katsudou Concludes with 14th Volume",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74958547"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Confirmed: The serialization of Aoi Akashiro and Sonshou Hangetsuban's manga series Working for God in a Godless World officially concluded with its 14th volume following its ending on October 2.",
+      "latest_development": "Confirmed: The serialization of Aoi Akashiro and Sonshou Hangetsuban's manga series Working for God in a Godless World officially concluded with its 14th volume following its ending on October 2.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-d60846d43997",
+      "event_key": "gensou-suikoden-anime-additional-cast",
+      "canonical_title": "Gensou Suikoden Anime Adaptation Reveals Additional Cast Members",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74958379"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The official website for the anime adaptation of Konami's fantasy role-playing franchise Gensou Suikoden has revealed additional voice cast members.",
+      "latest_development": "Reported: The official website for the anime adaptation of Konami's fantasy role-playing franchise Gensou Suikoden has revealed additional voice cast members.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-20T06:41:33+05:45"
+    },
+    {
+      "event_id": "evt-bc087c487588",
+      "event_key": "shin-oishinbo-anime-winter-2027-premiere",
+      "canonical_title": "Shin Oishinbo Anime Adaptation Sets Winter 2027 Premiere and Cast",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-20",
+      "last_seen": "2026-11-20",
+      "first_reported": "2026-11-20",
+      "last_reported": "2026-11-20",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74957463"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The official website for the television anime adaptation Shin Oishinbo based on Tetsu Kariya's manga has revealed additional staff, key visuals, and a Winter 2027 premiere date.",
+      "latest_development": "Reported: The official website for the television anime adaptation Shin Oishinbo based on Tetsu Kariya's manga has revealed additional staff, key visuals, and a Winter 2027 premiere date.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-20",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2027-01-01",
+      "updated_at": "2026-11-20T06:41:33+05:45"
     }
   ],
   "archived": []

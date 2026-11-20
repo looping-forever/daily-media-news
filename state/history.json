@@ -1,83 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "onlinekhabar.com/2026/11/2055819/climate-crisis-is-overwhelming-the-worlds-preparedness-and-response-capacity",
-      "title_hash": "44618fd8fe94d628b9a2df28c015fec9a58f9f22",
-      "title": "UN Secretary-General Urges Accelerated Climate Action at COP-31",
-      "category": "nepal",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2055829/tourist-traffic-increasing-in-gosainkunda-after-floods",
-      "title_hash": "02cb881e90c3d460442f73619fffa8ae6e463843",
-      "title": "Gosainkunda Tourist Traffic Increases Following Flood Recovery",
-      "category": "nepal",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cw7vppyr80eeo",
-      "title_hash": "8090c3dbbf9b81f312e0343c9592ef49a20aec5d",
-      "title": "Historic Senate Win for Scott Colom in Mississippi",
-      "category": "world_major",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74928431",
-      "title_hash": "08b43e0fa4f8748d4fab80aad17a5a236b07e001",
-      "title": "'Mashle: Sanma Taisou Shinkakusha Saishuu Shiken-hen' Reveals Additional Cast, Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "dev.to/taocarts/building-a-real-time-parcel-tracking-feed-with-websockets-1k3a",
-      "title_hash": "ff8d08839fd66be5f3267a513f74d7f762de07b5",
-      "title": "Building a Real-Time Parcel Tracking Feed with WebSockets",
-      "category": "tech_career",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "dev.to/theophilushawkins9265/fifo-queue-vs-standard-queue-for-failed-jobs-idempotent-consumer-guide-c66",
-      "title_hash": "07ee4bbdda694a7e5749a717ef2843cefe2c9292",
-      "title": "FIFO Queue vs Standard Queue for Failed Jobs: Idempotent Consumer Guide",
-      "category": "tech_career",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/videos/c60rkwjj7x7go",
-      "title_hash": "faf3cf9d997ed6c87ea12d90a9a04e0c73b5163c",
-      "title": "New York building collapse kills one person and injures 12",
-      "category": "world_major",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/ck5ynyw527wdo",
-      "title_hash": "febab71025c32ce9f0422924d324ba785569c4af",
-      "title": "Nigeria's president launches re-election manifesto but can he regain voters' trust?",
-      "category": "world_major",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "pcgamer.com/software/platforms/humble-bundles-new-redesign-inexplicably-removes-2-factor-authentication-dramatically-weakening-account-security",
-      "title_hash": "0f407941f06581d193e507476f771e62ae654a72",
-      "title": "Humble Bundle Redesign Weakens Account Security",
-      "category": "tech_career",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2056412/three-more-victims-of-bhimphedi-accident-identified",
-      "title_hash": "e27dd82d5d5fc3fbcdc7f18bfac71211d2885610",
-      "title": "Bhimphedi Road Accident: Three More Victims Identified",
-      "category": "nepal",
-      "date_sent": "2026-11-12"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/crime-news/police-arrest-44-people-for-gambling-in-kathmandu-and-tanahun",
-      "title_hash": "b514a511148fbed1b409453fa14c26888b50d69c",
-      "title": "Police Arrest 44 Individuals for Gambling in Kathmandu and Tanahun",
-      "category": "nepal",
-      "date_sent": "2026-11-12"
-    },
-    {
       "url_normalized": "iost.tu.edu.np/notices/16061",
       "title_hash": "5fcb941786b2ee01784ec55ff5ac2ec9c6bb973c",
       "title": "Tribhuvan University IOST Publishes BIT V Semester Exam Results",
@@ -1791,6 +1714,76 @@
       "title": "New anime film 'Rakuen Tsuihō' debuts in Japan",
       "category": "anime",
       "date_sent": "2026-11-19"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2061545/traffic-on-tribhuvan-highway-to-be-affected-today-urges-to-take-alternative-routes",
+      "title_hash": "5ae2d784f940a7f33cf58b0feae3bebb02b88cb4",
+      "title": "Tribhuvan Highway Traffic Affected Due to Religious Festival Fair",
+      "category": "local_city",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16101",
+      "title_hash": "d18d030a2a02bdfb4fe6d02bddc9baeda3d35fe2",
+      "title": "Tribhuvan University Publishes BIT Second Semester Exam Center Notice",
+      "category": "education_tu",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/20/576252",
+      "title_hash": "78af1fa31c343c7d1a6815efb6144dca51f5814b",
+      "title": "Nepal Rastra Bank Publishes Official Foreign Exchange Rates",
+      "category": "bank_local",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "tu.edu.np/notices/16221",
+      "title_hash": "e715072bd6a49a0a9cfe9762abdba4032d4a74b8",
+      "title": "Tribhuvan University Invites Procurement Quotations for Coordination Division",
+      "category": "education_tu",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-19/criterion-channel-adds-speed-racer-anime/.243995",
+      "title_hash": "9b1695f779dbc67e3eb2d397c6674009f5c2843c",
+      "title": "Criterion Channel Adds Speed Racer Anime to Streaming Lineup",
+      "category": "anime",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74958379",
+      "title_hash": "00e865b5a5c16f4a972be6a6e2c7831060019cf2",
+      "title": "Gensou Suikoden Anime Adaptation Reveals Additional Cast Members",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74958547",
+      "title_hash": "c5788633d5ea0a05a8d87d411b7033ed731968f7",
+      "title": "Manga Adaptation Kaminaki Sekai no Kamisama Katsudou Concludes with 14th Volume",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74957463",
+      "title_hash": "5cad3183d6c30b94bdb4a6251b25d430bb3bafba",
+      "title": "Shin Oishinbo Anime Adaptation Sets Winter 2027 Premiere and Cast",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2061550/preparations-to-set-ride-sharing-fares-in-karnali-arbitrary-fees-to-be-controlled",
+      "title_hash": "1e0ab9e5e7f4f8270611be413729fc4c73879a05",
+      "title": "Karnali Province Moves to Regulate Ride-Sharing Fares and Fees",
+      "category": "nepal",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2061540/four-games-of-the-10th-national-games-in-lumbini-banke-and-bardiya-await-the-competition",
+      "title_hash": "562db3ed0c80a1b19d68bd950181bd6954b016fa",
+      "title": "Four Events of the 10th National Games Allocated to Lumbini Province",
+      "category": "nepal",
+      "date_sent": "2026-11-20"
     }
   ]
 }
