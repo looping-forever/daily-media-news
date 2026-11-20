@@ -1875,6 +1875,76 @@
       "title": "White House cyber director ousted after US hit by wave of tech outages",
       "category": "world_major",
       "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16251",
+      "title_hash": "285241df5ed8f0ed36dbfcfb8ecd61f854c7bff7",
+      "title": "Tribhuvan University IOST publishes notice regarding entrance examinations for post-graduate admissions",
+      "category": "education_tu",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/nation/muglin-kathmandu-road-closed-for-five-hours-daily",
+      "title_hash": "027a271ec864ef21776bdf9148f24182fcf47de2",
+      "title": "Muglin-Kathmandu road section to face daily five-hour traffic halts due to landslide risks",
+      "category": "local_city",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "pcgamer.com/hardware/openai-says-it-redesigned-an-amd-gpu-and-amd-is-using-some-of-those-tweaks-for-use-in-future-products",
+      "title_hash": "f64571033ace26cb1c773b0cf94eab4b78a093c6",
+      "title": "OpenAI confirms redesign of AMD GPU with tweaks incorporated into future hardware products",
+      "category": "tech_career",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "theregister.com/security/2026/11/20/uk-government-cant-keep-its-encryption-busting-order-to-apple-a-secret-tribunal-rules/5311292",
+      "title_hash": "1afe2f484121ca14286c2dfa043fcf1c028d711f",
+      "title": "UK tribunal rules government cannot keep encryption-breaking order to Apple secret",
+      "category": "tech_career",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-20/a-pen-handcuffs-and-a-common-law-marriage-tv-anime-reveals-theme-song-artists-more-january-9-/.244022",
+      "title_hash": "9cf43855369af8077f0fbccc9a4ab5b96d7231b2",
+      "title": "A Pen, Handcuffs, and a Common-Law Marriage TV Anime announces January 9 debut date and theme artists",
+      "category": "anime",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-20/kengo-matsumoto-jimoto-no-ijimekko-tachi-ni-shikaeshi-shiyo-to-shitara-manga-gets-tv-anime/.244020",
+      "title_hash": "b5a44ee9cd62e523c0e3c089d3fdad0ae626c9a7",
+      "title": "Kengo Matsumoto's Jimoto no Ijimekko-tachi ni Shikaeshi Shiyō manga receives 2027 TV anime adaptation",
+      "category": "anime",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "english.nepalpress.com/2026/11/20/cabinet-approves-pm-shahs-india-visit",
+      "title_hash": "abcc0a0cd9ee03d8a5959c562d44b9fdc6b91597",
+      "title": "Cabinet approves Prime Minister's India visit and accepts USD two million grant assistance",
+      "category": "nepal",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-20/life-with-an-ordinary-guy-who-reincarnated-into-a-total-fantasy-knockout-manga-ends-with-20th-volume/.244002",
+      "title_hash": "67a0799217ec8267234886e1156e4d1aeaf3f72e",
+      "title": "Life with an Ordinary Guy Who Reincarnated into a Total Fantasy Knockout Manga concludes with 20th volume",
+      "category": "anime",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2062103/supreme-court-says-there-is-no-need-to-repeat-the-pashupati-gaushala-case-now-the-funds-rights-are-upheld",
+      "title_hash": "99f9a01d72f0dc1327cdc6e4f202bc62b4d945f9",
+      "title": "Supreme Court rules Pashupati Gaushala case closed with Pashupati Area Development Trust rights upheld",
+      "category": "nepal",
+      "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "english.onlinekhabar.com/gold-prices-plunge-but-nepal-has-none.html",
+      "title_hash": "aa3d81fb79bf3facd67a13071473a7aa1778f891",
+      "title": "Gold prices plunge globally while Nepal's domestic market experiences severe shortages",
+      "category": "nepal",
+      "date_sent": "2026-11-20"
     }
   ]
 }
