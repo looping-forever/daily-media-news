@@ -1812,6 +1812,34 @@
       "title": "Police arrest two Indian nationals with marijuana in Chitwan district",
       "category": "nepal",
       "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/21/576398",
+      "title_hash": "a7d830bd11151c632ff8f3eb7f732cd0250c30de",
+      "title": "Kathmandu Valley Temperature Drops to 8.3 Degrees Celsius",
+      "category": "local_city",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "theregister.com/devops/2026/11/20/php-86-things-are-gonna-get-a-lot-more-strict-around-here/5311486",
+      "title_hash": "84d4aa371ed85ee6d6ba49a6cc71ad94a00638e1",
+      "title": "PHP 8.6 Update Introduces Stricter Default Behaviors",
+      "category": "tech_career",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/21/576401",
+      "title_hash": "60c24e4233c9adfb8d226258e1d244d9b5f1d6aa",
+      "title": "Lumbini Lions and Sudurpaschim Royals Face Off in Nepal Premier League Final",
+      "category": "nepal",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "polygon.com/the-witcher-4-physical-release-cd-projekt-red-ps5",
+      "title_hash": "28d236f582508d7325698c6740c9c5195a10c6f4",
+      "title": "CD Projekt Red Shares Update Regarding Physical Release Plans for The Witcher 4",
+      "category": "gaming",
+      "date_sent": "2026-11-21"
     }
   ]
 }
