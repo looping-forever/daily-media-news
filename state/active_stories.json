@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-20T19:22:19+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -17921,7 +17921,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -17931,7 +17931,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:40+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-b57401979cb5",
@@ -18093,7 +18093,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "",
       "latest_development": "",
       "alerted": true,
@@ -18103,7 +18103,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T06:07:11+05:45",
+      "updated_at": "2026-11-21T06:41:23+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
     },
@@ -18123,7 +18123,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology (IOST) has published the exam results for BIT V Semester-2080 under notice ID 16061 on iost.tu.edu.np.",
       "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology (IOST) has published the exam results for BIT V Semester-2080 under notice ID 16061 on iost.tu.edu.np.",
       "alerted": false,
@@ -18133,7 +18133,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T06:41:19+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-a91a3d170b1c",
@@ -18151,7 +18151,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University has officially invited grant-based research proposals under notice ID 16055 published on tu.edu.np for faculty and researchers.",
       "latest_development": "Confirmed: Tribhuvan University has officially invited grant-based research proposals under notice ID 16055 published on tu.edu.np for faculty and researchers.",
       "alerted": false,
@@ -18161,7 +18161,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T06:41:19+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-967677ad0fe0",
@@ -18179,7 +18179,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Microsoft is struggling to fix a massive cloud outage that has taken down corporate email and Intune services, admitting that actions taken thus far have not provided the anticipated relief.",
       "latest_development": "Reported: Microsoft is struggling to fix a massive cloud outage that has taken down corporate email and Intune services, admitting that actions taken thus far have not provided the anticipated relief.",
       "alerted": false,
@@ -18189,7 +18189,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-12",
-      "updated_at": "2026-11-13T06:41:19+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-f44e0afddb0f",
@@ -18207,7 +18207,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The United States Department of Justice is targeting $1.2 billion in cryptocurrency loot associated with Binance while the FBI successfully disrupts a North Korean FaceStealer scam tied to over $400 million in thefts and 900 webcam recordings.",
       "latest_development": "Reported: The United States Department of Justice is targeting $1.2 billion in cryptocurrency loot associated with Binance while the FBI successfully disrupts a North Korean FaceStealer scam tied to over $400 million in thefts and 900 webcam recordings.",
       "alerted": false,
@@ -18217,7 +18217,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T06:41:19+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-9fdbf372bfdb",
@@ -18235,7 +18235,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Mega Crit has released its biggest beta patch for Slay the Spire 2 yet, introducing its first new early access character alongside two distinct game modes and numerous balance tweaks.",
       "latest_development": "Reported: Mega Crit has released its biggest beta patch for Slay the Spire 2 yet, introducing its first new early access character alongside two distinct game modes and numerous balance tweaks.",
       "alerted": false,
@@ -18245,7 +18245,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T06:41:19+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-5132171ee916",
@@ -18263,7 +18263,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The leader of the Australian cricket team dismissed accusations regarding the 2018 ball-tampering incident detailed in his teammate's new book as completely unfounded.",
       "latest_development": "The leader of the Australian cricket team dismissed accusations regarding the 2018 ball-tampering incident detailed in his teammate's new book as completely unfounded.",
       "alerted": false,
@@ -18273,7 +18273,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-f58a7e3f749b",
@@ -18291,7 +18291,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The chief executive officer has stepped down from his position following disclosures of extramarital relationships, including one involving a person alleged to be a spy for China.",
       "latest_development": "The chief executive officer has stepped down from his position following disclosures of extramarital relationships, including one involving a person alleged to be a spy for China.",
       "alerted": false,
@@ -18301,7 +18301,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-bd096f39fa8e",
@@ -18319,7 +18319,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The defense secretary issued the commendation after the soldier instructed his team to remain silent following laughter near the Tomb of the Unknown Soldier.",
       "latest_development": "The defense secretary issued the commendation after the soldier instructed his team to remain silent following laughter near the Tomb of the Unknown Soldier.",
       "alerted": false,
@@ -18329,7 +18329,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-50a8c3894e45",
@@ -18347,7 +18347,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The President warned in Washington DC that any Iranian targeting of American officials would result in those individuals no longer existing.",
       "latest_development": "The President warned in Washington DC that any Iranian targeting of American officials would result in those individuals no longer existing.",
       "alerted": false,
@@ -18357,7 +18357,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-d77f08b3c0ab",
@@ -18375,7 +18375,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Located within the Gosaikunda region, this sacred body of water is distinct due to the traditional restrictions and myths surrounding it.",
       "latest_development": "Located within the Gosaikunda region, this sacred body of water is distinct due to the traditional restrictions and myths surrounding it.",
       "alerted": false,
@@ -18385,7 +18385,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-64f7483dd1cf",
@@ -18403,7 +18403,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This new document released today aims to improve interoperability and observability for users who have been implementing the service over HTTP since 2015.",
       "latest_development": "This new document released today aims to improve interoperability and observability for users who have been implementing the service over HTTP since 2015.",
       "alerted": false,
@@ -18413,7 +18413,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-3709ab992f05",
@@ -18431,7 +18431,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Milan Kumar Nembang Limbu from Ilam is stuck at Kirtipur Burn Hospital because his employers have not covered his medical expenses.",
       "latest_development": "Milan Kumar Nembang Limbu from Ilam is stuck at Kirtipur Burn Hospital because his employers have not covered his medical expenses.",
       "alerted": false,
@@ -18441,7 +18441,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-adc039ba4bab",
@@ -18459,7 +18459,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Director Takashi Nakamura is leading the project and is also credited for the original concept.",
       "latest_development": "Director Takashi Nakamura is leading the project and is also credited for the original concept.",
       "alerted": false,
@@ -18469,7 +18469,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-cf8a58d7cd5f",
@@ -18487,7 +18487,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The author is waiting for a SAW filter and LNA to arrive so they can boost plane signals before installing the antenna outdoors.",
       "latest_development": "The author is waiting for a SAW filter and LNA to arrive so they can boost plane signals before installing the antenna outdoors.",
       "alerted": false,
@@ -18497,7 +18497,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-f06b9944550b",
@@ -18515,7 +18515,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The list includes titles such as Zelda: Ocarina of Time and Mario Kart World.",
       "latest_development": "The list includes titles such as Zelda: Ocarina of Time and Mario Kart World.",
       "alerted": false,
@@ -18525,7 +18525,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-8f426f89c042",
@@ -18543,7 +18543,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The platform encountered eight separate service incidents throughout the month that caused a decrease in operational performance.",
       "latest_development": "The platform encountered eight separate service incidents throughout the month that caused a decrease in operational performance.",
       "alerted": false,
@@ -18553,7 +18553,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:39+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-d10cb5d2517c",
@@ -18571,7 +18571,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -18581,7 +18581,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:40+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-0acb80620159",
@@ -18599,7 +18599,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This release celebrates the franchise's 35th anniversary by depicting a battle between the main cast and Metal Sonic.",
       "latest_development": "This release celebrates the franchise's 35th anniversary by depicting a battle between the main cast and Metal Sonic.",
       "alerted": false,
@@ -18609,7 +18609,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:40+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-9ef3222c418a",
@@ -18627,7 +18627,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Christopher Robin Miller and Lani Minella are reprising their respective roles as the titular professor and his companion, Luke.",
       "latest_development": "Christopher Robin Miller and Lani Minella are reprising their respective roles as the titular professor and his companion, Luke.",
       "alerted": false,
@@ -18637,7 +18637,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:40+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-c537fac1255d",
@@ -18655,7 +18655,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This television anime adaptation of Tetsu Kariya's manga will premiere in 2027 and features voice actor Kenji Yamauchi.",
       "latest_development": "This television anime adaptation of Tetsu Kariya's manga will premiere in 2027 and features voice actor Kenji Yamauchi.",
       "alerted": false,
@@ -18665,7 +18665,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:40+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-a09ad7936379",
@@ -18683,7 +18683,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Asmik Ace is producing this television series based on the manga by Juntarou Aoki and Shin Moriyama.",
       "latest_development": "Asmik Ace is producing this television series based on the manga by Juntarou Aoki and Shin Moriyama.",
       "alerted": false,
@@ -18693,7 +18693,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T07:23:40+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-aaa6e405b958",
@@ -18711,7 +18711,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A minibus carrying 20 people plunged down a slope in Nepal, resulting in 14 deaths. The incident was reported by Kathmandu Post via UA.NEWS.",
       "latest_development": "Reported: A minibus carrying 20 people plunged down a slope in Nepal, resulting in 14 deaths. The incident was reported by Kathmandu Post via UA.NEWS.",
       "alerted": true,
@@ -18721,7 +18721,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T08:16:18+05:45",
+      "updated_at": "2026-11-21T06:41:23+05:45",
       "last_confidence": "HIGH",
       "detection_source": "rss"
     },
@@ -18741,7 +18741,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University's Institute of Science and Technology (IOST) has officially published the examination schedule for M.Sc. Second Semester 2082 candidates. Students enrolled in the program must review the official IOST notice board for date sheets and examination centers.",
       "latest_development": "Confirmed: Tribhuvan University's Institute of Science and Technology (IOST) has officially published the examination schedule for M.Sc. Second Semester 2082 candidates. Students enrolled in the program must review the official IOST notice board for date sheets and examination centers.",
       "alerted": false,
@@ -18751,7 +18751,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T18:41:46+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-a2a28993aac1",
@@ -18769,7 +18769,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Sudurpaschim Royals secured their qualification for the Nepal Premier League (NPL) playoffs following a seven-run win against the Kathmandu Gorkhas. Batting first at the TU International Cricket Ground in Kirtipur, Sudurpaschim defended a total of 125 runs.",
       "latest_development": "Reported: The Sudurpaschim Royals secured their qualification for the Nepal Premier League (NPL) playoffs following a seven-run win against the Kathmandu Gorkhas. Batting first at the TU International Cricket Ground in Kirtipur, Sudurpaschim defended a total of 125 runs.",
       "alerted": false,
@@ -18779,7 +18779,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T18:41:46+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-ddb0d64a1559",
@@ -18797,7 +18797,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Chief Justice Dr. Manoj Kumar Sharma administered the oath of office and secrecy to four newly appointed Supreme Court justices in a ceremony attended by President Ram Chandra Poudel. The newly sworn-in members are Dr. Ratna Bahadur Bagchand, Chandra Bahadur Saru, Janak Pandey, and G.",
       "latest_development": "Confirmed: Chief Justice Dr. Manoj Kumar Sharma administered the oath of office and secrecy to four newly appointed Supreme Court justices in a ceremony attended by President Ram Chandra Poudel. The newly sworn-in members are Dr. Ratna Bahadur Bagchand, Chandra Bahadur Saru, Janak Pandey, and G.",
       "alerted": false,
@@ -18807,7 +18807,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T18:41:46+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-ddd73d972580",
@@ -18825,7 +18825,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: AMD has rolled out an optional Adrenalin software update targeted at RX 7000-series graphics cards and newer hardware models. The patch addresses a reported driver bug affecting storage drives while introducing its own set of system installation behaviors.",
       "latest_development": "Reported: AMD has rolled out an optional Adrenalin software update targeted at RX 7000-series graphics cards and newer hardware models. The patch addresses a reported driver bug affecting storage drives while introducing its own set of system installation behaviors.",
       "alerted": false,
@@ -18835,7 +18835,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T18:41:46+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-09ea4e6bdb1a",
@@ -18853,7 +18853,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Xbox has published a fresh gameplay trailer for the upcoming Fable reboot. The newly revealed footage showcases atmospheric exploration and visual direction, drawing mixed reactions across gaming communities.",
       "latest_development": "Reported: Xbox has published a fresh gameplay trailer for the upcoming Fable reboot. The newly revealed footage showcases atmospheric exploration and visual direction, drawing mixed reactions across gaming communities.",
       "alerted": false,
@@ -18863,7 +18863,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T18:41:46+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-5e6eee60827a",
@@ -18881,7 +18881,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The tech giant confirmed that the disruption was not the result of a cyber-security attack, though repair attempts have largely failed.",
       "latest_development": "The tech giant confirmed that the disruption was not the result of a cyber-security attack, though repair attempts have largely failed.",
       "alerted": false,
@@ -18891,7 +18891,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-bcfa386aef07",
@@ -18909,7 +18909,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sudhakar Dalela met with Amrit Bahadur Rai at the Ministry of Foreign Affairs in Kathmandu to discuss bilateral relations.",
       "latest_development": "Sudhakar Dalela met with Amrit Bahadur Rai at the Ministry of Foreign Affairs in Kathmandu to discuss bilateral relations.",
       "alerted": false,
@@ -18919,7 +18919,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-29c4d949e71f",
@@ -18937,7 +18937,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Janakpur Bolts finished their allotted overs with a score of 88 for the loss of 9 wickets while playing the Chitwan Rhinos.",
       "latest_development": "The Janakpur Bolts finished their allotted overs with a score of 88 for the loss of 9 wickets while playing the Chitwan Rhinos.",
       "alerted": false,
@@ -18947,7 +18947,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-78e18a393f34",
@@ -18965,7 +18965,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "When thinking of the creative inspirations behind HoYoverse's upcoming cozy lifesim, Petit Planet , there are some things that instantly spring to mind. The development team has already acknowledged whimsical influences such as the…",
       "latest_development": "When thinking of the creative inspirations behind HoYoverse's upcoming cozy lifesim, Petit Planet , there are some things that instantly spring to mind. The development team has already acknowledged whimsical influences such as the…",
       "alerted": false,
@@ -18975,7 +18975,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-b4172e0b07ca",
@@ -18993,7 +18993,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Microsoft released a limited supply of the 25th Anniversary Xbox Series X consoles this week following an initial sell-out earlier this year.",
       "latest_development": "Microsoft released a limited supply of the 25th Anniversary Xbox Series X consoles this week following an initial sell-out earlier this year.",
       "alerted": false,
@@ -19003,7 +19003,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-c801b1802bdc",
@@ -19021,7 +19021,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sakar Krishi Sahakari Sanstha Limited launched the initiative to assist local farmers following a reduction in government paddy purchases.",
       "latest_development": "Sakar Krishi Sahakari Sanstha Limited launched the initiative to assist local farmers following a reduction in government paddy purchases.",
       "alerted": false,
@@ -19031,7 +19031,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-0dfd902a21dd",
@@ -19049,7 +19049,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Zia Yusuf and Chris Philp engaged in a heated argument in front of local residents and cameras during a public event.",
       "latest_development": "Zia Yusuf and Chris Philp engaged in a heated argument in front of local residents and cameras during a public event.",
       "alerted": false,
@@ -19059,7 +19059,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-3401e1c00a37",
@@ -19077,7 +19077,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A Palestinian American activist was denied access to the country where he planned to participate in his charity's yearly fundraising event for Gaza.",
       "latest_development": "A Palestinian American activist was denied access to the country where he planned to participate in his charity's yearly fundraising event for Gaza.",
       "alerted": false,
@@ -19087,7 +19087,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-db83e0f9285e",
@@ -19105,7 +19105,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The incident originated with disruptions to Outlook and Teams before escalating to impact broader cloud infrastructure, with the company currently in the process of rolling out fixes.",
       "latest_development": "The incident originated with disruptions to Outlook and Teams before escalating to impact broader cloud infrastructure, with the company currently in the process of rolling out fixes.",
       "alerted": false,
@@ -19115,7 +19115,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-8da943d75514",
@@ -19133,7 +19133,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This production depicts a grand duke navigating his household's multi-generational struggle with a demonic curse.",
       "latest_development": "This production depicts a grand duke navigating his household's multi-generational struggle with a demonic curse.",
       "alerted": false,
@@ -19143,7 +19143,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-c00d0fca7978",
@@ -19161,7 +19161,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The German Bundeswehr resumed flight operations following a precautionary grounding caused by a malicious software update affecting military servers.",
       "latest_development": "The German Bundeswehr resumed flight operations following a precautionary grounding caused by a malicious software update affecting military servers.",
       "alerted": false,
@@ -19171,7 +19171,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-34a79c9fead9",
@@ -19189,7 +19189,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Legislators have threatened to issue subpoenas if the former executive fails to appear at a requested meeting, though he has signaled his intention to attend.",
       "latest_development": "Legislators have threatened to issue subpoenas if the former executive fails to appear at a requested meeting, though he has signaled his intention to attend.",
       "alerted": false,
@@ -19199,7 +19199,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-c516c9c9756a",
@@ -19217,7 +19217,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Article URL: https://respawnfirst.com/before-resigning-jensen-huang-admitted-he-was-facing-an-avalanche-of-excess-wafers-and-memory-new-report-sheds-more-light-on-the-gpu-ram-crisis/ Comments URL…",
       "latest_development": "Article URL: https://respawnfirst.com/before-resigning-jensen-huang-admitted-he-was-facing-an-avalanche-of-excess-wafers-and-memory-new-report-sheds-more-light-on-the-gpu-ram-crisis/ Comments URL…",
       "alerted": false,
@@ -19227,7 +19227,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-b91030816633",
@@ -19245,7 +19245,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The heroes manage to pass a seemingly impossible test by convincing Richmond that their experiences hold greater significance.",
       "latest_development": "The heroes manage to pass a seemingly impossible test by convincing Richmond that their experiences hold greater significance.",
       "alerted": false,
@@ -19255,7 +19255,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-455615f4e21a",
@@ -19273,7 +19273,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Each of the ten recognized creators will be awarded a trophy and a cash prize equivalent to approximately 7,200 US dollars.",
       "latest_development": "Each of the ten recognized creators will be awarded a trophy and a cash prize equivalent to approximately 7,200 US dollars.",
       "alerted": false,
@@ -19283,7 +19283,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-4b3fdbb3ba2e",
@@ -19301,7 +19301,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The television adaptation of Ryousen Takami's novel has debuted its second promotional video alongside new details regarding its production team and musical contributions.",
       "latest_development": "The television adaptation of Ryousen Takami's novel has debuted its second promotional video alongside new details regarding its production team and musical contributions.",
       "alerted": false,
@@ -19311,7 +19311,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-c57aa6da7683",
@@ -19329,7 +19329,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "CyberAgent establishes a new animation studio, Colorful Palette, and partners with MAPPA for expansion in Japan's anime industry.",
       "latest_development": "CyberAgent establishes a new animation studio, Colorful Palette, and partners with MAPPA for expansion in Japan's anime industry.",
       "alerted": false,
@@ -19339,7 +19339,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-e460a13d3a7a",
@@ -19357,7 +19357,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Publishing company Shufunotomo announces a TV anime adaptation of the 'Isekai Douraku ni Akitara' light novel, set to premiere in Winter 2027.",
       "latest_development": "Publishing company Shufunotomo announces a TV anime adaptation of the 'Isekai Douraku ni Akitara' light novel, set to premiere in Winter 2027.",
       "alerted": false,
@@ -19367,7 +19367,7 @@
       "in_evening": "2026-11-13",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-13T19:24:11+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-4b0dc7f51356",
@@ -24061,7 +24061,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "RESOLVED",
       "known_facts": "Reported: Archive Team has initiated preservation efforts for the Apple Support Community discussion boards ahead of their scheduled closure on November 20, 2026.",
       "latest_development": "Reported: Archive Team has initiated preservation efforts for the Apple Support Community discussion boards ahead of their scheduled closure on November 20, 2026.",
       "alerted": false,
@@ -24071,7 +24071,7 @@
       "in_evening": null,
       "deadline": "2026-11-20",
       "effective_date": "2026-11-20",
-      "updated_at": "2026-11-18T06:41:22+05:45"
+      "updated_at": "2026-11-21T06:41:23+05:45"
     },
     {
       "event_id": "evt-c9ea2b7c36af",
@@ -26900,6 +26900,314 @@
       "deadline": "2027-01-09",
       "effective_date": null,
       "updated_at": "2026-11-20T19:22:19+05:45"
+    },
+    {
+      "event_id": "evt-491addbfe2f5",
+      "event_key": "prithvi-highway-five-hour-closure-nov21",
+      "canonical_title": "Prithvi Highway closed for five hours daily starting today",
+      "category": "action",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 10,
+      "sources": [
+        "english.khabarhub.com/2026/21/576362"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Department of Roads announced that vehicular movement along various sections of the Prithvi Highway will be suspended for five hours daily, from 11 am to 4 pm, starting today.",
+      "latest_development": "Confirmed: The Department of Roads announced that vehicular movement along various sections of the Prithvi Highway will be suspended for five hours daily, from 11 am to 4 pm, starting today.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-21",
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-3ba03fd453ca",
+      "event_key": "nrb-foreign-currency-rates-nov21",
+      "canonical_title": "Nepal Rastra Bank publishes official foreign currency exchange rates",
+      "category": "bank_local",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.khabarhub.com/2026/21/576388"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank released the official buying and selling exchange rates for major foreign currencies for Saturday.",
+      "latest_development": "Confirmed: Nepal Rastra Bank released the official buying and selling exchange rates for major foreign currencies for Saturday.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-21",
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-917962a54ef8",
+      "event_key": "fifa-afc-nepal-football-resolution",
+      "canonical_title": "FIFA and AFC advance talks to resolve football suspension in Nepal",
+      "category": "nepal",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.onlinekhabar.com/fifa-afc-nepal-football-crisis.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Representatives from FIFA and the Asian Football Confederation held discussions with Nepali sports officials in Kathmandu to chart a roadmap for lifting Nepal's football suspension.",
+      "latest_development": "Reported: Representatives from FIFA and the Asian Football Confederation held discussions with Nepali sports officials in Kathmandu to chart a roadmap for lifting Nepal's football suspension.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-0916e1dc7e2f",
+      "event_key": "chitwan-marijuana-seizure-443kg",
+      "canonical_title": "Police arrest two Indian nationals with marijuana in Chitwan district",
+      "category": "nepal",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "english.khabarhub.com/2026/21/576385"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Local law enforcement in Chitwan district arrested two Indian nationals in possession of 443 kilograms of marijuana during a security operation.",
+      "latest_development": "Reported: Local law enforcement in Chitwan district arrested two Indian nationals in possession of 443 kilograms of marijuana during a security operation.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-1cabfc0a48ee",
+      "event_key": "tu-iost-msc-2nd-sem-schedule-2082",
+      "canonical_title": "Tribhuvan University IOST releases M.Sc. II Semester exam schedule",
+      "category": "education_tu",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "iost.tu.edu.np/notices/16103"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Tribhuvan University's Institute of Science and Technology published the examination schedule for M.Sc. Second Semester 2082 students.",
+      "latest_development": "Confirmed: Tribhuvan University's Institute of Science and Technology published the examination schedule for M.Sc. Second Semester 2082 students.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-837170264a97",
+      "event_key": "tougen-anki-nikko-kegon-cast-reveal",
+      "canonical_title": "Tougen Anki anime adaptation reveals additional cast members",
+      "category": "anime",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74961958"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The official website for the television anime adaptation of Tougen Anki: Nikko Kegon no Taki-hen announced several additional voice cast members.",
+      "latest_development": "Reported: The official website for the television anime adaptation of Tougen Anki: Nikko Kegon no Taki-hen announced several additional voice cast members.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-e32e3fcbe435",
+      "event_key": "takamine-san-manga-ending-serialization",
+      "canonical_title": "Takamine-san manga series announces upcoming serialization conclusion",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74961851"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: Author Yuuichi Hiiragi announced via social media that the Haite Kudasai, Takamine-san manga series will conclude its serialization.",
+      "latest_development": "Reported: Author Yuuichi Hiiragi announced via social media that the Haite Kudasai, Takamine-san manga series will conclude its serialization.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-135c712805c5",
+      "event_key": "kaketa-tsuki-no-mercedes-supporting-cast",
+      "canonical_title": "Kaketa Tsuki no Mercedes anime adaptation announces supporting cast",
+      "category": "anime",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74961677"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The official website for the television anime adaptation of Firehead's Kaketa Tsuki no Mercedes revealed its supporting voice cast members.",
+      "latest_development": "Reported: The official website for the television anime adaptation of Firehead's Kaketa Tsuki no Mercedes revealed its supporting voice cast members.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-e92cf63d4af3",
+      "event_key": "jimoto-no-ijimekko-tachi-anime-2027",
+      "canonical_title": "Jimoto no Ijimekko-tachi manga gets television anime adaptation",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74960793"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: An official website opened to announce that Kengo Matsumoto's manga Jimoto no Ijimekko-tachi ni Shikaeshi Shiyou to Shitara is receiving a television anime adaptation in 2027.",
+      "latest_development": "Reported: An official website opened to announce that Kengo Matsumoto's manga Jimoto no Ijimekko-tachi ni Shikaeshi Shiyou to Shitara is receiving a television anime adaptation in 2027.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": "2027-12-31",
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-910ef92f822e",
+      "event_key": "pen-to-wappa-to-jijitsukon-anime-promo",
+      "canonical_title": "Pen to Wappa to Jijitsukon anime unveils production details and promo",
+      "category": "anime",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74960710"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The official website for the Pen to Wappa to Jijitsukon television anime adaptation released its first promotional video along with additional staff and theme song details.",
+      "latest_development": "Reported: The official website for the Pen to Wappa to Jijitsukon television anime adaptation released its first promotional video along with additional staff and theme song details.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-2d871148a26c",
+      "event_key": "saudi-coalition-intercepts-houthi-missiles-nov21",
+      "canonical_title": "Saudi coalition intercepts Houthi missiles amid ongoing regional conflict",
+      "category": "world_major",
+      "first_seen": "2026-11-21",
+      "last_seen": "2026-11-21",
+      "first_reported": "2026-11-21",
+      "last_reported": "2026-11-21",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "aljazeera.com/news/liveblog/2026/11/21/iran-war-live-saudi-led-coalition-repels-houthi-missiles"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: The Saudi-led coalition announced it intercepted three missiles following a series of emergency alerts issued in Riyadh amidst regional escalation.",
+      "latest_development": "Reported: The Saudi-led coalition announced it intercepted three missiles following a series of emergency alerts issued in Riyadh amidst regional escalation.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-21",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-21T06:41:23+05:45"
     }
   ],
   "archived": []

@@ -1,251 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "iost.tu.edu.np/notices/16061",
-      "title_hash": "5fcb941786b2ee01784ec55ff5ac2ec9c6bb973c",
-      "title": "Tribhuvan University IOST Publishes BIT V Semester Exam Results",
-      "category": "education_tu",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "tu.edu.np/notices/16055",
-      "title_hash": "b178900ea5171b209a7d306a467be6e57af64871",
-      "title": "Tribhuvan University Invites Proposals for Mini Research Grants",
-      "category": "education_tu",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theregister.com/saas/2026/11/12/microsoft-struggling-to-fix-massive-cloud-outage-thats-taken-down-email-and-intune/5309531",
-      "title_hash": "c8a02a72c146e5d9e10d7d8d20d828249ec4a02e",
-      "title": "Microsoft Fails to Resolve Massive Cloud Outage Affecting Email and Intune",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/slay-the-spire-2s-biggest-beta-patch-yet-adds-its-first-new-early-access-and-foolish-character-two-game-modes-and-more-tweaks-than-you-can-shake-a-stick-at",
-      "title_hash": "4e754dfefb46c72a92dbbfea1959af1c2ccda6d2",
-      "title": "Slay the Spire 2 Releases Largest Beta Patch Adding New Character and Game Modes",
-      "category": "gaming",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theregister.com/cyber-crime/2026/11/12/doj-takes-aim-at-12b-in-binance-loot-as-fbi-disrupts-north-korean-scam/5309523",
-      "title_hash": "9d8757503c857c39a227478d58814d1471e99956",
-      "title": "DOJ Targets $1.2B in Binance Loot as FBI Disrupts North Korean Scam Network",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "graphql.org/blog/2026-11-12-announcing-the-graphql-over-http-spec",
-      "title_hash": "12220cdb1b19a0677facae201ab25febc387cd01",
-      "title": "Announcing the GraphQL over HTTP specification",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/13/575404",
-      "title_hash": "4b8137e97c798587194b0b7c20f2db145f1790da",
-      "title": "Bhairav Kunda in Rasuwa steeped in religious beliefs and ancient legends",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-12/blue-rights-company-unveils-pilot-film-for-orochi-seventh-echoes-original-animated-feature/.243748",
-      "title_hash": "78c067a30bc791054057409ab2db2e1a4373f8c9",
-      "title": "Blue Rights Company Unveils Pilot Film for Orochi -Seventh Echoes- Original Animated Feature",
-      "category": "anime",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "kew.edbn.me/blog/adsb-receiver",
-      "title_hash": "11cccd809ec193e1523d5249c7c529640a5ee60a",
-      "title": "Building my own ADS-B receiver",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "github.blog/news-insights/company-news/github-availability-report-october-2026",
-      "title_hash": "a49120fd84f41b68429009047f8a080e43092554",
-      "title": "GitHub availability report: October 2026",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/live/2026/nov/12/mississippi-scott-colom-ukraine-donald-trump",
-      "title_hash": "e9397dee92b62ff03fdeb55b94adba0be11d390f",
-      "title": "Hegseth gives medal to guard who reprimanded him at Arlington national cemetery – US politics live",
-      "category": "world_major",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theguardian.com/technology/live/2026/nov/13/nvidia-jensen-huang-to-testify-before-congress-live-latest-updates",
-      "title_hash": "6c220f82384d1c74c7e0be62f588586e6fd7a6cc",
-      "title": "Nvidia’s Jensen Huang expected to testify before Congress amid calls for crackdown on China chip exports – live",
-      "category": "world_major",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theguardian.com/sport/live/2026/nov/13/pat-cummins-press-conference-usman-khawaja-sandpapergate-australia-cricket-captain-statement-ntwnfb",
-      "title_hash": "86563d6796c9340caf7c193367bd8363679a8db9",
-      "title": "Pat Cummins press conference live updates: Australian cricket captain speaks about Usman Khawaja’s ‘sandpapergate’ claims",
-      "category": "world_major",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-12/professor-layton-and-the-new-world-of-steam-game-reveals-english-dub-cast/.243767",
-      "title_hash": "778ed3826fbdadc1739157ccf0c9066c11dec497",
-      "title": "Professor Layton and The New World of Steam Game Reveals English Dub, Cast",
-      "category": "anime",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-12/sega-streams-sonic-the-hedgehog-memories-and-beyond-short-animated-film-on-youtube/.243768",
-      "title_hash": "baf342d49d9f725287bd80061d035a32e3e26bec",
-      "title": "Sega Streams Sonic the Hedgehog: Memories and Beyond Short Animated Film on YouTube",
-      "category": "anime",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "polygon.com/best-nintendo-switch-2-games",
-      "title_hash": "a3345a51ee63151d3104400911c42bc3684e25bf",
-      "title": "The 25 Best Nintendo Switch 2 Games in 2026",
-      "category": "gaming",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/workers-injured-by-electric-shocks-left-in-limbo-as-contractors-fail-to-pay-hospital-bills.html",
-      "title_hash": "55deac39df747a6446e73e44df819dd40cc235c1",
-      "title": "Workers injured by electric shocks left in limbo as contractors fail to pay hospital bills",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "iost.tu.edu.np/notices/16103",
-      "title_hash": "e16df9ba491b6dfc617c959d820b2e26823fa297",
-      "title": "Tribhuvan University Publishes M.Sc. II Semester Exam Schedule for 2082",
-      "category": "education_tu",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "pcgamer.com/hardware/graphics-cards/amd-has-patched-its-ssd-eating-gpu-driver-bug-with-an-optional-adrenalin-update-for-rx-7000-series-graphics-cards-and-above",
-      "title_hash": "344e4cc0399b10e1503bf40a0adc6b0d1aad332a",
-      "title": "AMD Releases Optional Adrenalin Driver Update to Address Storage Bug",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/13/575472",
-      "title_hash": "7702ae3e48d2faeb960d0d53b3a8e4e702558bc4",
-      "title": "Four Newly Appointed Supreme Court Justices Take Oath of Office",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/13/575467",
-      "title_hash": "ae30cc584f3f49ced01ba886ffc4fc654b45c98f",
-      "title": "Sudurpaschim Royals Advance to NPL Playoffs After Victory Over Kathmandu Gorkhas",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "polygon.com/fable-new-gameplay-trailer-xbox",
-      "title_hash": "7e53955f180b73985a2901c82be66548a228714a",
-      "title": "Xbox Shares New Gameplay Trailer for Upcoming Fable Reboot",
-      "category": "gaming",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "pcgamer.com/hardware/graphics-cards/clear-national-security-concerns-that-need-to-be-addressed-immediately-new-letters-to-jensen-huang-from-congress-strike-a-tougher-tone-for-the-ex-nvidia-ceo",
-      "title_hash": "6d2c8d0bbd078636bff1d916a136e23d1f5c51d4",
-      "title": "'Clear national security concerns that need to be addressed immediately': new letters to Jensen Huang from Congress strike a tougher tone for the ex-Nvidia CEO",
-      "category": "gaming",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74934867",
-      "title_hash": "bec16c05558af85f68ed1df0ade116aa658781fb",
-      "title": "'Isekai Tensei Soudouki' Reveals Additional Cast, Staff, Theme Songs, Second Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/cooperative-begins-purchasing-10000-quintals-of-paddy-in-banke",
-      "title_hash": "5c414f679295c4ac011dcbf7a984dc328e52e3e5",
-      "title": "Cooperative begins purchasing 10,000 quintals of paddy in Banke",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74934668",
-      "title_hash": "6f844a1842d23cfdea92efdb679b5cec77f76a40",
-      "title": "CyberAgent Expands Production Network With Latent One Launch and MAPPA Partnership",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/13/575480",
-      "title_hash": "7522f21d0e6ec8e1b72beeddde61a67cd8af1819",
-      "title": "Indian Ambassador calls on Foreign Secretary Rai",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/sports/janakpur-sets-89-run-target-for-chitwan-in-npl",
-      "title_hash": "5bf46089cfa5c898e099549561162d11493f3ed6",
-      "title": "Janakpur sets 89-run target for Chitwan in NPL",
-      "category": "nepal",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "respawnfirst.com/before-resigning-jensen-huang-admitted-he-was-facing-an-avalanche-of-excess-wafers-and-memory-new-report-sheds-more-light-on-the-gpu-ram-crisis",
-      "title_hash": "8a3c15d6941ad46f1275593167f1919402b8a8fd",
-      "title": "Jensen Huang Admitted He Was Facing an \"Avalanche\" of Excess Wafers and Memory",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74934042",
-      "title_hash": "d7e33b9724f74c714a172ff7a5c4a08dde0b8247",
-      "title": "Light Novel 'Isekai Douraku ni Akitara' Gets TV Anime in Winter 2027",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/13/microsoft-latest-email-outage-turned-into-a-full-blown-global-cloud-crisis",
-      "title_hash": "57b996eaa71dff494e2d8189089403955c61099c",
-      "title": "Microsoft’s latest email outage turned into a full blown global cloud crisis",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-13/omniscient-reader-greatest-estate-developer-debut-or-die-7-more-works-win-2026-world-webtoon-awards/.243552",
-      "title_hash": "7a9fb6287823e2eca4e7fb33da786a0a4efd795e",
-      "title": "Omniscient Reader, Greatest Estate Developer, Debut or Die!, 7 More Works Win 2026 World Webtoon Awards",
-      "category": "anime",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theregister.com/security/2026/11/13/quantum-systems-drones-back-in-the-air-after-malware-scare/5309658",
-      "title_hash": "d8d5f558d77843c459cd303d0070e7f46c7e5d71",
-      "title": "Quantum Systems drones back in the air after malware scare",
-      "category": "tech_career",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "theguardian.com/politics/live/2026/nov/13/uk-eu-post-brexit-deal-relationship-trade-food-standards-committee-latest-news-updates",
-      "title_hash": "6f76decca2129725de5292c3b2fc9939b0302419",
-      "title": "Row breaks out between Tories and Reform at Piddington news conference – UK politics live",
-      "category": "world_major",
-      "date_sent": "2026-11-13"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-13/stage-musical-adaptation-of-webtoon-the-siren-becoming-the-villain-family-to-premiere-in-seoul-on-/.243641",
-      "title_hash": "5b2e073393f692fbbf5947cacf13324b7bb69345",
-      "title": "Stage Musical Adaptation of Webtoon The Siren: Becoming the Villain's Family to Premiere in Seoul on March 24, 2027",
-      "category": "anime",
-      "date_sent": "2026-11-13"
-    },
-    {
       "url_normalized": "polygon.com/overwatch-new-hero-55-hudson-damage-dps-blizzard",
       "title_hash": "62073c00b273c8d3a6b2ac54771a8af9d8b8665e",
       "title": "Blizzard Officially Responds to Disappointed Overwatch Fans Over Hero 55",
@@ -1980,6 +1735,83 @@
       "title": "Independent Drivers Association Provides Relief Support to Flood Victim Family in Rasuwa",
       "category": "nepal",
       "date_sent": "2026-11-20"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/21/576362",
+      "title_hash": "81c452a425aa9795292373d3eabd0ed6d027fe18",
+      "title": "Prithvi Highway closed for five hours daily starting today",
+      "category": "action",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16103",
+      "title_hash": "6908e549e6b627638e8a03740111bad250457a4d",
+      "title": "Tribhuvan University IOST releases M.Sc. II Semester exam schedule",
+      "category": "education_tu",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "aljazeera.com/news/liveblog/2026/11/21/iran-war-live-saudi-led-coalition-repels-houthi-missiles",
+      "title_hash": "6e5a490a4c473429f8125b343f5f11217f75b5e9",
+      "title": "Saudi coalition intercepts Houthi missiles amid ongoing regional conflict",
+      "category": "world_major",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/21/576388",
+      "title_hash": "b65fa9f829bdbd3efb880971a3081298150f6467",
+      "title": "Nepal Rastra Bank publishes official foreign currency exchange rates",
+      "category": "bank_local",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74960793",
+      "title_hash": "135f9626ab961eca70022c2ba93d181a290d6038",
+      "title": "Jimoto no Ijimekko-tachi manga gets television anime adaptation",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74961677",
+      "title_hash": "f540c199119e0b7e67288b4a186e2da10833b206",
+      "title": "Kaketa Tsuki no Mercedes anime adaptation announces supporting cast",
+      "category": "anime",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74960710",
+      "title_hash": "de9a64b3ddce8ef4e417aed27b347779c8062afa",
+      "title": "Pen to Wappa to Jijitsukon anime unveils production details and promo",
+      "category": "anime",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74961851",
+      "title_hash": "bb209558bd8c1b82ea84a0293d5da4cedd5cd66c",
+      "title": "Takamine-san manga series announces upcoming serialization conclusion",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74961958",
+      "title_hash": "5b311b489415067c2a897b9cc2f6686faf064f61",
+      "title": "Tougen Anki anime adaptation reveals additional cast members",
+      "category": "anime",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "english.onlinekhabar.com/fifa-afc-nepal-football-crisis.html",
+      "title_hash": "e762efde69c0e61c0d43666e585e6c8f1b3b0467",
+      "title": "FIFA and AFC advance talks to resolve football suspension in Nepal",
+      "category": "nepal",
+      "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/21/576385",
+      "title_hash": "1934da1e22f6b3620f0e7fb894f09b6bc4bb25c9",
+      "title": "Police arrest two Indian nationals with marijuana in Chitwan district",
+      "category": "nepal",
+      "date_sent": "2026-11-21"
     }
   ]
 }
