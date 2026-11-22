@@ -132,13 +132,16 @@
       "success": 159,
       "timeout": 0,
       "transport": 0,
-      "garbage": 0,
+      "garbage": 1,
       "quota_notice": 0,
-      "consecutive_failures": 0,
-      "last_ok_at": 1795273634.5461726
+      "consecutive_failures": 1,
+      "last_ok_at": 1795273634.5461726,
+      "last_failure": "garbage",
+      "last_fail_at": 1795344011.9784603,
+      "cooldown_until": 1795365611.9784603
     },
     "gemini/gemini-3.1-flash-lite": {
-      "success": 37,
+      "success": 38,
       "timeout": 1,
       "transport": 0,
       "garbage": 1,
@@ -146,7 +149,7 @@
       "consecutive_failures": 0,
       "last_failure": "timeout",
       "last_fail_at": 1795112312.712256,
-      "last_ok_at": 1795157883.2759266
+      "last_ok_at": 1795344017.0947883
     },
     "gemini-key2/gemini-3.1-flash-lite": {
       "success": 45,
