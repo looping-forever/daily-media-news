@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-21T19:21:31+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -11787,7 +11787,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -11797,7 +11797,7 @@
       "in_evening": "2026-11-05",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-f3630b32eb9e",
@@ -19385,7 +19385,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -19395,7 +19395,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-bc61fc177e67",
@@ -19413,7 +19413,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "One way or another, the company will get some more data on Saturday.",
       "latest_development": "One way or another, the company will get some more data on Saturday.",
       "alerted": false,
@@ -19423,7 +19423,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-5a8207332274",
@@ -19441,7 +19441,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Sean Duffy reported that agency technicians are investigating the nationwide ground-stop order, with the homeland security secretary stating there is currently no evidence of a cyberattack.",
       "latest_development": "Sean Duffy reported that agency technicians are investigating the nationwide ground-stop order, with the homeland security secretary stating there is currently no evidence of a cyberattack.",
       "alerted": false,
@@ -19451,7 +19451,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-1d28cd5ffaec",
@@ -19469,7 +19469,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -19479,7 +19479,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-932ce100a7ac",
@@ -19497,7 +19497,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Wire’s fourth season provided a far deeper look at Baltimore’s problems",
       "latest_development": "The Wire’s fourth season provided a far deeper look at Baltimore’s problems",
       "alerted": false,
@@ -19507,7 +19507,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-6033379c5fa5",
@@ -19525,7 +19525,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Microsoft services began recovering on Friday after an outage disrupted Outlook and Teams.",
       "latest_development": "Microsoft services began recovering on Friday after an outage disrupted Outlook and Teams.",
       "alerted": false,
@@ -19535,7 +19535,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-fb1cbc488ba5",
@@ -19553,7 +19553,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Bethesda Softworks announced Fallout 5 alongside new releases of Fallout 3 and New Vegas.",
       "latest_development": "Bethesda Softworks announced Fallout 5 alongside new releases of Fallout 3 and New Vegas.",
       "alerted": false,
@@ -19563,7 +19563,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-7b2f065e9df3",
@@ -19581,7 +19581,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Three years after a bilateral agreement was signed, Nepalis remain unable to utilize digital QR payments while traveling in India.",
       "latest_development": "Three years after a bilateral agreement was signed, Nepalis remain unable to utilize digital QR payments while traveling in India.",
       "alerted": false,
@@ -19591,7 +19591,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-a9d0557261eb",
@@ -19609,7 +19609,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The regulatory agency based in Washington DC issued the directive due to a significant telecommunications failure that impacted essential aviation navigation systems.",
       "latest_development": "The regulatory agency based in Washington DC issued the directive due to a significant telecommunications failure that impacted essential aviation navigation systems.",
       "alerted": false,
@@ -19619,7 +19619,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-6caed9dbfb8f",
@@ -19637,7 +19637,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Krishna Prasad Yadav is scheduled to appear before the provincial assembly in Janakpurdham this Saturday to secure support from legislators.",
       "latest_development": "Krishna Prasad Yadav is scheduled to appear before the provincial assembly in Janakpurdham this Saturday to secure support from legislators.",
       "alerted": false,
@@ -19647,7 +19647,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-6eb9d1fcb702",
@@ -19665,7 +19665,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Article URL: https://github.com/mjha-arya/DOC-foundry Comments URL: https://news.ycombinator.com/item?id=50491753 Points: 5 # Comments: 0",
       "latest_development": "Article URL: https://github.com/mjha-arya/DOC-foundry Comments URL: https://news.ycombinator.com/item?id=50491753 Points: 5 # Comments: 0",
       "alerted": false,
@@ -19675,7 +19675,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-f2dcfc84bb50",
@@ -19693,7 +19693,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Article URL: https://grounds.top/ Comments URL: https://news.ycombinator.com/item?id=50491545 Points: 6 # Comments: 0",
       "latest_development": "Article URL: https://grounds.top/ Comments URL: https://news.ycombinator.com/item?id=50491545 Points: 6 # Comments: 0",
       "alerted": false,
@@ -19703,7 +19703,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-dff1a1a9ea48",
@@ -19721,7 +19721,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Developers confirmed that the character Hudson will join the roster as a Damage role fighter rather than a support.",
       "latest_development": "Developers confirmed that the character Hudson will join the roster as a Damage role fighter rather than a support.",
       "alerted": false,
@@ -19731,7 +19731,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-b29bec5b04c1",
@@ -19749,7 +19749,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "New releases arriving this week include the second seasons of The Apothecary Diaries and Call of the Night alongside various manga titles.",
       "latest_development": "New releases arriving this week include the second seasons of The Apothecary Diaries and Call of the Night alongside various manga titles.",
       "alerted": false,
@@ -19759,7 +19759,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-221a2e97134b",
@@ -19777,7 +19777,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The accelerated narrative speed of the latest installment negatively impacted the overall viewing experience.",
       "latest_development": "The accelerated narrative speed of the latest installment negatively impacted the overall viewing experience.",
       "alerted": false,
@@ -19787,7 +19787,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-7a95e29682c5",
@@ -19805,7 +19805,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The reviewer finds it difficult to sympathize with Momoka despite finding some merit in her arguments.",
       "latest_development": "The reviewer finds it difficult to sympathize with Momoka despite finding some merit in her arguments.",
       "alerted": false,
@@ -19815,7 +19815,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T06:43:18+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-a305e08060ca",
@@ -19833,7 +19833,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Westerly winds bring partial cloud cover to Nepal today",
       "latest_development": "Westerly winds bring partial cloud cover to Nepal today",
       "alerted": false,
@@ -19843,7 +19843,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-7814ee53fac8",
@@ -19861,7 +19861,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Nepal's Foreign Minister Shishir Khanal emphasizes the need for preparation, diplomatic efforts, and multilateral cooperation in climate negotiations.",
       "latest_development": "Nepal's Foreign Minister Shishir Khanal emphasizes the need for preparation, diplomatic efforts, and multilateral cooperation in climate negotiations.",
       "alerted": false,
@@ -19871,7 +19871,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-3b96d166c1dc",
@@ -19889,7 +19889,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "ANTALYA: Foreign Minister Shisir Khanal has stressed the need for stronger preparations, sustained diplomatic engagement and multilateral cooperation to enhance Nepal’s role and effectiveness in international climate negotiations. Speaking…",
       "latest_development": "ANTALYA: Foreign Minister Shisir Khanal has stressed the need for stronger preparations, sustained diplomatic engagement and multilateral cooperation to enhance Nepal’s role and effectiveness in international climate negotiations. Speaking…",
       "alerted": false,
@@ -19899,7 +19899,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-120970eae03c",
@@ -19917,7 +19917,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No passengers or crew were killed or critically hurt after a tanker collided with a river cruise ship on the Mississippi River, officials say New Orleans river collision – latest updates In what the city’s mayor declared a “miracle on the…",
       "latest_development": "No passengers or crew were killed or critically hurt after a tanker collided with a river cruise ship on the Mississippi River, officials say New Orleans river collision – latest updates In what the city’s mayor declared a “miracle on the…",
       "alerted": false,
@@ -19927,7 +19927,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-6c080f2aad57",
@@ -19945,7 +19945,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Democratic lawmakers press Trump officials for more details about communication system failures as nationwide flight fiasco continues FAA issues nationwide ground-stop order, delaying or canceling nearly 7,000 flights Sign up for the…",
       "latest_development": "Democratic lawmakers press Trump officials for more details about communication system failures as nationwide flight fiasco continues FAA issues nationwide ground-stop order, delaying or canceling nearly 7,000 flights Sign up for the…",
       "alerted": false,
@@ -19955,7 +19955,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-fa0325b5d899",
@@ -19973,7 +19973,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Article URL: https://www.hawaiinewsnow.com/2026/11/14/dot-all-west-coast-flights-halted-by-spacex-debris-after-faa-ground-stop/ Comments URL: https://news.ycombinator.com/item?id=50492450 Points: 21 # Comments: 2",
       "latest_development": "Article URL: https://www.hawaiinewsnow.com/2026/11/14/dot-all-west-coast-flights-halted-by-spacex-debris-after-faa-ground-stop/ Comments URL: https://news.ycombinator.com/item?id=50492450 Points: 21 # Comments: 2",
       "alerted": false,
@@ -19983,7 +19983,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-64f2d7f90ac3",
@@ -20001,7 +20001,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The FAA's nationwide ground stop stemmed from a communication issue, with the transportation secretary citing it and homeland security ruling out a nefarious attack.",
       "latest_development": "The FAA's nationwide ground stop stemmed from a communication issue, with the transportation secretary citing it and homeland security ruling out a nefarious attack.",
       "alerted": false,
@@ -20011,7 +20011,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-8528b02f9825",
@@ -20029,7 +20029,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Amtrak's ticket booking system experiences outage amid FAA ground stop on November 13, 2026.",
       "latest_development": "Amtrak's ticket booking system experiences outage amid FAA ground stop on November 13, 2026.",
       "alerted": false,
@@ -20039,7 +20039,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T07:23:03+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-4416f04026c2",
@@ -20057,7 +20057,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The leader stated that his party would evaluate government actions based solely on their merit rather than political affiliation.",
       "latest_development": "The leader stated that his party would evaluate government actions based solely on their merit rather than political affiliation.",
       "alerted": false,
@@ -20067,7 +20067,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-a8d06905fa5e",
@@ -20085,7 +20085,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This 1972 crime film revolutionized cinema by offering a deep exploration of themes like family dynamics and moral decay.",
       "latest_development": "This 1972 crime film revolutionized cinema by offering a deep exploration of themes like family dynamics and moral decay.",
       "alerted": false,
@@ -20095,7 +20095,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-341914374601",
@@ -20113,7 +20113,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Chief economist Huw Pill indicated that further borrowing costs are necessary following last month's hike to 4% to address persistent inflationary pressures.",
       "latest_development": "Chief economist Huw Pill indicated that further borrowing costs are necessary following last month's hike to 4% to address persistent inflationary pressures.",
       "alerted": false,
@@ -20123,7 +20123,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-084ddd92ebe4",
@@ -20141,7 +20141,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Who will play Jason, Lucia, and other major characters in GTA 6? Rockstar hasn't made an official reveal yet, but the internet has plenty of ideas.",
       "latest_development": "Who will play Jason, Lucia, and other major characters in GTA 6? Rockstar hasn't made an official reveal yet, but the internet has plenty of ideas.",
       "alerted": false,
@@ -20151,7 +20151,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-158a34d8ce3f",
@@ -20169,7 +20169,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "President Volodymyr Zelensky claimed that SpaceX is throttling the satellite service used for drone guidance over Russian-occupied areas, though the developer denies these allegations.",
       "latest_development": "President Volodymyr Zelensky claimed that SpaceX is throttling the satellite service used for drone guidance over Russian-occupied areas, though the developer denies these allegations.",
       "alerted": false,
@@ -20179,7 +20179,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-8c216c215d1b",
@@ -20197,7 +20197,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Correspondent Tom Canetti reported from a medical facility in the Amhara region as humanitarian groups note an escalating number of civilian casualties.",
       "latest_development": "Correspondent Tom Canetti reported from a medical facility in the Amhara region as humanitarian groups note an escalating number of civilian casualties.",
       "alerted": false,
@@ -20207,7 +20207,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-d9c1619ecbeb",
@@ -20225,7 +20225,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Development on this new project follows an 18-year hiatus since the release of the series' previous installment.",
       "latest_development": "Development on this new project follows an 18-year hiatus since the release of the series' previous installment.",
       "alerted": false,
@@ -20235,7 +20235,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-a883236ea63f",
@@ -20253,7 +20253,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This continuation of the series was officially confirmed during the 10th Anniversary Starlight Party event held this past Saturday.",
       "latest_development": "This continuation of the series was officially confirmed during the 10th Anniversary Starlight Party event held this past Saturday.",
       "alerted": false,
@@ -20263,7 +20263,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-faa0e7f5aff5",
@@ -20281,7 +20281,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Radiation and collisions reshape the planetary building materials.",
       "latest_development": "Radiation and collisions reshape the planetary building materials.",
       "alerted": false,
@@ -20291,7 +20291,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-7876a2be6d9f",
@@ -20309,7 +20309,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A remake of The Legend of Zelda: Ocarina of Time reached the top spot by selling 537,041 units.",
       "latest_development": "A remake of The Legend of Zelda: Ocarina of Time reached the top spot by selling 537,041 units.",
       "alerted": false,
@@ -20319,7 +20319,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-8139cd54bfed",
@@ -20337,7 +20337,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Nepalese domestic workers face sexual harassment and abuse at home, often unreported and unaddressed.",
       "latest_development": "Nepalese domestic workers face sexual harassment and abuse at home, often unreported and unaddressed.",
       "alerted": false,
@@ -20347,7 +20347,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-1809e39c74b7",
@@ -20365,7 +20365,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "Winemakers are adopting conservation practices, such as healthy soils, native plants, and fewer chemicals, to improve business.",
       "latest_development": "Winemakers are adopting conservation practices, such as healthy soils, native plants, and fewer chemicals, to improve business.",
       "alerted": false,
@@ -20375,7 +20375,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-0f7cdd161691",
@@ -20393,7 +20393,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Showrunner Patrick McKay reveals that the third season depicts the creation process of Sauron's servants and explains why they retain remnants of their former human nature.",
       "latest_development": "Showrunner Patrick McKay reveals that the third season depicts the creation process of Sauron's servants and explains why they retain remnants of their former human nature.",
       "alerted": false,
@@ -20403,7 +20403,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-79fc9291e7db",
@@ -20421,7 +20421,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Kadokawa announced the upcoming continuation during the franchise's 10th anniversary event held on Saturday.",
       "latest_development": "Kadokawa announced the upcoming continuation during the franchise's 10th anniversary event held on Saturday.",
       "alerted": false,
@@ -20431,7 +20431,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-27020213247a",
@@ -20449,7 +20449,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Education customers are currently considering switching to platforms like Nextcloud or Collabora due to rising costs for previously free services.",
       "latest_development": "Education customers are currently considering switching to platforms like Nextcloud or Collabora due to rising costs for previously free services.",
       "alerted": false,
@@ -20459,7 +20459,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-91eb3c94978d",
@@ -20477,7 +20477,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "During this period, the third season of The Apothecary Diaries achieved a 3.5% viewership rating.",
       "latest_development": "During this period, the third season of The Apothecary Diaries achieved a 3.5% viewership rating.",
       "alerted": false,
@@ -20487,7 +20487,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T18:43:55+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-8acba83591ee",
@@ -20505,7 +20505,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Agriculture, Forests, and Environment Minister Geeta Chaudhary made this commitment while attending a conference in Turkiye.",
       "latest_development": "Agriculture, Forests, and Environment Minister Geeta Chaudhary made this commitment while attending a conference in Turkiye.",
       "alerted": false,
@@ -20515,7 +20515,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-e2674706c180",
@@ -20533,7 +20533,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Édith Pagot was among the children transported via two trains from Germany to Commercy, France, in 1946 after being born in maternity homes established by the Nazi regime.",
       "latest_development": "Édith Pagot was among the children transported via two trains from Germany to Commercy, France, in 1946 after being born in maternity homes established by the Nazi regime.",
       "alerted": false,
@@ -20543,7 +20543,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-03378a4135cd",
@@ -20561,7 +20561,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Organizers of the new competition have successfully restricted political discourse from the stage, contrasting with the challenges frequently faced by its long-running European counterpart.",
       "latest_development": "Organizers of the new competition have successfully restricted political discourse from the stage, contrasting with the challenges frequently faced by its long-running European counterpart.",
       "alerted": false,
@@ -20571,7 +20571,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-6bf5c9c57867",
@@ -20589,7 +20589,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Technical issues affected email and messaging services for approximately 36 hours, impacting users worldwide.",
       "latest_development": "Technical issues affected email and messaging services for approximately 36 hours, impacting users worldwide.",
       "alerted": false,
@@ -20599,7 +20599,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-c222b8ff5ee6",
@@ -20617,7 +20617,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Officials started selecting a new administration after Chief Minister Krishna Prasad Yadav resigned according to Article 169(1)(a) of the Constitution.",
       "latest_development": "Officials started selecting a new administration after Chief Minister Krishna Prasad Yadav resigned according to Article 169(1)(a) of the Constitution.",
       "alerted": false,
@@ -20627,7 +20627,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-6b63671a377d",
@@ -20645,7 +20645,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The television anime adaptation of Kazuma Kamachi's light novel released a promotional video and introduced new voice actors on Saturday.",
       "latest_development": "The television anime adaptation of Kazuma Kamachi's light novel released a promotional video and introduced new voice actors on Saturday.",
       "alerted": false,
@@ -20655,7 +20655,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-3a03f2f97b68",
@@ -20673,7 +20673,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "During a visit to Janakpurdham, the party chair characterized critical feedback as a healthy element of democracy rather than evidence of a fractured political relationship.",
       "latest_development": "During a visit to Janakpurdham, the party chair characterized critical feedback as a healthy element of democracy rather than evidence of a fractured political relationship.",
       "alerted": false,
@@ -20683,7 +20683,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-8651c870462b",
@@ -20701,7 +20701,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Data from the latest GDC study indicates a marginal increase in the adoption of these tools.",
       "latest_development": "Data from the latest GDC study indicates a marginal increase in the adoption of these tools.",
       "alerted": false,
@@ -20711,7 +20711,7 @@
       "in_evening": "2026-11-14",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-14T19:24:38+05:45"
+      "updated_at": "2026-11-22T06:41:26+05:45"
     },
     {
       "event_id": "evt-2cb7792be240",
@@ -27684,6 +27684,146 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-21T19:21:31+05:45"
+    },
+    {
+      "event_id": "evt-13a0452dfed7",
+      "event_key": "pm-balen-india-visit-nov22",
+      "canonical_title": "PM Balendra Shah begins two-day state visit to India",
+      "category": "nepal",
+      "first_seen": "2026-11-22",
+      "last_seen": "2026-11-22",
+      "first_reported": "2026-11-22",
+      "last_reported": "2026-11-22",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2062777/prime-minister-balen-to-visit-india-today-meet-modi-tomorrow"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Prime Minister Balendra Shah (Balen) departed today, November 22, for a two-day state visit to India at the invitation of his Indian counterpart. He is scheduled to meet Prime Minister Narendra Modi tomorrow.",
+      "latest_development": "Confirmed: Prime Minister Balendra Shah (Balen) departed today, November 22, for a two-day state visit to India at the invitation of his Indian counterpart. He is scheduled to meet Prime Minister Narendra Modi tomorrow.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-22",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-22T06:41:26+05:45"
+    },
+    {
+      "event_id": "evt-9034eca82e45",
+      "event_key": "madhesh-cm-oath-nov22",
+      "canonical_title": "Saroj Kumar Yadav to be sworn in as Madhesh Province Chief Minister today",
+      "category": "nepal",
+      "first_seen": "2026-11-22",
+      "last_seen": "2026-11-22",
+      "first_reported": "2026-11-22",
+      "last_reported": "2026-11-22",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2062805/newly-appointed-chief-minister-of-madhesh-yadav-taking-oath-today-2"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Newly appointed Chief Minister of Madhesh Province, Saroj Kumar Yadav, is scheduled to take the oath of office and secrecy today, November 22, at the Office of the Province Chief.",
+      "latest_development": "Confirmed: Newly appointed Chief Minister of Madhesh Province, Saroj Kumar Yadav, is scheduled to take the oath of office and secrecy today, November 22, at the Office of the Province Chief.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-22",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-22T06:41:26+05:45"
+    },
+    {
+      "event_id": "evt-1c8c8057d6ce",
+      "event_key": "birgunj-city-bus-launch",
+      "canonical_title": "Preparations underway for new city bus service in Parsa and Bara",
+      "category": "local_city",
+      "first_seen": "2026-11-22",
+      "last_seen": "2026-11-22",
+      "first_reported": "2026-11-22",
+      "last_reported": "2026-11-22",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2062807/preparations-for-city-bus-operation-in-four-municipalities-of-parsa-bara"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Birgunj Metropolitan City is preparing to launch a new city bus service connecting Birgunj with four municipalities across Parsa and Bara districts by the end of this month (Mangsir).",
+      "latest_development": "Reported: The Birgunj Metropolitan City is preparing to launch a new city bus service connecting Birgunj with four municipalities across Parsa and Bara districts by the end of this month (Mangsir).",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-22",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-12-01",
+      "updated_at": "2026-11-22T06:41:26+05:45"
+    },
+    {
+      "event_id": "evt-e988a70b09c6",
+      "event_key": "rasuwa-flood-rehab-initiative",
+      "canonical_title": "Bhotekoshi flood survivors in Rasuwa request rehabilitation",
+      "category": "nepal",
+      "first_seen": "2026-11-22",
+      "last_seen": "2026-11-22",
+      "first_reported": "2026-11-22",
+      "last_reported": "2026-11-22",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.khabarhub.com/2026/22/576463"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Survivors of the August 26 floods in Syabrubesi, Rasuwa, have begun a collective initiative to demand rehabilitation and safe resettlement three months after the disaster.",
+      "latest_development": "Reported: Survivors of the August 26 floods in Syabrubesi, Rasuwa, have begun a collective initiative to demand rehabilitation and safe resettlement three months after the disaster.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-22",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-22T06:41:26+05:45"
+    },
+    {
+      "event_id": "evt-44a849dfd262",
+      "event_key": "nrb-exchange-rate-nov22",
+      "canonical_title": "Foreign Exchange Rates for November 22, 2026",
+      "category": "bank_local",
+      "first_seen": "2026-11-22",
+      "last_seen": "2026-11-22",
+      "first_reported": "2026-11-22",
+      "last_reported": "2026-11-22",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2062796/todays-foreign-exchange-rate-is-53"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The Nepal Rastra Bank has set the foreign exchange rate for today. The buying rate for 1 US Dollar is fixed at 147.98 Nepalese Rupees.",
+      "latest_development": "Confirmed: The Nepal Rastra Bank has set the foreign exchange rate for today. The buying rate for 1 US Dollar is fixed at 147.98 Nepalese Rupees.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-22",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-22",
+      "updated_at": "2026-11-22T06:41:26+05:45"
     }
   ],
   "archived": []

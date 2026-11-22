@@ -1,307 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "polygon.com/overwatch-new-hero-55-hudson-damage-dps-blizzard",
-      "title_hash": "62073c00b273c8d3a6b2ac54771a8af9d8b8665e",
-      "title": "Blizzard Officially Responds to Disappointed Overwatch Fans Over Hero 55",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "github.com/mjha-arya/doc-foundry",
-      "title_hash": "5019e70a2f062a92681d0ed3d2db3984929527ab",
-      "title": "Doc-foundry – AI writes Security detection rules, then proves they work",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/14/575510",
-      "title_hash": "9af1fcddf04d2ee5887812e04b319ecde5cd0435",
-      "title": "FAA grounds all departing US flights following air traffic control communications outage",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "polygon.com/fallout-5-fo3-remaster-new-games-bethesda-softworks",
-      "title_hash": "b3306c7c5cc03a87f74026c2ef211af7414062c6",
-      "title": "Fallout 5 and Fallout Remasters Officially Announced",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "polygon.com/the-wire-season-4-recommendation",
-      "title_hash": "806d372cb7a7e3e051a79dbbe3b8d69b52ced575",
-      "title": "HBO’s 5-Part Crime Drama Has One of the Best Seasons in TV History",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/14/575485",
-      "title_hash": "92701dd4d261b8098b1f3f6fb377a2c40d2d3db8",
-      "title": "Madhesh Chief Minister Yadav to seek vote of confidence today",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/review/magic-knight-rayearth/episode-6/.243803",
-      "title_hash": "0e9175c16c198159e604f35a60f75f1f4d3ddb2b",
-      "title": "Magic Knight Rayearth ‒ Episode 6",
-      "category": "anime",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "aljazeera.com/video/newsfeed/2026/11/14/microsoft-services-begin-recovering-after-global-outage",
-      "title_hash": "a836241b02edc996cf9d06511d7c2e3af408be4c",
-      "title": "Microsoft services begin recovering after global outage",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-13/north-american-anime-manga-releases-november-8-14/.243661",
-      "title_hash": "1d2fcf659180c6848929c1c1be07a504194b9cd6",
-      "title": "North American Anime, Manga Releases, November 8-14",
-      "category": "anime",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "grounds.top",
-      "title_hash": "48a1f97c12503de00581a3695ce3e01efd59840f",
-      "title": "Show HN: Live map of U.S. flights during tonight's FAA nationwide ground stop",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "arstechnica.com/space/2026/11/starship-flight-15-powers-to-orbit-setting-up-a-possible-catch-on-saturday",
-      "title_hash": "ba5326b912c3acf0dcbba443b717d9e20b4f0ead",
-      "title": "Starship flight 15 powers to orbit—setting up a possible catch on Saturday",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/review/the-ramparts-of-ice-season-2/episode-21/.243802",
-      "title_hash": "85f38101a6364458afddab6d5284ccd7f6f8c08e",
-      "title": "The Ramparts of Ice Season 2 ‒ Episode 21",
-      "category": "anime",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/2026/nov/13/mississippi-river-crash-new-orleans",
-      "title_hash": "1d85865ab2ee277e64ff41abc606dec746ee8eba",
-      "title": "All passengers and crew accounted for after New Orleans boat crash in ‘miracle on the Mississippi’",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "fox5dc.com/news/amtrak-outage-ticket-booking-faa-ground-stop-november-13-2026",
-      "title_hash": "27d46d6796bbfd44003c465f15ef805a36338f03",
-      "title": "Amtrak booking system experiencing major issues amid nationwide FAA ground stop",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "hawaiinewsnow.com/2026/11/14/dot-all-west-coast-flights-halted-by-spacex-debris-after-faa-ground-stop",
-      "title_hash": "5d317da87dc4949c2e31a18772a85048a93ebe2a",
-      "title": "Hawaii DOT: All West Coast flights halted by SpaceX debris after FAA ground stop",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "theguardian.com/world/2026/nov/13/faa-nationwide-ground-stop-flights",
-      "title_hash": "1612bf63de1659151f1ab325de2b4490277659a6",
-      "title": "Nationwide FAA ground stop: nearly 11,000 flights delayed or canceled at airports across the US",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/diplomacy/nepals-preparation-and-institutional-capacity-building-a-must-for-climate-negotiations-minister-khanal",
-      "title_hash": "4173a0a7b460bc1cc5d68b4742e88059a71ceee7",
-      "title": "Nepal’s preparation and institutional capacity building a must for climate negotiations, Minister Khanal",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/live/2026/nov/13/us-politics-latest-news-updates-democrats-republicans-donald-trump-van-hollen-chuck-schumer",
-      "title_hash": "fd104483ff46e56670fe203353264882c60b4540",
-      "title": "US flight outage live updates: Trump officials set to brief public hours after FAA grounds thousands of flights",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/14/575518",
-      "title_hash": "58b1d9378e1505ba53049e05560a1c27eb7fb6f5",
-      "title": "Westerly winds bring partial cloud cover today",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/14/575514",
-      "title_hash": "91af0fd5762bf2817ab64c16dd63a3ed6d4e80d4",
-      "title": "“Nepal needs stronger diplomatic capacity for climate talks”",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74938716",
-      "title_hash": "1f70d0a4adbe6ca3fddd00fdd07e4dceb0b6a63e",
-      "title": "'Re:Zero kara Hajimeru Isekai Seikatsu' Gets 5th Season",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/entertainment-lifestyle/an-empire-built-on-loyalty-and-blood-why-the-godfather-still-defines-world-cinema",
-      "title_hash": "5a867a2e59a1a9178ac5576698321ea6c9a87d9c",
-      "title": "An empire built on loyalty and blood: Why “The Godfather” still defines world cinema",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/hidden-abuse-domestic-workers.html",
-      "title_hash": "8f2ca2fdd484f9cd6f6ed99c44b3e92a4b827918",
-      "title": "Domestic workers need protection beyond the household walls",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "polygon.com/gta-6-cast-rumors-speculation-confirmed-actors",
-      "title_hash": "697614a4aa7db48443aaebead80ced7d60032fcf",
-      "title": "Every GTA 6 Actor Rumored and Confirmed by Rockstar Ahead of Launch",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "france24.com/en/inside-ethiopia-s-war-rare-access-to-a-hospital-treating-victims-of-renewed-fighting",
-      "title_hash": "fcdaaf6aedee4048d577f056b18d0d0c71844d24",
-      "title": "Inside Ethiopia's war: Rare access to a hospital treating victims of renewed fighting",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "theguardian.com/business/2026/nov/14/interest-rate-rises-inflation-bank-of-england-chief-economist",
-      "title_hash": "44409052172e956cc2f14745205257032f70e9b1",
-      "title": "Interest rate rises likely in coming months, Bank of England’s chief economist says",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "arstechnica.com/science/2026/11/james-webb-telescope-finds-ice-older-than-the-star-it-orbits",
-      "title_hash": "981f0ca4c09c5de011dc44e0f14ee511d09787ad",
-      "title": "James Webb telescope finds ice older than the star it orbits",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-14/japan-video-game-rankings-november-2-8/.243786",
-      "title_hash": "9c948dd62597efcfff2b33fecc136b3b01c2f208",
-      "title": "Japan's Video Game Rankings, November 2-8",
-      "category": "anime",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-14/japanese-animation-tv-ranking-november-2-8/.243787",
-      "title_hash": "7d1c3625e0cb579510546580f29d544b34e4c918",
-      "title": "Japanese Animation TV Ranking, November 2-8",
-      "category": "anime",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "theregister.com/saas/2026/11/14/microsofts-school-email-bill-gives-rivals-something-to-smile-about/5309296",
-      "title_hash": "a7193ca99d1c5919495421b404b53ea7206358b1",
-      "title": "Microsoft's school email bill gives rivals something to smile about",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/politics/rabi-lamichhane-vows-to-deliver-results-over-promises-warns-against-ticket-bribery",
-      "title_hash": "c8b720967c750ff857aff4dbd4337500479e3f8f",
-      "title": "Rabi Lamichhane vows to deliver results over promises, warns against ticket bribery",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-14/re-zero-starting-life-in-another-world-tv-anime-gets-5th-season/.243813",
-      "title_hash": "0b215744fa49eb19f1fb5addf8d8328bdca0f786",
-      "title": "Re:ZERO -Starting Life in Another World- TV Anime Gets 5th Season",
-      "category": "anime",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "polygon.com/rings-of-power-season-3-nazgnagol-vs-nazgul-explained",
-      "title_hash": "215706dc713f54b12c2a32a344b58f6082384629",
-      "title": "Rings of Power Just Changed the Nazgul in 1 Terrifying Way: ‘They Still Have a Human Side’",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "eurogamer.net/rainbow-six-vegas-new-game-ubisoft-spades-report",
-      "title_hash": "94eb73f3bdf8967d14349ec4d3a3594dfa4410fc",
-      "title": "Ubisoft is reportedly making a new Rainbow Six Vegas game, nearly two decades after Vegas 2",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "france24.com/en/france/20261114-i-never-imagined-my-father-was-a-nazi-born-in-a-german-run-baby-factory",
-      "title_hash": "34db214d02108e626ebbb296563134dff5fafa92",
-      "title": "'I never imagined my father was a Nazi': Born in a German-run 'baby factory'",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74938827",
-      "title_hash": "37ea36b09408b37bbd40a348c242d34f61fba50a",
-      "title": "'Toaru Anbu no Item' Reveals Additional Cast, Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "pcgamer.com/software/ai/40-percent-of-game-developers-use-generative-ai-according-to-a-new-report-but-more-than-half-reckon-the-technology-has-a-negative-impact-on-the-games-industry",
-      "title_hash": "0f77e6e1b17425ad20b1a86b01ef69a097d07e6d",
-      "title": "40% of game developers use generative AI according to a new report, but more than half reckon the technology has a negative impact on the games industry",
-      "category": "gaming",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "nytimes.com/2026/11/14/world/asia/eurovision-asia-politics.html",
-      "title_hash": "861720e289a141522d3e95004a6e69a3807c1b3d",
-      "title": "Geopolitics Looms Over Eurovision, but Not Its Asian Edition",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "nytimes.com/2026/11/13/technology/microsoft-outage-what-to-know.html",
-      "title_hash": "23e9b152f7822a5f0354c80d9a1768057613b61a",
-      "title": "Microsoft’s Global Outage and Fixes: What We Know",
-      "category": "world_major",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/nation/minister-chaudhary-pledges-to-prioritize-indigenous-issues-in-climate-negotiations",
-      "title_hash": "8e30411181bbb50255c449b5769e3d0e64eed526",
-      "title": "Minister Chaudhary pledges to prioritize indigenous issues in climate negotiations",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/politics/new-government-formation-process-begins-in-madhesh-province",
-      "title_hash": "69341e6dddc38c82db52d0ff9c6fe817261c9018",
-      "title": "New government formation process begins in Madhesh Province",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/14/575595",
-      "title_hash": "0b530b5f045cc6bf615bd60743b5d05d635d2e51",
-      "title": "Rabi Lamichhane rules out dispute between RSP and govt",
-      "category": "nepal",
-      "date_sent": "2026-11-14"
-    },
-    {
-      "url_normalized": "arstechnica.com/science/2026/11/winemakers-are-learning-that-conservation-can-be-good-for-business",
-      "title_hash": "88bda8fc2c54523820caa529894075baabce45fd",
-      "title": "Winemakers are learning that conservation can be good for business",
-      "category": "tech_career",
-      "date_sent": "2026-11-14"
-    },
-    {
       "url_normalized": "iost.tu.edu.np/notices/16102",
       "title_hash": "26473fe1544dacbf70b3404cc940ad8c56c0df77",
       "title": "Tribhuvan University Releases B.Sc. CSIT II Semester Exam Center Notice",
@@ -1931,6 +1630,41 @@
       "title": "ChatGPT Model Shrunk Down to Execute on Super Nintendo Entertainment System",
       "category": "tech_career",
       "date_sent": "2026-11-21"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2062777/prime-minister-balen-to-visit-india-today-meet-modi-tomorrow",
+      "title_hash": "dabccc4c0c4611f3a5b17ab72d02a7ba0c813bb7",
+      "title": "PM Balendra Shah begins two-day state visit to India",
+      "category": "nepal",
+      "date_sent": "2026-11-22"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2062807/preparations-for-city-bus-operation-in-four-municipalities-of-parsa-bara",
+      "title_hash": "c526d276ed3de68a44ec9e1af669d8c9de065e0b",
+      "title": "Preparations underway for new city bus service in Parsa and Bara",
+      "category": "local_city",
+      "date_sent": "2026-11-22"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2062796/todays-foreign-exchange-rate-is-53",
+      "title_hash": "71218a2f6c01f022f436838c15f3402bd205e602",
+      "title": "Foreign Exchange Rates for November 22, 2026",
+      "category": "bank_local",
+      "date_sent": "2026-11-22"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2062805/newly-appointed-chief-minister-of-madhesh-yadav-taking-oath-today-2",
+      "title_hash": "962b028662cc1bf1369318d339a71f9f73fbaa6c",
+      "title": "Saroj Kumar Yadav to be sworn in as Madhesh Province Chief Minister today",
+      "category": "nepal",
+      "date_sent": "2026-11-22"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/22/576463",
+      "title_hash": "1b8cfcf21a42bad2b0123cd5f74d183572f3f619",
+      "title": "Bhotekoshi flood survivors in Rasuwa request rehabilitation",
+      "category": "nepal",
+      "date_sent": "2026-11-22"
     }
   ]
 }
