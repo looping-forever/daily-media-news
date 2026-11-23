@@ -1539,6 +1539,34 @@
       "title": "Three Nepali Nationals Rescued After Being Held Hostage in New Delhi Hotel",
       "category": "nepal",
       "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16314",
+      "title_hash": "b3dad12b27e9aedf411d5a95699a210782ad9ef7",
+      "title": "Tribhuvan University IOST Publishes Master in Data Science Exam Schedule",
+      "category": "education_tu",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/nvidia-release-hotfix-for-latest-graphics-card-driver-battering-ssds-with-excessive-writes-but-it-looks-like-reverting-still-better-option",
+      "title_hash": "4f103f07e08ec68f5c77548e2d5fa706a336251a",
+      "title": "Nvidia Releases Hotfix Driver for GeForce 621.24 Addressing Excessive SSD Writes",
+      "category": "tech_career",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-23/magical-buffs-anime-announces-3-more-cast-members/.244111",
+      "title_hash": "023fa9e1e6c47e61ff2169d41c7be9861600df07",
+      "title": "Magical Buffs Anime Adaptation Announces Three Additional Cast Members",
+      "category": "anime",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cwdr155e2d05o",
+      "title_hash": "9416c2a0ed29f681443883af232f6f35b6ac94d1",
+      "title": "Flights and Train Services Cancelled Across Belgium Amid General Strike",
+      "category": "world_major",
+      "date_sent": "2026-11-23"
     }
   ]
 }

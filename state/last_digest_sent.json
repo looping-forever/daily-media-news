@@ -1,22 +1,22 @@
 {
   "date": "2026-11-23",
   "time": "evening",
-  "stories": 5,
+  "stories": 4,
   "empty_digest": false,
   "empty_kind": null,
   "channels": {
-    "website": false,
-    "ntfy": false,
+    "website": true,
+    "ntfy": true,
     "gmail": false,
     "telegram": false
   },
   "channel_reasons": {
-    "website": "prebuild",
-    "ntfy": "prebuild",
+    "website": "delivered",
+    "ntfy": "delivered",
     "gmail": "disabled by decision",
     "telegram": "disabled by decision"
   },
-  "delivered": false,
+  "delivered": true,
   "dry_run": false,
-  "phase": "prebuild"
+  "phase": "full"
 }
