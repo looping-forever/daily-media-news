@@ -1504,6 +1504,41 @@
       "title": "COP31 Climate Talks Conclude Without Reaching Major Agreement",
       "category": "world_major",
       "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/science-technology/authorities-to-test-mobile-emergency-alert-system-in-kathmandu-valley-on-monday",
+      "title_hash": "dce550e6d33751443bd3569a2894e0e7a3c8d6a7",
+      "title": "Kathmandu Valley to Test Mobile Emergency Alert System on Monday",
+      "category": "local_city",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16315",
+      "title_hash": "e6b733a30c1de8a8713b80c45faab5838981c674",
+      "title": "Tribhuvan University IOST Publishes Application Form Notice for Physics Postgraduate Programs",
+      "category": "education_tu",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/science-technology/supreme-court-orders-registration-of-petition-challenging-tribhuvan-universitys-ai-detection-system",
+      "title_hash": "93e21f2609d4dd01d06176b7cf145ccefea8cfab",
+      "title": "Supreme Court Orders Registration of Writ Against Tribhuvan University AI Detection System",
+      "category": "nepal",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/23/576772",
+      "title_hash": "1c287674a3f85b61edc82cfdf2286b51948ffba6",
+      "title": "Prime Minister Balendra Shah Returns to Nepal Following State Visit to India",
+      "category": "nepal",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2063982/three-nepalis-held-hostage-in-delhi-hotel-for-45-days-rescued",
+      "title_hash": "c062c19e1d1e6255e0ae50a117d988e1e67edfab",
+      "title": "Three Nepali Nationals Rescued After Being Held Hostage in New Delhi Hotel",
+      "category": "nepal",
+      "date_sent": "2026-11-23"
     }
   ]
 }
