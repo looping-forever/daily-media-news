@@ -1,286 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "iost.tu.edu.np/notices/16102",
-      "title_hash": "26473fe1544dacbf70b3404cc940ad8c56c0df77",
-      "title": "Tribhuvan University Releases B.Sc. CSIT II Semester Exam Center Notice",
-      "category": "education_tu",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/15/575619",
-      "title_hash": "4c526549058c0a828364c1a87d8feca111d2ac4d",
-      "title": "Department of Hydrology and Meteorology Forecasts Light Drizzle and Cloudy Skies",
-      "category": "local_city",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2057752/what-is-the-exchange-rate-of-which-foreign-currency-today-28",
-      "title_hash": "b3c780a147e8c163956cc3d34e58a9e2c8604b14",
-      "title": "Nepal Rastra Bank Sets Foreign Currency Exchange Rates",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/15/575611",
-      "title_hash": "2574449f624bb39da31a0eb5e6fe26ae92448f01",
-      "title": "Chhath Festival Main Day Celebrations Across Nepal",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "polygon.com/co-op-games-real-life-schedules",
-      "title_hash": "b93c4a0b665a581ed92a5375fa82bdc74a27b56c",
-      "title": "10 Must-Play Co-Op Games for People With Real-Life Schedules",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/15/575627",
-      "title_hash": "6bad6dd110bf2625a39fa49bb9846e2d663735f3",
-      "title": "Chhath reflects Nepal’s unique cultural identity: Vice President Yadav",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/review/detective-conan/the-clash-of-the-red-and-black/anime-series/.243437",
-      "title_hash": "bc8bb4249eb8f329f9bc8fa6ad0e03cbcb1e4042",
-      "title": "Detective Conan: The Clash of the Red and Black Anime Series Review",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-14/even-the-student-council-has-its-holes-anime-casts-yoko-hikasa/.243815",
-      "title_hash": "bb7f1eed9637b2ae5ce571b38a1b5a2bdf0e653c",
-      "title": "Even the Student Council Has It's Holes! Anime Casts Yōko Hikasa",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "aljazeera.com/news/2026/11/15/hundreds-of-men-march-in-switzerland-to-protest-violence-against-women",
-      "title_hash": "c3e44101edf2260679705034f139965dd5c1eb99",
-      "title": "Hundreds of men march in Switzerland to protest violence against women",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "aljazeera.com/news/2026/11/15/israeli-air-strike-kills-senior-hamas-commander-in-gaza",
-      "title_hash": "2a517c998ac0376d75edb58210d91fe83ca93d2b",
-      "title": "Israeli air strike kills senior Hamas commander in Gaza",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-14/kakao-openai-collaborate-on-ai-generated-short-animation-based-on-ryan-begins-webtoon/.243712",
-      "title_hash": "d47d0e7d2de1963b4e140f6b886d239c6804aa91",
-      "title": "Kakao, OpenAI Collaborate on AI-Generated Short Animation Based on Ryan Begins Webtoon",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/15/575622",
-      "title_hash": "bc3933ce19fbf707e3512a006bc86a674f85850f",
-      "title": "NRB publishes today’s foreign currency exchange rates",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "polygon.com/kirby-world-beyond-nintendo-switch-2-2027",
-      "title_hash": "e3935f1e8447f62f11d0e8d48ab83eb4a3e60b04",
-      "title": "Nintendo Officially Reveals New Kirby Game for Switch 2",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/15/575624",
-      "title_hash": "73b86e7ebe05eeb7b868fa4ad49262e217b408f2",
-      "title": "President Paudel calls for social harmony and unity",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "polygon.com/stephen-king-prime-video-crouch-end-tv-show",
-      "title_hash": "570f49ea4723b3d03911778131ef214b6cb90ff7",
-      "title": "Stephen King’s Underrated 1980 Horror Thriller Gets New Prime Video Adaptation",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "theguardian.com/law/2026/nov/15/uk-government-to-consider-changing-age-of-consent-after-allegations-against-russell-brand",
-      "title_hash": "bf2bd97153571003c013f0dfab74fdd933024b6c",
-      "title": "UK government to consider changing age of consent after allegations against Russell Brand",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "poolp.org/posts/2026-11-14/walking-across-my-minecraft-backups-with-plakar",
-      "title_hash": "d1c8e11d18024e42f61e5bb83e3d1b9ea5670310",
-      "title": "Walking across my Minecraft backups with Plakar",
-      "category": "tech_career",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/14/where-was-nvidias-security-team",
-      "title_hash": "cc7f83773bd5e2e69c6d157dca6120b3f5328303",
-      "title": "Where was Nvidia’s security team?",
-      "category": "tech_career",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "arstechnica.com/space/2026/11/with-starship-catch-spacex-still-shows-it-can-dazzle-the-world",
-      "title_hash": "11fcee4a5e6ff265910e57840ff5ff3660872aa2",
-      "title": "With Starship catch, SpaceX still shows it can dazzle the world",
-      "category": "tech_career",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "lucypero.com/lucynes.html",
-      "title_hash": "e0dde02151741d2c0bfd0e38445327b0dbe26333",
-      "title": "A NES emulator written in Odin",
-      "category": "tech_career",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "aljazeera.com/sports/2026/11/15/australia-crush-new-zealand-to-win-fourth-womens-rugby-league-world-cup",
-      "title_hash": "122dab885655ff7e6694c4dcd79c6c5d50668d40",
-      "title": "Australia crush New Zealand to win fourth Women’s Rugby League World Cup",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "aljazeera.com/news/2026/11/15/bahrain-accuses-iran-of-attacking-its-territory-to-settle-score-with-us",
-      "title_hash": "e64afbb5f3cf30705cb832e86476add9ff5d39d5",
-      "title": "Bahrain accuses Iran of attacking its territory to ‘settle’ score with US",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/15/575724",
-      "title_hash": "2777d88920587b684f09a347e2fd59fdba18a078",
-      "title": "Chhath festival: President Paudel offers worship at Guheshwari",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "pcgamer.com/games/strategy/chronicles-medieval-developer-declared-bankruptcy-on-the-day-it-announced-it-was-in-trouble-but-development-will-continue-after-a-usd5-million-reprieve-from-coffee-stain",
-      "title_hash": "47bbe74e389129d485aaea626a64f7c504651ccf",
-      "title": "Chronicles: Medieval developer declared bankruptcy on the day it announced it was in trouble, but development will continue after a $5 million reprieve from Coffee Stain",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "pcgamer.com/games/survival-crafting/former-survival-mmo-dune-awakening-can-now-be-played-without-requiring-an-internet-connection-at-any-point-as-its-much-requested-offline-mode-arrives",
-      "title_hash": "ea8cadb35e9fbf3b57f49ae1d5bd596eb3e6bd95",
-      "title": "Former survival MMO Dune: Awakening can now be played 'without requiring an Internet connection at any point' as its much requested offline mode arrives",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "arstechnica.com/science/2026/11/how-the-worlds-fires-changed-while-humanity-hit-pause",
-      "title_hash": "0fa61892dbc441370eb63fa98638acb7257568e9",
-      "title": "How the world’s fires changed while humanity hit pause",
-      "category": "tech_career",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "theguardian.com/world/live/2026/nov/15/middle-east-crisis-live-iran-bahrain-strikes-gulf-donald-trump-us-israel-yemen-houthis",
-      "title_hash": "6a99da187f9b174b250682e5cd8d880724d173d5",
-      "title": "Iran targets Bahrain airbase as strikes resume in Gulf - Middle East crisis live",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "theconsensus.dev/p/2026/11/08/c-memory-management-survey.html",
-      "title_hash": "8b5c6751fdf5d325460daf0af70eb0d38c394a8d",
-      "title": "Memory management in 40 major C projects, a survey",
-      "category": "tech_career",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-15/retrocrush-streams-sugar-sugar-rune-genocyber-anime/.243828",
-      "title_hash": "57ff092b22d445a1781fe4ef0ee0f06f53f6a264",
-      "title": "RetroCrush Streams Sugar Sugar Rune, Genocyber Anime",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "polygon.com/village-in-the-shade-new-farm-sim-horror-game",
-      "title_hash": "eb030ec25a159fba8544c5d72354c0865082c45b",
-      "title": "Stardew Valley Meets Night in the Woods in One of 2026's Scariest New Games",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-15/stranger-than-heaven-game-streams-story-trailer-for-2nd-act-kure/.243829",
-      "title_hash": "393b616de74916a7872c1473189dda933ae7125d",
-      "title": "Stranger Than Heaven Game Streams Story Trailer for 2nd Act 'Kure'",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animeuknews.net/2026/11/the-seaside-where-dragon-boys-dwell-volume-1-review",
-      "title_hash": "c90edf241f0c05a813f205c04353dbdb71165d41",
-      "title": "The Seaside Where Dragon Boys Dwell Volume 1 Review",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/entertainment-lifestyle/winners-of-swar-samrat-narayan-gopal-memorial-honours-and-awards-announced",
-      "title_hash": "13ceccbecf4ff205d7e397ae790940cfaa717367",
-      "title": "Winners of Swar Samrat Narayan Gopal Memorial Honours and Awards announced",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "polygon.com/xbox-retrospective-best-things-besides-halo",
-      "title_hash": "93253be6c334641fc92d7b2f9c7efa7b0079b38e",
-      "title": "7 Best Things About the Original Xbox That Aren't Halo, Ranked",
-      "category": "gaming",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "theguardian.com/money/2026/nov/15/christmas-dupes-gift-aldi-candles-quince-cashmere-jumpers-price",
-      "title_hash": "5e514939abf61b27bc2131023c16ae94072035b3",
-      "title": "Christmas ‘dupes’: the cheaper gift versions proving a festive hit in the cost of living crisis",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/govt-appoint-letter-dan-bahadur-karki.html",
-      "title_hash": "20edfee4a31941a142744f5ad349d2bf0c9cb684",
-      "title": "Govt hands special adviser appointment letter to former IGP Dan Bahadur Karki",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/pm-balen-shah-assigns-roles-to-members-of-his-private-secretariat.html",
-      "title_hash": "9c5050b6ca053e3d4912643c795cc9fbd72e4916",
-      "title": "PM Balen Shah assigns roles to members of his private secretariat",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/sports/pokhara-avengers-set-record-225-run-target-for-kathmandu-gorkhas",
-      "title_hash": "4382e5f84212327f829a03365eed1754d8f8f5a2",
-      "title": "Pokhara Avengers set record 225-run target for Kathmandu Gorkhas",
-      "category": "nepal",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-09/webtoon-ceo-junkoo-kim-receives-outstanding-contribution-award-at-korea-26th-cartoon-day-ceremony/.243642",
-      "title_hash": "b67e66eef04425da5d0f2de8b917db0b6cf5c5a4",
-      "title": "WEBTOON CEO Junkoo Kim Receives Outstanding Contribution Award at Korea's 26th Cartoon Day Ceremony",
-      "category": "anime",
-      "date_sent": "2026-11-15"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/2026/nov/15/trump-self-enrichment-lawsuits",
-      "title_hash": "6a89f37b573dc8bded8f2868de011db64ac4fffe",
-      "title": "‘Shameless venality’: how a flurry of lawsuits has thwarted Trump’s self-enrichment schemes",
-      "category": "world_major",
-      "date_sent": "2026-11-15"
-    },
-    {
       "url_normalized": "iost.tu.edu.np/notices/16111",
       "title_hash": "a984646f93c9414d709610549984fc49de01a437",
       "title": "Tribhuvan University Extends B.Sc. Entrance Exam Application Deadline",
@@ -1735,6 +1455,55 @@
       "title": "American Mahjong Controversy and Cultural Rivalry",
       "category": "world_major",
       "date_sent": "2026-11-22"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/english.khabarhub.com/2026/23/576643",
+      "title_hash": "be37bc3ea1f316d5c82ea17eda98d4d64886e584",
+      "title": "Kathmandu Valley Minimum Temperature Drops to 8.1 Degrees Celsius",
+      "category": "local_city",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74968322",
+      "title_hash": "d36e7a6dfeb3b1862017cf1c9f83c890cdd13043",
+      "title": "Light Novel Sono Mono. Nochi ni… Adaptation Announced for 2027",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74968755",
+      "title_hash": "3771c90529e14ab0b07efb92d3e6af35aeac9a73",
+      "title": "Manga Sakamoto Days Concludes Serialization After Six Years",
+      "category": "manga_manhwa_manhua",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-22/martial-arts-manhwa-yeolhyeol-gangho-to-end-next-year-after-33-years/.244079",
+      "title_hash": "7b06a7da4a20a4338d8a704cb9cb183701af1c21",
+      "title": "Martial Arts Manhwa Yeolhyeol Gangho Scheduled to Conclude Next Year",
+      "category": "anime",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/english.khabarhub.com/2026/23/576641",
+      "title_hash": "f98756e2cdaa9ec736c810763fefb3c6a55e86dd",
+      "title": "Nepal Rastra Bank Publishes Foreign Currency Exchange Rates",
+      "category": "nepal",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/english.khabarhub.com/2026/23/576638",
+      "title_hash": "0ee63ba170333d93c4a5aeb08fb970781b21a347",
+      "title": "Prime Minister Balendra Shah Holds High-Level Bilateral Talks in New Delhi",
+      "category": "nepal",
+      "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cqwy06zrd26lo",
+      "title_hash": "6acde27286b34fbe16fa4c0d4f7e850283804d95",
+      "title": "COP31 Climate Talks Conclude Without Reaching Major Agreement",
+      "category": "world_major",
+      "date_sent": "2026-11-23"
     }
   ]
 }

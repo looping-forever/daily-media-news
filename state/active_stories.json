@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-22T18:41:30+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -20729,7 +20729,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Institute of Science and Technology has officially published notice number 16102 detailing examination centers for B.Sc.CSIT II Semester-2082 students.",
       "latest_development": "Confirmed: The Institute of Science and Technology has officially published notice number 16102 detailing examination centers for B.Sc.CSIT II Semester-2082 students.",
       "alerted": false,
@@ -20739,7 +20739,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T06:41:25+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-4316e555c68f",
@@ -20757,7 +20757,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: According to Nepal Rastra Bank rates published via Onlinekhabar, the buying rate for one US dollar is fixed at 150.49 rupees and the selling rate at 151.09 rupees.",
       "latest_development": "Confirmed: According to Nepal Rastra Bank rates published via Onlinekhabar, the buying rate for one US dollar is fixed at 150.49 rupees and the selling rate at 151.09 rupees.",
       "alerted": false,
@@ -20767,7 +20767,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-15",
-      "updated_at": "2026-11-15T06:41:25+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-314e19fbb171",
@@ -20785,7 +20785,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Meteorological Forecasting Division reports partial influence of westerly winds bringing cloudy conditions to mountainous and hilly regions, with Kathmandu experiencing a maximum temperature of 20 degrees Celsius, minimum of 11 degrees Celsius, and 0.7 mm of forecasted precipitation.",
       "latest_development": "Reported: The Meteorological Forecasting Division reports partial influence of westerly winds bringing cloudy conditions to mountainous and hilly regions, with Kathmandu experiencing a maximum temperature of 20 degrees Celsius, minimum of 11 degrees Celsius, and 0.7 mm of forecasted precipitation.",
       "alerted": false,
@@ -20795,7 +20795,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-15",
-      "updated_at": "2026-11-15T06:41:25+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-39b49ed10600",
@@ -20813,7 +20813,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Devotees across the country gather at rivers, ponds, and lakes today to offer holy Argha to the setting sun during the main rituals of the four-day Chhath festival.",
       "latest_development": "Reported: Devotees across the country gather at rivers, ponds, and lakes today to offer holy Argha to the setting sun during the main rituals of the four-day Chhath festival.",
       "alerted": false,
@@ -20823,7 +20823,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-15",
-      "updated_at": "2026-11-15T06:41:25+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-6c26d0c39623",
@@ -20841,7 +20841,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Prime Video is developing a Lovecraftian crime-thriller miniseries based on the author's story.",
       "latest_development": "Prime Video is developing a Lovecraftian crime-thriller miniseries based on the author's story.",
       "alerted": false,
@@ -20851,7 +20851,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-eb08d3fe30c9",
@@ -20869,7 +20869,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The central bank of Nepal set the buying rate for one US dollar at 150.49 rupees and the selling rate at 151.09 rupees today.",
       "latest_development": "The central bank of Nepal set the buying rate for one US dollar at 150.49 rupees and the selling rate at 151.09 rupees today.",
       "alerted": false,
@@ -20879,7 +20879,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-8a290c11b81f",
@@ -20897,7 +20897,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Vice President Ram Sahay Prasad Yadav noted that the festival encourages mutual respect and national unity while offering his best wishes to observers.",
       "latest_development": "Vice President Ram Sahay Prasad Yadav noted that the festival encourages mutual respect and national unity while offering his best wishes to observers.",
       "alerted": false,
@@ -20907,7 +20907,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-26e77b0701c5",
@@ -20925,7 +20925,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The militant group confirmed that Saturday's attack on Khan Younis resulted in the death of Rafah brigade commander Samir Abu Younis.",
       "latest_development": "The militant group confirmed that Saturday's attack on Khan Younis resulted in the death of Rafah brigade commander Samir Abu Younis.",
       "alerted": false,
@@ -20935,7 +20935,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-a60631500d47",
@@ -20953,7 +20953,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Selected titles such as Overcooked! and Gears of War: E-Day are suggested for gamers with limited availability, ranging from brief single-level experiences to more extended campaigns.",
       "latest_development": "Selected titles such as Overcooked! and Gears of War: E-Day are suggested for gamers with limited availability, ranging from brief single-level experiences to more extended campaigns.",
       "alerted": false,
@@ -20963,7 +20963,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-39f397ca8d43",
@@ -20981,7 +20981,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "President Ram Chandra Paudel believes the celebration in Kathmandu will aid in eradicating societal issues like caste, gender, and class-based discrimination.",
       "latest_development": "President Ram Chandra Paudel believes the celebration in Kathmandu will aid in eradicating societal issues like caste, gender, and class-based discrimination.",
       "alerted": false,
@@ -20991,7 +20991,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-dab616341240",
@@ -21009,7 +21009,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "While the historical Space Shuttle program failed to meet its cost-per-pound target of $25, reaching closer to $25,000 instead, SpaceX currently has five Starships in advanced development at its Starbase facility.",
       "latest_development": "While the historical Space Shuttle program failed to meet its cost-per-pound target of $25, reaching closer to $25,000 instead, SpaceX currently has five Starships in advanced development at its Starbase facility.",
       "alerted": false,
@@ -21019,7 +21019,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-e19dc672034a",
@@ -21037,7 +21037,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This demonstration follows a Swiss study revealing that fifty percent of men between the ages of 18 and 24 maintain restrictive attitudes toward masculinity.",
       "latest_development": "This demonstration follows a Swiss study revealing that fifty percent of men between the ages of 18 and 24 maintain restrictive attitudes toward masculinity.",
       "alerted": false,
@@ -21047,7 +21047,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-5ff168004725",
@@ -21065,7 +21065,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The new title, Kirby and the World Beyond, is scheduled to launch on the upcoming console in 2027.",
       "latest_development": "The new title, Kirby and the World Beyond, is scheduled to launch on the upcoming console in 2027.",
       "alerted": false,
@@ -21075,7 +21075,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-547c05e52f40",
@@ -21093,7 +21093,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The deputy prime minister noted that such a legal adjustment requires thorough scrutiny after a complainant publicly waived her right to anonymity.",
       "latest_development": "The deputy prime minister noted that such a legal adjustment requires thorough scrutiny after a complainant publicly waived her right to anonymity.",
       "alerted": false,
@@ -21103,7 +21103,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-b3d6a016bc0f",
@@ -21121,7 +21121,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "CEO Jensen Huang resigned following revelations about his connections to an executive at a company potentially shipping chips to China, coinciding with the vacancy of the company's top security role since August.",
       "latest_development": "CEO Jensen Huang resigned following revelations about his connections to an executive at a company potentially shipping chips to China, coinciding with the vacancy of the company's top security role since August.",
       "alerted": false,
@@ -21131,7 +21131,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-935b352e6119",
@@ -21149,7 +21149,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Voice actress Yōko Hikasa will join the production to portray the mother of council president Hisako during the series' seventh episode airing this weekend.",
       "latest_development": "Voice actress Yōko Hikasa will join the production to portray the mother of council president Hisako during the series' seventh episode airing this weekend.",
       "alerted": false,
@@ -21159,7 +21159,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-a98ad57b56d4",
@@ -21177,7 +21177,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Each Minecraft chunk occupies 512 bytes, while region files contain 32 by 32 chunks with 1023 of them holding 511 KiB of payload data.",
       "latest_development": "Each Minecraft chunk occupies 512 bytes, while region files contain 32 by 32 chunks with 1023 of them holding 511 KiB of payload data.",
       "alerted": false,
@@ -21187,7 +21187,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-d146d5e4b6b5",
@@ -21205,7 +21205,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "To capture the necessary emotional nuance and direction, the creators utilized around 1,500 individual prompts for just one scene of the project.",
       "latest_development": "To capture the necessary emotional nuance and direction, the creators utilized around 1,500 individual prompts for just one scene of the project.",
       "alerted": false,
@@ -21215,7 +21215,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-3a5f8be732f9",
@@ -21233,7 +21233,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The plot progresses as a potential new associate discloses his links to the Black Organization while the FBI initiates strategic maneuvers.",
       "latest_development": "The plot progresses as a potential new associate discloses his links to the Black Organization while the FBI initiates strategic maneuvers.",
       "alerted": false,
@@ -21243,7 +21243,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T07:25:11+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-8b886f2010a2",
@@ -21261,7 +21261,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Data from the study indicates that 15 of these examined codebases utilize memory regions, while only 8 rely exclusively on manual malloc and free operations.",
       "latest_development": "Data from the study indicates that 15 of these examined codebases utilize memory regions, while only 8 rely exclusively on manual malloc and free operations.",
       "alerted": false,
@@ -21271,7 +21271,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-f89f4cccec2d",
@@ -21289,7 +21289,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Narayan Gopal Music Trust in Kathmandu selected veteran dancer Bhairav Bahadur Thapa to receive the Special Honour, which includes a cash prize.",
       "latest_development": "The Narayan Gopal Music Trust in Kathmandu selected veteran dancer Bhairav Bahadur Thapa to receive the Special Honour, which includes a cash prize.",
       "alerted": false,
@@ -21299,7 +21299,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-8f9f5295b013",
@@ -21317,7 +21317,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Ram Chandra Paudel performed ritual offerings to an idol of Chhathi Mata along the Bagmati River bank located near the Pashupati area.",
       "latest_development": "Ram Chandra Paudel performed ritual offerings to an idol of Chhathi Mata along the Bagmati River bank located near the Pashupati area.",
       "alerted": false,
@@ -21327,7 +21327,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-9514870b6755",
@@ -21345,7 +21345,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Developing this emulator required seven months of work, countering claims that it can be completed as a simple weekend project.",
       "latest_development": "Developing this emulator required seven months of work, countering claims that it can be completed as a simple weekend project.",
       "alerted": false,
@@ -21355,7 +21355,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-5378cd0369e7",
@@ -21373,7 +21373,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Tehran defends its air strikes against nations collaborating with the United States by citing international law.",
       "latest_development": "Tehran defends its air strikes against nations collaborating with the United States by citing international law.",
       "alerted": false,
@@ -21383,7 +21383,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-3ee639931f81",
@@ -21401,7 +21401,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Players can now manage single-player characters, including creation and deletion, entirely without an active web connection.",
       "latest_development": "Players can now manage single-player characters, including creation and deletion, entirely without an active web connection.",
       "alerted": false,
@@ -21411,7 +21411,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-7e0f6a0ac691",
@@ -21429,7 +21429,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The winning side secured a 34-10 victory after taking advantage of mistakes made by the opposing team during the first half.",
       "latest_development": "The winning side secured a 34-10 victory after taking advantage of mistakes made by the opposing team during the first half.",
       "alerted": false,
@@ -21439,7 +21439,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-594702eb436e",
@@ -21457,7 +21457,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Iranian officials indicate that Foreign Minister Abbas Araqchi plans to hold discussions in Oman this coming Tuesday.",
       "latest_development": "Iranian officials indicate that Foreign Minister Abbas Araqchi plans to hold discussions in Oman this coming Tuesday.",
       "alerted": false,
@@ -21467,7 +21467,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-debf887bdd9a",
@@ -21485,7 +21485,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This title is scheduled for release on January 15 across PC, PlayStation 5, and Xbox Series X|S platforms.",
       "latest_development": "This title is scheduled for release on January 15 across PC, PlayStation 5, and Xbox Series X|S platforms.",
       "alerted": false,
@@ -21495,7 +21495,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-e9b01b355631",
@@ -21513,7 +21513,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Pandemic-related lockdowns resulted in a 12.3 percent reduction in fire activity globally.",
       "latest_development": "Pandemic-related lockdowns resulted in a 12.3 percent reduction in fire activity globally.",
       "alerted": false,
@@ -21523,7 +21523,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-48c57db255d7",
@@ -21541,7 +21541,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This upcoming horror farm simulation title explores the unsettling aspects of community living.",
       "latest_development": "This upcoming horror farm simulation title explores the unsettling aspects of community living.",
       "alerted": false,
@@ -21551,7 +21551,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-7a03f561c3eb",
@@ -21569,7 +21569,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "A newly formed studio consisting of core team members will complete the production of this historical strategy game.",
       "latest_development": "A newly formed studio consisting of core team members will complete the production of this historical strategy game.",
       "alerted": false,
@@ -21579,7 +21579,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-c04f77646d04",
@@ -21597,7 +21597,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The streaming platform has also acquired the 1983 live-action adaptation of The Girl Who Leapt Through Time.",
       "latest_development": "The streaming platform has also acquired the 1983 live-action adaptation of The Girl Who Leapt Through Time.",
       "alerted": false,
@@ -21607,7 +21607,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-2fda492825b6",
@@ -21625,7 +21625,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "After the passing of her father, Mizuka moves in with her uncle in the seaside town of Komorisaki which is famous for being inhabited by 'dragon folk', one of whom Mizuka will now also find herself living with! Will these two be able to…",
       "latest_development": "After the passing of her father, Mizuka moves in with her uncle in the seaside town of Komorisaki which is famous for being inhabited by 'dragon folk', one of whom Mizuka will now also find herself living with! Will these two be able to…",
       "alerted": false,
@@ -21635,7 +21635,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T18:52:37+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-9308864c3063",
@@ -21653,7 +21653,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "On November 15 in Kathmandu, Kumar Byanjankar was among those named as coordinators or deputy coordinators within the newly organized team.",
       "latest_development": "On November 15 in Kathmandu, Kumar Byanjankar was among those named as coordinators or deputy coordinators within the newly organized team.",
       "alerted": false,
@@ -21663,7 +21663,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-299dedea2b50",
@@ -21681,7 +21681,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Following his removal from the Inspector General of Police position, he officially received his documentation for the new role on November 15 in Kathmandu.",
       "latest_development": "Following his removal from the Inspector General of Police position, he officially received his documentation for the new role on November 15 in Kathmandu.",
       "alerted": false,
@@ -21691,7 +21691,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-397e058dff29",
@@ -21709,7 +21709,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This achievement occurred during the final league stage match of the Nepal Premier League.",
       "latest_development": "This achievement occurred during the final league stage match of the Nepal Premier League.",
       "alerted": false,
@@ -21719,7 +21719,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-4ac75979220f",
@@ -21737,7 +21737,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The executive shares this recognition with attorney Sung-joo Kim of the Deoksu law firm, who was honored for his legal efforts supporting cartoonists.",
       "latest_development": "The executive shares this recognition with attorney Sung-joo Kim of the Deoksu law firm, who was honored for his legal efforts supporting cartoonists.",
       "alerted": false,
@@ -21747,7 +21747,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-658b83f65e29",
@@ -21765,7 +21765,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Polygon highlights the original Xbox's achievements beyond Halo, emphasizing its library and impact on gaming.",
       "latest_development": "Polygon highlights the original Xbox's achievements beyond Halo, emphasizing its library and impact on gaming.",
       "alerted": false,
@@ -21775,7 +21775,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-ed3a5332d333",
@@ -21793,7 +21793,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Guardian reports on lawsuits targeting Trump's attempts to enrich himself, calling his actions 'shameless venality'",
       "latest_development": "The Guardian reports on lawsuits targeting Trump's attempts to enrich himself, calling his actions 'shameless venality'",
       "alerted": false,
@@ -21803,7 +21803,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-f2a16d6cb0b5",
@@ -21821,7 +21821,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Popular affordable alternatives now include items like botanical-scented candles from Aldi and cashmere sweaters sold by Quince.",
       "latest_development": "Popular affordable alternatives now include items like botanical-scented candles from Aldi and cashmere sweaters sold by Quince.",
       "alerted": false,
@@ -21831,7 +21831,7 @@
       "in_evening": "2026-11-15",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-15T19:23:04+05:45"
+      "updated_at": "2026-11-23T06:41:21+05:45"
     },
     {
       "event_id": "evt-b3d2146f0d9b",
@@ -28104,6 +28104,202 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-22T18:41:30+05:45"
+    },
+    {
+      "event_id": "evt-fa12a36eba89",
+      "event_key": "kathmandu-temperature-drop-nov-2026",
+      "canonical_title": "Kathmandu Valley Minimum Temperature Drops to 8.1 Degrees Celsius",
+      "category": "local_city",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.khabarhub.com/english.khabarhub.com/2026/23/576643"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The Department of Hydrology and Meteorology recorded a decline in the minimum temperature across the Kathmandu Valley to 8.1 degrees Celsius on Monday morning, marking an onset of noticeably colder morning and evening conditions.",
+      "latest_development": "Reported: The Department of Hydrology and Meteorology recorded a decline in the minimum temperature across the Kathmandu Valley to 8.1 degrees Celsius on Monday morning, marking an onset of noticeably colder morning and evening conditions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-23T06:41:21+05:45"
+    },
+    {
+      "event_id": "evt-d3d7fe25567c",
+      "event_key": "nrb-foreign-exchange-rates-nov-23-2026",
+      "canonical_title": "Nepal Rastra Bank Publishes Foreign Currency Exchange Rates",
+      "category": "nepal",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.khabarhub.com/english.khabarhub.com/2026/23/576641"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has released the official buying and selling exchange rates for major international foreign currencies for Monday, setting benchmarks for commercial financial transactions.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has released the official buying and selling exchange rates for major international foreign currencies for Monday, setting benchmarks for commercial financial transactions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-23T06:41:21+05:45"
+    },
+    {
+      "event_id": "evt-2af79ac24d07",
+      "event_key": "pm-shah-new-delhi-visit-nov-2026",
+      "canonical_title": "Prime Minister Balendra Shah Holds High-Level Bilateral Talks in New Delhi",
+      "category": "nepal",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "english.khabarhub.com/english.khabarhub.com/2026/23/576638"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Prime Minister Balendra Shah engaged in official diplomatic meetings and discussions with Indian counterpart Narendra Modi in New Delhi during his two-day official visit, focusing on bilateral cooperation and agreements.",
+      "latest_development": "Reported: Prime Minister Balendra Shah engaged in official diplomatic meetings and discussions with Indian counterpart Narendra Modi in New Delhi during his two-day official visit, focusing on bilateral cooperation and agreements.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-23T06:41:21+05:45"
+    },
+    {
+      "event_id": "evt-421b65acf98e",
+      "event_key": "cop31-climate-talks-deadlock-2026",
+      "canonical_title": "COP31 Climate Talks Conclude Without Reaching Major Agreement",
+      "category": "world_major",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 4,
+      "sources": [
+        "bbc.co.uk/news/articles/cqwy06zrd26lo"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: Negotiations at the COP31 climate summit stalled and failed to produce a comprehensive final agreement following sharp divisions among participating nations over explicit references to phasing out fossil fuels.",
+      "latest_development": "Reported: Negotiations at the COP31 climate summit stalled and failed to produce a comprehensive final agreement following sharp divisions among participating nations over explicit references to phasing out fossil fuels.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-23T06:41:21+05:45"
+    },
+    {
+      "event_id": "evt-5a5e5eb0b0ca",
+      "event_key": "yeolhyeol-gangho-manhwa-conclusion-2027",
+      "canonical_title": "Martial Arts Manhwa Yeolhyeol Gangho Scheduled to Conclude Next Year",
+      "category": "anime",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-22/martial-arts-manhwa-yeolhyeol-gangho-to-end-next-year-after-33-years/.244079"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The long-running martial arts manhwa series Yeolhyeol Gangho has been announced to conclude in February 2027 with its 97th collected volume, bringing its 33-year serialization history to an end.",
+      "latest_development": "Reported: The long-running martial arts manhwa series Yeolhyeol Gangho has been announced to conclude in February 2027 with its 97th collected volume, bringing its 33-year serialization history to an end.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2027-02-01",
+      "updated_at": "2026-11-23T06:41:21+05:45"
+    },
+    {
+      "event_id": "evt-347ff2284c63",
+      "event_key": "sakamoto-days-manga-conclusion-2026",
+      "canonical_title": "Manga Sakamoto Days Concludes Serialization After Six Years",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74968755"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: Yuuto Suzuki's action manga Sakamoto Days has officially concluded its serialization in the 52nd issue of Weekly Shounen Jump magazine, reaching its final chapter after a six-year run.",
+      "latest_development": "Reported: Yuuto Suzuki's action manga Sakamoto Days has officially concluded its serialization in the 52nd issue of Weekly Shounen Jump magazine, reaching its final chapter after a six-year run.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-23T06:41:21+05:45"
+    },
+    {
+      "event_id": "evt-08293264e365",
+      "event_key": "sono-mono-nochi-ni-anime-adaptation-2027",
+      "canonical_title": "Light Novel Sono Mono. Nochi ni… Adaptation Announced for 2027",
+      "category": "manga_manhwa_manhua",
+      "first_seen": "2026-11-23",
+      "last_seen": "2026-11-23",
+      "first_reported": "2026-11-23",
+      "last_reported": "2026-11-23",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74968322"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: An official website opened to announce a television anime adaptation for NAHAaTO's fantasy light novel series Sono Mono. Nochi ni..., scheduled to premiere in 2027.",
+      "latest_development": "Reported: An official website opened to announce a television anime adaptation for NAHAaTO's fantasy light novel series Sono Mono. Nochi ni..., scheduled to premiere in 2027.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-23",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2027-01-01",
+      "updated_at": "2026-11-23T06:41:21+05:45"
     }
   ],
   "archived": []
