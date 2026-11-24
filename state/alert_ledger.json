@@ -1,4 +1,15 @@
 {
-  "conditions": {},
+  "conditions": {
+    "breaking.honesty_gate||": {
+      "alerted_at": "2026-11-24T13:31:12Z",
+      "cause": "ai_fail_safe: models=opencode/mimo-v2.5-free,opencode/muse-spark-1.3-contributor-free,opencode/ling-3.0-flash-fin-free,opencode/muse-spark-1.2-contributor-free source=live; opencode/mimo-v2.5-free: model_not_found",
+      "first_seen": "2026-11-24T13:31:12Z",
+      "last_seen": "2026-11-24T13:31:12Z",
+      "runs": 1,
+      "window_first": "",
+      "window_last": "",
+      "window_runs": 0
+    }
+  },
   "schema_version": 1
 }
