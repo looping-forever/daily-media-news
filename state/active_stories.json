@@ -28664,6 +28664,37 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-24T06:42:02+05:45"
+    },
+    {
+      "event_id": "evt-125c3fb83c0c",
+      "event_key": null,
+      "canonical_title": "Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News",
+      "category": "local_city",
+      "first_seen": "2026-11-24",
+      "last_seen": "2026-11-24",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiwgfbvv95cuxovxdhwmpbbkm3d0lzsxzkb2rhm3p1uxbnnhnutmxeagq1ump3ue15qy1oukxncjhjumh1aknxrxe3rhfqrfjitmz4duroalnwnmzmqwhoz2p6qjlhs3c3qklscki4oxvycflvvw1gvf9ivvy4tvdbbgstvnzey1u5cdy5eullvupxcflxqmvrtxphtmllafm3stnuyuu4nuvsr21fsfp5aklqug1nmdd5sxvuqi1hsdl6d0tiaetpuvdcuq"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-24T17:42:59+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-24T17:42:59+05:45",
+      "alert_anchor": "Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []

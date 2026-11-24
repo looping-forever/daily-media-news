@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-11-13T02:31:18Z",
+    "at": "2026-11-24T11:57:59Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Minibus accident in Nepal results in 14 fatalities — check this now",
+    "title": "🚨 CRITICAL: Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-11-13T02:31:18Z",
+    "at": "2026-11-24T11:57:59Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Minibus accident in Nepal results in 14 fatalities — check this now",
+    "title": "🚨 CRITICAL: Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-11-24T11:57:59Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-11-13T02:31:18Z",
       "ok": true,
@@ -87,14 +95,6 @@
       "channel": "ntfy",
       "note": "ntfy:delivered",
       "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
-      "label": "CRITICAL"
-    },
-    {
-      "at": "2026-10-28T04:48:46Z",
-      "ok": true,
-      "channel": "ntfy",
-      "note": "ntfy:delivered",
-      "title": "🚨 CRITICAL: Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com — check this now",
       "label": "CRITICAL"
     }
   ]
