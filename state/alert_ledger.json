@@ -4,7 +4,7 @@
       "alerted_at": "2026-11-24T13:31:12Z",
       "cause": "ai_fail_safe: models=opencode/nemotron-3-ultra-free,opencode/nemotron-3.5-lightning-free,opencode/big-pickle source=live; opencode/nemotron-3-ultra-free: model_not_found -- the provider does not serve this id; cool",
       "first_seen": "2026-11-24T13:31:12Z",
-      "healthy_streak": 0,
+      "healthy_streak": 1,
       "last_seen": "2026-11-24T13:38:55Z",
       "runs": 2,
       "window_first": "2026-11-24T13:38:55Z",
