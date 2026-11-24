@@ -1,272 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "iost.tu.edu.np/notices/16111",
-      "title_hash": "a984646f93c9414d709610549984fc49de01a437",
-      "title": "Tribhuvan University Extends B.Sc. Entrance Exam Application Deadline",
-      "category": "education_tu",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "tu.edu.np/notices/16097",
-      "title_hash": "8aca73e368cfb014e91479b3e27556d71720c3aa",
-      "title": "Tribhuvan University Publishes Important Notice Regarding College Affiliations",
-      "category": "education_tu",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/nepal-rastra-bank-publishes-foreign-exchange-rates-for-today-3",
-      "title_hash": "a0618524d8e101819b93c67836dab2485f349cc7",
-      "title": "Foreign Exchange Rates Update for Nepal",
-      "category": "bank_local",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/16/575766",
-      "title_hash": "2b2f57c5be736bb320a08afa30f6a376f54eed4f",
-      "title": "Kathmandu Valley Experiences Temperature Rise",
-      "category": "local_city",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "polygon.com/most-underrated-new-rpgs",
-      "title_hash": "870e74a1bfe25b5edba1c67fe8db488b56d969a2",
-      "title": "10 Most Underrated RPGs of the Past Decade",
-      "category": "gaming",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/15/apple-launches-new-app-to-study-how-people-use-ai-for-health",
-      "title_hash": "00a603aaf7de2bd4d4c2d9f9011fd59f60713bd1",
-      "title": "Apple launches new app to study how people use AI for health",
-      "category": "tech_career",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cx5y1pzr9604o",
-      "title_hash": "85859ebbb373c693f9ed705c9f064eae63212f39",
-      "title": "Clothing factories shut in Bangladesh as workers strike over pay",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "sunshowers.io/posts/nextest-install-scripts",
-      "title_hash": "d69a7911c87bb2e50f7307d707a527ea7b3634a7",
-      "title": "Designing nextest's install scripts",
-      "category": "tech_career",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "polygon.com/pokemon-pokepark-fishing-rally-ds-found",
-      "title_hash": "1619b33263b7c7b82bc62110844c735ef7aaf60f",
-      "title": "Extremely Rare Pokémon Game Found 20 Years Later",
-      "category": "gaming",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/16/575762",
-      "title_hash": "766f1c493a2414c1ecd39bfb3c10ff763d4ad50e",
-      "title": "Farmers in Ilam busy harvesting paddy as harvest season begins",
-      "category": "nepal",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74943102",
-      "title_hash": "b58e6340bf3e58fa092c7427d0381ce266bb6998",
-      "title": "Manga 'Witch Watch' Concludes Serialization",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "theguardian.com/technology/2026/nov/16/megaspeed-company-breaks-slience-nvidia-jensen-huang-alice-huang",
-      "title_hash": "28afc391b4d202d1c93f6d1e7f3b4e7399bd88ee",
-      "title": "Megaspeed, the company linked to the downfall of Nvidia boss, says it’s a ‘legitimate and lawful business’",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-15/spitz-band-drummer-tatsuo-sakiyama-seriously-injured-in-traffic-accident/.243836",
-      "title_hash": "ee6e66daa4b6c7eaaab50826b1f5329fb14bed32",
-      "title": "SPITZ Band's Drummer Tatsuo Sakiyama Seriously Injured in Traffic Accident",
-      "category": "anime",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "polygon.com/best-games-like-star-wars-galactic-racer",
-      "title_hash": "e4631f9e873bd7798047c140c03d3aa56f52f79c",
-      "title": "The 7 Best Star Wars: Galactic Racer Replacements You Can Play Right Now",
-      "category": "gaming",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "forum.torproject.org/t/security-release-0-4-9-17/22454",
-      "title_hash": "b78e0a21b23b1438d90fc45a8d8daaf7cfd85143",
-      "title": "Tor Project Issues Rapid-Response DoS-Defense Fix Amid Sustained DDoS Attack",
-      "category": "tech_career",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-15/uzono-shiniko-hokoku-manga-ends-in-4th-volume/.243817",
-      "title_hash": "cd4df590ef5462c0cf094aa042d4a263c3a6f13e",
-      "title": "Uzono Shiniko Hōkoku Manga Ends in 4th Volume",
-      "category": "anime",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/weather/weather-update-western-low-brings-patchy-clouds-to-himalayas",
-      "title_hash": "f96adfa59185fda33bf408deb0c5a97fc93351b6",
-      "title": "Weather update: Western low brings patchy clouds to Himalayas",
-      "category": "nepal",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-15/witch-watch-manga-ends-with-anime-season-2-to-air-in-2027/.243834",
-      "title_hash": "6bcf92cf2788e4361a6f3f560e6ef0bbc2d937ca",
-      "title": "Witch Watch Manga Ends With Anime Season 2 to Air in 2027",
-      "category": "anime",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "theguardian.com/world/2026/nov/16/pope-leo-speech-peru-justice-for-amazon-activists-environment",
-      "title_hash": "b870baa825a7989d4fb58ebb9cb9d2083fc1b7cb",
-      "title": "‘The blood of these brothers cries out’: Pope Leo demands justice for people killed protecting the Amazon",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/finance-minister-dr-wagle-stresses-on-bad-loan-recovery",
-      "title_hash": "44a9ac68932f057cc98d3ebbabafe9344f00a522",
-      "title": "Finance Minister Dr. Wagle Directs Nepal Bank Limited to Prioritize Bad Loan Recovery",
-      "category": "bank_local",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "nytimes.com/2026/11/16/world/europe/russia-ukraine-winter-campaign.html",
-      "title_hash": "7bdd4e9e6bf77e2a90646f95fec9092999dea1da",
-      "title": "Intense Russian Bombing Campaign Targets Ukrainian Heating and Water Infrastructure",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2059014/long-term-solution-to-be-sought-with-india-to-export-electricity-to-bangladesh",
-      "title_hash": "12574292419fd11f745cef4d5d2418521948f950",
-      "title": "Nepal and India Explore Long-Term Framework for Power Export to Bangladesh",
-      "category": "nepal",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "bbc.co.uk/news/articles/cw987343352go",
-      "title_hash": "5597b8510aca4ec4c81ee8b3e40043d1cd5995aa",
-      "title": "Five EU Nations Plan Asylum Return Hub in Rwanda",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74945973",
-      "title_hash": "229724c239c2b651967a470158b2be478f22e1ff",
-      "title": "'Skip to Loafer 2nd Season' Reveals Additional Cast Pair, First Promo",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74945506",
-      "title_hash": "1f9b60436648e5340f936f5efd290056013f9184",
-      "title": "'Wanpaku! Touken Ranbu' Reveals Main Staff, Winter 2027 Premiere",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/16/after-dodging-death-battery-startup-our-next-energy-is-now-going-public",
-      "title_hash": "31e27a264f7494e1f241cef8abffb5cdcb0d30e7",
-      "title": "After dodging death, battery startup Our Next Energy is now going public",
-      "category": "tech_career",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "theguardian.com/politics/live/2026/nov/16/ed-miliband-russell-brand-andy-burnham-brexit-eu-milburn-review-young-people-employment-uk-politics-latest-news",
-      "title_hash": "f1d0b46215509a1897bfe92f8e581379f1cf5483",
-      "title": "Brand statement from prison claiming his innocence ‘appalling’ and could breach rules, says No 10 – UK politics live",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "nytimes.com/2026/11/16/world/canada/carney-china-xi-trump-putin-trade.html",
-      "title_hash": "f9e2ad225c37d6470cabcd936e10b4ed5f61d4ad",
-      "title": "Canada’s Leader, Once a Curiosity at Asia Summits, Is Now a Star",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/closure-of-tatopani-and-rasuwagadhi-border-points-pushes-up-nepal-china-trade-costs.html",
-      "title_hash": "2500444db067c43767de8657959ea2151e1e4fd3",
-      "title": "Closure of Tatopani and Rasuwagadhi border points pushes up Nepal-China trade costs",
-      "category": "nepal",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "france24.com/en/video/20261116-excitement-builds-ahead-of-gta-vi-release",
-      "title_hash": "1d33532781aa967c7a036a5dd4fb55baea68bd57",
-      "title": "Excitement builds ahead of GTA VI release",
-      "category": "world_major",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "polygon.com/final-fantasy-7-director-naoki-hamaguchi",
-      "title_hash": "0b5c2a65a52334fa9eb624c94ef2f32e4bef5f30",
-      "title": "Final Fantasy 7 Remake Director Confirms He Doesn’t Let Fans’ Reactions Shape His Games",
-      "category": "gaming",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/16/575835",
-      "title_hash": "12f0678edcd1dcc4ff519dbd960fdbe5223e1d4e",
-      "title": "Finance Minister Wagle calls for stronger recovery of bad loans",
-      "category": "nepal",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "pcgamer.com/hardware/processors/intel-hit-with-class-action-alleging-it-misled-investors-companys-recent-downturn-due-in-part-to-how-darn-expensive-pcs-are-right-now",
-      "title_hash": "e8d8892cfe3066c968b05476337c369661148deb",
-      "title": "Intel hit with class action alleging it 'misled investors' – company's recent downturn due in part to how darn expensive PCs are right now",
-      "category": "gaming",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "polygon.com/ebenezer-johnny-depp-box-office-opening-weekend",
-      "title_hash": "83b45f3552cda41dc5bfa673aa587ecde1cba9d0",
-      "title": "Johnny Depp Tops the Box Office Again With Ebenezer's Opening Weekend",
-      "category": "gaming",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-16/marchen-crown-manga-ends-in-next-chapter/.243838",
-      "title_hash": "e4346ed2d0294d0afb8c670446782acf28cfa6b2",
-      "title": "Märchen Crown Manga Ends in Next Chapter",
-      "category": "anime",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/nepal-sovereign-credit-rating.html",
-      "title_hash": "c7f1361e38a63e42c82e27bc15ba3fd3bbcd9b3b",
-      "title": "Nepal retains BB- sovereign credit rating for third consecutive year",
-      "category": "nepal",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/review/romelia-war-chronicle/episode-7/.243820",
-      "title_hash": "4e9cf744debafa17a7f494b9f182eb9afb29aef2",
-      "title": "Romelia War Chronicle ‒ Episode 7",
-      "category": "anime",
-      "date_sent": "2026-11-16"
-    },
-    {
-      "url_normalized": "theregister.com/ai-and-ml/2026/11/16/the-jensen-huang-saga-could-be-the-beginning-of-the-end-of-the-ai-bubble-or-just-a-boon-for-competitors/5309856",
-      "title_hash": "05f40e622578dc633f42a991088ba642b52feabd",
-      "title": "The Jensen Huang saga could be the beginning of the end of the AI bubble – or just a boon for competitors",
-      "category": "tech_career",
-      "date_sent": "2026-11-16"
-    },
-    {
       "url_normalized": "polygon.com/anthony-mackie-jamie-dornan-interview-12-12-12",
       "title_hash": "728ca9d60727b4cd2283886f0f1d357d9ba571c3",
       "title": "'Avengers: Doomsday' Star Says He Was Lied to About His Next Big Role",
@@ -1567,6 +1301,34 @@
       "title": "Flights and Train Services Cancelled Across Belgium Amid General Strike",
       "category": "world_major",
       "date_sent": "2026-11-23"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/24/576796",
+      "title_hash": "2883d8e4e3df76f2dff7b1ab8e9a0d7d575e1ddc",
+      "title": "NRB Fixes Foreign Currency Exchange Rates for November 24",
+      "category": "nepal",
+      "date_sent": "2026-11-24"
+    },
+    {
+      "url_normalized": "nytimes.com/2026/11/23/world/asia/indonesia-factory-fire.html",
+      "title_hash": "8852a6aad882f6b8b7437a5c59cb5a5dbfeddcee",
+      "title": "Major Factory Fire in Indonesia Results in 24 Deaths",
+      "category": "world_major",
+      "date_sent": "2026-11-24"
+    },
+    {
+      "url_normalized": "videogameschronicle.com/news/gta-6-was-the-biggest-launch-in-playstation-history-with-over-39-million-players",
+      "title_hash": "d98d4ad5e7b97feb7377059d7e669543e67e0544",
+      "title": "GTA 6 Sets Concurrent Player Record on PlayStation",
+      "category": "gaming",
+      "date_sent": "2026-11-24"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/24/576798",
+      "title_hash": "9762fb2cb08630e9aeb2544d77074b6bdc536556",
+      "title": "Mundum Trekking Route Sees Increased Tourist Footfall",
+      "category": "nepal",
+      "date_sent": "2026-11-24"
     }
   ]
 }

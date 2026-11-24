@@ -7863,7 +7863,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "latest_development": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "alerted": false,
@@ -7873,7 +7873,7 @@
       "in_evening": "2026-11-01",
       "deadline": "2026-11-23",
       "effective_date": "2026-11-23",
-      "updated_at": "2026-11-09T06:42:10+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-15d07f280a39",
@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-23T19:21:31+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -21849,7 +21849,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University has issued an urgent notice concerning the addition of subjects, programs, sections, and quotas for affiliated colleges, requiring immediate attention from campus administration.",
       "latest_development": "Confirmed: Tribhuvan University has issued an urgent notice concerning the addition of subjects, programs, sections, and quotas for affiliated colleges, requiring immediate attention from campus administration.",
       "alerted": false,
@@ -21859,7 +21859,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T06:41:46+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-be03e41e1856",
@@ -21877,7 +21877,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Institute of Science and Technology (IOST) at Tribhuvan University has extended the application deadline for B.Sc. entrance examinations to accommodate eligible students.",
       "latest_development": "Confirmed: The Institute of Science and Technology (IOST) at Tribhuvan University has extended the application deadline for B.Sc. entrance examinations to accommodate eligible students.",
       "alerted": false,
@@ -21887,7 +21887,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T06:41:46+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-f9f8050ea71e",
@@ -21905,7 +21905,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Nepal Rastra Bank has published today's foreign exchange rates, listing the US Dollar buying rate at Rs 150.49 and selling rate at Rs 151.09, and the Euro at Rs 165.88 buying and Rs 166.54 selling.",
       "latest_development": "Confirmed: Nepal Rastra Bank has published today's foreign exchange rates, listing the US Dollar buying rate at Rs 150.49 and selling rate at Rs 151.09, and the Euro at Rs 165.88 buying and Rs 166.54 selling.",
       "alerted": false,
@@ -21915,7 +21915,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-16",
-      "updated_at": "2026-11-16T06:41:46+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-2c0050d7daa1",
@@ -21933,7 +21933,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The minimum temperature in the Kathmandu Valley increased by 2.4 degrees Celsius over the last 24 hours, reaching 12.4 degrees Celsius as of Monday morning.",
       "latest_development": "Reported: The minimum temperature in the Kathmandu Valley increased by 2.4 degrees Celsius over the last 24 hours, reaching 12.4 degrees Celsius as of Monday morning.",
       "alerted": false,
@@ -21943,7 +21943,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-16",
-      "updated_at": "2026-11-16T06:41:46+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-0991f4565ba9",
@@ -21961,7 +21961,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This software will provide responses to routine medical inquiries from users.",
       "latest_development": "This software will provide responses to routine medical inquiries from users.",
       "alerted": false,
@@ -21971,7 +21971,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-a1ccf7fd4cc3",
@@ -21989,7 +21989,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The firm maintains that Alice Huang, who faces allegations of espionage, departed their operations during the latter part of 2025.",
       "latest_development": "The firm maintains that Alice Huang, who faces allegations of espionage, departed their operations during the latter part of 2025.",
       "alerted": false,
@@ -21999,7 +21999,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-749aa328b71d",
@@ -22017,7 +22017,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Pope Leo XIV made these remarks during his final day in Peru, where he also supported initiatives led by Indigenous groups.",
       "latest_development": "Pope Leo XIV made these remarks during his final day in Peru, where he also supported initiatives led by Indigenous groups.",
       "alerted": false,
@@ -22027,7 +22027,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-32e405335048",
@@ -22045,7 +22045,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Employees are protesting to secure a new monthly minimum wage of 30,000 taka, which is equivalent to £182.",
       "latest_development": "Employees are protesting to secure a new monthly minimum wage of 30,000 taka, which is equivalent to £182.",
       "alerted": false,
@@ -22055,7 +22055,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-ebe2fcebc44e",
@@ -22073,7 +22073,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The organization PSA Video Games verified that a collector discovered a working copy of the long-lost title.",
       "latest_development": "The organization PSA Video Games verified that a collector discovered a working copy of the long-lost title.",
       "alerted": false,
@@ -22083,7 +22083,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-f6b598fa2bef",
@@ -22101,7 +22101,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Star Wars: Galactic Racer has no exact replicas, but there are plenty of obvious influences. Here are the best games like Star War: Galactic Racer.",
       "latest_development": "Star Wars: Galactic Racer has no exact replicas, but there are plenty of obvious influences. Here are the best games like Star War: Galactic Racer.",
       "alerted": false,
@@ -22111,7 +22111,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-ed41475f3957",
@@ -22129,7 +22129,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Some stellar RPGs have arrived over the last decade, but their brilliance made 10 absolute gems easy to miss.",
       "latest_development": "Some stellar RPGs have arrived over the last decade, but their brilliance made 10 absolute gems easy to miss.",
       "alerted": false,
@@ -22139,7 +22139,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-17a7651e1b2c",
@@ -22157,7 +22157,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Koshi, Bagmati, and Gandaki provinces are seeing partial cloud cover due to a western low-pressure system currently affecting the nation.",
       "latest_development": "Koshi, Bagmati, and Gandaki provinces are seeing partial cloud cover due to a western low-pressure system currently affecting the nation.",
       "alerted": false,
@@ -22167,7 +22167,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-286c16c54566",
@@ -22185,7 +22185,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Agricultural workers in the lower regions of the district are gathering their crops now that the Tihar festivities have concluded.",
       "latest_development": "Agricultural workers in the lower regions of the district are gathering their crops now that the Tihar festivities have concluded.",
       "alerted": false,
@@ -22195,7 +22195,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-f8137a518f5d",
@@ -22213,7 +22213,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Article URL: https://forum.torproject.org/t/security-release-0-4-9-17/22454 Comments URL: https://news.ycombinator.com/item?id=50512441 Points: 3 # Comments: 0",
       "latest_development": "Article URL: https://forum.torproject.org/t/security-release-0-4-9-17/22454 Comments URL: https://news.ycombinator.com/item?id=50512441 Points: 3 # Comments: 0",
       "alerted": false,
@@ -22223,7 +22223,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-94ace6fe8fc0",
@@ -22241,7 +22241,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The author developed the software's manifest format and installation location independently, consciously rejecting a common industry reliance on AI assistants to generate and maintain infrastructure code.",
       "latest_development": "The author developed the software's manifest format and installation location independently, consciously rejecting a common industry reliance on AI assistants to generate and maintain infrastructure code.",
       "alerted": false,
@@ -22251,7 +22251,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-477867414ee7",
@@ -22269,7 +22269,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Upcoming television broadcasts featuring the musical group will utilize previously recorded footage of the percussionist while he remains under medical care.",
       "latest_development": "Upcoming television broadcasts featuring the musical group will utilize previously recorded footage of the percussionist while he remains under medical care.",
       "alerted": false,
@@ -22279,7 +22279,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-03d2f0f0ecf9",
@@ -22297,7 +22297,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Kenta Shinohara's supernatural comedy series finished its five-year run with the release of chapter 270.",
       "latest_development": "Kenta Shinohara's supernatural comedy series finished its five-year run with the release of chapter 270.",
       "alerted": false,
@@ -22307,7 +22307,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-1634f8df90c7",
@@ -22325,7 +22325,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Shueisha published the final installment of the series in the 51st issue of its weekly magazine on Monday.",
       "latest_development": "Shueisha published the final installment of the series in the 51st issue of its weekly magazine on Monday.",
       "alerted": false,
@@ -22335,7 +22335,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-f06c85933d74",
@@ -22353,7 +22353,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This adaptation of Bunkichi Majima's novel originally launched in December 2024.",
       "latest_development": "This adaptation of Bunkichi Majima's novel originally launched in December 2024.",
       "alerted": false,
@@ -22363,7 +22363,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T07:22:34+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-e57634e8ff2b",
@@ -22381,7 +22381,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: During the 90th-anniversary celebration of Nepal Bank Limited, Finance Minister Dr. Swarnim Wagle directed banking officials to enforce strict financial discipline and prioritize the recovery of bad loans.",
       "latest_development": "Confirmed: During the 90th-anniversary celebration of Nepal Bank Limited, Finance Minister Dr. Swarnim Wagle directed banking officials to enforce strict financial discipline and prioritize the recovery of bad loans.",
       "alerted": false,
@@ -22391,7 +22391,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T18:42:14+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-d7359c4e7fb5",
@@ -22409,7 +22409,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepal Electricity Authority announced ongoing discussions with Indian authorities to secure long-term transit permissions through Indian transmission grids to export an additional 20 megawatts of electricity to Bangladesh beyond the current 60-megawatt agreement.",
       "latest_development": "Reported: The Nepal Electricity Authority announced ongoing discussions with Indian authorities to secure long-term transit permissions through Indian transmission grids to export an additional 20 megawatts of electricity to Bangladesh beyond the current 60-megawatt agreement.",
       "alerted": false,
@@ -22419,7 +22419,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T18:42:14+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-2c007e0f778a",
@@ -22437,7 +22437,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Governments in Germany, Denmark, Austria, Greece, and the Netherlands have announced plans to establish a joint external return hub in Rwanda to process failed asylum seekers.",
       "latest_development": "Reported: Governments in Germany, Denmark, Austria, Greece, and the Netherlands have announced plans to establish a joint external return hub in Rwanda to process failed asylum seekers.",
       "alerted": false,
@@ -22447,7 +22447,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T18:42:14+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-3bfb0702512f",
@@ -22465,7 +22465,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: International monitors report that Russian forces have initiated a severe winter bombing campaign aimed at systematically disabling heating, sanitation, and clean water supplies in Kyiv and other major urban centers.",
       "latest_development": "Reported: International monitors report that Russian forces have initiated a severe winter bombing campaign aimed at systematically disabling heating, sanitation, and clean water supplies in Kyiv and other major urban centers.",
       "alerted": false,
@@ -22475,7 +22475,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T18:42:14+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-390d068cea78",
@@ -22493,7 +22493,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The film generated $42 million in ticket sales over its first few days in theaters despite receiving polarizing feedback from reviewers.",
       "latest_development": "The film generated $42 million in ticket sales over its first few days in theaters despite receiving polarizing feedback from reviewers.",
       "alerted": false,
@@ -22503,7 +22503,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-9c0dedeb6303",
@@ -22521,7 +22521,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Traders are forced to shift their logistics toward the Korala border crossing in Mustang because the two main trade routes remain non-functional as of November 16.",
       "latest_development": "Traders are forced to shift their logistics toward the Korala border crossing in Mustang because the two main trade routes remain non-functional as of November 16.",
       "alerted": false,
@@ -22531,7 +22531,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-3469abf86199",
@@ -22549,7 +22549,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Potential corporate wrongdoing by a major industry leader might trigger a collapse of the current artificial intelligence market.",
       "latest_development": "Potential corporate wrongdoing by a major industry leader might trigger a collapse of the current artificial intelligence market.",
       "alerted": false,
@@ -22559,7 +22559,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-0b7be886f24b",
@@ -22577,7 +22577,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The semiconductor manufacturer experienced a significant drop in its stock valuation during the previous week.",
       "latest_development": "The semiconductor manufacturer experienced a significant drop in its stock valuation during the previous week.",
       "alerted": false,
@@ -22587,7 +22587,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-026870a92a87",
@@ -22605,7 +22605,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Rockstar Games is launching the latest title in the series this Thursday, November 19, following an eight-year development cycle.",
       "latest_development": "Rockstar Games is launching the latest title in the series this Thursday, November 19, following an eight-year development cycle.",
       "alerted": false,
@@ -22615,7 +22615,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-c88ed36309b6",
@@ -22633,7 +22633,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The developer stated he is sticking to his original creative vision for 'Final Fantasy 7: Revelation' before its scheduled April 2027 debut.",
       "latest_development": "The developer stated he is sticking to his original creative vision for 'Final Fantasy 7: Revelation' before its scheduled April 2027 debut.",
       "alerted": false,
@@ -22643,7 +22643,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-3ed5a6e84b29",
@@ -22661,7 +22661,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The remarks were delivered by the individual's wife, Laura, during a recent broadcast on their YouTube channel.",
       "latest_development": "The remarks were delivered by the individual's wife, Laura, during a recent broadcast on their YouTube channel.",
       "alerted": false,
@@ -22671,7 +22671,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-cfd8d59f5f90",
@@ -22689,7 +22689,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Prime Minister Mark Carney aims to secure significant economic benefits through upcoming meetings with Xi Jinping, Vladimir Putin, and President Trump in China.",
       "latest_development": "Prime Minister Mark Carney aims to secure significant economic benefits through upcoming meetings with Xi Jinping, Vladimir Putin, and President Trump in China.",
       "alerted": false,
@@ -22699,7 +22699,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-f20143b426c5",
@@ -22717,7 +22717,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The creator developed this tool after finding that his previous manual caching implementation for his static site generator was difficult to test and prone to errors.",
       "latest_development": "The creator developed this tool after finding that his previous manual caching implementation for his static site generator was difficult to test and prone to errors.",
       "alerted": false,
@@ -22727,7 +22727,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-e3cc9611c6f8",
@@ -22745,7 +22745,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Dr. Swarnim Wagle issued this directive while opening the institution's 90th anniversary event in Kathmandu.",
       "latest_development": "Dr. Swarnim Wagle issued this directive while opening the institution's 90th anniversary event in Kathmandu.",
       "alerted": false,
@@ -22755,7 +22755,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-07a3a4656574",
@@ -22773,7 +22773,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Fitch Ratings confirmed this stable assessment in its latest November 16 report using the firm's Sovereign Rating Model.",
       "latest_development": "Fitch Ratings confirmed this stable assessment in its latest November 16 report using the firm's Sovereign Rating Model.",
       "alerted": false,
@@ -22783,7 +22783,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-083857dc40a2",
@@ -22801,7 +22801,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The company chose to enter the public markets through a special purpose acquisition company.",
       "latest_development": "The company chose to enter the public markets through a special purpose acquisition company.",
       "alerted": false,
@@ -22811,7 +22811,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-c09ba5c1c740",
@@ -22829,7 +22829,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "I love that Romelia War Chronicle is willing to treat its audience like adults who can actually handle a story with some complexity and ambiguity.",
       "latest_development": "I love that Romelia War Chronicle is willing to treat its audience like adults who can actually handle a story with some complexity and ambiguity.",
       "alerted": false,
@@ -22839,7 +22839,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-be8318f1a2be",
@@ -22857,7 +22857,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This series created by Aka Akasaka, Aoi Kujira, and Ajichika is concluding after launching in March 2025.",
       "latest_development": "This series created by Aka Akasaka, Aoi Kujira, and Ajichika is concluding after launching in March 2025.",
       "alerted": false,
@@ -22867,7 +22867,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-e38533988902",
@@ -22885,7 +22885,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This Monday, the anime's official website unveiled a new key visual alongside the first promotional video.",
       "latest_development": "This Monday, the anime's official website unveiled a new key visual alongside the first promotional video.",
       "alerted": false,
@@ -22895,7 +22895,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-d3daaa809416",
@@ -22913,7 +22913,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This television series, based on the character project produced by Sanrio, has released a teaser visual.",
       "latest_development": "This television series, based on the character project produced by Sanrio, has released a teaser visual.",
       "alerted": false,
@@ -22923,7 +22923,7 @@
       "in_evening": "2026-11-16",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-16T19:23:39+05:45"
+      "updated_at": "2026-11-24T06:42:02+05:45"
     },
     {
       "event_id": "evt-25a0a6a35be9",
@@ -28552,6 +28552,118 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-23T19:21:31+05:45"
+    },
+    {
+      "event_id": "evt-95007043f514",
+      "event_key": "nrb-daily-fx-rates-2026-11-24",
+      "canonical_title": "NRB Fixes Foreign Currency Exchange Rates for November 24",
+      "category": "nepal",
+      "first_seen": "2026-11-24",
+      "last_seen": "2026-11-24",
+      "first_reported": "2026-11-24",
+      "last_reported": "2026-11-24",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.khabarhub.com/2026/24/576796"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has officially set the foreign exchange rates for today, affecting currency conversion values for the Nepali Rupee.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has officially set the foreign exchange rates for today, affecting currency conversion values for the Nepali Rupee.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-24",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-24",
+      "updated_at": "2026-11-24T06:42:02+05:45"
+    },
+    {
+      "event_id": "evt-7fa6e7a395cb",
+      "event_key": "mundum-trekking-tourist-increase",
+      "canonical_title": "Mundum Trekking Route Sees Increased Tourist Footfall",
+      "category": "nepal",
+      "first_seen": "2026-11-24",
+      "last_seen": "2026-11-24",
+      "first_reported": "2026-11-24",
+      "last_reported": "2026-11-24",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "english.khabarhub.com/2026/24/576798"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Tourist activity has risen significantly along the Mundum Trekking Route in eastern Nepal, contributing positively to the local economy in the region.",
+      "latest_development": "Reported: Tourist activity has risen significantly along the Mundum Trekking Route in eastern Nepal, contributing positively to the local economy in the region.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-24",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-24T06:42:02+05:45"
+    },
+    {
+      "event_id": "evt-cf082436ab4f",
+      "event_key": "gta-6-playstation-record",
+      "canonical_title": "GTA 6 Sets Concurrent Player Record on PlayStation",
+      "category": "gaming",
+      "first_seen": "2026-11-24",
+      "last_seen": "2026-11-24",
+      "first_reported": "2026-11-24",
+      "last_reported": "2026-11-24",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "videogameschronicle.com/news/gta-6-was-the-biggest-launch-in-playstation-history-with-over-39-million-players"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Sony reports that GTA 6 has achieved the highest number of concurrent players of any game in the history of the PlayStation platform, exceeding 39 million players.",
+      "latest_development": "Confirmed: Sony reports that GTA 6 has achieved the highest number of concurrent players of any game in the history of the PlayStation platform, exceeding 39 million players.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-24",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-24T06:42:02+05:45"
+    },
+    {
+      "event_id": "evt-2081c1e604e7",
+      "event_key": "indonesia-factory-fire",
+      "canonical_title": "Major Factory Fire in Indonesia Results in 24 Deaths",
+      "category": "world_major",
+      "first_seen": "2026-11-24",
+      "last_seen": "2026-11-24",
+      "first_reported": "2026-11-24",
+      "last_reported": "2026-11-24",
+      "importance": 0,
+      "personal_relevance": 3,
+      "sources": [
+        "nytimes.com/2026/11/23/world/asia/indonesia-factory-fire.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: At least 24 people have died following a massive fire at a candy factory in Indonesia on Saturday, according to local authorities.",
+      "latest_development": "Reported: At least 24 people have died following a massive fire at a candy factory in Indonesia on Saturday, according to local authorities.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-24",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-24T06:42:02+05:45"
     }
   ],
   "archived": []
