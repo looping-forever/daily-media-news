@@ -47,6 +47,12 @@
       "last_hit": "2026-11-24T13:31:05.118723+00:00",
       "reason": "model_not_found",
       "until": "2026-11-25T13:31:05.118723+00:00"
+    },
+    "opencode/nemotron-3-ultra-free": {
+      "hits": 1,
+      "last_hit": "2026-11-24T13:33:51.496346+00:00",
+      "reason": "model_not_found",
+      "until": "2026-11-25T13:33:51.496346+00:00"
     }
   },
   "pool": {},
