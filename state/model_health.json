@@ -143,32 +143,34 @@
       "success": 56,
       "timeout": 2,
       "transport": 0,
-      "garbage": 1,
+      "garbage": 2,
       "quota_notice": 0,
-      "consecutive_failures": 0,
-      "last_failure": "timeout",
-      "last_fail_at": 1795501477.2853196,
-      "last_ok_at": 1795614551.5257287
+      "consecutive_failures": 1,
+      "last_failure": "garbage",
+      "last_fail_at": 1795627219.1840234,
+      "last_ok_at": 1795614551.5257287,
+      "cooldown_until": 1795648819.1840234
     },
     "gemini-key2/gemini-3.1-flash-lite": {
       "success": 46,
       "timeout": 1,
       "transport": 0,
-      "garbage": 1,
+      "garbage": 2,
       "quota_notice": 0,
-      "consecutive_failures": 0,
+      "consecutive_failures": 1,
       "last_ok_at": 1795501590.7353706,
       "last_failure": "garbage",
-      "last_fail_at": 1794407377.7385256
+      "last_fail_at": 1795627298.8746107,
+      "cooldown_until": 1795648898.8746107
     },
     "gemini-key2/gemini-3.5-flash-lite": {
-      "success": 5,
+      "success": 6,
       "timeout": 0,
       "transport": 0,
       "garbage": 0,
       "quota_notice": 0,
       "consecutive_failures": 0,
-      "last_ok_at": 1794329182.9841456
+      "last_ok_at": 1795627322.8894513
     }
   }
 }
