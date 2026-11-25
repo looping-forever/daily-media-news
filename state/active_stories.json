@@ -7863,7 +7863,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "latest_development": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "alerted": false,
@@ -7873,7 +7873,7 @@
       "in_evening": "2026-11-01",
       "deadline": "2026-11-23",
       "effective_date": "2026-11-23",
-      "updated_at": "2026-11-24T18:55:44+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-15d07f280a39",
@@ -8703,7 +8703,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -8713,7 +8713,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-24T18:55:44+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -22941,7 +22941,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The procession reached its final destination at Gajendramoksha Divya Dham in Triveni Dham on Monday after departing from the sacred site on October 25.",
       "latest_development": "The procession reached its final destination at Gajendramoksha Divya Dham in Triveni Dham on Monday after departing from the sacred site on October 25.",
       "alerted": false,
@@ -22951,7 +22951,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-be2b13abad37",
@@ -22969,7 +22969,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The president supported his nominee after Treasury Secretary Scott Bessent accused the commerce department of hindering the implementation of bans on advanced AI chip exports.",
       "latest_development": "The president supported his nominee after Treasury Secretary Scott Bessent accused the commerce department of hindering the implementation of bans on advanced AI chip exports.",
       "alerted": false,
@@ -22979,7 +22979,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-3cdf85254cd5",
@@ -22997,7 +22997,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The central bank established the buying rate for one US dollar at Rs 149.98 and the selling rate at Rs 150.58.",
       "latest_development": "The central bank established the buying rate for one US dollar at Rs 149.98 and the selling rate at Rs 150.58.",
       "alerted": false,
@@ -23007,7 +23007,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-bc74b610b91f",
@@ -23025,7 +23025,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Prime Minister Andy Burnham claims the nation experienced greater losses than gains following its departure from the bloc.",
       "latest_development": "Prime Minister Andy Burnham claims the nation experienced greater losses than gains following its departure from the bloc.",
       "alerted": false,
@@ -23035,7 +23035,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-0620194cccb7",
@@ -23053,7 +23053,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The government revised its plan to increase the limit for people eligible to stay a third year on a holidaymaker visa from 5,000 to 25,000.",
       "latest_development": "The government revised its plan to increase the limit for people eligible to stay a third year on a holidaymaker visa from 5,000 to 25,000.",
       "alerted": false,
@@ -23063,7 +23063,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-27d2235f9492",
@@ -23081,7 +23081,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Six months into Balendra Shah's term as Prime Minister, the country navigates the aftermath of a September 2025 uprising and a March 2026 election.",
       "latest_development": "Six months into Balendra Shah's term as Prime Minister, the country navigates the aftermath of a September 2025 uprising and a March 2026 election.",
       "alerted": false,
@@ -23091,7 +23091,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-be900590b308",
@@ -23109,7 +23109,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Anthony Mackie realized he had been misled about the nature of his role in the November 13 Apple TV heist thriller 12 12 12, which was falsely pitched as a production similar to The Italian Job.",
       "latest_development": "Anthony Mackie realized he had been misled about the nature of his role in the November 13 Apple TV heist thriller 12 12 12, which was falsely pitched as a production similar to The Italian Job.",
       "alerted": false,
@@ -23119,7 +23119,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-b181920597c3",
@@ -23137,7 +23137,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The company secured $125 million in Series A funding led by NEA just three months after launching its artificial intelligence product.",
       "latest_development": "The company secured $125 million in Series A funding led by NEA just three months after launching its artificial intelligence product.",
       "alerted": false,
@@ -23147,7 +23147,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-17e95887a362",
@@ -23165,7 +23165,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -23175,7 +23175,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-f43428087847",
@@ -23193,7 +23193,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This open-source project has gathered 18 points and three comments on Hacker News.",
       "latest_development": "This open-source project has gathered 18 points and three comments on Hacker News.",
       "alerted": false,
@@ -23203,7 +23203,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-33542caf4e0c",
@@ -23221,7 +23221,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Developers from franchises including Resident Evil, Control, and Star Wars are sharing production insights ahead of the announcement of Game of the Year nominees.",
       "latest_development": "Developers from franchises including Resident Evil, Control, and Star Wars are sharing production insights ahead of the announcement of Game of the Year nominees.",
       "alerted": false,
@@ -23231,7 +23231,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-e6e4548ceb75",
@@ -23249,7 +23249,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "This upcoming series, which premieres in Shueisha's Young Jump magazine on January 21, follows detectives investigating child disappearances at a juvenile training school.",
       "latest_development": "This upcoming series, which premieres in Shueisha's Young Jump magazine on January 21, follows detectives investigating child disappearances at a juvenile training school.",
       "alerted": false,
@@ -23259,7 +23259,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-c5915b88e4dd",
@@ -23277,7 +23277,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "No summary available.",
       "latest_development": "No summary available.",
       "alerted": false,
@@ -23287,7 +23287,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-004ac15282df",
@@ -23305,7 +23305,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The creator of Super Mario Bros. and The Legend of Zelda received this honor, which is scheduled to be presented just once every ten years.",
       "latest_development": "The creator of Super Mario Bros. and The Legend of Zelda received this honor, which is scheduled to be presented just once every ten years.",
       "alerted": false,
@@ -23315,7 +23315,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-02eb497f6274",
@@ -23333,7 +23333,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "TOHO animation launched a portal for the adaptation of Oohashi Hirai's work on Tuesday, showcasing an announcement visual alongside key staff members.",
       "latest_development": "TOHO animation launched a portal for the adaptation of Oohashi Hirai's work on Tuesday, showcasing an announcement visual alongside key staff members.",
       "alerted": false,
@@ -23343,7 +23343,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T06:42:57+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-c2c35e1cb13c",
@@ -23361,7 +23361,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Nepal's Agriculture Minister requested increased aid for post-disaster reconstruction and climate-resilient infrastructure projects.",
       "latest_development": "Nepal's Agriculture Minister requested increased aid for post-disaster reconstruction and climate-resilient infrastructure projects.",
       "alerted": false,
@@ -23371,7 +23371,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-b39a14a119ae",
@@ -23389,7 +23389,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The animal required observation after consuming a knit item that fell into her habitat from a ceiling fan.",
       "latest_development": "The animal required observation after consuming a knit item that fell into her habitat from a ceiling fan.",
       "alerted": false,
@@ -23399,7 +23399,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-070093c8cadc",
@@ -23417,7 +23417,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "The Himalayan district of Rasuwa is distinguished by its significant biodiversity and long-standing religious and cultural traditions.",
       "latest_development": "The Himalayan district of Rasuwa is distinguished by its significant biodiversity and long-standing religious and cultural traditions.",
       "alerted": false,
@@ -23427,7 +23427,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-a405572e5c46",
@@ -23445,7 +23445,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Defending champions Lumbini Lions face the Sudurpaschim Royals this Tuesday at the TU Cricket Ground for the third edition of the Nepal Premier League's first qualifier.",
       "latest_development": "Defending champions Lumbini Lions face the Sudurpaschim Royals this Tuesday at the TU Cricket Ground for the third edition of the Nepal Premier League's first qualifier.",
       "alerted": false,
@@ -23455,7 +23455,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-1570b10f81ec",
@@ -23473,7 +23473,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Germany, Austria, Netherlands, Denmark and Greece intend to establish an offshore facility for individuals lacking legal residency rights.",
       "latest_development": "Germany, Austria, Netherlands, Denmark and Greece intend to establish an offshore facility for individuals lacking legal residency rights.",
       "alerted": false,
@@ -23483,7 +23483,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-4ea71eb294ac",
@@ -23501,7 +23501,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Report-URI reveals malware attack affected brands like Zoom and GitLab through Optimizely.",
       "latest_development": "Report-URI reveals malware attack affected brands like Zoom and GitLab through Optimizely.",
       "alerted": false,
@@ -23511,7 +23511,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T07:23:28+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-afe0ff734a76",
@@ -23529,7 +23529,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Machhapuchhre Bank Limited has entered into a formal agreement with international digital remittance provider Taptap Send to facilitate remittance services for customers.",
       "latest_development": "Confirmed: Machhapuchhre Bank Limited has entered into a formal agreement with international digital remittance provider Taptap Send to facilitate remittance services for customers.",
       "alerted": false,
@@ -23539,7 +23539,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T18:41:38+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-3c4bd004be0c",
@@ -23557,7 +23557,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: According to an agreement between the Nepal Electricity Authority and Indian counterparts, Nepal is permitted to import up to 350 MW of electricity starting today until Shrawan 15.",
       "latest_development": "Confirmed: According to an agreement between the Nepal Electricity Authority and Indian counterparts, Nepal is permitted to import up to 350 MW of electricity starting today until Shrawan 15.",
       "alerted": false,
@@ -23567,7 +23567,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": "2026-11-17",
-      "updated_at": "2026-11-17T18:41:38+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-8924efb6fc0f",
@@ -23585,7 +23585,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Ukrainian forces have launched an attack on the Kerch Bridge, the only structure linking mainland Russia to the occupied Crimean Peninsula, as part of a strategic military objective.",
       "latest_development": "Reported: Ukrainian forces have launched an attack on the Kerch Bridge, the only structure linking mainland Russia to the occupied Crimean Peninsula, as part of a strategic military objective.",
       "alerted": false,
@@ -23595,7 +23595,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T18:41:38+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-4e69b16f144a",
@@ -23613,7 +23613,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Venâncio Mondlane is appearing in court to face charges related to the deadly post-election protests in Mozambique that occurred in 2024.",
       "latest_development": "Reported: Venâncio Mondlane is appearing in court to face charges related to the deadly post-election protests in Mozambique that occurred in 2024.",
       "alerted": false,
@@ -23623,7 +23623,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T18:41:38+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-2a46adca18bf",
@@ -23641,7 +23641,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University has released an official notice regarding the process for adding new academic programs or subjects at affiliated colleges and campuses.",
       "latest_development": "Confirmed: Tribhuvan University has released an official notice regarding the process for adding new academic programs or subjects at affiliated colleges and campuses.",
       "alerted": false,
@@ -23651,7 +23651,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T18:41:38+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-4e9c7b46d70a",
@@ -23669,7 +23669,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University has issued a notice detailing the official requirements and steps for affiliated colleges to introduce new academic programs or subjects to their curricula.",
       "latest_development": "Confirmed: Tribhuvan University has issued a notice detailing the official requirements and steps for affiliated colleges to introduce new academic programs or subjects to their curricula.",
       "alerted": false,
@@ -23679,7 +23679,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-2663cf06d663",
@@ -23697,7 +23697,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Nepal’s sovereign credit rating score has reached 3.66 this year, an improvement from 3.47 last year. This increase is attributed to positive progress in the nation’s economic and financial indicators.",
       "latest_development": "Reported: Nepal’s sovereign credit rating score has reached 3.66 this year, an improvement from 3.47 last year. This increase is attributed to positive progress in the nation’s economic and financial indicators.",
       "alerted": false,
@@ -23707,7 +23707,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-3b74da0002ac",
@@ -23725,7 +23725,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepal Stock Exchange (NEPSE) index closed at 2,636.10 points today, following a 12.79-point decline. Trading activity resumed after a three-day public holiday.",
       "latest_development": "Reported: The Nepal Stock Exchange (NEPSE) index closed at 2,636.10 points today, following a 12.79-point decline. Trading activity resumed after a three-day public holiday.",
       "alerted": false,
@@ -23735,7 +23735,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-50bdced934d3",
@@ -23753,7 +23753,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A fatal accident occurred at Ghoptebhir along the Prithvi Highway, where a stone falling from a cliff struck and killed a motorcyclist in Ichchhakamana Rural Municipality-4.",
       "latest_development": "Reported: A fatal accident occurred at Ghoptebhir along the Prithvi Highway, where a stone falling from a cliff struck and killed a motorcyclist in Ichchhakamana Rural Municipality-4.",
       "alerted": false,
@@ -23763,7 +23763,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-3efb8aa2915a",
@@ -23781,7 +23781,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Bhatbhateni Supermarket and Departmental Store has delayed its planned transition to 24-hour grocery operations at its Tangal location.",
       "latest_development": "Confirmed: Bhatbhateni Supermarket and Departmental Store has delayed its planned transition to 24-hour grocery operations at its Tangal location.",
       "alerted": false,
@@ -23791,7 +23791,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-25e4410a522c",
@@ -23809,7 +23809,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Sudurpaschim Royals have set a 106-run target for the Lumbini Lions in their current Nepal Premier League match.",
       "latest_development": "Reported: The Sudurpaschim Royals have set a 106-run target for the Lumbini Lions in their current Nepal Premier League match.",
       "alerted": false,
@@ -23819,7 +23819,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-6fe49edae26f",
@@ -23837,7 +23837,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Department of Customs collected 189.61 billion rupees in revenue during the first quarter, achieving 100.6% of the set target despite prevailing economic challenges.",
       "latest_development": "Confirmed: The Department of Customs collected 189.61 billion rupees in revenue during the first quarter, achieving 100.6% of the set target despite prevailing economic challenges.",
       "alerted": false,
@@ -23847,7 +23847,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-7af121db5797",
@@ -23865,7 +23865,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: President Trump has arrived in the Philippines, marking the beginning of a 48-hour trip to Asia. The itinerary includes scheduled meetings with Southeast Asian leaders in Manila, followed by discussions with President Xi Jinping of China and President Vladimir Putin of Russia.",
       "latest_development": "Reported: President Trump has arrived in the Philippines, marking the beginning of a 48-hour trip to Asia. The itinerary includes scheduled meetings with Southeast Asian leaders in Manila, followed by discussions with President Xi Jinping of China and President Vladimir Putin of Russia.",
       "alerted": false,
@@ -23875,7 +23875,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-320123dde593",
@@ -23893,7 +23893,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Ukrainian forces have launched an unprecedented attack on the Kerch Bridge, causing significant damage. While the Kremlin stated that repairs will be undertaken, the incident remains a critical development in the ongoing conflict.",
       "latest_development": "Reported: Ukrainian forces have launched an unprecedented attack on the Kerch Bridge, causing significant damage. While the Kremlin stated that repairs will be undertaken, the incident remains a critical development in the ongoing conflict.",
       "alerted": false,
@@ -23903,7 +23903,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-b037e89b2c87",
@@ -23921,7 +23921,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A security researcher identified six zero-day vulnerabilities in Danfoss fridge controller firmware in under an hour, highlighting significant weaknesses in basic authentication and exploit defenses.",
       "latest_development": "Reported: A security researcher identified six zero-day vulnerabilities in Danfoss fridge controller firmware in under an hour, highlighting significant weaknesses in basic authentication and exploit defenses.",
       "alerted": false,
@@ -23931,7 +23931,7 @@
       "in_evening": "2026-11-17",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-17T19:28:15+05:45"
+      "updated_at": "2026-11-25T06:41:23+05:45"
     },
     {
       "event_id": "evt-73c1ca12925e",
@@ -29255,6 +29255,118 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-24T18:55:45+05:45"
+    },
+    {
+      "event_id": "evt-d3773c5950fd",
+      "event_key": "siddharthanagar-waste-management-privatization",
+      "canonical_title": "Siddharthanagar Waste Management Handed to Private Firm",
+      "category": "local_city",
+      "first_seen": "2026-11-25",
+      "last_seen": "2026-11-25",
+      "first_reported": "2026-11-25",
+      "last_reported": "2026-11-25",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2064786/siddharthanagars-waste-management-to-be-handed-over-to-private-company-for-five-years"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Confirmed: Siddharthanagar Municipality has officially contracted the collection, transportation, and management of waste in the municipal area to a private company for a five-year term.",
+      "latest_development": "Confirmed: Siddharthanagar Municipality has officially contracted the collection, transportation, and management of waste in the municipal area to a private company for a five-year term.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-25",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-25",
+      "updated_at": "2026-11-25T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-f487054140cf",
+      "event_key": "bhotekoshi-flood-rent-subsidy",
+      "canonical_title": "Rent Subsidy Distribution Begins for Bhotekoshi Flood Victims",
+      "category": "local_city",
+      "first_seen": "2026-11-25",
+      "last_seen": "2026-11-25",
+      "first_reported": "2026-11-25",
+      "last_reported": "2026-11-25",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "onlinekhabar.com/2026/11/2064788/distribution-of-house-rent-money-to-970-families-affected-by-bhotekoshi-flood-begins"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Confirmed: The distribution of house rent subsidies to 970 families in Bidur Municipality, who were affected by the Bhotekoshi flood, has officially commenced, supported by funding from the federal government.",
+      "latest_development": "Confirmed: The distribution of house rent subsidies to 970 families in Bidur Municipality, who were affected by the Bhotekoshi flood, has officially commenced, supported by funding from the federal government.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-25",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-25",
+      "updated_at": "2026-11-25T06:41:23+05:45"
+    },
+    {
+      "event_id": "evt-056d88673d5d",
+      "event_key": "nrb-exchange-rates-nov25",
+      "canonical_title": "NRB Publishes Official Exchange Rates",
+      "category": "bank_local",
+      "first_seen": "2026-11-25",
+      "last_seen": "2026-11-25",
+      "first_reported": "2026-11-25",
+      "last_reported": "2026-11-25",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/25/576956"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Nepal Rastra Bank has updated the official buying and selling rates for major foreign currencies for Monday, November 25, 2026.",
+      "latest_development": "Confirmed: Nepal Rastra Bank has updated the official buying and selling rates for major foreign currencies for Monday, November 25, 2026.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-25",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-25",
+      "updated_at": "2026-11-25T06:41:24+05:45"
+    },
+    {
+      "event_id": "evt-bbacf95f6a13",
+      "event_key": "nasa-mars-fleet-technical-issues",
+      "canonical_title": "Half of NASA's Mars Fleet Facing Technical Issues",
+      "category": "tech_career",
+      "first_seen": "2026-11-25",
+      "last_seen": "2026-11-25",
+      "first_reported": "2026-11-25",
+      "last_reported": "2026-11-25",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "arstechnica.com/space/2026/11/half-of-nasas-aging-mars-fleet-knocked-offline-by-technical-issues"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: NASA's aging Mars fleet is experiencing significant technical disruptions, with Perseverance struggling with data transmission and Odyssey rapidly depleting its remaining fuel.",
+      "latest_development": "Reported: NASA's aging Mars fleet is experiencing significant technical disruptions, with Perseverance struggling with data transmission and Odyssey rapidly depleting its remaining fuel.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-25",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-25T06:41:24+05:45"
     }
   ],
   "archived": []
