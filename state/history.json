@@ -1322,6 +1322,34 @@
       "title": "New Appointment in Deuba Faction of Congress Party",
       "category": "nepal",
       "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/business/noc-directs-gas-industries-to-increase-imports-supplies-of-cooking-gas",
+      "title_hash": "ca520a149e9f57a14cf16ee4bdc3409c140d0882",
+      "title": "NOC Instructs Gas Industries to Increase Imports",
+      "category": "nepal",
+      "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065284/electricity-leakage-drops-to-12-16-percent",
+      "title_hash": "fa058ca0c47c75aed41d4b7fab706479721d7ffa",
+      "title": "Electricity Leakage Decreases to 12.16%",
+      "category": "nepal",
+      "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065220/npl-winner-sudurpaschim-royals-trophy-tour-begins-on-november-13",
+      "title_hash": "0f9f5585b678aa67aed2d66bf4022afbdbd9ad50",
+      "title": "Sudurpashchim Royals Trophy Tour Begins December 29",
+      "category": "nepal",
+      "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065281/paddy-production-increases-by-2-70-percent-in-myagdi",
+      "title_hash": "88344151438da3a684a2817e2844d259705b11a1",
+      "title": "Paddy Production Increases in Myagdi",
+      "category": "nepal",
+      "date_sent": "2026-11-25"
     }
   ]
 }
