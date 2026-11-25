@@ -140,16 +140,15 @@
       "last_fail_at": 1795549887.9518042
     },
     "gemini/gemini-3.1-flash-lite": {
-      "success": 56,
+      "success": 57,
       "timeout": 2,
       "transport": 0,
       "garbage": 2,
       "quota_notice": 0,
-      "consecutive_failures": 1,
+      "consecutive_failures": 0,
       "last_failure": "garbage",
       "last_fail_at": 1795627219.1840234,
-      "last_ok_at": 1795614551.5257287,
-      "cooldown_until": 1795648819.1840234
+      "last_ok_at": 1795628277.1668634
     },
     "gemini-key2/gemini-3.1-flash-lite": {
       "success": 46,
