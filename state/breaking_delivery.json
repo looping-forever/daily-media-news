@@ -1,22 +1,30 @@
 {
   "schema_version": 1,
   "last_delivery": {
-    "at": "2026-11-24T11:57:59Z",
+    "at": "2026-11-25T07:57:47Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News — check this now",
+    "title": "🚨 CRITICAL: Nepal Must Confirm Deaths Of 54 Missing Malaysians Before Certificates Can Be Issued - Bus — check this now",
     "label": "CRITICAL"
   },
   "last_attempt": {
-    "at": "2026-11-24T11:57:59Z",
+    "at": "2026-11-25T07:57:47Z",
     "ok": true,
     "channel": "ntfy",
     "note": "ntfy:delivered",
-    "title": "🚨 CRITICAL: Leopard Kills 13-Year-Old Girl Near Nepal’s Bardiya National Park - Nature World News — check this now",
+    "title": "🚨 CRITICAL: Nepal Must Confirm Deaths Of 54 Missing Malaysians Before Certificates Can Be Issued - Bus — check this now",
     "label": "CRITICAL"
   },
   "history": [
+    {
+      "at": "2026-11-25T07:57:47Z",
+      "ok": true,
+      "channel": "ntfy",
+      "note": "ntfy:delivered",
+      "title": "🚨 CRITICAL: Nepal Must Confirm Deaths Of 54 Missing Malaysians Before Certificates Can Be Issued - Bus — check this now",
+      "label": "CRITICAL"
+    },
     {
       "at": "2026-11-24T11:57:59Z",
       "ok": true,
@@ -87,14 +95,6 @@
       "channel": "ntfy",
       "note": "ntfy:delivered",
       "title": "🚨 CRITICAL: 113 Deaths in Nepal Due to Snakebites in Last 6 Months - Ratopati — check this now",
-      "label": "CRITICAL"
-    },
-    {
-      "at": "2026-10-28T15:37:05Z",
-      "ok": true,
-      "channel": "ntfy",
-      "note": "ntfy:delivered",
-      "title": "🚨 CRITICAL: Spain train disaster kills at least 64, worst rail accident since 2013 - Nepalnews.com — check this now",
       "label": "CRITICAL"
     }
   ]

@@ -29507,6 +29507,37 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-25T07:21:30+05:45"
+    },
+    {
+      "event_id": "evt-866a3dc277e7",
+      "event_key": null,
+      "canonical_title": "Nepal Must Confirm Deaths Of 54 Missing Malaysians Before Certificates Can Be Issued - BusinessToday Malaysia",
+      "category": "local_city",
+      "first_seen": "2026-11-25",
+      "last_seen": "2026-11-25",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 0,
+      "sources": [
+        "news.google.com/rss/articles/cbmiyafbvv95cuxonvfudgo2q2njeunhzthkwnrrnmfsbvver2zss3pmay16ulp2szvxwk1iswcwbdfznjnqn01lwknfvulvala2mwdswthtsm4tx1ztbnrvwl9hedzxc3nvrjbls2gttwtzzdhbmxliaelqu1ztz1hqnhqxdwnvnvbtls1mb2zhbvkwaxvxngs1cjjrrgpdynfkc3f1bxnwruk1bnnxquxemgdvrgjyr0dfm05zt1fbbkpjs1jdx1rnsljzmvppce82sa"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "",
+      "latest_development": "",
+      "alerted": true,
+      "alert_count": 1,
+      "last_alerted": "2026-11-25T13:42:47+05:45",
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-25T13:42:47+05:45",
+      "alert_anchor": "Nepal Must Confirm Deaths Of 54 Missing Malaysians Before Certificates Can Be Issued - BusinessToday Malaysia",
+      "last_confidence": "HIGH",
+      "detection_source": "google-news"
     }
   ],
   "archived": []
