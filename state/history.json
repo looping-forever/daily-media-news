@@ -1217,6 +1217,34 @@
       "title": "Half of NASA's Mars Fleet Facing Technical Issues",
       "category": "tech_career",
       "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "france24.com/en/europe/20261125-ukraine-seeks-%e2%82%ac115-billion-in-foreign-aid-for-2027-zelensky-says",
+      "title_hash": "621bf421bd58f204acef28e0a61cba55beff54c3",
+      "title": "Ukraine Requests €115 Billion in Foreign Aid for 2027",
+      "category": "world_major",
+      "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/cmy49ngydqzpo",
+      "title_hash": "2b6ea443251455ab212e58a197f08ee4555374de",
+      "title": "Huawei Found Guilty of Stealing Trade Secrets in New York Trial",
+      "category": "world_major",
+      "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2064809/2-chinese-nationals-arrested-with-illegal-gold-at-kathmandu-airport",
+      "title_hash": "3f12774fad9c5f1ab6d7d420c3f5cc1acd2f884c",
+      "title": "Two Chinese Nationals Arrested at Tribhuvan International Airport for Gold Smuggling",
+      "category": "nepal",
+      "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/25/576959",
+      "title_hash": "66c0f96dd83da2dad28081f3a5258a93ceda9eca",
+      "title": "Mechi Customs Office Exceeds Kartik Revenue Target",
+      "category": "nepal",
+      "date_sent": "2026-11-25"
     }
   ]
 }
