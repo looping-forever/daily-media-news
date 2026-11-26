@@ -129,13 +129,13 @@
       "quota_notice": 0
     },
     "gemini/gemini-3.5-flash-lite": {
-      "success": 213,
+      "success": 214,
       "timeout": 2,
       "transport": 0,
       "garbage": 1,
       "quota_notice": 0,
       "consecutive_failures": 0,
-      "last_ok_at": 1795726699.000758,
+      "last_ok_at": 1795727410.7264495,
       "last_failure": "timeout",
       "last_fail_at": 1795679126.9225051
     },
