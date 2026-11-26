@@ -1273,6 +1273,41 @@
       "title": "Bagmati Province Formulates 10-Year Development Framework",
       "category": "nepal",
       "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "theregister.com/security/2026/11/26/company-was-religious-about-backups-but-sinned-by-leaving-them-exposed/5312234",
+      "title_hash": "c031824c695a3f7bc0373b439da07c0c6eb80b4b",
+      "title": "Company Backup Infrastructure Vulnerabilities Exposed Due to Windows Domain Misconfiguration",
+      "category": "tech_career",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "eurogamer.net/umamusame-pretty-derby-ai-clone-taken-off-mobile-after-reports",
+      "title_hash": "a46ba92145f019db9c8e351b43fb46d9b3d47bcc",
+      "title": "Google Play Store Removes Unauthorized Umamusume: Pretty Derby AI Clone App",
+      "category": "gaming",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065934/special-trolley-for-targeted-passengers-at-tribhuvan-airport",
+      "title_hash": "fae3b92c31fbe19e1ddddd107c23bb3a874a8e24",
+      "title": "Tribhuvan International Airport Introduces Dedicated Passenger Trolley Service",
+      "category": "local_city",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065943/trying-to-evacuate-holding-centers-without-making-alternative-arrangements-is-inhumane-mp-gurung",
+      "title_hash": "1d4c26bbb1b18b71550a94eeb374088fab4e3ae2",
+      "title": "Nepali Congress Objects to Eviction Plans for Holding Centers without Alternative Housing",
+      "category": "nepal",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "english.onlinekhabar.com/balen-lamichhane-five-hour-meet.html",
+      "title_hash": "363b8df071e820bbfb6c4cc64f7543dbb7629395",
+      "title": "Prime Minister Balendra Shah and RSP Chair Rabi Lamichhane Hold Extended Discussion",
+      "category": "nepal",
+      "date_sent": "2026-11-26"
     }
   ]
 }
