@@ -1,209 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "bbc.co.uk/news/articles/cm2kl50vkwkdo",
-      "title_hash": "ca244c3ce77b55970b8ce8aeecff97089472ebad",
-      "title": "Nvidia Reports Strong Quarterly Financial Results Following Executive Changes",
-      "category": "tech_career",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "arstechnica.com/gadgets/2026/11/microsoft-calls-copilot-the-new-os-for-work-at-ignite-keynote",
-      "title_hash": "f557795a5d9c8f5d93ce21b579b80a5a915c0098",
-      "title": "Microsoft Unveils Office Suite Integration Inside Copilot at Ignite Keynote",
-      "category": "tech_career",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "wiki.archiveteam.org",
-      "title_hash": "f691f8c79db801efb93ed4777242c86dd2296585",
-      "title": "Archive Team Begins Archiving Apple Support Community Ahead of Closure",
-      "category": "tech_career",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/18/575965",
-      "title_hash": "10421c2b4b70531c33bf6b41d6a3a53372cefa03",
-      "title": "Kathmandu Morning Temperature Rises to 9.8 Degrees Celsius",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/18/575967",
-      "title_hash": "f9e14e8e5b832f3f777e5277aa024a07f4095d9d",
-      "title": "Nepal Proposes Three-Point Mountain Climate Program at COP-31",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2059927/civil-service-trade-union-dispute-in-constitutional-court",
-      "title_hash": "77310375539e803d423a22f3984f82e54446bf5c",
-      "title": "Supreme Court Constitutional Bench to Review Civil Service Trade Union Dispute",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2059953/kathmandu-and-chitwan-clash-in-nepal-eliminator-today",
-      "title_hash": "4bb1967e4c7a6669d6f50fdc3717e10150f45d3f",
-      "title": "Kathmandu and Chitwan Clash in NPL Eliminator Today",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "aljazeera.com/news/2026/11/18/board-of-peace-warns-gaza-ceasefire-faces-imminent-collapse-without-action",
-      "title_hash": "1a7179f5cc157e3a97df62ab89137379c7d15916",
-      "title": "Board of Peace Warns Gaza Ceasefire Faces Imminent Collapse",
-      "category": "world_major",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/18/575974",
-      "title_hash": "aa78717d09296e7733c3fc07685d737c0150a6e8",
-      "title": "Westerly Winds Trigger Cloud Cover and Potential Mountain Snowfall",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2059935/nepal-is-unhappy-when-india-does-not-buy-electricity-from-chinese-contractors-seeking-permission-for-balens-visit",
-      "title_hash": "6096f125183b36bf776eeb58d60027916697c4b2",
-      "title": "Nepal Seeks Indian Permission for Electricity Export from Chinese-Built Projects",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/17/nvidia-promises-that-revenue-will-keep-soaring-for-now",
-      "title_hash": "87a568333665d4d3dd0b48efe6f1fab1700bd64f",
-      "title": "Nvidia Projects Continued Revenue Growth Despite Leadership Transition",
-      "category": "tech_career",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/2026/nov/17/white-house-withdraws-heidi-overton-fda",
-      "title_hash": "520a3166e7cdbb7dc5d453659245912b76540fa4",
-      "title": "White House Withdraws Nomination of Heidi Overton for FDA Leadership",
-      "category": "world_major",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-17/rpg-maker-u2u-software-launches-for-pc-via-steam-on-january-28/.243916",
-      "title_hash": "7d6916b368a88fecc588f3a1c0f05ee46d02e479",
-      "title": "RPG Maker U2U Software Scheduled for January Steam Launch",
-      "category": "anime",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/18/575977",
-      "title_hash": "34700556c80511fe36285d3afebe0739745b1be0",
-      "title": "Police Arrest 21 Individuals in Nationwide Drug Operations Across 10 Districts",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2060434/tribhuvan-university-is-adding-subjects-to-affiliated-colleges-what-are-the-criteria",
-      "title_hash": "41ffb2627c299b67c880441749710a6e78c4b998",
-      "title": "Tribhuvan University Prepares to Add New Subjects in Affiliated Colleges After 10 Years",
-      "category": "education_tu",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "theguardian.com/world/live/2026/nov/18/apec-summit-live-updates-xi-putin-trump-world-leaders-gather-in-china",
-      "title_hash": "de73a1b90bb195fc7820892daadbfc03736b18da",
-      "title": "Global Leaders Gather in Shenzhen for Apec Summit Discussions",
-      "category": "world_major",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/business/nrb-reports-rs-410-billion-profit-transfers-rs-42-billion-to-government",
-      "title_hash": "d344e91cbe85e8e42ce8e6f37af5c366ad925b2e",
-      "title": "Nepal Rastra Bank Reports NPR 410 Billion Net Profit and Transfers NPR 42 Billion to Government",
-      "category": "bank_local",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2060433/surgery-now-within-three-days-through-expanded-service-at-tu-teaching-hospital",
-      "title_hash": "17061b6430e62165ba67f32f01edd61cf7ad3746",
-      "title": "TU Teaching Hospital Introduces Expanded Services Aimed at Reducing Surgery Waits to Three Days",
-      "category": "local_city",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74951901",
-      "title_hash": "fd362ac42860ff1cc977fd2d89dc3bf342f6228e",
-      "title": "Sakamoto Days Second Season Unveils Cast Additions and Opening Theme",
-      "category": "anime",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-18/spice-and-wolf-merchant-meets-the-wise-wolf-season-2-to-debut-in-january/.243941",
-      "title_hash": "136832b89e0cbad17d1ae796c451e166a3e2a208",
-      "title": "Spice & Wolf: Merchant Meets the Wise Wolf Season 2 Scheduled to Premiere in January",
-      "category": "anime",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/chronicles-medieval-devs-raw-power-are-bankrupt-but-their-sandbox-rpg-lives-on-at-a-new-studio-co-founded-by-satisfactory-devs-coffee-stain",
-      "title_hash": "1144dc0a7d86a5339621568a51536df8d9d41e34",
-      "title": "Coffee Stain Acquires Intellectual Property Rights and Assets for Chronicles: Medieval",
-      "category": "gaming",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "nytimes.com/live/2026/11/18/world/trump-china-asia-apec",
-      "title_hash": "5ca52c1eada8c77d0a39cc3466ed114957dae097",
-      "title": "Update: APEC Summit in Shenzhen",
-      "category": "world_major",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/18/nvidia-clarifies-when-it-will-and-wont-keep-financing-neoclouds",
-      "title_hash": "ee454079b46e396c4ce8c27d0208194d57bd69a6",
-      "title": "Nvidia Financing for Neoclouds",
-      "category": "tech_career",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2060561/only-one-director-will-attend-all-board-meetings-of-the-nepal-rastra-bank",
-      "title_hash": "4436e37d009b6a8d0eb0decf17d216134acaca83",
-      "title": "Update: Nepal Rastra Bank Board Meeting Attendance",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/steamdb-will-add-affiliate-links-to-authorised-game-retailers-and-a-new-tab-dedicated-to-mods-first-update-since-nexus-mods-takeover-confirms",
-      "title_hash": "9131b5f267abc6385391d8f4bb2db496f1b68478",
-      "title": "SteamDB and Nexus Mods Update",
-      "category": "gaming",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2060526/lumbini-development-fund-vice-president-and-member-secretary-assume-charge",
-      "title_hash": "213304bf26d54ae89f90d914232aa714c7869807",
-      "title": "Lumbini Development Fund Leadership Assumes Charge",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/tourism/myagdi-allocates-rs-17-5-million-for-24-tourism-infrastructure-projects",
-      "title_hash": "682e52515fd386b96781e089ecc437daf9979034",
-      "title": "Myagdi Infrastructure Projects Funded",
-      "category": "nepal",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "gamespot.com/articles/gta-6-owner-take-twos-stock-explodes-after-high-review-scores-but-its-still-down-massively-this-year",
-      "title_hash": "94545105485ff3072c8d409111fb9222d9bfe48d",
-      "title": "Take-Two Interactive Stock Performance",
-      "category": "gaming",
-      "date_sent": "2026-11-18"
-    },
-    {
-      "url_normalized": "arstechnica.com/space/2026/11/voyager-1-at-one-light-day-historian-revisits-golden-records-forgotten-details",
-      "title_hash": "8cb439705dff4e2b38700c6cdbffb921965fe73f",
-      "title": "Voyager 1 Golden Record Details",
-      "category": "tech_career",
-      "date_sent": "2026-11-18"
-    },
-    {
       "url_normalized": "iost.tu.edu.np/notices/16179",
       "title_hash": "d15a254ede3131adabf73cc768f0c49710e3b342",
       "title": "Tribhuvan University Exam Notices: B.Sc. Results and College Program Updates",
@@ -1350,6 +1147,62 @@
       "title": "Paddy Production Increases in Myagdi",
       "category": "nepal",
       "date_sent": "2026-11-25"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/26/576987",
+      "title_hash": "c5aaff4f53c0ca491fd527840e518dd3333fd43f",
+      "title": "Strategic Considerations Raised Over Proposed IIT Offshore Campus in Nepal",
+      "category": "nepal",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/26/577059",
+      "title_hash": "3e7d9afa81b87b6ad6e8b250f5e3a8890726dad3",
+      "title": "Weather Across Nepal to Remain Mainly Clear Today with Localized Fog",
+      "category": "nepal",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065393/trump-announces-new-tariffs-on-14-countries-including-china-and-india",
+      "title_hash": "3f1a7974cd6137e4f307d0b23ef6c74be83b39ee",
+      "title": "US President Announces New Tariffs on 14 Countries Including China and India",
+      "category": "nepal",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-25/k-on-naoko-yamada-helms-official-hige-dandism-pokemon-music-video-with-madhouse/.244183",
+      "title_hash": "a324cef51a6d150b71b3bc0e39c6ee6e7d14da52",
+      "title": "Madhouse and Director Naoko Yamada Team Up for Official Pokémon Music Video Evergreen",
+      "category": "anime",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-25/now-that-we-draw-anime-new-video-unveils-more-cast-ending-song-artist-january-8-debut/.244186",
+      "title_hash": "8eb56b57a040c2d19752084e8a4c4ed65cadad1a",
+      "title": "Now That We Draw Anime Adaptation Confirms January 8 Premiere and Additional Cast",
+      "category": "anime",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2065400/locals-request-for-construction-of-swing-bridge",
+      "title_hash": "6094931d394a157de9bd76cc819225033445c2a9",
+      "title": "Locals Urge Construction of Trishuli River Swing Bridge Between Tanahun and Chitwan",
+      "category": "local_city",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "polygon.com/exoprimal-capcom-shutting-down-2027",
+      "title_hash": "1ecd5342677a96ca63d4625dd913473c20c9762c",
+      "title": "Capcom Announces Official Shutdown Date for Multiplayer Shooter Exoprimal in 2027",
+      "category": "gaming",
+      "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "videogameschronicle.com/news/playstation-plus-games-for-december-include-tony-hawks-pro-skater-34",
+      "title_hash": "6b6b6d183e04e4940181aed99603a2442bbdbef4",
+      "title": "PlayStation Plus Reveals December Game Lineup Headlined by Tony Hawk's Pro Skater 3+4",
+      "category": "gaming",
+      "date_sent": "2026-11-26"
     }
   ]
 }
