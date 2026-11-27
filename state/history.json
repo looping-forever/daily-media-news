@@ -1147,6 +1147,62 @@
       "title": "Weather Forecast: Generally Clear Skies",
       "category": "local_city",
       "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066570/meter-badge-law-in-the-making-5-years-imprisonment-for-making-affixed-on-blank-paper",
+      "title_hash": "8e5e1a8782b333a63f813819c957d0fe36649bd2",
+      "title": "Government Drafts Bill to Control Unfair Meter-Loan Practices",
+      "category": "nepal",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066564/national-human-rights-commission-to-inquire-into-the-condition-of-inam-sapkota",
+      "title_hash": "778022bbf411ecb7299b6732c7a7dbb048708279",
+      "title": "NHRC to Investigate Alleged Human Rights Violation of Inam Sapkota",
+      "category": "nepal",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "rockpapershotgun.com/a-new-era-for-vermintide-2-modding-dawneth-as-fatshark-release-powerful-new-tools-for-custom-levels-models-and-animations",
+      "title_hash": "e797654a5724c52e017cf3f28228f96dd0b16648",
+      "title": "Fatshark Releases Modding Tools for Vermintide 2",
+      "category": "gaming",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066589/the-4th-bagmati-province-level-deputy-mayors-cup-open-taekwondo-will-be-held-from-november-10",
+      "title_hash": "7b70721cbfac214042b605db9226e3796507dc62",
+      "title": "Bagmati Province Taekwondo Tournament Scheduled for December 12",
+      "category": "nepal",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "eurogamer.net/world-of-warcraft-forever-summon-kicking-warlock-addon",
+      "title_hash": "79684c2f05fd856ea1dab5e87ff26da1d2d426b5",
+      "title": "Warcraft: Forever Mod Fights Back Against Summon-Kicking",
+      "category": "gaming",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "theguardian.com/media/2026/nov/26/antisemitism-adviser-to-launch-inquiry-into-hostile-work-environment-at-bbc",
+      "title_hash": "95300779022ab7dec838ce87e5ee70e3ac50d339",
+      "title": "Antisemitism Inquiry Launched at the BBC",
+      "category": "world_major",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "theguardian.com/politics/live/2026/nov/27/department-work-pensions-offline-cyber-incident-rosebank-slapps-latest-news-updates",
+      "title_hash": "c02bd86776b23058d710554b0030a3e6bfef4fe1",
+      "title": "UK Pension Services Disrupted by Cyber Incident",
+      "category": "world_major",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "theguardian.com/media/2026/nov/27/labour-backs-bill-lawsuits-journalists-whistleblowers-slapps",
+      "title_hash": "823d60dcfd6b64ed6259bb625d2dd164e8aa5dcc",
+      "title": "UK Government Backs Bill to Address SLAPP Lawsuits",
+      "category": "world_major",
+      "date_sent": "2026-11-27"
     }
   ]
 }
