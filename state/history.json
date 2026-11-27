@@ -1,195 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "iost.tu.edu.np/notices/16179",
-      "title_hash": "d15a254ede3131adabf73cc768f0c49710e3b342",
-      "title": "Tribhuvan University Exam Notices: B.Sc. Results and College Program Updates",
-      "category": "education_tu",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/19/576103",
-      "title_hash": "18459dbbc919b00cb01f81896f1f9bedb7e96445",
-      "title": "Weather Forecast: Partial Impact of Cyclone Akwan",
-      "category": "local_city",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2060691/birgunj-customs-revenue-collection-exceeds-target",
-      "title_hash": "3c70714e878ddc32dbc8018b34c3d056035dda07",
-      "title": "Birgunj Customs Revenue Exceeds Monthly Target",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/live/2026/nov/18/donald-trump-mary-peltola-alaska-hakeem-jeffries-democrats-republicans-congress-house-senate-midterms-latest-news-updates",
-      "title_hash": "0093fc7a803396eea34a53ba94a8233a44aed545",
-      "title": "Global Market Update: FAA Ground Stop Blamed on Contractor",
-      "category": "world_major",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/19/576098",
-      "title_hash": "7beae878150ccb0b92546711abd2e8f64e3e5fab",
-      "title": "Two Indian Nationals Arrested in Sarlahi with Contraband",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/teramocs-verdict-minister-nta-staff.html",
-      "title_hash": "d9ecfe9c1f7d6a16b8ce713738b253f1a273617b",
-      "title": "TERAMOCS Case: Former Minister Acquitted, Officials Convicted",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2060692/election-commission-in-discussions-with-parties-regarding-local-elections",
-      "title_hash": "a20473d66a4bd7d28a81d3a1e088da16843cdb9e",
-      "title": "Election Commission in Consultations on Local Elections",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/weather/nepal-under-partial-influence-of-cyclone-akvan",
-      "title_hash": "783d67c57cea3b3a8d318ea84c4e82dd098776b4",
-      "title": "Cyclone Akvan Causes Partial Cloud Cover",
-      "category": "local_city",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/19/576111",
-      "title_hash": "9f73b2c81980cd4f15a9c55700cfd049b0ca9ec0",
-      "title": "NPL Qualifier: Sudurpaschim vs. Chitwan",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/kathmandu-plan-tackle-air-pollution.html",
-      "title_hash": "2bbff23ca8b734201ab302e43b20a51570b75b24",
-      "title": "Kathmandu Metropolitan City Planning Action Plan for Air Pollution",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "theregister.com/personal-tech/2026/11/19/microsoft-to-do-will-soon-become-microsoft-done/5310973",
-      "title_hash": "572d1311589f89829a113bee46a6b578f3c9ab18",
-      "title": "Microsoft To Do Application Retirement Announced",
-      "category": "tech_career",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-19/shin-oishinbo-anime-reveals-more-cast-staff-january-4-debut-in-main-trailer/.243985",
-      "title_hash": "7743633203e0db016c6256291147decdc3c82ba8",
-      "title": "New 'Shin Oishinbo' Anime Premiere Details Revealed",
-      "category": "anime",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "nytimes.com/live/2026/11/19/world/myanmar-icj-ruling-genocide",
-      "title_hash": "b87d3050647b47553e7648be7b87d32b1b23f855",
-      "title": "International Court of Justice Rules on Myanmar Genocide Case",
-      "category": "world_major",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "gamespot.com/articles/playstation-plus-is-losing-more-games-but-one-departure-stings-the-most",
-      "title_hash": "55deca54f66af2179a5fc1d4f408fb702d1cbd31",
-      "title": "PlayStation Plus Game Catalog Departure List Updated",
-      "category": "gaming",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-19/i-lost-my-adventurer-license-anime-main-promo-video-reveals-more-staff-opening-song-artist-january-/.243986",
-      "title_hash": "f48f3973d17068f9dd5d229033737447a07c69bc",
-      "title": "I Lost My Adventurer's License Anime Premiere Confirmed for January",
-      "category": "anime",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "theregister.com/security/2026/11/19/cyberattack-on-service-provider-exposes-payee-data-at-40-irish-credit-unions/5310979",
-      "title_hash": "b6c35123d94994420c5fd8f15797fc69cbdbf885",
-      "title": "Cyberattack Exposes Payee Data at 40 Irish Credit Unions",
-      "category": "tech_career",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061272/government-indifference-to-buying-paddy-zero-purchases-in-all-offices-except-dhangadhi",
-      "title_hash": "90f29f7123a05bda76e1384b2cc4c8490d0a27f3",
-      "title": "Government Indifference to Paddy Procurement",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "rockpapershotgun.com/hour-long-total-war-warhammer-40000-campaign-stream-shows-off-ship-battle-less-fleet-management-makes-clear-how-not-ideal-getting-space-marine-armies-killed-is",
-      "title_hash": "0fa860ef9cbc3540160d1013e515493b3a6712b8",
-      "title": "Total War: Warhammer 40,000 Campaign Management Insights",
-      "category": "gaming",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061304/remand-period-extended-for-7-days-against-3-people-including-inam-sapkota",
-      "title_hash": "8298be3c87c6579c4c9a38f09e056c79c4365c2f",
-      "title": "Remand Extended for Three Individuals Including Inam Sapkota",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "eurogamer.net/world-of-warcraft-forever-secret-hunter-pet-green-cat",
-      "title_hash": "3f9888a1856aa1d1aceadc191e09ee0fc6fa3f71",
-      "title": "Updated: World of Warcraft: Forever Secret Hunter Pet Discovered",
-      "category": "gaming",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061353/banks-base-rate-decreased-by-1-percentage-point-in-1-year",
-      "title_hash": "69cf66c0a676384f5aacd95e602cdd4fee049771",
-      "title": "Banks see 1 percentage point decrease in average base rate over last year",
-      "category": "bank_local",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061358/agreement-between-federation-and-ministry-to-conduct-skills-and-employment-fair",
-      "title_hash": "58d69ef048d8f985f5ed161300de982a53656912",
-      "title": "Government and Federation sign agreement for skills and employment fair",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/19/576218",
-      "title_hash": "4df0f749f36de495c3222e8a40d839d2af28e628",
-      "title": "Arrest warrant issued against former Chief Secretary Eknarayan Aryal",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061349/cop-31-nepals-initiative-for-the-mountain-agenda",
-      "title_hash": "37532ee514ed0e3dbc3e4816560b7147eb5dff6b",
-      "title": "Nepal promotes Mountain Agenda at COP-31 climate conference",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "english.nepalpress.com/2026/11/19/umls-national-gathering-concludes-with-21-point-proposal",
-      "title_hash": "97ebdb31394101a091d70d46e2de723e0d625f53",
-      "title": "UML national gathering concludes with 21-point proposal",
-      "category": "nepal",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "pcgamer.com/hardware/gaming-monitors/oled-monitor-shipments-have-doubled-from-last-year-and-all-i-can-say-is-its-well-deserved",
-      "title_hash": "95dd4faddfc179c6bf3d112848218544cf8ba9f2",
-      "title": "Double growth in OLED monitor shipments",
-      "category": "gaming",
-      "date_sent": "2026-11-19"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-19/rakuen-tsuiho-expelled-from-paradise-kokoro-no-resonance-film-opens-at-no.5-in-japan/.243961",
-      "title_hash": "d84b34a888190c9a0acfd5b3f1e3bfa62aac98c5",
-      "title": "New anime film 'Rakuen Tsuihō' debuts in Japan",
-      "category": "anime",
-      "date_sent": "2026-11-19"
-    },
-    {
       "url_normalized": "onlinekhabar.com/2026/11/2061545/traffic-on-tribhuvan-highway-to-be-affected-today-urges-to-take-alternative-routes",
       "title_hash": "5ae2d784f940a7f33cf58b0feae3bebb02b88cb4",
       "title": "Tribhuvan Highway Traffic Affected Due to Religious Festival Fair",
@@ -1308,6 +1119,34 @@
       "title": "Prime Minister Balendra Shah and RSP Chair Rabi Lamichhane Hold Extended Discussion",
       "category": "nepal",
       "date_sent": "2026-11-26"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/27/577204",
+      "title_hash": "ca0d20a61f0afa024b5467e2731b7f355cd13668",
+      "title": "Nepal Rastra Bank Announces Foreign Currency Exchange Rates",
+      "category": "nepal",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "myanimelist.net/news/74984559",
+      "title_hash": "a71d22faaca06d35865b57b7911bf2b2d6311b70",
+      "title": "Killer Shark in Another World Manga Gets Anime Adaptation",
+      "category": "anime",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066051/rahughat-hydropower-project-in-production-phase-after-a-decade-and-a-half-of-construction",
+      "title_hash": "12f53948979bc2364af50d13645c75bbac8ba9e7",
+      "title": "Rahughat Hydropower Project Enters Production Phase",
+      "category": "nepal",
+      "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066049/the-weather-across-the-country-will-remain-mainly-clear-today",
+      "title_hash": "6c85f7b71555b67c3e01a54f94ef4a643eb9f3de",
+      "title": "Weather Forecast: Generally Clear Skies",
+      "category": "local_city",
+      "date_sent": "2026-11-27"
     }
   ]
 }

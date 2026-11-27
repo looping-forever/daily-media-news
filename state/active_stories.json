@@ -2,62 +2,6 @@
   "version": 1,
   "stories": [
     {
-      "event_id": "evt-ebcd058c51e1",
-      "event_key": "cyclone-arnab-nepal-warning",
-      "canonical_title": "Cyclone Arnab warning: heavy rain and snowfall possible across Nepal",
-      "category": "nepal",
-      "first_seen": "2026-10-27",
-      "last_seen": "2026-10-27",
-      "first_reported": "2026-10-27",
-      "last_reported": "2026-10-27",
-      "importance": 0,
-      "personal_relevance": 8,
-      "sources": [
-        "english.onlinekhabar.com/cyclone-arnab-bring-rain-snow.html"
-      ],
-      "source_count": 1,
-      "reliability": "tier2",
-      "status": "STALE",
-      "known_facts": "Reported: Nepal's Department of Hydrology and Meteorology issued a special weather bulletin warning that Cyclone Arnab over the Bay of Bengal is expected to intensify and bring rain and snowfall to several parts of Nepal, with heavy rain possible in Lumbini Province. The department urged people to take precautions.",
-      "latest_development": "Reported: Nepal's Department of Hydrology and Meteorology issued a special weather bulletin warning that Cyclone Arnab over the Bay of Bengal is expected to intensify and bring rain and snowfall to several parts of Nepal, with heavy rain possible in Lumbini Province. The department urged people to take precautions.",
-      "alerted": false,
-      "alert_count": 0,
-      "last_alerted": null,
-      "in_morning": "2026-10-27",
-      "in_evening": null,
-      "deadline": null,
-      "effective_date": null,
-      "updated_at": "2026-11-04T06:44:00+05:45"
-    },
-    {
-      "event_id": "evt-bef65da1230d",
-      "event_key": "openai-three-research-discoveries",
-      "canonical_title": "OpenAI announces three research discoveries in math, computer science and physics",
-      "category": "tech_career",
-      "first_seen": "2026-10-27",
-      "last_seen": "2026-10-27",
-      "first_reported": "2026-10-27",
-      "last_reported": "2026-10-27",
-      "importance": 0,
-      "personal_relevance": 6,
-      "sources": [
-        "openai.com/index/building-scientific-understanding-with-academic-communities"
-      ],
-      "source_count": 1,
-      "reliability": "tier1",
-      "status": "STALE",
-      "known_facts": "Confirmed: OpenAI announced three new discoveries in mathematics, computer science and physics. The feed headline gave no further details about the individual results.",
-      "latest_development": "Confirmed: OpenAI announced three new discoveries in mathematics, computer science and physics. The feed headline gave no further details about the individual results.",
-      "alerted": false,
-      "alert_count": 0,
-      "last_alerted": null,
-      "in_morning": "2026-10-27",
-      "in_evening": null,
-      "deadline": null,
-      "effective_date": null,
-      "updated_at": "2026-11-04T06:44:00+05:45"
-    },
-    {
       "event_id": "evt-579bdc4d3e28",
       "event_key": null,
       "canonical_title": "Road accidents on the rise in Jhapa, 13 dead, 247 injured in a month - Nepalnews.com",
@@ -7229,7 +7173,7 @@
       "in_evening": "2026-11-01",
       "deadline": "2026-11-23",
       "effective_date": "2026-11-23",
-      "updated_at": "2026-11-26T19:22:11+05:45"
+      "updated_at": "2026-11-27T06:41:32+05:45"
     },
     {
       "event_id": "evt-15d07f280a39",
@@ -8069,7 +8013,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-26T19:22:11+05:45"
+      "updated_at": "2026-11-27T06:41:32+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -23427,7 +23371,7 @@
       "in_evening": null,
       "deadline": "2026-11-20",
       "effective_date": "2026-11-20",
-      "updated_at": "2026-11-26T19:22:11+05:45"
+      "updated_at": "2026-11-27T06:41:32+05:45"
     },
     {
       "event_id": "evt-c9ea2b7c36af",
@@ -24145,7 +24089,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology has officially published the results for the B.Sc. retake entrance examination, following notices issued under reference 16179.",
       "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology has officially published the results for the B.Sc. retake entrance examination, following notices issued under reference 16179.",
       "alerted": false,
@@ -24155,7 +24099,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-d63ee9c43441",
@@ -24173,7 +24117,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Tribhuvan University Institute of Science and Technology has released examination center details for the Bachelor in Information Technology (BIT) Second Semester 2082 under notice reference 16101.",
       "latest_development": "Confirmed: Tribhuvan University Institute of Science and Technology has released examination center details for the Bachelor in Information Technology (BIT) Second Semester 2082 under notice reference 16101.",
       "alerted": false,
@@ -24183,7 +24127,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-9abbbd78c455",
@@ -24201,7 +24145,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Department of Hydrology and Meteorology reports that Nepal is experiencing the partial influence of westerly winds and Cyclone Akvan, bringing partly cloudy skies to parts of the country and morning fog to the Terai region.",
       "latest_development": "Reported: The Department of Hydrology and Meteorology reports that Nepal is experiencing the partial influence of westerly winds and Cyclone Akvan, bringing partly cloudy skies to parts of the country and morning fog to the Terai region.",
       "alerted": false,
@@ -24211,7 +24155,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-4e2a7c427e5d",
@@ -24229,7 +24173,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Meteorological records show that Kathmandu Valley recorded a minimum temperature of 9.5 degrees Celsius on Thursday morning, marking a slight drop compared to previous days.",
       "latest_development": "Reported: Meteorological records show that Kathmandu Valley recorded a minimum temperature of 9.5 degrees Celsius on Thursday morning, marking a slight drop compared to previous days.",
       "alerted": false,
@@ -24239,7 +24183,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-05e91c4d6fb5",
@@ -24257,7 +24201,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "DEVELOPING",
+      "status": "STALE",
       "known_facts": "Confirmed: The Birgunj Customs Office reported that it collected 17 billion in revenue during the month of Kartik, exceeding its set target for the current fiscal year.",
       "latest_development": "Confirmed: The Birgunj Customs Office reported that it collected 17 billion in revenue during the month of Kartik, exceeding its set target for the current fiscal year.",
       "alerted": false,
@@ -24267,7 +24211,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-19",
-      "updated_at": "2026-11-19T06:41:43+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-1923b4b184d6",
@@ -24285,7 +24229,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Farmers in Kanchanpur are increasingly replacing traditional paddy and wheat cultivation with sugarcane farming, anticipating double the financial returns.",
       "latest_development": "Reported: Farmers in Kanchanpur are increasingly replacing traditional paddy and wheat cultivation with sugarcane farming, anticipating double the financial returns.",
       "alerted": false,
@@ -24295,7 +24239,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-1159aff5b914",
@@ -24313,7 +24257,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Law enforcement authorities in Sarlahi arrested two Indian citizens in possession of illegal drugs, pistol ammunition, and pharmaceutical injections.",
       "latest_development": "Reported: Law enforcement authorities in Sarlahi arrested two Indian citizens in possession of illegal drugs, pistol ammunition, and pharmaceutical injections.",
       "alerted": false,
@@ -24323,7 +24267,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-9327932d93fd",
@@ -24341,7 +24285,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Microsoft CEO Satya Nadella addressed the rationale behind offering voluntary buyouts to 60,000 employees during October rather than executing standard involuntary layoffs.",
       "latest_development": "Reported: Microsoft CEO Satya Nadella addressed the rationale behind offering voluntary buyouts to 60,000 employees during October rather than executing standard involuntary layoffs.",
       "alerted": false,
@@ -24351,7 +24295,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-0b594e56f449",
@@ -24369,7 +24313,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Vincent van Gogh's 1890 painting Châtaigniers en fleurs sold for a record 190.4 million dollars at auction after resolving historical disputes concerning its Nazi-era provenance.",
       "latest_development": "Reported: Vincent van Gogh's 1890 painting Châtaigniers en fleurs sold for a record 190.4 million dollars at auction after resolving historical disputes concerning its Nazi-era provenance.",
       "alerted": false,
@@ -24379,7 +24323,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-f2789d26b76c",
@@ -24397,7 +24341,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: US Transportation Secretary Sean Duffy attributed a nationwide aviation ground stoppage to contractor L3Harris, stating that the underlying system failure was not identified quickly enough.",
       "latest_development": "Reported: US Transportation Secretary Sean Duffy attributed a nationwide aviation ground stoppage to contractor L3Harris, stating that the underlying system failure was not identified quickly enough.",
       "alerted": false,
@@ -24407,7 +24351,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-b11bba6f3469",
@@ -24425,7 +24369,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Colombian government officially rejected a joint military proposal with the United States to target drug cartels directly on Colombian soil.",
       "latest_development": "Reported: The Colombian government officially rejected a joint military proposal with the United States to target drug cartels directly on Colombian soil.",
       "alerted": false,
@@ -24435,7 +24379,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-88de92f0515b",
@@ -24453,7 +24397,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A comprehensive Pew Research Center study on India indicates that the nation will remain predominantly Hindu while projecting faster growth rates for its Muslim population.",
       "latest_development": "Reported: A comprehensive Pew Research Center study on India indicates that the nation will remain predominantly Hindu while projecting faster growth rates for its Muslim population.",
       "alerted": false,
@@ -24463,7 +24407,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:32+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-3eef65d05edb",
@@ -24481,7 +24425,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Institute of Science and Technology (IOST) has published results for the B.Sc. re-entrance examination. Additionally, Tribhuvan University has issued a formal notice regarding the addition of new academic programs or subjects in affiliated campuses and colleges.",
       "latest_development": "Confirmed: The Institute of Science and Technology (IOST) has published results for the B.Sc. re-entrance examination. Additionally, Tribhuvan University has issued a formal notice regarding the addition of new academic programs or subjects in affiliated campuses and colleges.",
       "alerted": false,
@@ -24491,7 +24435,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:43+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-b7609c4cd26b",
@@ -24509,7 +24453,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Nepal is experiencing the partial influence of westerly winds and Cyclone Akwan. Kathmandu recorded a minimum temperature of 9.5°C early Thursday morning, and residents in the Terai-Madhesh region can expect foggy conditions.",
       "latest_development": "Confirmed: Nepal is experiencing the partial influence of westerly winds and Cyclone Akwan. Kathmandu recorded a minimum temperature of 9.5°C early Thursday morning, and residents in the Terai-Madhesh region can expect foggy conditions.",
       "alerted": false,
@@ -24519,7 +24463,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": "2026-11-19",
-      "updated_at": "2026-11-19T06:41:43+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-8590d999fe98",
@@ -24537,7 +24481,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Sarlahi police have arrested two Indian nationals found in possession of illegal drugs, pistol ammunition, and various injections.",
       "latest_development": "Confirmed: Sarlahi police have arrested two Indian nationals found in possession of illegal drugs, pistol ammunition, and various injections.",
       "alerted": false,
@@ -24547,7 +24491,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:43+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-c6ada4d42ce6",
@@ -24565,7 +24509,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The US transportation secretary has officially attributed the nationwide FAA ground stoppage to a failure by the contractor, L3Harris, stating that the issue was not identified quickly enough.",
       "latest_development": "Reported: The US transportation secretary has officially attributed the nationwide FAA ground stoppage to a failure by the contractor, L3Harris, stating that the issue was not identified quickly enough.",
       "alerted": false,
@@ -24575,7 +24519,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T06:41:43+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-d5bd85f9431c",
@@ -24593,7 +24537,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Special Court has acquitted former Information and Communications Minister Mohan Bahadur Basnet in the TERAMOCS procurement case, while convicting three NTA officials for their roles.",
       "latest_development": "Confirmed: The Special Court has acquitted former Information and Communications Minister Mohan Bahadur Basnet in the TERAMOCS procurement case, while convicting three NTA officials for their roles.",
       "alerted": false,
@@ -24603,7 +24547,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T07:22:13+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-dd21ac323514",
@@ -24621,7 +24565,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Election Commission is holding discussions with representatives from political parties to prepare for upcoming local level elections.",
       "latest_development": "Reported: The Election Commission is holding discussions with representatives from political parties to prepare for upcoming local level elections.",
       "alerted": false,
@@ -24631,7 +24575,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T07:22:13+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-2a4a7c90e6b6",
@@ -24649,7 +24593,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Nepal Premier League (NPL) second qualifier match will take place this Thursday, determining which team advances to the final against the Lumbini Rhinos.",
       "latest_development": "Reported: The Nepal Premier League (NPL) second qualifier match will take place this Thursday, determining which team advances to the final against the Lumbini Rhinos.",
       "alerted": false,
@@ -24659,7 +24603,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T07:22:13+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-c85ea417b741",
@@ -24677,7 +24621,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Cyclone Akvan is influencing weather conditions in Nepal, bringing partial cloud cover to Koshi, Madhesh, Bagmati, and Gandaki provinces.",
       "latest_development": "Reported: Cyclone Akvan is influencing weather conditions in Nepal, bringing partial cloud cover to Koshi, Madhesh, Bagmati, and Gandaki provinces.",
       "alerted": false,
@@ -24687,7 +24631,7 @@
       "in_evening": null,
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T07:22:13+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-355aa18654de",
@@ -24705,7 +24649,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The International Court of Justice has issued a landmark verdict, formally holding Myanmar accountable for violating the 1948 Genocide Convention. This ruling, the first of its kind against a sovereign state, could have far-reaching international legal implications regarding state accountability for mass atrocities.",
       "latest_development": "Confirmed: The International Court of Justice has issued a landmark verdict, formally holding Myanmar accountable for violating the 1948 Genocide Convention. This ruling, the first of its kind against a sovereign state, could have far-reaching international legal implications regarding state accountability for mass atrocities.",
       "alerted": false,
@@ -24715,7 +24659,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-17bfc49c654f",
@@ -24733,7 +24677,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Kathmandu Metropolitan City's acting mayor, Sunita Dangol, announced the development of a new action plan specifically designed to mitigate the city's deteriorating air quality. The initiative aims to implement structural interventions following rising pollution levels reported across the valley.",
       "latest_development": "Confirmed: Kathmandu Metropolitan City's acting mayor, Sunita Dangol, announced the development of a new action plan specifically designed to mitigate the city's deteriorating air quality. The initiative aims to implement structural interventions following rising pollution levels reported across the valley.",
       "alerted": false,
@@ -24743,7 +24687,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-5eb481bf1c6c",
@@ -24761,7 +24705,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Kathmandu District Court has extended the judicial remand period by seven days for three individuals, including the broker Inam Sapkota, as investigations continue. Among those detained is an associate of a prominent political figure.",
       "latest_development": "Reported: The Kathmandu District Court has extended the judicial remand period by seven days for three individuals, including the broker Inam Sapkota, as investigations continue. Among those detained is an associate of a prominent political figure.",
       "alerted": false,
@@ -24771,7 +24715,7 @@
       "in_evening": "2026-11-19",
       "deadline": "2026-11-26",
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:32+05:45"
     },
     {
       "event_id": "evt-6b5b496212d2",
@@ -24789,7 +24733,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Official procurement of paddy remains stagnant across 12 government offices and departments, with Dhangadhi being the only exception. Despite the season, no procurement has been initiated through agricultural cooperatives to date.",
       "latest_development": "Reported: Official procurement of paddy remains stagnant across 12 government offices and departments, with Dhangadhi being the only exception. Despite the season, no procurement has been initiated through agricultural cooperatives to date.",
       "alerted": false,
@@ -24799,7 +24743,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-87e00569b9a1",
@@ -24817,7 +24761,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: Microsoft has announced the retirement of the 'Microsoft To Do' application, with services scheduled to end in June 2027. The company has clarified that there will be no automated migration path for tasks and no direct replacement planned for personal user accounts.",
       "latest_development": "Confirmed: Microsoft has announced the retirement of the 'Microsoft To Do' application, with services scheduled to end in June 2027. The company has clarified that there will be no automated migration path for tasks and no direct replacement planned for personal user accounts.",
       "alerted": false,
@@ -24827,7 +24771,7 @@
       "in_evening": "2026-11-19",
       "deadline": "2027-06-01",
       "effective_date": "2027-06-01",
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-bcf3e444f9f0",
@@ -24845,7 +24789,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A cyberattack against the service provider Wellington IT in October has led to the exposure of payee data across 40 Irish credit unions. Government officials have labeled the delay in reporting this breach as unacceptable.",
       "latest_development": "Reported: A cyberattack against the service provider Wellington IT in October has led to the exposure of payee data across 40 Irish credit unions. Government officials have labeled the delay in reporting this breach as unacceptable.",
       "alerted": false,
@@ -24855,7 +24799,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": "2026-10-01",
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-042a3c322bb6",
@@ -24873,7 +24817,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The upcoming television anime adaptation of Tetsu Kariya's Oishinbo manga, officially titled 'Shin Oishinbo', is confirmed to premiere on January 4, 2027. The project has revealed key visual and expanded cast information in a new promotional trailer.",
       "latest_development": "Confirmed: The upcoming television anime adaptation of Tetsu Kariya's Oishinbo manga, officially titled 'Shin Oishinbo', is confirmed to premiere on January 4, 2027. The project has revealed key visual and expanded cast information in a new promotional trailer.",
       "alerted": false,
@@ -24883,7 +24827,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": "2027-01-04",
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-7ab5cf6381cd",
@@ -24901,7 +24845,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The PlayStation Plus Game Catalog is set to remove a selection of titles this month, as new additions arrive in the library. Several specific games have been identified as leaving the service platform.",
       "latest_development": "Reported: The PlayStation Plus Game Catalog is set to remove a selection of titles this month, as new additions arrive in the library. Several specific games have been identified as leaving the service platform.",
       "alerted": false,
@@ -24911,7 +24855,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-768885dcb487",
@@ -24929,7 +24873,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: A recent one-hour campaign stream for Total War: Warhammer 40,000 provided new insights into fleet management mechanics, specifically emphasizing that space ship battles will not be a core feature. The developers highlighted the significant tactical risks associated with losing entire Space Marine armies during ground engagements.",
       "latest_development": "Reported: A recent one-hour campaign stream for Total War: Warhammer 40,000 provided new insights into fleet management mechanics, specifically emphasizing that space ship battles will not be a core feature. The developers highlighted the significant tactical risks associated with losing entire Space Marine armies during ground engagements.",
       "alerted": false,
@@ -24939,7 +24883,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-c8405f4d5d0b",
@@ -24957,7 +24901,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The ongoing search for hidden secrets in World of Warcraft: Forever has yielded a significant new discovery, specifically an elusive hunter pet recently found by the community. This finding marks the latest in a series of ongoing, cryptic developments within the game's secret-hunting community.",
       "latest_development": "Reported: The ongoing search for hidden secrets in World of Warcraft: Forever has yielded a significant new discovery, specifically an elusive hunter pet recently found by the community. This finding marks the latest in a series of ongoing, cryptic developments within the game's secret-hunting community.",
       "alerted": false,
@@ -24967,7 +24911,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-2d257131fac2",
@@ -24985,7 +24929,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The upcoming anime adaptation 'I Lost My Adventurer's License' (Boukensha License wo Hakudatsu sareta Ossan dakedo) has confirmed a debut date of January 7, 2027. The production team released a main promotional video detailing the staff and the opening theme song artist, Satoko Shibata.",
       "latest_development": "Confirmed: The upcoming anime adaptation 'I Lost My Adventurer's License' (Boukensha License wo Hakudatsu sareta Ossan dakedo) has confirmed a debut date of January 7, 2027. The production team released a main promotional video detailing the staff and the opening theme song artist, Satoko Shibata.",
       "alerted": false,
@@ -24995,7 +24939,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": "2027-01-07",
-      "updated_at": "2026-11-19T18:42:37+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-032a5f71bccb",
@@ -25013,7 +24957,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The Kathmandu District Court has issued an arrest warrant for former Chief Secretary Eknarayan Aryal regarding an ongoing investigation into an alleged case.",
       "latest_development": "Reported: The Kathmandu District Court has issued an arrest warrant for former Chief Secretary Eknarayan Aryal regarding an ongoing investigation into an alleged case.",
       "alerted": false,
@@ -25023,7 +24967,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-5279128e00ce",
@@ -25041,7 +24985,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: According to recent banking data, the average base rate for banks and financial institutions decreased by 1 percentage point as of Ashoj, the first quarter of the current fiscal year, due to high liquidity and low credit demand.",
       "latest_development": "Confirmed: According to recent banking data, the average base rate for banks and financial institutions decreased by 1 percentage point as of Ashoj, the first quarter of the current fiscal year, due to high liquidity and low credit demand.",
       "alerted": false,
@@ -25051,7 +24995,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": "2026-11-19",
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-87459342ffb6",
@@ -25069,7 +25013,7 @@
       ],
       "source_count": 1,
       "reliability": "tier1",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Confirmed: The Ministry of Labour and the Federation of Nepalese Chambers of Commerce and Industry have signed an agreement to organize a skills and employment fair.",
       "latest_development": "Confirmed: The Ministry of Labour and the Federation of Nepalese Chambers of Commerce and Industry have signed an agreement to organize a skills and employment fair.",
       "alerted": false,
@@ -25079,7 +25023,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-d9604c5bbd5a",
@@ -25097,7 +25041,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The CPN-UML national gathering held in Kathmandu has concluded, with the party adopting a 21-point proposal as a key outcome of the event.",
       "latest_development": "Reported: The CPN-UML national gathering held in Kathmandu has concluded, with the party adopting a 21-point proposal as a key outcome of the event.",
       "alerted": false,
@@ -25107,7 +25051,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-ebaee69cf4df",
@@ -25125,7 +25069,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: During the ongoing UN climate change conference (COP-31) in Antalya, Turkey, Nepal has successfully advanced its 'Mountain Agenda' to address climate change impacts on high-altitude regions.",
       "latest_development": "Reported: During the ongoing UN climate change conference (COP-31) in Antalya, Turkey, Nepal has successfully advanced its 'Mountain Agenda' to address climate change impacts on high-altitude regions.",
       "alerted": false,
@@ -25135,7 +25079,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-a2047463062f",
@@ -25153,7 +25097,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: Global shipments of OLED monitors have doubled compared to the previous year, highlighting the increasing market preference for OLED displays among gamers.",
       "latest_development": "Reported: Global shipments of OLED monitors have doubled compared to the previous year, highlighting the increasing market preference for OLED displays among gamers.",
       "alerted": false,
@@ -25163,7 +25107,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-1f9d0329cb42",
@@ -25181,7 +25125,7 @@
       ],
       "source_count": 1,
       "reliability": "tier3",
-      "status": "NEW",
+      "status": "STALE",
       "known_facts": "Reported: The latest anime film in the 'Rakuen Tsuihō -Expelled from Paradise-' series, titled 'Kokoro no Resonance', has officially opened in Japanese theaters at number 5.",
       "latest_development": "Reported: The latest anime film in the 'Rakuen Tsuihō -Expelled from Paradise-' series, titled 'Kokoro no Resonance', has officially opened in Japanese theaters at number 5.",
       "alerted": false,
@@ -25191,7 +25135,7 @@
       "in_evening": "2026-11-19",
       "deadline": null,
       "effective_date": null,
-      "updated_at": "2026-11-19T19:21:49+05:45"
+      "updated_at": "2026-11-27T06:41:22+05:45"
     },
     {
       "event_id": "evt-1c3e23e11798",
@@ -29930,9 +29874,317 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-26T19:22:11+05:45"
+    },
+    {
+      "event_id": "evt-b9a125d9e65a",
+      "event_key": "nrb-fx-rates-2026-11-27",
+      "canonical_title": "Nepal Rastra Bank Announces Foreign Exchange Rates for Friday",
+      "category": "nepal",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": "2026-11-27",
+      "last_reported": "2026-11-27",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/27/577204"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "DEVELOPING",
+      "known_facts": "Confirmed: The Nepal Rastra Bank has set the buying rate for the US dollar at Rs 147.62 for Friday, November 27.",
+      "latest_development": "Confirmed: The Nepal Rastra Bank has set the buying rate for the US dollar at Rs 147.62 for Friday, November 27.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-27",
+      "updated_at": "2026-11-27T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-844e314260ff",
+      "event_key": "raghughat-hydropower-production-phase",
+      "canonical_title": "Raghuganga Hydropower Project Reaches Production Phase After Decade of Construction",
+      "category": "nepal",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "onlinekhabar.com/2026/11/2066051/raghuggata-hydropower-project-in-production-phase-after-a-decade-and-a-half-of-construction"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The 40-megawatt Raghuganga Hydropower Project, developed by the state-owned Nepal Electricity Authority subsidiary, has officially entered its operational production phase in Myagdi after nearly a decade and a half of construction.",
+      "latest_development": "Confirmed: The 40-megawatt Raghuganga Hydropower Project, developed by the state-owned Nepal Electricity Authority subsidiary, has officially entered its operational production phase in Myagdi after nearly a decade and a half of construction.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-27T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-6bf4f2107629",
+      "event_key": "nepal-weather-clear-nov27",
+      "canonical_title": "Kathmandu Valley Weather Remains Fair with Clear Skies",
+      "category": "local_city",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.khabarhub.com/2026/27/577202"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: Meteorological authorities report that current weather conditions across Kathmandu Valley and Nepal remain stable with clear skies and no active atmospheric disturbance systems.",
+      "latest_development": "Confirmed: Meteorological authorities report that current weather conditions across Kathmandu Valley and Nepal remain stable with clear skies and no active atmospheric disturbance systems.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-27T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-199e22c67c8d",
+      "event_key": "poe2-director-criticizes-game-announcements",
+      "canonical_title": "Path of Exile 2 Director Criticizes Industry Announcement Standards",
+      "category": "gaming",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "pcgamer.com/games/rpg/blizzard-im-looking-at-you-path-of-exile-2-boss-criticizes-truly-terrible-game-announcements-that-hold-the-juiciest-details-until-the-end"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Grinding Gear Games director Jonathan Rogers has publicly criticized game industry studios for withholding major announcements and key details until the very end of promotional presentations.",
+      "latest_development": "Reported: Grinding Gear Games director Jonathan Rogers has publicly criticized game industry studios for withholding major announcements and key details until the very end of promotional presentations.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-27T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-61d07968c7bd",
+      "event_key": "darwins-game-live-action-cast",
+      "canonical_title": "Live-Action Darwin's Game Film Trailer Reveals Additional Cast",
+      "category": "anime",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-26/live-action-darwin-game-film-trailer-reveals-more-cast/.244219"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The official production team for the live-action Darwin's Game film has released a new promotional trailer confirming additional cast members including Raul and Gaku Sano.",
+      "latest_development": "Confirmed: The official production team for the live-action Darwin's Game film has released a new promotional trailer confirming additional cast members including Raul and Gaku Sano.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-27T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-bcc2783a7a0b",
+      "event_key": "us-thanksgiving-storm-power-outages",
+      "canonical_title": "Major US Coastal Storms Disrupt Thanksgiving Travel and Power Grids",
+      "category": "world_major",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": null,
+      "last_reported": null,
+      "importance": 0,
+      "personal_relevance": 4,
+      "sources": [
+        "bbc.co.uk/news/articles/ckm2mz3prq77o"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: Severe winter storms hitting both United States coasts have left nearly one million customers without electrical power and triggered widespread flight cancellations during Thanksgiving week.",
+      "latest_development": "Reported: Severe winter storms hitting both United States coasts have left nearly one million customers without electrical power and triggered widespread flight cancellations during Thanksgiving week.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": null,
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-27",
+      "updated_at": "2026-11-27T06:41:22+05:45"
+    },
+    {
+      "event_id": "evt-b46376bf3699",
+      "event_key": "rahughat-hydro-production",
+      "canonical_title": "Rahughat Hydropower Project Enters Production Phase",
+      "category": "nepal",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": "2026-11-27",
+      "last_reported": "2026-11-27",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "onlinekhabar.com/2026/11/2066051/rahughat-hydropower-project-in-production-phase-after-a-decade-and-a-half-of-construction"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Confirmed: The 40-megawatt Rahughat Hydropower Project in Myagdi, developed by a subsidiary of the Nepal Electricity Authority, has reached the production phase after 15 years of construction.",
+      "latest_development": "Confirmed: The 40-megawatt Rahughat Hydropower Project in Myagdi, developed by a subsidiary of the Nepal Electricity Authority, has reached the production phase after 15 years of construction.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-27T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-d02d81d6b420",
+      "event_key": "nepal-weather-2026-11-27",
+      "canonical_title": "Weather Forecast: Generally Clear Skies",
+      "category": "local_city",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": "2026-11-27",
+      "last_reported": "2026-11-27",
+      "importance": 0,
+      "personal_relevance": 5,
+      "sources": [
+        "onlinekhabar.com/2026/11/2066049/the-weather-across-the-country-will-remain-mainly-clear-today"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: Meteorological conditions across Nepal remain stable today, November 27, with mainly clear weather and some partial cloudiness expected in hilly and Himalayan regions.",
+      "latest_development": "Reported: Meteorological conditions across Nepal remain stable today, November 27, with mainly clear weather and some partial cloudiness expected in hilly and Himalayan regions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-11-27",
+      "updated_at": "2026-11-27T06:41:32+05:45"
+    },
+    {
+      "event_id": "evt-68bf58c40bf3",
+      "event_key": "killer-shark-anime-announcement",
+      "canonical_title": "Killer Shark in Another World Manga Gets Anime Adaptation",
+      "category": "anime",
+      "first_seen": "2026-11-27",
+      "last_seen": "2026-11-27",
+      "first_reported": "2026-11-27",
+      "last_reported": "2026-11-27",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "myanimelist.net/news/74984559"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: The manga series Isekai Kuimetsu no Same (Killer Shark in Another World) by Kuboken is receiving a television anime adaptation, with a website already launched by Kadokawa.",
+      "latest_development": "Reported: The manga series Isekai Kuimetsu no Same (Killer Shark in Another World) by Kuboken is receiving a television anime adaptation, with a website already launched by Kadokawa.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-27T06:41:32+05:45"
     }
   ],
   "archived": [
+    {
+      "event_id": "evt-ebcd058c51e1",
+      "event_key": "cyclone-arnab-nepal-warning",
+      "canonical_title": "Cyclone Arnab warning: heavy rain and snowfall possible across Nepal",
+      "category": "nepal",
+      "first_seen": "2026-10-27",
+      "last_seen": "2026-10-27",
+      "first_reported": "2026-10-27",
+      "last_reported": "2026-10-27",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "english.onlinekhabar.com/cyclone-arnab-bring-rain-snow.html"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "STALE",
+      "known_facts": "Reported: Nepal's Department of Hydrology and Meteorology issued a special weather bulletin warning that Cyclone Arnab over the Bay of Bengal is expected to intensify and bring rain and snowfall to several parts of Nepal, with heavy rain possible in Lumbini Province. The department urged people to take precautions.",
+      "latest_development": "Reported: Nepal's Department of Hydrology and Meteorology issued a special weather bulletin warning that Cyclone Arnab over the Bay of Bengal is expected to intensify and bring rain and snowfall to several parts of Nepal, with heavy rain possible in Lumbini Province. The department urged people to take precautions.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-10-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-04T06:44:00+05:45"
+    },
+    {
+      "event_id": "evt-bef65da1230d",
+      "event_key": "openai-three-research-discoveries",
+      "canonical_title": "OpenAI announces three research discoveries in math, computer science and physics",
+      "category": "tech_career",
+      "first_seen": "2026-10-27",
+      "last_seen": "2026-10-27",
+      "first_reported": "2026-10-27",
+      "last_reported": "2026-10-27",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "openai.com/index/building-scientific-understanding-with-academic-communities"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "STALE",
+      "known_facts": "Confirmed: OpenAI announced three new discoveries in mathematics, computer science and physics. The feed headline gave no further details about the individual results.",
+      "latest_development": "Confirmed: OpenAI announced three new discoveries in mathematics, computer science and physics. The feed headline gave no further details about the individual results.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-10-27",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-04T06:44:00+05:45"
+    },
     {
       "event_id": "evt-a7becf749c62",
       "event_key": "nepal-government-websites-php-outage",
