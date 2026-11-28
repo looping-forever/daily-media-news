@@ -1007,6 +1007,48 @@
       "title": "Humla apple production yields over Rs 82 million for local farmers",
       "category": "nepal",
       "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "malspark.com/blog/malicious-gguf-models-hugging-face",
+      "title_hash": "74bf9d6d4c33efc7550cd496592a77157c4d75aa",
+      "title": "Malicious GGUF Models Discovered on Hugging Face Platform",
+      "category": "tech_career",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/sports/government-aims-to-ready-gautam-buddha-cricket-stadium-for-npl",
+      "title_hash": "799434499588497b992e192793cfc287e1d09413",
+      "title": "Government Directs Upgrades to Gautam Buddha Cricket Stadium for NPL",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "animenewsnetwork.com/news/2026-11-28/wit-studio-original-tv-anime-lona-reveals-7-more-cast-members-confirms-april-2027-debut/.244266",
+      "title_hash": "a4ca131d1905f7c24601f28644eb7ebfda36237f",
+      "title": "Wit Studio Original TV Anime LONA Confirms April 2027 Premiere and Additional Cast",
+      "category": "anime",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066971/pokharas-municipal-transport-starts-electric-bus-service-hands-over-16-minibuses",
+      "title_hash": "66e90f5ae7e9739191b257a313a7cdd90a788cb2",
+      "title": "Pokhara Municipal Transport Introduces Fleet of 16 Electric Minibuses",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "eurogamer.net/archeage-chronicles-xl-games-restructuring-layoffs-closure",
+      "title_hash": "137abd0dca1c891363eb73240c65d2c6f2b539fd",
+      "title": "South Korean Studio XL Games Faces Restructuring After Title Sales Shortfall",
+      "category": "gaming",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "france24.com/en/credit-rating-agency-s-p-may-downgrade-france-s-credit-rating",
+      "title_hash": "1de8c9d3a8db2a8f98be84737a01ebbd0815cee9",
+      "title": "Credit Rating Agency S&P Lowers France Sovereign Outlook to Negative",
+      "category": "world_major",
+      "date_sent": "2026-11-28"
     }
   ]
 }
