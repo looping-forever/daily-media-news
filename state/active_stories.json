@@ -4387,7 +4387,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "STALE",
+      "status": "RESOLVED",
       "known_facts": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "latest_development": "Reported: The Nepal International Trade Fair is scheduled to commence on 7th Mangsir (November 23, 2026), featuring over 200 stalls with domestic and foreign products.",
       "alerted": false,
@@ -4397,7 +4397,7 @@
       "in_evening": "2026-11-01",
       "deadline": "2026-11-23",
       "effective_date": "2026-11-23",
-      "updated_at": "2026-11-28T06:42:05+05:45"
+      "updated_at": "2026-11-28T07:23:35+05:45"
     },
     {
       "event_id": "evt-15d07f280a39",
@@ -5227,7 +5227,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "latest_development": "Reported: Bank employees are protesting the Fairfax privatisation deal with a scheduled strike on November 2 and 3, which may affect branch services and ATM operations.",
       "alerted": false,
@@ -5237,7 +5237,7 @@
       "in_evening": null,
       "deadline": "2026-11-03",
       "effective_date": "2026-11-02",
-      "updated_at": "2026-11-28T06:42:05+05:45"
+      "updated_at": "2026-11-28T07:23:35+05:45"
     },
     {
       "event_id": "evt-db4899fdc78b",
@@ -20585,7 +20585,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: Archive Team has initiated preservation efforts for the Apple Support Community discussion boards ahead of their scheduled closure on November 20, 2026.",
       "latest_development": "Reported: Archive Team has initiated preservation efforts for the Apple Support Community discussion boards ahead of their scheduled closure on November 20, 2026.",
       "alerted": false,
@@ -20595,7 +20595,7 @@
       "in_evening": null,
       "deadline": "2026-11-20",
       "effective_date": "2026-11-20",
-      "updated_at": "2026-11-28T06:42:05+05:45"
+      "updated_at": "2026-11-28T07:23:35+05:45"
     },
     {
       "event_id": "evt-c9ea2b7c36af",
@@ -21929,7 +21929,7 @@
       ],
       "source_count": 1,
       "reliability": "tier2",
-      "status": "RESOLVED",
+      "status": "STALE",
       "known_facts": "Reported: The Kathmandu District Court has extended the judicial remand period by seven days for three individuals, including the broker Inam Sapkota, as investigations continue. Among those detained is an associate of a prominent political figure.",
       "latest_development": "Reported: The Kathmandu District Court has extended the judicial remand period by seven days for three individuals, including the broker Inam Sapkota, as investigations continue. Among those detained is an associate of a prominent political figure.",
       "alerted": false,
@@ -21939,7 +21939,7 @@
       "in_evening": "2026-11-19",
       "deadline": "2026-11-26",
       "effective_date": null,
-      "updated_at": "2026-11-28T06:42:05+05:45"
+      "updated_at": "2026-11-28T07:23:35+05:45"
     },
     {
       "event_id": "evt-6b5b496212d2",
@@ -27938,6 +27938,118 @@
       "deadline": null,
       "effective_date": null,
       "updated_at": "2026-11-28T06:42:05+05:45"
+    },
+    {
+      "event_id": "evt-15882baf2ce2",
+      "event_key": "bajura-tractor-accident-nov28",
+      "canonical_title": "Tractor accident in Bajura claims third life",
+      "category": "nepal",
+      "first_seen": "2026-11-28",
+      "last_seen": "2026-11-28",
+      "first_reported": "2026-11-28",
+      "last_reported": "2026-11-28",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/28/577329"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Reported: The death toll from the tractor accident in Jagannath Rural Municipality, Bajura, has increased to three after one of the injured patients passed away while undergoing treatment in Dhangadhi.",
+      "latest_development": "Reported: The death toll from the tractor accident in Jagannath Rural Municipality, Bajura, has increased to three after one of the injured patients passed away while undergoing treatment in Dhangadhi.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-28",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-28T07:23:36+05:45"
+    },
+    {
+      "event_id": "evt-a2b43170999a",
+      "event_key": "kathmandu-temperature-nov28",
+      "canonical_title": "Kathmandu minimum temperature drops to 8.4 degrees Celsius",
+      "category": "local_city",
+      "first_seen": "2026-11-28",
+      "last_seen": "2026-11-28",
+      "first_reported": "2026-11-28",
+      "last_reported": "2026-11-28",
+      "importance": 0,
+      "personal_relevance": 7,
+      "sources": [
+        "english.khabarhub.com/2026/28/577321"
+      ],
+      "source_count": 1,
+      "reliability": "tier1",
+      "status": "NEW",
+      "known_facts": "Reported: The Department of Hydrology and Meteorology recorded a minimum temperature of 8.4 degrees Celsius in the Kathmandu Valley today, signaling a continuing seasonal decline in temperatures.",
+      "latest_development": "Reported: The Department of Hydrology and Meteorology recorded a minimum temperature of 8.4 degrees Celsius in the Kathmandu Valley today, signaling a continuing seasonal decline in temperatures.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-28",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-28T07:23:36+05:45"
+    },
+    {
+      "event_id": "evt-da3c69e9e101",
+      "event_key": "humla-apple-revenue-2026",
+      "canonical_title": "Humla apple production yields over Rs 82 million for local farmers",
+      "category": "nepal",
+      "first_seen": "2026-11-28",
+      "last_seen": "2026-11-28",
+      "first_reported": "2026-11-28",
+      "last_reported": "2026-11-28",
+      "importance": 0,
+      "personal_relevance": 6,
+      "sources": [
+        "english.khabarhub.com/2026/28/577318"
+      ],
+      "source_count": 1,
+      "reliability": "tier2",
+      "status": "NEW",
+      "known_facts": "Confirmed: Farmers across Humla's seven rural municipalities generated a total revenue of Rs 82.656 million from apple sales this season, exceeding previous production estimates.",
+      "latest_development": "Confirmed: Farmers across Humla's seven rural municipalities generated a total revenue of Rs 82.656 million from apple sales this season, exceeding previous production estimates.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-28",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": null,
+      "updated_at": "2026-11-28T07:23:36+05:45"
+    },
+    {
+      "event_id": "evt-2cc2b0b1c224",
+      "event_key": "pokemon-anime-new-season-2027",
+      "canonical_title": "Pokémon anime gets new season featuring Liko and Roy",
+      "category": "anime",
+      "first_seen": "2026-11-28",
+      "last_seen": "2026-11-28",
+      "first_reported": "2026-11-28",
+      "last_reported": "2026-11-28",
+      "importance": 0,
+      "personal_relevance": 8,
+      "sources": [
+        "animenewsnetwork.com/news/2026-11-27/pokemon-anime-gets-new-season-featuring-liko-roy-in-october-2027/.244257"
+      ],
+      "source_count": 1,
+      "reliability": "tier3",
+      "status": "NEW",
+      "known_facts": "Reported: A new Pokémon television anime season featuring characters Liko and Roy is scheduled to premiere in October 2027, with a separate program beginning on January 8.",
+      "latest_development": "Reported: A new Pokémon television anime season featuring characters Liko and Roy is scheduled to premiere in October 2027, with a separate program beginning on January 8.",
+      "alerted": false,
+      "alert_count": 0,
+      "last_alerted": null,
+      "in_morning": "2026-11-28",
+      "in_evening": null,
+      "deadline": null,
+      "effective_date": "2026-01-08",
+      "updated_at": "2026-11-28T07:23:36+05:45"
     }
   ],
   "archived": [
