@@ -1,272 +1,6 @@
 {
   "stories": [
     {
-      "url_normalized": "onlinekhabar.com/2026/11/2061545/traffic-on-tribhuvan-highway-to-be-affected-today-urges-to-take-alternative-routes",
-      "title_hash": "5ae2d784f940a7f33cf58b0feae3bebb02b88cb4",
-      "title": "Tribhuvan Highway Traffic Affected Due to Religious Festival Fair",
-      "category": "local_city",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "iost.tu.edu.np/notices/16101",
-      "title_hash": "d18d030a2a02bdfb4fe6d02bddc9baeda3d35fe2",
-      "title": "Tribhuvan University Publishes BIT Second Semester Exam Center Notice",
-      "category": "education_tu",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/20/576252",
-      "title_hash": "78af1fa31c343c7d1a6815efb6144dca51f5814b",
-      "title": "Nepal Rastra Bank Publishes Official Foreign Exchange Rates",
-      "category": "bank_local",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "tu.edu.np/notices/16221",
-      "title_hash": "e715072bd6a49a0a9cfe9762abdba4032d4a74b8",
-      "title": "Tribhuvan University Invites Procurement Quotations for Coordination Division",
-      "category": "education_tu",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-19/criterion-channel-adds-speed-racer-anime/.243995",
-      "title_hash": "9b1695f779dbc67e3eb2d397c6674009f5c2843c",
-      "title": "Criterion Channel Adds Speed Racer Anime to Streaming Lineup",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74958379",
-      "title_hash": "00e865b5a5c16f4a972be6a6e2c7831060019cf2",
-      "title": "Gensou Suikoden Anime Adaptation Reveals Additional Cast Members",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74958547",
-      "title_hash": "c5788633d5ea0a05a8d87d411b7033ed731968f7",
-      "title": "Manga Adaptation Kaminaki Sekai no Kamisama Katsudou Concludes with 14th Volume",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "myanimelist.net/news/74957463",
-      "title_hash": "5cad3183d6c30b94bdb4a6251b25d430bb3bafba",
-      "title": "Shin Oishinbo Anime Adaptation Sets Winter 2027 Premiere and Cast",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061550/preparations-to-set-ride-sharing-fares-in-karnali-arbitrary-fees-to-be-controlled",
-      "title_hash": "1e0ab9e5e7f4f8270611be413729fc4c73879a05",
-      "title": "Karnali Province Moves to Regulate Ride-Sharing Fares and Fees",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061540/four-games-of-the-10th-national-games-in-lumbini-banke-and-bardiya-await-the-competition",
-      "title_hash": "562db3ed0c80a1b19d68bd950181bd6954b016fa",
-      "title": "Four Events of the 10th National Games Allocated to Lumbini Province",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/19/anthropic-rival-says-companies-can-mostly-skip-the-pricey-models",
-      "title_hash": "647c53e03b75c3f0249ba9d4628a26d36a6dcc0b",
-      "title": "Anthropic rival says companies can (mostly) skip the pricey models",
-      "category": "tech_career",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/19/anthropics-7-founders-cashed-out-nearly-2b-in-record-breaking-ipo",
-      "title_hash": "4abfed4e2bf65addb3f4daab13de6067f3762768",
-      "title": "Anthropic’s 7 founders cashed out nearly $2B in record-breaking IPO",
-      "category": "tech_career",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "techcrunch.com/2026/11/19/apple-may-be-developing-its-own-ai-agent-that-runs-your-mac",
-      "title_hash": "9977becc0b2b00d19ea7cf05a7311c39a36c9516",
-      "title": "Apple may be developing its own AI agent that runs your Mac",
-      "category": "tech_career",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "polygon.com/gta-6-physical-disc-spoof-game",
-      "title_hash": "d56d8b9fc310dd93790984f1d253d2d4349b3ee5",
-      "title": "Controversial GTA 6 Easter Egg Will Annoy Millions of Gamers",
-      "category": "gaming",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/20/576258",
-      "title_hash": "adbe1ef2a94e18691500fdf7abd0079ed9abada6",
-      "title": "Cyclone Akwan partially affects weather across Nepal",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/2026/nov/19/record-executions-florida-texas",
-      "title_hash": "7cfd76d0a74c9fc18065ebe311e2c05a38eb11ef",
-      "title": "Florida carries out record-breaking 20th execution of the year",
-      "category": "world_major",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "pcgamer.com/games/grand-theft-auto/gta-for-gta-6-singleplayer-is-like-subscription-based-horse-armor",
-      "title_hash": "910297a3a59d6531610a6c4d52ff9ce070ecd8a4",
-      "title": "GTA+ for GTA 6 singleplayer is like subscription-based horse armor",
-      "category": "gaming",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-19/grotesqqque-anime-film-screens-in-los-angeles-on-december-3-for-1-week-only/.243997",
-      "title_hash": "2464e8a6d6580fb8dfc79f3e4432a3c534a1c8ba",
-      "title": "Grotesqqque Anime Film Screens in Los Angeles on December 3 for 1-Week Only",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "gamespot.com/articles/how-to-save-weapons-you-find-in-gta-6",
-      "title_hash": "ba5c5ab2bb3c03617864f486506781b45442eb84",
-      "title": "How To Save Guns And Weapons You Find In GTA 6",
-      "category": "gaming",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-19/omoi-announces-digital-release-of-sho-asahina-tsuyo-girl-manga-in-january/.243981",
-      "title_hash": "7ad7ff6883b305f020c8c1ab47d59af11ac21278",
-      "title": "Omoi Announces Digital Release of Shō Asahina's Tsuyo-Girl Manga in January",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/20/576254",
-      "title_hash": "95b69d4dac638bdaf72c380d1d595f5080621961",
-      "title": "Public vehicle movement restricted on Hetauda-Kulekhani-Kathmandu road today",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.khabarhub.com/2026/20/576261",
-      "title_hash": "a3212654de611171806741a0e6c4084850b4a664",
-      "title": "US envoy Kushner says Europe united in support of Ukraine",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "theguardian.com/us-news/2026/nov/19/white-house-cyber-director-ousted",
-      "title_hash": "b81b8b547d31dd4a1c03ad69673627c2383648c4",
-      "title": "White House cyber director ousted after US hit by wave of tech outages",
-      "category": "world_major",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "iost.tu.edu.np/notices/16251",
-      "title_hash": "285241df5ed8f0ed36dbfcfb8ecd61f854c7bff7",
-      "title": "Tribhuvan University IOST publishes notice regarding entrance examinations for post-graduate admissions",
-      "category": "education_tu",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.nepalnews.com/s/nation/muglin-kathmandu-road-closed-for-five-hours-daily",
-      "title_hash": "027a271ec864ef21776bdf9148f24182fcf47de2",
-      "title": "Muglin-Kathmandu road section to face daily five-hour traffic halts due to landslide risks",
-      "category": "local_city",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "pcgamer.com/hardware/openai-says-it-redesigned-an-amd-gpu-and-amd-is-using-some-of-those-tweaks-for-use-in-future-products",
-      "title_hash": "f64571033ace26cb1c773b0cf94eab4b78a093c6",
-      "title": "OpenAI confirms redesign of AMD GPU with tweaks incorporated into future hardware products",
-      "category": "tech_career",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "theregister.com/security/2026/11/20/uk-government-cant-keep-its-encryption-busting-order-to-apple-a-secret-tribunal-rules/5311292",
-      "title_hash": "1afe2f484121ca14286c2dfa043fcf1c028d711f",
-      "title": "UK tribunal rules government cannot keep encryption-breaking order to Apple secret",
-      "category": "tech_career",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-20/a-pen-handcuffs-and-a-common-law-marriage-tv-anime-reveals-theme-song-artists-more-january-9-/.244022",
-      "title_hash": "9cf43855369af8077f0fbccc9a4ab5b96d7231b2",
-      "title": "A Pen, Handcuffs, and a Common-Law Marriage TV Anime announces January 9 debut date and theme artists",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-20/kengo-matsumoto-jimoto-no-ijimekko-tachi-ni-shikaeshi-shiyo-to-shitara-manga-gets-tv-anime/.244020",
-      "title_hash": "b5a44ee9cd62e523c0e3c089d3fdad0ae626c9a7",
-      "title": "Kengo Matsumoto's Jimoto no Ijimekko-tachi ni Shikaeshi Shiyō manga receives 2027 TV anime adaptation",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.nepalpress.com/2026/11/20/cabinet-approves-pm-shahs-india-visit",
-      "title_hash": "abcc0a0cd9ee03d8a5959c562d44b9fdc6b91597",
-      "title": "Cabinet approves Prime Minister's India visit and accepts USD two million grant assistance",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-20/life-with-an-ordinary-guy-who-reincarnated-into-a-total-fantasy-knockout-manga-ends-with-20th-volume/.244002",
-      "title_hash": "67a0799217ec8267234886e1156e4d1aeaf3f72e",
-      "title": "Life with an Ordinary Guy Who Reincarnated into a Total Fantasy Knockout Manga concludes with 20th volume",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2062103/supreme-court-says-there-is-no-need-to-repeat-the-pashupati-gaushala-case-now-the-funds-rights-are-upheld",
-      "title_hash": "99f9a01d72f0dc1327cdc6e4f202bc62b4d945f9",
-      "title": "Supreme Court rules Pashupati Gaushala case closed with Pashupati Area Development Trust rights upheld",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "english.onlinekhabar.com/gold-prices-plunge-but-nepal-has-none.html",
-      "title_hash": "aa3d81fb79bf3facd67a13071473a7aa1778f891",
-      "title": "Gold prices plunge globally while Nepal's domestic market experiences severe shortages",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2061356/102-cctv-cameras-in-birendranagar-market-area-only-one-operational",
-      "title_hash": "e76c22bbd8da880600f89dbf81995af94fd313f4",
-      "title": "Birendranagar Market Area Operates Only One CCTV Camera Out of 102 Installed Units",
-      "category": "local_city",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2062133/industry-minister-sah-and-japanese-ambassador-discuss-expansion-of-japanese-technology-and-investment",
-      "title_hash": "22bfb499e530273cc2b6711e3f857ffd66cb8bb1",
-      "title": "Nepal and Japan Discuss Expansion of Bilateral Industrial Technology and Investment",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-20/mitei-hattori-smile-manga-gets-epilogue-chapter/.244005",
-      "title_hash": "8646b4a67f8290e6a66686995811ad2be028f5b6",
-      "title": "Mitei Hattori's Smile! Manga Announces Epilogue Chapter Release",
-      "category": "manga_manhwa_manhua",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "animenewsnetwork.com/news/2026-11-20/a-pen-handcuffs-and-a-common-law-marriage-tv-anime-reveals-theme-song-artists-more-cast-january-9-/.244022",
-      "title_hash": "39f7537c122f63f084a96deb2edfc47a42ef6a26",
-      "title": "Pen to Wappa to Jijitsukon TV Anime Confirms January Debut and Theme Songs",
-      "category": "anime",
-      "date_sent": "2026-11-20"
-    },
-    {
-      "url_normalized": "onlinekhabar.com/2026/11/2062129/independent-drivers-association-provides-assistance-to-the-family-of-govinda-who-went-missing-in-the-bhotekoshi-flood",
-      "title_hash": "953af7959d12c27113d26d734eada199faec279e",
-      "title": "Independent Drivers Association Provides Relief Support to Flood Victim Family in Rasuwa",
-      "category": "nepal",
-      "date_sent": "2026-11-20"
-    },
-    {
       "url_normalized": "english.khabarhub.com/2026/21/576362",
       "title_hash": "81c452a425aa9795292373d3eabd0ed6d027fe18",
       "title": "Prithvi Highway closed for five hours daily starting today",
@@ -1203,6 +937,48 @@
       "title": "UK Government Backs Bill to Address SLAPP Lawsuits",
       "category": "world_major",
       "date_sent": "2026-11-27"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066684/narayangadh-mugling-road-to-be-closed-for-5-hours-daily-from-sunday",
+      "title_hash": "cf8c30cb03c21d25e5c09628534777249cd89f82",
+      "title": "Narayangadh-Mugling Road Closure Starting Sunday",
+      "category": "local_city",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066691/a-10-day-campaign-to-identify-tuberculosis-patients-will-be-launched-in-sankhuwasabha",
+      "title_hash": "10c7aef46d4f589c9b7b390bdad83deb8169be36",
+      "title": "Tuberculosis Detection Campaign in Sankhuwasabha Starting December 16",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066686/62000-smart-licenses-being-printed-monthly-at-security-printing-center",
+      "title_hash": "28bbec9eca0f4db1838203aa22f47afe7a823a16",
+      "title": "62,000 Smart Licenses Printed Monthly at [redacted] Center",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066692/the-number-of-mps-in-both-houses-of-india-will-be-increased-by-50-percent",
+      "title_hash": "f284f40535d4929c7288de01b5c338e8458d6d92",
+      "title": "India Increases Parliamentary Seats by 50 Percent",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "tu.edu.np/notices/16329",
+      "title_hash": "cf4ddbb6672c071e8c9740c5a28a48f4bf89216c",
+      "title": "Tribhuvan University Issues Important Procurement Notice",
+      "category": "education_tu",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "english.khabarhub.com/2026/28/577313",
+      "title_hash": "a8091fbb67dfc1d94b5f687db51be729284deb05",
+      "title": "Two Killed in Bajura Tractor Accident",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
     }
   ]
 }
