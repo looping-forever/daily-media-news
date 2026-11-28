@@ -208,7 +208,7 @@
     "2026-11-28": {
       "evening": {
         "built_at": "2026-11-28T12:57:12Z",
-        "source_health_state": "partial",
+        "source_health_state": "ok",
         "story_count": 6
       },
       "morning": {

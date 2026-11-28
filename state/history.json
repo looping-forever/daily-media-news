@@ -1049,6 +1049,48 @@
       "title": "Credit Rating Agency S&P Lowers France Sovereign Outlook to Negative",
       "category": "world_major",
       "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "iost.tu.edu.np/notices/16426",
+      "title_hash": "57bfa5ac36642cc3a0ac78e972d3a47f24ac147a",
+      "title": "Tribhuvan University IOST Publishes Notice for B.Sc. CSIT Merit Scholarship 2083",
+      "category": "education_tu",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "english.nepalnews.com/s/nation/balen-expected-to-visit-china-by-january-2027",
+      "title_hash": "39e50284365631b10e01373bfd9afc992209e02c",
+      "title": "Prime Minister Balendra Shah Expected to Undertake Official Visit to China",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "bbc.co.uk/news/articles/c84gnq3qq9rno",
+      "title_hash": "766bc7056ffbffa8663c9e277c2947d245ce17e2",
+      "title": "International Tribunal Rejects Argentina's Bid to Block Falkland Islands Oil Drilling",
+      "category": "world_major",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066984/bagmatis-first-win-in-mens-cricket-koshi-eliminated",
+      "title_hash": "66ad8197ab6ba15e1bd3c4920cbf76cb400ee7f4",
+      "title": "Bagmati Province Claims First Victory in Men's Cricket at National Games",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "onlinekhabar.com/2026/11/2066998/gandaki-ranks-first-with-four-gold-medals-in-bodybuilding",
+      "title_hash": "cf0b4d8e38c0ba3dd5f0515640b83c0e764d6c54",
+      "title": "Gandaki Province Secures First Place with Four Golds in Bodybuilding Championship",
+      "category": "nepal",
+      "date_sent": "2026-11-28"
+    },
+    {
+      "url_normalized": "theguardian.com/australia-news/2026/nov/28/victoria-election-2026-winner-announced-who-won-poll-win-coalition-labor-victorian-state-results",
+      "title_hash": "abd9c7a51d09c5e3423f0b85e79373055a315a01",
+      "title": "Victoria Coalition Secures Majority Government in 2026 State Election",
+      "category": "world_major",
+      "date_sent": "2026-11-28"
     }
   ]
 }
